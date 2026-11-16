@@ -1,6 +1,6 @@
 // Rendu du monde : eau, sol, décors triés en profondeur, entités, effets,
 // éclairage jour/nuit, brume, faune et étiquettes.
-import { TILE, MAP_W, MAP_H, OVER_H, T, darkness, dayFrac, weatherAt } from '../../shared/constants.js';
+import { TILE, MAP_W, MAP_H, OVER_H, T, darkness, dayFrac, weatherAt, isFullMoon } from '../../shared/constants.js';
 import { PROPS, Z, SAFE, tileAt, zoneAt } from '../../shared/world.js';
 import { boatSprites } from './sprites-boats.js';
 import { ITEMS } from '../../shared/data/items.js';
@@ -16,12 +16,14 @@ import { textCanvas, textWidth } from './font.js';
 import { PB } from './pixel.js';
 import { hash2 } from '../../shared/rng.js';
 import { extend06, petSheets, drawTentacle } from './sprites-06.js';
+import { extend07 } from './sprites-07.js';
 
 const TAU = Math.PI * 2;
 const TREES = new Set(['tree', 'jtree', 'palm', 'deadtree']);
 // couleur des zones d'alerte selon l'attaque : canon, cendre, os, onde, bond, geyser, Kraken, vague, tentacule
 const TELE_COL = { 0: [230, 40, 30], 1: [255, 150, 40], 2: [230, 40, 30], 3: [255, 130, 50], 4: [225, 225, 195], 5: [255, 215, 70], 6: [200, 110, 255], 7: [90, 180, 255], 8: [200, 40, 110], 9: [120, 220, 255], 10: [210, 60, 130] };
-const isSea = (e) => e.k === 'a' || (e.k === 'm' && MOBS[e.type] && MOBS[e.type].sea);
+const isSea = (e) => e.k === 'a' || (e.k === 'm' && MOBS[e.type] && (MOBS[e.type].sea || MOBS[e.type].ship));
+const SHIP_SET = { black: 'noir', red: 'brick', ghost: 'ghost' };
 const rnd = Math.random;
 
 function makeCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
@@ -89,7 +91,7 @@ export class Renderer {
     this.water = makeWaterLayers();
     this.env = buildEnvSprites();
     this.structSpr = buildStructSprites(this.env);
-    extend06(this.env, this.structSpr); this.pets = petSheets(); this.tentacle = drawTentacle;
+    extend06(this.env, this.structSpr); extend07(this.env); this.pets = petSheets(); this.tentacle = drawTentacle;
     this.boats = boatSprites();
     this.room = null;
     this.parrot = parrotSheet();
@@ -111,7 +113,7 @@ export class Renderer {
     this.camX = 0; this.camY = 0;
     this.shakeT = 0; this.shakeA = 0;
     this.parts = []; this.texts = []; this.fx = []; this.projs = new Map(); this.bombs = []; this.teles = []; this.critters = []; this.glints = []; this.bubbles = [];
-    this.fogA = 0; this.drunk = 0; this.lteles = []; this.inks = []; this.abyss = null; this.redSails = new Map();
+    this.fogA = 0; this.drunk = 0; this.lteles = []; this.inks = []; this.abyss = null; this.redSails = new Map(); this.clouds = []; this.tintA = 0; this.tintC = '0,0,0';
     this.rain = []; this.splashes = []; this.decals = []; this.flash = 0; this.nextBolt = 0; this.bolt = null; this.onThunder = null;
     this.cats = { orange: catSheet('orange'), black: catSheet('black'), white: catSheet('white') };
     this.shakeOn = true;
@@ -121,6 +123,7 @@ export class Renderer {
     this.buckets = new Map();
     this.lights = [];
     this.smokers = [];
+    for (const l of this.world.lavaLights || []) this.lights.push({ x: l.x, y: l.y, r: 46, c: 'warm', flicker: 1 });
     for (const p of this.world.props) {
       const key = Math.floor(p.x / CHUNK_PX) + Math.floor(p.y / CHUNK_PX) * 100;
       if (!this.buckets.has(key)) this.buckets.set(key, []);
@@ -308,6 +311,7 @@ export class Renderer {
       this.drawAtmosphere(ctx, G, camX, camY, now, dt, dark);
     } else this.critters.length = 0;
     this.drawLighting(ctx, G, camX, camY, now, dark, f);
+    if (!room && dark > 0.2 && isFullMoon(G.worldTime || 0)) { ctx.fillStyle = `rgba(120,18,30,${0.12 * dark})`; ctx.fillRect(0, 0, W, H); } // la pleine lune rougit la nuit
     if (!room) { this.drawCritters(ctx, camX, camY, now, dark, true); this.drawWeather(ctx, G, now, dt, dark); }
     else { this.weather = { rain: 0, storm: 0, kind: 0 }; this.rain.length = 0; }
     this.drawLabels(ctx, G, draw, camX, camY, now);
@@ -429,7 +433,7 @@ export class Renderer {
   sheetOf(e) {
     if (isSea(e)) return null;
     if (e.k === 'p' || e.k === 'f') { if (!e.sheet || e.sheetKey !== e.lookKey) { e.sheet = humanSheet(e.look); e.sheetKey = e.lookKey; } return e.sheet; }
-    if (!e.sheet) e.sheet = mobSheet(e.type);
+    if (!e.sheet || e.sheetSun !== !!e.sun) { e.sheet = mobSheet(e.sun ? e.type + ':sun' : e.type); e.sheetSun = !!e.sun; }
     return e.sheet;
   }
   drawBoat(ctx, e, kind, sh, camX, camY, now) {
@@ -544,9 +548,26 @@ export class Renderer {
   }
   // encre, tourbillon, abysses : ce qui se passe à la surface de l'eau
   drawSeaFx(ctx, G, camX, camY, now) {
-    const tw = this.world.twin;
-    if (tw && !this.room) for (const pl of tw.plates) { // dalles des Jumeaux : elles s'éveillent sous les pas
-      let on = G.sealUntil > now;
+    for (let i = this.clouds.length - 1; i >= 0; i--) { // nuages de peste
+      const c = this.clouds[i], k = (now - c.t0) / c.dur;
+      if (k >= 1) { this.clouds.splice(i, 1); continue; }
+      const a = Math.min(1, k * 6) * Math.min(1, (1 - k) * 3);
+      for (let q = 0; q < 4; q++) {
+        const an = now * 0.7 + q * 1.6, rr = c.r * (0.55 + 0.2 * Math.sin(now * 2 + q));
+        ctx.fillStyle = `rgba(120,170,40,${0.2 * a})`;
+        ctx.beginPath(); ctx.ellipse(c.x - camX + Math.cos(an) * c.r * 0.35, c.y - camY + Math.sin(an) * c.r * 0.25, rr, rr * 0.7, 0, 0, TAU); ctx.fill();
+      }
+      if (rnd() < 0.3 * a) this.burst(c.x + (rnd() - 0.5) * c.r, c.y + (rnd() - 0.5) * c.r * 0.6, 1, { z: 4, col: ['#b8e05a', '#7aa830'], up: 12, speed: 3, life: 0.9, g: -8 });
+    }
+    for (const e of G.ents.values()) if (e.link && e.k === 'm' && MOBS[e.type] && MOBS[e.type].twin && !e.dyingT) { // les Frères se tiennent : un arc doré les relie
+      let tw = null; for (const q of G.ents.values()) if (q.k === 'm' && q.type === MOBS[e.type].twin && !q.dyingT) tw = q;
+      if (!tw || e.type !== 'frere_fer') continue;
+      ctx.strokeStyle = `rgba(255,215,90,${0.55 + 0.35 * Math.sin(now * 14)})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(e.x - camX, e.y - camY - 30); ctx.quadraticCurveTo((e.x + tw.x) / 2 - camX, Math.min(e.y, tw.y) - camY - 60, tw.x - camX, tw.y - camY - 30); ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+    for (const S of (this.room ? [] : this.world.seals || [])) for (const pl of S.plates) { // dalles : elles s'éveillent sous les pas
+      let on = (G.seals || {})[S.id] > now;
       if (!on && G.player && Math.hypot(G.player.x - pl.x, G.player.y - pl.y) < 11) on = true;
       if (!on) for (const e of G.ents.values()) if (e.k === 'p' && Math.hypot(e.x - pl.x, e.y - pl.y) < 11) { on = true; break; }
       if (!on) continue;
@@ -585,8 +606,33 @@ export class Renderer {
       }
     }
   }
+  drawShip(ctx, e, camX, camY, now, G) {
+    const def = MOBS[e.type], sd = def.ship, dir = e.dir & 3, set = this.boats[SHIP_SET[sd.sail] || 'noir'], fr = set[dir][0];
+    const sc = sd.scale || 1, X = Math.round(e.x - camX), Y = Math.round(e.y - camY);
+    const sink = e.dyingT ? Math.min(1, (now - e.dyingT) / 2.2) : 0;
+    const bob = Math.round(Math.sin(now * 2 + e.id) * 0.8);
+    ctx.save();
+    if (sd.sail === 'ghost') ctx.globalAlpha = 0.82 + Math.sin(now * 3) * 0.08;
+    if (sink > 0) { ctx.beginPath(); ctx.rect(X - 100, Y - 140, 200, 144); ctx.clip(); ctx.translate(X, Y); ctx.rotate(sink * 0.5 * (dir === 1 ? -1 : 1)); ctx.translate(-X, -Y + sink * sink * 46); }
+    else { ctx.fillStyle = 'rgba(8,24,44,0.3)'; ctx.beginPath(); ctx.ellipse(X, Y + 1, fr.cv.width * 0.44 * sc, fr.cv.height * 0.32 * sc, 0, 0, TAU); ctx.fill(); }
+    ctx.translate(X, Y + bob); ctx.scale(sc, sc);
+    const x0 = -fr.ax, y0 = -fr.ay;
+    ctx.drawImage(fr.cv, x0, y0);
+    if (!this.crewSheet) this.crewSheet = mobSheet('zsailor');
+    const sh = this.crewSheet;
+    if (sink < 0.5) ctx.drawImage(sh.cv, 0, dir * sh.fh, sh.fw, 21, x0 + fr.seat[0] - sh.ax, y0 + fr.seat[1] - 19, sh.fw, 21);
+    if (fr.sail) ctx.drawImage(fr.sail.cv, x0 + fr.sail.x, y0 + fr.sail.y);
+    if (now - (e.hitT || -9) < 0.09) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.4; ctx.drawImage(fr.cv, x0, y0); ctx.globalCompositeOperation = 'source-over'; }
+    ctx.restore();
+    if (sd.sail === 'ghost' && !e.dyingT) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.35 + Math.sin(now * 4) * 0.1; ctx.drawImage(this.glows.green, X - 50, Y - 70, 100, 90); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
+    if (sink > 0) { if (rnd() < 0.9) this.burst(e.x + (rnd() - 0.5) * 60 * sc, e.y + (rnd() - 0.5) * 14, 2, { z: 2, col: ['#ffffff', '#d8f6ff', '#9fd8ff'], up: 50, speed: 24, life: 0.7, g: 80 }); return; }
+    ctx.strokeStyle = 'rgba(230,250,250,0.45)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.ellipse(X, Y, fr.cv.width * 0.46 * sc + Math.sin(now * 3) * 0.8, fr.cv.height * 0.3 * sc, 0, 0, TAU); ctx.stroke();
+    if (e.moving && rnd() < 0.8) { const len = (dir === 1 || dir === 2 ? fr.cv.width : fr.cv.height) * 0.42 * sc; this.burst(e.x + [0, 1, -1, 0][dir] * len, e.y - 2 + [-1, 0, 0, 1][dir] * len, 1, { z: 1, col: ['#ffffff', '#d8f6ff'], up: 8, speed: 10, life: 0.6, g: 30 }); }
+  }
   drawEntity(ctx, e, camX, camY, now, G) {
     if (e.k === 'a') return this.drawAlly(ctx, e, camX, camY, now, G);
+    if (e.k === 'm' && MOBS[e.type] && MOBS[e.type].ship) return this.drawShip(ctx, e, camX, camY, now, G);
     if (e.type === 'kraken') return this.drawKraken(ctx, e, camX, camY, now, G);
     if (e.type === 'tentacule') return this.drawTentacleMob(ctx, e, camX, camY, now, G);
     const sh = this.sheetOf(e);
@@ -620,7 +666,7 @@ export class Renderer {
     const water = this.inWater(e.x, e.y);
     const cut = Math.max(sit, water ? (sh.fw > FW ? 8 : 5) : 0);
     ctx.save();
-    if (dying >= 0) { ctx.globalAlpha = Math.max(0, 1 - dying / 0.75); y += Math.round(dying * 10); }
+    if (dying >= 0) { ctx.globalAlpha = Math.max(0, 1 - dying / 0.75); y += Math.round(dying * (e.burnT ? 4 : 10)); }
     if (e.ghost) ctx.globalAlpha *= 0.5;
     if (e.flags & 4 && e.k === 'p' && Math.floor(now * 16) % 2 === 0 && !(e.rollT && now - e.rollT < 0.3)) ctx.globalAlpha *= 0.55;
     const roll = e.rollT ? now - e.rollT : 9;
@@ -645,6 +691,7 @@ export class Renderer {
       ctx.globalAlpha = dying >= 0 ? Math.max(0, 1 - dying / 0.75) : 1;
     }
     if (!wpBehind) this.drawWeapon(ctx, e, sh, meta, x, y, now, dir);
+    if (e.burnT && dying >= 0) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.max(0, 0.8 - dying); ctx.drawImage(this.glows.warm, Math.round(e.x - camX) - 16, Math.round(e.y - camY) - 30, 32, 34); ctx.globalCompositeOperation = 'source-over'; if (rnd() < 0.8) this.burst(e.x + (rnd() - 0.5) * 10, e.y - 4, 1, { z: 10, col: ['#ffd24a', '#ff8a2a', '#e04a1a'], up: 40, speed: 6, life: 0.5, g: -30 }); }
     ctx.restore();
     if (e.k === 'm' && (e.flags & 16)) { // carapace : presque rien ne passe
       const cx = Math.round(e.x - camX), cy = Math.round(e.y - camY) - Math.round(sh.fh * 0.3);
@@ -822,6 +869,28 @@ export class Renderer {
         if (rnd() < 0.5) this.burst(p.x, p.y + 9, 1, { z: 9, col: ['#ffd24a', '#ff8a2a', '#ff5a1a'], up: 10, speed: 8, life: 0.35, g: -20 });
         continue;
       }
+      if (p.kind === 'curse' || p.kind === 'note') {
+        const pur = p.kind === 'curse';
+        ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.7; ctx.drawImage(pur ? this.glows.purple : this.glows.cold, x - 9, y - 9, 18, 18); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+        if (pur) { ctx.fillStyle = '#e8c8ff'; ctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, 3, 3); ctx.fillStyle = '#8a3aff'; ctx.fillRect(Math.round(x - dx * 4), Math.round(y - dy * 4), 2, 2); }
+        else { ctx.fillStyle = '#1c1426'; ctx.fillRect(Math.round(x), Math.round(y) - 4, 1, 5); ctx.fillRect(Math.round(x) - 2, Math.round(y), 3, 2); ctx.fillStyle = '#bff4ff'; ctx.fillRect(Math.round(x) + 1, Math.round(y) - 4, 2, 1); }
+        if (rnd() < 0.4) this.burst(p.x, p.y + 9, 1, { z: 9, col: pur ? ['#b06aff', '#e8c8ff'] : ['#9fd8ff', '#ffffff'], up: 6, speed: 4, life: 0.4, g: -10 });
+        continue;
+      }
+      if (p.kind === 'flask') {
+        const h = Math.sin(Math.min(1, p.t / 0.9) * Math.PI) * 10;
+        ctx.fillStyle = 'rgba(20,12,34,0.3)'; ctx.fillRect(Math.round(x) - 2, Math.round(y) + 9, 4, 2);
+        ctx.fillStyle = '#1c1426'; ctx.fillRect(Math.round(x) - 2, Math.round(y - h) - 2, 5, 5);
+        ctx.fillStyle = '#8ad83a'; ctx.fillRect(Math.round(x) - 1, Math.round(y - h) - 1, 3, 3); ctx.fillStyle = '#e8ffc0'; ctx.fillRect(Math.round(x) - 1, Math.round(y - h) - 1, 1, 1);
+        continue;
+      }
+      if (p.kind === 'crow') {
+        const fl = Math.floor(p.t * 14) % 2;
+        ctx.fillStyle = '#100c14'; ctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, 3, 2);
+        ctx.fillRect(Math.round(x) - 4, Math.round(y) - (fl ? 3 : 0), 3, 1); ctx.fillRect(Math.round(x) + 2, Math.round(y) - (fl ? 3 : 0), 3, 1);
+        ctx.fillStyle = '#ff3a2a'; ctx.fillRect(Math.round(x + dx * 2), Math.round(y + dy * 2) - 1, 1, 1);
+        continue;
+      }
       if (p.kind === 'bone') {
         const a = p.t * 14, c = Math.cos(a) * 3, s = Math.sin(a) * 3;
         ctx.strokeStyle = '#1c1426'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - c, y - s); ctx.lineTo(x + c, y + s); ctx.stroke();
@@ -997,7 +1066,15 @@ export class Renderer {
     }
     // brume du marais
     const z = zoneAt(this.world, camX + W / 2, camY + H / 2);
-    const target = (z === Z.SWAMP || z === Z.WRECK) ? 0.55 + dark * 0.2 : dark * 0.12;
+    const target = z === Z.BRUMES ? 0.85 : (z === Z.SWAMP || z === Z.WRECK || z === Z.PENDUS) ? 0.55 + dark * 0.2 : z === Z.QUARANTAINE || z === Z.DAMNES ? 0.35 + dark * 0.2 : dark * 0.12;
+    // teinte propre à certaines îles : pourpre des Damnés, rouge du volcan, vert de la peste
+    const tint = z === Z.DAMNES ? ['40,10,50', 0.28] : z === Z.VOLCAN ? ['90,20,0', 0.16] : z === Z.QUARANTAINE ? ['50,70,10', 0.14] : z === Z.PENDUS ? ['10,20,30', 0.2] : ['0,0,0', 0];
+    if (tint[1] > 0) this.tintC = tint[0];
+    this.tintA += (tint[1] - this.tintA) * Math.min(1, dt * 0.8);
+    if (this.tintA > 0.01) { ctx.fillStyle = `rgba(${this.tintC},${this.tintA})`; ctx.fillRect(0, 0, W, H); }
+    if ((z === Z.VOLCAN || z === Z.DAMNES) && rnd() < 0.5) { // cendres qui volent
+      this.parts.push({ x: camX + rnd() * W, y: camY + rnd() * H, z: 30 + rnd() * 30, vx: 8 + rnd() * 6, vy: 2, vz: -4, g: 0, life: 2.2, max: 2.2, col: z === Z.VOLCAN && rnd() < 0.4 ? 'rgba(255,140,60,0.8)' : 'rgba(80,70,80,0.6)', size: 1, kind: 'smoke', drag: 0.2 });
+    }
     this.fogA += (target - this.fogA) * Math.min(1, dt * 0.8);
     if (this.fogA > 0.02) {
       if (!this.patFog) this.patFog = ctx.createPattern(this.fog, 'repeat');
@@ -1143,6 +1220,12 @@ export class Renderer {
         continue;
       }
       if (e.type === 'kraken') continue;
+      if (e.k === 'm' && MOBS[e.type] && MOBS[e.type].ship) {
+        const def = MOBS[e.type], sc = def.ship.scale || 1, top2 = Math.round(e.y - camY - 60 * sc);
+        const t = textCanvas(def.name, def.elite ? '#ffb040' : '#ff9a8a'); ctx.drawImage(t, x - (t.width >> 1), top2 - 8);
+        if (e.hp < 100) this.hpBar(ctx, x, top2 + 2, 30, e.hp / 100, '#e04a3a');
+        continue;
+      }
       if (e.type === 'tentacule') { if (e.hp < 100) this.hpBar(ctx, x, Math.round(e.y - camY) - 58, 18, e.hp / 100, '#e04a3a'); continue; }
       const sh = e.sheet;
       const top = Math.round(e.y - camY - (sh ? sh.ay : 26) + (e.type === 'boss' ? 4 : 2) + (e.k === 'p' && (e === G.player ? G.player.boat : (e.flags & 16)) ? 5 : 0));

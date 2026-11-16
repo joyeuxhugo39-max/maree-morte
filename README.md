@@ -25,6 +25,21 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Nouveautés de la version 0.7 : le Grand Large
+
+- **Une carte quatre fois plus grande.** L'archipel d'origine ne bouge pas ; à l'est et au sud s'ouvrent de nouvelles terres : Rade-aux-Flibustiers (ville de forbans), les Collines de la Rade, la Forêt des Pendus, le Lagon des Sirènes, l'Îlot de l'Ermite, Anse-Tranquille (village de pêcheurs), l'Atoll des Ossements, l'Île de la Quarantaine, le Volcan de Cendrelune, les Brumes Éternelles et l'**Île des Damnés** (niveaux 26-30, zone extrême, butin légendaire).
+- **La Couronne des Marées** : une grande quête de cape et d'épée en onze étapes avec un personnage original, le capitaine Ambroise Vif-Argent, beau parleur et peu fiable. Au programme : une évasion de la Geôle, trois gardiens à abattre, une trahison, le Docteur Corbeau, le Galion Fantôme, Vespère le Comte des Marées, et un choix final (rendre la Couronne à Morgane ou la laisser au Fanfaron) avec des récompenses différentes.
+- **Les Frères de la Côte**, une quête **impossible seul** : la porte du Fort des Deux Clés ne s'ouvre qu'avec un pirate sur chacune des deux dalles, et à l'intérieur, Fer et Rouille sont invulnérables tant qu'ils se tiennent côte à côte. Chacun en attire un de son côté, et il faut les abattre à quelques secondes d'intervalle, sinon le survivant relève son frère.
+- **Navires maudits** : bricks des Noyés, frégates maudites et le Galion Fantôme patrouillent, canonnent tout ce qui flotte et coulent, avec leurs débris à piller. Nouveau navire : le brick de course (deux canons par bordée).
+- **Jour et nuit** : le jour, la plupart des morts dorment sous terre ; seuls ceux qui résistent au soleil (chapeau de paille, peau tannée) restent dehors. À l'aube, les autres brûlent. Une nuit sur trois, c'est la **pleine lune** : la Horde se lève autour des pirates.
+- **Tenues** (nouvel emplacement) : treize tenues à acheter, à coudre à la table de couture de la Rade, à forger, à gagner en quête ou à arracher aux boss. Elles changent l'apparence (chapeaux à plume, masque de peste, morion, capes…) et donnent leurs propres bonus.
+- **Maisons sur d'autres îles** : 13 nouvelles maisons à la Rade, à Anse-Tranquille et sur l'Îlot de l'Ermite (cette dernière île n'est pas protégée).
+- **Nouveaux boss à phases** : le Bourreau, la Reine des Sirènes, le Général d'Os, le Docteur Corbeau (nuages de peste), le Brasier, les Frères Ferrailleurs et Vespère (quatre phases).
+- **Passeurs** : des billets pour voyager de ville en ville sans prendre la mer.
+- **Les autres joueurs apparaissent sur la carte** (M) et sur la minicarte, où qu'ils soient.
+- **Musique générative** : chaque morceau est composé à la volée (tonalité, accords, mélodie, instruments et forme changent à chaque fois), avec des silences entre les morceaux en exploration. Les thèmes de 0.6 reviennent parfois, jamais en boucle.
+- 27 nouvelles quêtes (dont 4 primes), 14 nouveaux personnages, 25 nouveaux ennemis (dont 8 boss et 3 navires), 11 nouvelles armes (dont 5 légendaires), 9 hauts faits.
+
 ## Nouveautés de la version 0.6 : le Kraken
 
 - **Le Kraken** : une chaîne de quatre quêtes (Ysaline → capitaine Elouan, à Havre-des-Brumes) mène à la Conque des Abysses. Soufflez dedans à bord, au-dessus du Gouffre : cinématique (le Goéland d'Elouan est happé par les tentacules), puis combat naval en trois phases — encre qui aveugle, tentacules qui frappent et saisissent les navires, tourbillon, vagues, plongée. La Mouette Écarlate de Morgane vient vous couvrir de ses canons. Les PV du Kraken s'adaptent au nombre de pirates.

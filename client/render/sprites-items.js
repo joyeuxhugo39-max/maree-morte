@@ -7,6 +7,7 @@ const GOLD = [0x7a4a12, 0xa86e1c, 0xd49a2a, 0xf2c14a, 0xffe58a];
 const IRON = [0x1d1c24, 0x2c2b36, 0x403f4e, 0x5a596b, 0x7c7b8f, 0xa2a1b2];
 const WOOD = [0x34200f, 0x4f321a, 0x6d4626, 0x8c5c33, 0xab7643, 0xc79357];
 const STONE5 = [0x353443, 0x4c4b5d, 0x666579, 0x828196, 0xa3a2b4];
+const BONE5 = [0x6c6450, 0x9a9076, 0xc4bb9c, 0xe4dcc0, 0xfaf5e4];
 const BLADES = {
   rust: [0x5a3a2a, 0x8a5a3a, 0xb07a52, 0xcfa078],
   steel: [0x4a4c5a, 0x7c8090, 0xb4b8c6, 0xeef0f8],
@@ -300,6 +301,31 @@ const P = {
   conch(pb) { const S = [0x8a4a5a, 0xc87a8a, 0xf0b0b0, 0xffe0d8, 0xfff6f0]; pb.blob(8.5, 9, 6, 4.6, S, {}); pb.blob(4.5, 6, 3.2, 3, S, {}); pb.set(2, 4, S[3]); pb.set(1, 3, S[4]); for (let k = 0; k < 4; k++) pb.line(5 + k * 2.4, 6 + k * 0.4, 6 + k * 2.4, 12, S[1]); pb.ellipse(11.5, 10.5, 2.6, 1.8, 0x5a2434); pb.ellipse(11.5, 10, 1.6, 1, 0xff9ab0); },
   kraken_eye(pb) { pb.disc(8, 8, 6.4, 0xd8c8a0); pb.blob(8, 8, 6, 6, [0xb8a078, 0xd8c8a0, 0xf0e8c8, 0xfffbe6, 0xffffff], {}); pb.disc(8, 8, 3.8, 0xffc02a); pb.disc(8, 8, 2.8, 0xffe070); pb.rect(7, 4, 2, 8, 0x100610); pb.set(5, 5, 0xffffff); pb.set(6, 5, 0xffffff); for (const [x, y] of [[3, 10], [12, 11], [10, 3]]) pb.set(x, y, 0xc84a5a); },
   tentacle_food(pb) { const R = [0x6a2a1e, 0x9a4a2a, 0xc87a3a, 0xe8a858, 0xf8d090]; for (let k = 0; k <= 20; k++) { const u = k / 20, x = 2.5 + u * 10 + Math.sin(u * 5) * 1.6, y = 12.5 - u * 9 - Math.sin(u * 3) * 1.2; pb.disc(x, y, 2.6 - u * 1.6, k % 4 === 0 ? R[1] : R[2]); } for (let k = 2; k <= 18; k += 4) { const u = k / 20, x = 2.5 + u * 10 + Math.sin(u * 5) * 1.6, y = 12.5 - u * 9 - Math.sin(u * 3) * 1.2; pb.set(x - 1, y + 1, R[4]); } pb.set(12, 1, 0xd8d8d8); pb.set(13, 0, 0xb8b8b8); pb.set(10, 0, 0xd8d8d8); },
+  // ---- 0.7 : matériaux, billets, tenues
+  silk(pb) { for (let k = 0; k < 12; k++) { const x = 2 + k, y = 8 + Math.round(Math.sin(k * 0.8) * 3); pb.disc(x, y, 1.6, k % 3 ? 0x2a2430 : 0x3e3646); pb.set(x, y - 1, 0x6a6078); } pb.set(14, 5, 0x8a8098); },
+  goldthread(pb) { pb.rect(5, 3, 6, 10, GOLD[2]); for (let y = 4; y < 13; y += 2) pb.hl(5, y, 6, GOLD[1]); pb.hl(5, 3, 6, GOLD[4]); pb.rect(4, 2, 8, 1, WOOD[3]); pb.rect(4, 13, 8, 1, WOOD[3]); pb.line(11, 8, 15, 12, GOLD[3]); },
+  feather(pb) { pb.line(3, 14, 12, 2, 0x8a8a9a); for (let k = 0; k < 9; k++) { const x = 4 + k, y = 13 - k * 1.3; pb.line(x, y, x - 3, y - 2, 0x1a1620); pb.line(x, y, x + 2, y + 2, 0x26222c); } pb.set(12, 2, 0x4a4656); },
+  sscale(pb) { pb.blob(8, 8, 6, 6.5, [0x0e4a4a, 0x1e7a72, 0x3aaaa0, 0x8af0e0, 0xe8fffa], {}); for (let y = 4; y < 13; y += 3) for (let x = 4; x < 13; x += 3) pb.set(x + (y % 2), y, 0xc0fff4); pb.set(5, 4, 0xffffff); },
+  bigbone(pb) { pb.line(3, 12, 12, 3, BONE5[2], 2.4); pb.disc(3, 13, 2, BONE5[3]); pb.disc(1.6, 11.4, 1.6, BONE5[3]); pb.disc(13, 3, 2, BONE5[3]); pb.disc(14.4, 4.6, 1.6, BONE5[3]); pb.line(5, 11, 11, 5, BONE5[4]); pb.set(7, 8, 0x8a2a2a); },
+  ember(pb) { pb.blob(8, 9, 5.5, 5, [0x2a0a06, 0x8a1a0a, 0xe0501a, 0xff9a2a, 0xffd860], { noise: 0.3 }); pb.set(7, 7, 0xfff6c0); pb.set(9, 3, 0xffb84a); pb.set(6, 2, 0xff9a2a); pb.set(11, 4, 0xffd860); },
+  golemcore(pb) { pb.blob(8, 8.5, 6, 6, [0x141014, 0x241c20, 0x3a2e30, 0x524244, 0x6a5656], { noise: 0.3 }); pb.line(5, 6, 11, 11, 0xe0501a); pb.line(10, 5, 6, 11, 0xff9a2a); pb.disc(8, 8.5, 1.4, 0xffe070); },
+  essence(pb) { pb.rect(6, 2, 4, 2, 0xa0703f); pb.rect(5, 4, 6, 2, 0x3a3446); pb.blob(8, 10, 5, 4.5, [0x0a3a1a, 0x1a6a3a, 0x3ad86a, 0x6aff9a, 0xd8ffe8], {}); pb.set(6, 8, 0xffffff); for (const [x, y] of [[3, 3], [13, 5], [12, 1]]) pb.set(x, y, 0x6aff9a); },
+  wreckwood(pb) { pb.rect(2, 5, 12, 6, 0x3a2e24); pb.hl(2, 5, 12, 0x5a4a3a); pb.hl(2, 10, 12, 0x1a140e); for (const x of [4, 9]) pb.set(x, 7, 0x8a8a9a); pb.line(13, 5, 15, 2, 0x3a2e24); pb.set(6, 8, 0x4e6e3a); pb.set(11, 6, 0x4e6e3a); },
+  leather(pb) { pb.blob(8, 8, 6.5, 5.5, [0x2a1a10, 0x4a3020, 0x6a4830, 0x8a6040, 0xa87850], { noise: 0.25 }); pb.line(3, 9, 13, 7, 0x2a1a10); for (let x = 4; x < 13; x += 2) pb.set(x, 8 + (x % 4 === 0 ? 0 : -1), 0xd8c8a0); },
+  ticket(pb, t) { const C = { red: 0xc23a34, teal: 0x1e6a66, black: 0x2a2430, green: 0x326c44 }[t] || 0xc23a34; pb.rect(1, 4, 14, 8, 0xf0e4c4); pb.hl(1, 4, 14, 0xfff6dc); pb.hl(1, 11, 14, 0xc8b890); pb.rect(2, 5, 4, 6, C); for (let y = 5; y < 11; y += 2) pb.set(7, y, 0xc8b890); pb.hl(9, 6, 5, 0x6a5a48); pb.hl(9, 8, 4, 0x8a7a60); pb.hl(9, 10, 5, 0x8a7a60); pb.set(3, 7, 0xf0e4c4); pb.set(4, 8, 0xf0e4c4); },
+  brick_i(pb) { pb.ellipse(8, 11, 7, 3, 0x6a1418); pb.ellipse(8, 10, 6, 2, 0x8a5a30); pb.vl(5, 1, 9, WOOD[1]); pb.vl(10, 2, 8, WOOD[1]); pb.rect(2, 2, 5, 6, 0xc23a34); pb.rect(8, 3, 5, 5, 0xe05a4a); pb.set(5, 0, 0x141418); pb.set(10, 1, 0x141418); },
+  fang(pb) { for (let k = 0; k < 10; k++) { const w = Math.max(0.6, 3 - k * 0.28); pb.disc(8 + Math.sin(k * 0.25) * 2, 2 + k * 1.2, w, k > 6 ? 0xd8d0c0 : 0xf4ecd8); } pb.set(7, 3, 0xffffff); pb.set(9, 13, 0x8a2a2a); pb.set(8, 14, 0xc84a5a); },
+  outfit(pb, o) { // une tenue sur son cintre
+    const C = CL[o.topCol] || CL[o.top === 'armure' ? 'grey' : 'red'], Pn = CL[o.pants] || CL.brown;
+    pb.line(4, 3, 8, 1, WOOD[3]); pb.line(12, 3, 8, 1, WOOD[3]); pb.set(8, 0, IRON[3]);
+    for (let y = 3; y < 12; y++) { const hw = y < 5 ? 5 : y < 9 ? 4 : 4 + (y - 9); for (let x = 8 - hw; x < 8 + hw; x++) pb.set(x, y, C[x < 8 - hw + 2 ? 3 : x > 8 + hw - 3 ? 0 : 2]); }
+    if (o.top === 'rayee') for (let y = 4; y < 12; y += 2) pb.hl(4, y, 8, CL.white[2]);
+    if (o.top === 'gilet') { pb.vl(7, 3, 8, CL.white[2]); pb.vl(8, 3, 8, CL.white[1]); }
+    if (o.top === 'capitaine' || o.top === 'armure') { pb.vl(7, 4, 7, GOLD[3]); pb.set(4, 3, GOLD[3]); pb.set(11, 3, GOLD[3]); }
+    pb.rect(5, 12, 2, 3, Pn[2]); pb.rect(9, 12, 2, 3, Pn[1]);
+    if (o.cape) { const K = CL[o.cape] || CL.red; pb.vl(2, 4, 9, K[1]); pb.vl(13, 4, 9, K[0]); }
+    if (o.hat) { const H = CL[o.hatCol] || CL.black; pb.rect(10, 0, 6, 2, H[2]); pb.hl(9, 2, 7, H[1]); if (o.hat === 'plume' || o.hat === 'capitaine') pb.set(15, 0, 0xf6f0e2); if (o.hat === 'bec') pb.line(12, 3, 15, 5, 0x6a5a48); if (o.hat === 'morion') { pb.rect(10, 0, 6, 2, IRON[3]); pb.hl(9, 2, 7, IRON[2]); } }
+  },
   sk_slash(pb) {
     for (let a = -1.9; a < 0.4; a += 0.04) { const r = 6.5; pb.set(8 + Math.cos(a) * r, 9 + Math.sin(a) * r, 0xffffff); pb.set(8 + Math.cos(a) * (r - 1), 9 + Math.sin(a) * (r - 1), 0xbfe8ff); }
     P.saber(pb, 'steel');
@@ -359,6 +385,7 @@ export function iconCanvas(icon, tint, scale = 1) {
   const pb = new PB(16, 16);
   const fn = P[icon] || P.map;
   if (icon && icon.startsWith('w:')) drawWeaponIcon(pb, ITEMS[icon.slice(2)] && ITEMS[icon.slice(2)].form);
+  else if (icon && icon.startsWith('o:')) P.outfit(pb, (ITEMS[icon.slice(2)] && ITEMS[icon.slice(2)].outfit) || {});
   else if (icon === 'tricorne_big') P.tricorne(pb, true);
   else if (icon === 'shirt_striped') P.shirt(pb, 'white', true);
   else if (icon === 'vest') P.shirt(pb, 'white', false, true);

@@ -4,11 +4,12 @@ import { QUESTS, QUEST_ORDER, questState } from '../shared/data/quests.js';
 import { NPCS } from '../shared/data/npcs.js';
 import { SKILLS, HOTBAR } from '../shared/data/skills.js';
 import { ZONES, Z, SAFE } from '../shared/world.js';
-import { SLOTS, SLOT_NAMES, RARITY, INV_SIZE, MAP_W, OVER_H, TILE, clockString, dayFrac, darkness, weatherAt } from '../shared/constants.js';
+import { SLOTS, SLOT_NAMES, RARITY, INV_SIZE, MAP_W, OVER_H, TILE, clockString, dayFrac, darkness, weatherAt, isFullMoon } from '../shared/constants.js';
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { UPG_SLOTS, UPG_MAX, upgradeCost, UPG_TEXT } from '../shared/formulas.js';
 import { RECIPES, STATIONS, CATEGORIES, STRUCTS, HOME_OK } from '../shared/data/craft.js';
 import { iconURL } from './render/sprites-items.js';
+import { MOBS } from '../shared/data/mobs.js';
 import { slotFrameURL, plankURL, mouseURL, lockURL } from './render/ui-art.js';
 import { humanSheet, SKINS, HAIRS, CLOTH, CLOTH_KEYS, FW, FH } from './render/sprites-chars.js';
 import { MINI_COL } from './render/terrain.js';
@@ -20,7 +21,10 @@ const STYLE_NAMES = { court: 'Court', long: 'Long', queue: 'Queue', chauve: 'Cha
 const POI = [
   ['Port-Lanterne', 150, 96], ['Phare', 174, 92], ['Plage des Os Blanchis', 100, 118], ['Prairie des Murmures', 122, 78],
   ['Jungle de Brumesel', 104, 44], ['Ruines du Temple', 126, 20], ['Marais des Noyés', 40, 96], ['Cimetière', 33, 72], ["Crique de l'Épave", 30, 22],
-  ['Havre-des-Brumes', 262, 64], ['Île au Crâne', 252, 160], ['Îlot des Sirènes', 186, 186],
+  ['Havre-des-Brumes', 262, 64], ['Île au Crâne', 252, 160], ['Îlot de Cristal', 186, 186], ['Gouffre du Kraken', 208, 140],
+  ['Rade-aux-Flibustiers', 408, 50], ['Fort des Deux Clés', 444, 118], ['Forêt des Pendus', 540, 20], ['Lagon des Sirènes', 516, 136],
+  ["Îlot de l'Ermite", 352, 136], ['Anse-Tranquille', 150, 246], ['Atoll des Ossements', 70, 300], ['Île de la Quarantaine', 300, 296],
+  ['Volcan de Cendrelune', 470, 292], ['Brumes Éternelles', 566, 236], ['Île des Damnés', 590, 370],
 ];
 
 export class UI {
@@ -163,7 +167,9 @@ export class UI {
       if (me.drunk > 0) buffs.push(`🍾 Ivre ${Math.max(0, Math.ceil(me.drunk - (now - G.meAt)))}s`);
       if (G.zone === Z.TOWN) buffs.push('🔥 Flamme Bénite');
       if (G.player && G.player.boat) buffs.push(G.player.boat === 'sloop' ? '⛵ Sloop' : '⛵ Barque');
-      if (G.night) buffs.push('☾ Nuit');
+      if (G.night) buffs.push(isFullMoon(G.worldTime) ? '🌕 Pleine lune : la Horde rôde' : '☾ Nuit');
+      else if (isFullMoon(G.worldTime + 120)) buffs.push('🌕 Pleine lune ce soir');
+      if (ZONES[G.zone] && ZONES[G.zone].hard) buffs.push('☠ Zone extrême');
       if (G.evt && G.evt.state === 'on') buffs.push('🌊 Invasion !');
       const bh = buffs.map((b) => `<span class="buff">${esc(b)}</span>`).join('');
       if (bh !== this.lastBuffs) { $('buffs').innerHTML = bh; this.lastBuffs = bh; }
@@ -795,8 +801,16 @@ export class UI {
     x.drawImage(this.miniBase, tx, ty, w, h, 0, 0, c.width, c.height);
     const dot = (wx, wy, col, s = 2) => { const sx = (wx / TILE - tx) * Z2, sy = (wy / TILE - ty) * Z2; if (sx < 0 || sy < 0 || sx > c.width || sy > c.height) return; x.fillStyle = col; x.fillRect(Math.round(sx - s / 2), Math.round(sy - s / 2), s, s); };
     if (!inside) for (const e of G.ents.values()) {
-      if (e.k === 'm' && !e.dyingT) dot(e.x, e.y, e.type === 'boss' ? '#ff2a2a' : '#e05040', e.type === 'boss' ? 4 : 2);
-      else if (e.k === 'p') dot(e.x, e.y, (e.flags & 16) ? '#ffffff' : '#7ae0ff', 3);
+      if (e.k === 'm' && !e.dyingT) { const d = MOBS[e.type] || {}; dot(e.x, e.y, d.ship ? '#1c1426' : e.type === 'boss' || d.elite ? '#ff2a2a' : '#e05040', d.ship ? 5 : e.type === 'boss' || d.elite ? 4 : 2); if (d.ship) dot(e.x, e.y, '#ff8a6a', 3); }
+      else if (e.k === 'a') dot(e.x, e.y, '#ffd23a', 4);
+    }
+    for (const [id, , px0, py0, room, dead] of G.mapPlayers || []) { // les autres pirates, même hors de vue
+      if (id === G.myId) continue;
+      let px = px0, py = py0;
+      if (room >= 0) { const d = G.world.doors.find((q) => q.room === room); if (d) { px = d.ox; py = d.oy; } }
+      const e = G.ents.get(id);
+      if (e && !inside && room < 0) { px = e.x; py = e.y; }
+      dot(px, py, '#1c1426', 5); dot(px, py, dead ? '#8a8a9a' : '#7ae0ff', 3);
     }
     for (const d of G.world.doors) if (d.secret && G.found.has(d.id)) { dot(d.ox, d.oy, '#1c1426', 5); dot(d.ox, d.oy, '#b8a0ff', 3); }
     for (const n of G.npcs) { if (n.y >= OVER_H * TILE) continue; const mk = G.npcMarker(n.id); dot(n.x, n.y, mk ? '#ffd23a' : '#e8d8b0', mk ? 3 : 2); }
@@ -808,14 +822,22 @@ export class UI {
   }
   renderBigMap() {
     const G = this.G;
-    const S = 3, c = $('bigmap'); c.width = MAP_W * S; c.height = OVER_H * S;
+    const S = 2, c = $('bigmap'); c.width = MAP_W * S; c.height = OVER_H * S;
     const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
     x.drawImage(this.miniBase, 0, 0, c.width, c.height);
     x.font = '600 15px "Pirata One", serif'; x.textAlign = 'center';
     for (const [name, tx, ty] of POI) { x.fillStyle = 'rgba(0,0,0,0.6)'; x.fillText(name, tx * S + 1, ty * S + 1); x.fillStyle = '#fff2c8'; x.fillText(name, tx * S, ty * S); }
     for (const d of G.world.doors) if (d.secret && G.found.has(d.id)) { const dx = d.ox / TILE * S, dy = d.oy / TILE * S; x.fillStyle = '#1c1426'; x.beginPath(); x.arc(dx, dy, 6, 0, 6.3); x.fill(); x.fillStyle = '#b8a0ff'; x.beginPath(); x.arc(dx, dy, 4, 0, 6.3); x.fill(); x.font = '600 13px "Pixelify Sans", sans-serif'; x.fillStyle = 'rgba(0,0,0,0.6)'; x.fillText(d.name, dx + 1, dy - 9); x.fillStyle = '#e0d4ff'; x.fillText(d.name, dx, dy - 10); }
     for (const n of G.npcs) { const mk = G.npcMarker(n.id); if (!mk) continue; let nx = n.x, ny = n.y; if (ny >= OVER_H * TILE) { const rid = G.world.roomGrid[Math.floor(ny / TILE) * MAP_W + Math.floor(nx / TILE)], d = G.world.doors.find((q) => q.room === rid); if (!d) continue; nx = d.ox; ny = d.oy; } x.fillStyle = '#ffd23a'; x.font = '700 16px "Pixelify Sans", sans-serif'; x.fillText(mk, nx / TILE * S, ny / TILE * S - 6); }
-    if (G.room < 0) for (const e of G.ents.values()) if (e.k === 'p') { x.fillStyle = '#7ae0ff'; x.fillRect(e.x / TILE * S - 2, e.y / TILE * S - 2, 4, 4); }
+    x.font = '600 12px "Pixelify Sans", sans-serif';
+    for (const [id, name, px0, py0, room, dead] of G.mapPlayers || []) { // les autres pirates, partout sur la carte
+      if (id === G.myId) continue;
+      let px = px0, py = py0;
+      if (room >= 0) { const d = G.world.doors.find((q) => q.room === room); if (d) { px = d.ox; py = d.oy; } }
+      const sx = px / TILE * S, sy = py / TILE * S;
+      x.fillStyle = '#1c1426'; x.fillRect(sx - 4, sy - 4, 8, 8); x.fillStyle = dead ? '#8a8a9a' : '#7ae0ff'; x.fillRect(sx - 3, sy - 3, 6, 6);
+      x.fillStyle = 'rgba(0,0,0,0.65)'; x.fillText(name, sx + 1, sy - 6); x.fillStyle = '#c8f4ff'; x.fillText(name, sx, sy - 7);
+    }
     if (G.treasure) { const tx = G.treasure.x / TILE * S, ty = G.treasure.y / TILE * S; x.strokeStyle = '#d82a2a'; x.lineWidth = 3; x.beginPath(); x.moveTo(tx - 6, ty - 6); x.lineTo(tx + 6, ty + 6); x.moveTo(tx + 6, ty - 6); x.lineTo(tx - 6, ty + 6); x.stroke(); }
     if (G.objective) { x.fillStyle = '#ffd23a'; x.beginPath(); x.arc(G.objective.x / TILE * S, G.objective.y / TILE * S, 5, 0, 6.3); x.fill(); x.strokeStyle = '#1c1426'; x.lineWidth = 2; x.stroke(); }
     if (G.evt && G.evt.state === 'on') { x.strokeStyle = '#ff5a2a'; x.lineWidth = 3; x.beginPath(); x.arc(G.evt.x / TILE * S, G.evt.y / TILE * S, 14, 0, 6.3); x.stroke(); }

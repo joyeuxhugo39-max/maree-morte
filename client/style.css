@@ -141,6 +141,7 @@ kbd { font-family: var(--ui); font-size: 11px; background: #2a1a10; color: var(-
 .paperdoll .eslot[data-slot=body] { grid-column: 1; grid-row: 3; }
 .paperdoll .eslot[data-slot=trinket] { grid-column: 3; grid-row: 3; }
 .paperdoll .eslot[data-slot=boots] { grid-column: 2; grid-row: 4; }
+.paperdoll .eslot[data-slot=outfit] { grid-column: 3; grid-row: 4; background-image: var(--slot-gold); }
 .paperdoll { grid-template-rows: 52px 52px 52px 52px; }
 .slot, .eslot { position: relative; width: 48px; height: 48px; background: #2a1a10 var(--slot) no-repeat; background-size: 48px 48px; image-rendering: pixelated; cursor: pointer; }
 .slot img, .eslot img { position: absolute; left: 8px; top: 8px; width: 32px; height: 32px; image-rendering: pixelated; pointer-events: none; }

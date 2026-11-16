@@ -97,7 +97,7 @@ export class Sfx {
   }
   ambience(level) { if (this.amb) this.amb.gain.setTargetAtTime(0.02 + level * 0.07, this.ctx.currentTime, 1.2); }
   tone(f, dur, { type = 'square', vol = 0.15, slide = 0, delay = 0, attack = 0.005 } = {}) {
-    const c = this.ctx; if (!c) return;
+    const c = this.ctx; if (!c || !(vol > 0.0002)) return;
     const t = c.currentTime + delay;
     const o = c.createOscillator(), g = c.createGain();
     o.type = type; o.frequency.setValueAtTime(f, t);
@@ -116,7 +116,7 @@ export class Sfx {
     s.start(t, Math.random()); s.stop(t + dur + 0.05);
   }
   play(name, vol = 1) {
-    if (!this.ctx || this.muted) return;
+    if (!this.ctx || this.muted || !(vol > 0.002)) return; // trop loin pour être entendu
     const v = vol;
     switch (name) {
       case 'slash': this.hiss(0.14, { f: 2600, q: 0.8, vol: 0.18 * v, slide: 0.35 }); break;

@@ -2494,7 +2494,7 @@ export class Game {
   }
   entMeta(e, kind) {
     if (kind === 'p') return { id: e.id, k: 'p', name: e.name, look: e.look, lvl: e.level, x: Math.round(e.x), y: Math.round(e.y), w: e.eq.weapon, g: e.eq.gun, dead: e.dead, ti: e.title ? ACHIEVEMENTS[e.title].title : '', bt: e.boat ? ITEMS[e.boat].boat.kind : '', pt: e.pet || '', vo: this.time < e.thiefUntil ? 1 : 0 };
-    if (kind === 'm') return { id: e.id, k: 'm', type: e.type, x: Math.round(e.x), y: Math.round(e.y), hp: Math.ceil(e.hp), mhp: e.maxHp, sun: e.def.night && e.sunproof && !e.horde ? 1 : 0 };
+    if (kind === 'm') return { id: e.id, k: 'm', type: e.type, x: Math.round(e.x), y: Math.round(e.y), hp: Math.ceil(e.hp), mhp: e.maxHp, sun: e.def.night && e.sunproof && !e.horde ? 1 : 0, hd: e.horde ? 1 : 0 };
     return { id: e.id, k: 'd', item: e.item, n: e.n, x: Math.round(e.x), y: Math.round(e.y), own: e.owner, ou: Math.max(0, +(e.ownUntil - this.time).toFixed(1)) };
   }
   broadcastState() {

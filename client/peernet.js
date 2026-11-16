@@ -6,7 +6,7 @@
 import { Peer } from 'peerjs';
 import { BrowserStorage } from './net.js';
 
-export const WORLD_ID = 'mmorte-7f3k2-monde-v04';
+export const WORLD_ID = 'mmorte-7f3k2-monde-v07';
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const rnd = (a, b) => a + Math.random() * (b - a);
 const dbg = (...a) => { if (window.MM_DEBUG) console.log('[pair]', ...a); };

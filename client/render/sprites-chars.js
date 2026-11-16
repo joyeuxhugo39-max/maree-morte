@@ -15,6 +15,9 @@ export const UNDEAD_SKINS = {
   drowned: [0x2f5050, 0x447070, 0x60948e, 0x86bcb0],
   ghoul: [0x3e3450, 0x564a6e, 0x726690, 0x948ab0],
   ash: [0x3a3438, 0x56505a, 0x787078, 0x9a929a],
+  peste: [0x4e5226, 0x6e7234, 0x8e9448, 0xb0b664],
+  damne: [0x24263a, 0x383c54, 0x525874, 0x707894],
+  tanne: [0x5a3a1e, 0x7a5430, 0x9a7044, 0xba8c5a],
 };
 export const HAIRS = [
   [0x1e140e, 0x34221a, 0x523828],
@@ -85,6 +88,13 @@ function paintRight(look, dir, frame) {
   }
   if (style === 'squelette') { /* jambes d'os gérées ailleurs */ }
 
+  // ---- cape (dessinée avant le torse : elle passe derrière) ----
+  if (look.cape) {
+    const CP = clothOf(look.cape);
+    if (back) for (let y = tT - 1; y < 25; y++) for (let x = 5; x < 15; x++) { const flare = y > 20 ? 1 : 0; if (x < 5 - flare || x > 14 + flare) continue; body.set(x, y, CP[(x === 5 || x === 14) ? 1 : (x + (y >> 2)) % 4 === 0 ? 1 : 2]); }
+    else if (side) for (let y = tT; y < 25; y++) { const w = 2 + (y > 19 ? 1 : 0); for (let k = 0; k < w; k++) body.set(6 - k, y, CP[k === w - 1 ? 0 : 2]); body.set(7, y, CP[1]); }
+    else for (let y = tT; y < 24; y++) { body.set(4, y, CP[1]); body.set(15, y, CP[0]); if (y > 19) { body.set(3, y, CP[0]); body.set(16, y, CP[0]); } }
+  }
   // ---- torse ----
   const tx0 = side ? 7 : 6, tw = side ? 6 : 8;
   const shirt = style === 'gilet' ? CLOTH.white : TOP;
@@ -124,6 +134,16 @@ function paintRight(look, dir, frame) {
     }
   }
   function shirtCol() { return CLOTH.white[2]; }
+  if (style === 'armure') { // plastron bombé, arête centrale, rivets
+    for (let y = tT; y < tT + 6; y++) for (let x = tx0; x < tx0 + tw; x++) {
+      const u = (x - tx0) / (tw - 1);
+      body.set(x, y, TOP[u < 0.2 ? 3 : u > 0.8 ? 0 : u < 0.45 ? 3 : 2]);
+    }
+    if (!side && !back) { body.vl(9, tT, 5, mix(TOP[3], 0xffffff, 0.35)); body.vl(10, tT, 5, TOP[1]); for (const [x, y] of [[7, tT + 1], [12, tT + 1], [7, tT + 4], [12, tT + 4]]) body.set(x, y, GOLDC[2]); }
+    else if (side) { body.vl(tx0 + 4, tT, 5, mix(TOP[3], 0xffffff, 0.35)); body.set(tx0 + 2, tT + 2, GOLDC[2]); }
+    else for (let x = tx0 + 1; x < tx0 + tw - 1; x++) body.set(x, tT + 2, TOP[1]);
+    for (let y = tT + 6; y < tT + 8; y++) for (let x = tx0; x < tx0 + tw; x++) if ((x - tx0) % 2 === 0) body.set(x, y, TOP[1]); // tassettes
+  }
   if (style === 'tablier') {
     for (let y = tT + 1; y < tT + 9; y++) for (let x = tx0 + 1; x < tx0 + tw - 1; x++) if (!back) body.set(x, y, x === tx0 + 1 ? 0xf0e8d8 : 0xd8ccb4);
   }
@@ -298,6 +318,40 @@ function paintHat(h, look, dir, hx, hy) {
     for (let x = 5; x <= 14; x++) { s(x, 1, G[x < 8 ? 3 : 2]); s(x, 2, G[x < 8 ? 2 : 1]); }
     for (const px of [5, 8, 11, 14]) { s(px, 0, G[2]); s(px, -1, G[3]); }
     s(9, 1, 0xd8303a); s(10, 1, 0xd8303a); s(6, 2, 0x3a8ad8); s(13, 2, 0x3ad86a);
+  } else if (hat === 'foulard') { // foulard noué, deux pans qui pendent derrière
+    for (let j = 0; j < 4; j++) { const [a, b] = HEAD_ROWS[j]; for (let x = a; x <= b; x++) s(x, j, C[(x <= 7 && j <= 1) ? 3 : x >= 13 ? 1 : 2]); }
+    for (let x = 4; x <= 15; x++) s(x, 4, C[1]);
+    if (back) { s(9, 4, C[3]); s(10, 4, C[3]); for (let k = 0; k < 4; k++) { s(8 - (k >> 1), 5 + k, C[2]); s(11 + (k >> 1), 5 + k, C[1]); } }
+    else if (side) { s(3, 4, C[3]); s(2, 5, C[2]); s(2, 6, C[1]); s(1, 7, C[1]); s(3, 6, C[2]); s(2, 8, C[0]); }
+    else { s(15, 3, C[3]); s(16, 4, C[2]); s(16, 5, C[1]); s(17, 6, C[1]); }
+  } else if (hat === 'plume') { // grand chapeau de mousquetaire, plume blanche
+    const G = GOLDC;
+    for (let y = -2; y < 3; y++) { const ins = y === -2 ? 3 : y === -1 ? 2 : 1; for (let x = 4 + ins; x <= 15 - ins; x++) s(x, y, C[x < 8 ? 3 : x > 12 ? 1 : 2]); }
+    for (let x = 6; x <= 13; x++) s(x, 2, G[2]);
+    for (let x = 0; x <= 19; x++) { s(x, 3, C[x < 6 ? 3 : 2]); s(x, 4, C[1]); }
+    if (!back) for (let x = 2; x <= 17; x++) s(x, 5, C[0]);
+    const pl = side ? [[13, 1], [14, 0], [15, -1], [16, -2], [17, -3], [17, -4], [16, -5], [15, -5]] : [[14, 1], [15, 0], [16, -1], [17, -2], [18, -3], [18, -4], [17, -5], [16, -5], [15, 2]];
+    for (const [px, py] of pl) { s(px, py, 0xf6f0e2); s(px - 1, py + 1, 0xd8d0c0); }
+  } else if (hat === 'bec') { // masque de médecin de peste : bec, verres ronds, chapeau plat
+    for (let y = -1; y < 2; y++) { const ins = y === -1 ? 2 : 1; for (let x = 4 + ins; x <= 15 - ins; x++) s(x, y, C[x < 8 ? 3 : 2]); }
+    for (let x = 0; x <= 19; x++) { s(x, 2, C[2]); s(x, 3, C[1]); }
+    const M = [0x2a2420, 0x4a3e34, 0x6a5a48, 0x8a7860];
+    for (let j = 4; j < 10; j++) { const [a, b] = HEAD_ROWS[Math.min(10, j)]; for (let x = a; x <= b; x++) s(x, j, M[x < 8 ? 2 : 1]); }
+    if (!back) {
+      if (side) { for (let k = 0; k < 6; k++) { s(14 + k, 6 + (k >> 1), M[3 - (k >> 1)]); s(14 + k, 7 + (k >> 1), M[1]); } s(13, 5, 0xc8e8ff); s(12, 5, 0x6a8aa0); }
+      else { s(7, 5, 0xc8e8ff); s(12, 5, 0xc8e8ff); s(6, 5, 0x6a8aa0); s(13, 5, 0x6a8aa0); for (let k = 0; k < 5; k++) { s(9, 7 + k, M[3]); s(10, 7 + k, M[2]); } s(9, 12, M[1]); }
+    }
+  } else if (hat === 'morion') { // casque d'acier à crête
+    const S2 = [0x3a3a46, 0x5a5a6c, 0x8a8a9c, 0xc8c8d6];
+    for (let y = -1; y < 3; y++) { const ins = y === -1 ? 3 : y === 0 ? 2 : 1; for (let x = 4 + ins; x <= 15 - ins; x++) s(x, y, S2[x < 8 ? 3 : x > 12 ? 1 : 2]); }
+    for (let x = 8; x <= 11; x++) s(x, -2, S2[3]); s(9, -3, S2[3]); s(10, -3, S2[2]);
+    for (let x = 1; x <= 18; x++) s(x, 3, S2[(x + 1) % 5 === 0 ? 3 : 2]);
+    s(0, 2, S2[2]); s(19, 2, S2[1]); s(1, 4, S2[1]); s(18, 4, S2[1]);
+    if (!back && !side) { s(6, 2, GOLDC[2]); s(13, 2, GOLDC[2]); }
+  } else if (hat === 'cagoule') { // cagoule de bourreau
+    for (let j = -2; j < 11; j++) { const [a, b] = HEAD_ROWS[Math.max(0, Math.min(10, j))]; for (let x = a; x <= b; x++) s(x, j, C[(x <= 7 && j <= 3) ? 2 : x >= 13 ? 0 : 1]); }
+    s(9, -3, C[1]); s(10, -3, C[0]);
+    if (!back) { if (side) { s(13, 5, 0x141014); s(14, 5, 0xff3a3a); } else { s(7, 5, 0xff3a3a); s(12, 5, 0xff3a3a); s(6, 5, 0x141014); s(13, 5, 0x141014); } }
   } else if (hat === 'bonnet') {
     for (let y = -1; y < 5; y++) { const ins = y === -1 ? 3 : y === 0 ? 1 : 0; for (let x = 5 + ins; x <= 14 - ins; x++) s(x, y, C[y >= 3 ? 1 : (x < 8 ? 3 : 2)]); }
     for (let x = 4; x <= 15; x++) { s(x, 4, C[1]); s(x, 5, C[0]); }
@@ -308,7 +362,7 @@ function paintHat(h, look, dir, hx, hy) {
 // ---------- squelette ----------
 function paintSkeletonRight(look, dir, frame) {
   const side = dir === 2, back = dir === 3;
-  const B = [0x6c6450, 0x9a9076, 0xc8bfa2, 0xeee6cc];
+  const B = look.bones || [0x6c6450, 0x9a9076, 0xc8bfa2, 0xeee6cc];
   const pb = new PB(FW, FH), head = new PB(FW, FH);
   const bob = (frame === 1 || frame === 3) ? -1 : 0, step = frame === 1 ? 1 : frame === 3 ? -1 : 0;
   const meta = { eyes: [], hand: [14, 18] };
@@ -362,9 +416,9 @@ function paintSkeletonRight(look, dir, frame) {
 }
 
 // ---------- crabe ----------
-function paintCrab(frame) {
+function paintCrab(frame, pal) {
   const pb = new PB(FW, FH);
-  const S = [0x3a1420, 0x6a2430, 0x9a3640, 0xc85a56, 0xe8867a];
+  const S = pal || [0x3a1420, 0x6a2430, 0x9a3640, 0xc85a56, 0xe8867a];
   const cy = 19, open = frame % 2 === 0;
   for (let k = 0; k < 3; k++) {
     const up = (frame + k) % 2 ? 1 : 0;
@@ -448,13 +502,90 @@ export function mobSheet(kind) {
   const key = 'm' + kind;
   let s = sheetCache.get(key);
   if (s) return s;
-  const L = MOB_LOOKS[kind];
-  if (kind === 'crab') {
+  if (kind.endsWith(':sun')) { // mort résistant au soleil : peau tannée et chapeau de paille
+    const base = kind.slice(0, -4), L0 = MOB_LOOKS[base];
+    if (!L0 || L0.skel || L0.dog) return mobSheet(base);
+    MOB_LOOKS[kind] = Object.assign({}, L0, { skin: L0.skin === 'ghoul' ? 'ghoul' : 'tanne', hat: 'paille', eyeCol: 0xffb04a });
+    s = mobSheet2(kind, MOB_LOOKS[kind]); sheetCache.set(key, s); return s;
+  }
+  s = mobSheet2(kind, MOB_LOOKS[kind]);
+  sheetCache.set(key, s);
+  return s;
+}
+// planche « grande » : un personnage peint puis agrandi deux fois (Scale2x)
+function bigSheet(paint, L) {
+  const cv = document.createElement('canvas'); cv.width = FW * 8; cv.height = FH * 8;
+  const ctx = cv.getContext('2d'); const meta = [];
+  for (let d = 0; d < 4; d++) {
+    meta[d] = [];
+    for (let f = 0; f < 4; f++) {
+      let r = paint(L, d === 1 ? 2 : d, f), pb = r.pb, m = r.meta;
+      if (d === 1) { pb = pb.mirror(); m = { eyes: m.eyes.map(([x, y]) => [FW - 1 - x, y]), hand: [FW - m.hand[0], m.hand[1]] }; }
+      const big = scale2x(pb);
+      for (const [ex, ey] of m.eyes) { big.rect(ex * 2, ey * 2, 2, 2, L.eyeCol || 0xff4a3a); big.set(ex * 2, ey * 2, 0xffffff); }
+      ctx.drawImage(big.toCanvas(), f * FW * 2, d * FH * 2);
+      meta[d][f] = { eyes: m.eyes.map(([x, y]) => [x * 2, y * 2]), hand: [m.hand[0] * 2, m.hand[1] * 2] };
+    }
+  }
+  return { cv, meta, fw: FW * 2, fh: FH * 2, ax: AX * 2, ay: AY * 2, white: null };
+}
+// chien mort, de profil (on garde le profil pour toutes les directions)
+function paintDog(L, dir, frame) {
+  const pb = new PB(FW, FH), st = frame % 2, B = L.fur;
+  const y0 = 16;
+  pb.ellipse(9, y0 + 3, 6, 3, B[2]); pb.hl(5, y0 + 1, 8, B[3]);
+  for (let k = 0; k < 4; k++) pb.set(5 + k * 2, y0 + 3 + (k % 2), B[0]); // côtes saillantes
+  pb.disc(15.5, y0, 3, B[2]); pb.rect(16, y0, 4, 2, B[3]); pb.set(19, y0 + 1, 0x1a1014);
+  pb.rect(14, y0 - 4, 2, 3, B[0]);
+  for (const [x, o] of [[5, st], [7, 1 - st], [11, st], [13, 1 - st]]) pb.vl(x, y0 + 5, 4 - o, B[1]);
+  pb.line(3, y0 + 2, 0, y0 - 1 + st, B[1]);
+  for (const [x, y] of [[9, y0 + 2], [12, y0 + 4]]) pb.set(x, y, L.wound || 0x8a2a2a);
+  pb.outline('auto');
+  return { pb: dir === 1 ? pb : pb, meta: { eyes: [[16, y0 - 1]], hand: [18, y0 + 1] } };
+}
+function dogSheet(L) {
+  const cv = document.createElement('canvas'); cv.width = FW * 4; cv.height = FH * 4;
+  const ctx = cv.getContext('2d'), meta = [];
+  for (let d = 0; d < 4; d++) {
+    meta[d] = [];
+    for (let f = 0; f < 4; f++) {
+      let r = paintDog(L, d, f);
+      let pb = r.pb, m = r.meta;
+      if (d === 1) { pb = pb.mirror(); m = { eyes: m.eyes.map(([x, y]) => [FW - 1 - x, y]), hand: [FW - m.hand[0], m.hand[1]] }; }
+      for (const [ex, ey] of m.eyes) pb.set(ex, ey, L.eyeCol);
+      ctx.drawImage(pb.toCanvas(), f * FW, d * FH);
+      meta[d][f] = m;
+    }
+  }
+  return { cv, meta, fw: FW, fh: FH, ax: AX, ay: AY, white: null };
+}
+// golem de lave : un amas de roches noires veinées de feu
+function paintGolem(L, dir, frame) {
+  const pb = new PB(FW, FH), st = frame === 1 ? 1 : frame === 3 ? -1 : 0, side = dir === 2, back = dir === 3;
+  const R2 = L.rock, F = L.fire;
+  for (const [x0, lift] of [[6, st === -1 ? 1 : 0], [11, st === 1 ? 1 : 0]]) { pb.rect(x0, 20 - lift, 4, 6, R2[1]); pb.hl(x0, 20 - lift, 4, R2[2]); }
+  pb.blob(10, 15, 7, 5.5, R2, { noise: 0.35 });
+  pb.blob(side ? 11 : 10, 7, 4.5, 4, R2, { noise: 0.3 });
+  for (const [ax, ay] of side ? [[14, 15]] : [[3, 15], [17, 15]]) { pb.blob(ax, ay + st, 2.6, 4, R2, { noise: 0.3 }); }
+  const cracks = [[8, 13, 12, 17], [11, 12, 9, 16], [7, 16, 10, 18], [13, 14, 12, 18]];
+  for (const [x0, y0, x1, y1] of cracks) pb.line(x0, y0, x1, y1, F[1]);
+  pb.set(10, 15, F[2]); pb.set(9, 14, F[3]);
+  const meta = { eyes: [], hand: [side ? 15 : 17, 18 + st] };
+  if (!back) { if (side) { pb.set(13, 7, F[3]); meta.eyes.push([13, 7]); } else { pb.set(8, 7, F[3]); pb.set(12, 7, F[3]); meta.eyes.push([8, 7], [12, 7]); } }
+  pb.outline('auto');
+  return { pb, meta };
+}
+function mobSheet2(kind, L) {
+  let s;
+  if (kind === 'crab' || (L && L.crab)) {
     const cv = document.createElement('canvas'); cv.width = FW * 4; cv.height = FH * 4;
     const ctx = cv.getContext('2d'); const meta = [];
-    for (let d = 0; d < 4; d++) { meta[d] = []; for (let f = 0; f < 4; f++) { const r = paintCrab(f); ctx.drawImage(r.pb.toCanvas(), f * FW, d * FH); meta[d][f] = r.meta; } }
+    for (let d = 0; d < 4; d++) { meta[d] = []; for (let f = 0; f < 4; f++) { const r = paintCrab(f, L && L.crab); ctx.drawImage(r.pb.toCanvas(), f * FW, d * FH); meta[d][f] = r.meta; } }
     s = { cv, meta, fw: FW, fh: FH, ax: AX, ay: AY, white: null };
-  } else if (kind === 'skelgun') s = compose(paintSkeletonRight, L);
+  } else if (L && L.dog) s = dogSheet(L);
+  else if (L && L.golem) s = bigSheet(paintGolem, L);
+  else if (L && L.skel && L.big) s = bigSheet(paintSkeletonRight, L);
+  else if (kind === 'skelgun' || (L && L.skel)) s = compose(paintSkeletonRight, L);
   else if (kind === 'roi_squelette') {
     const cv = document.createElement('canvas'); cv.width = FW * 8; cv.height = FH * 8;
     const ctx = cv.getContext('2d'); const meta = [];
@@ -521,7 +652,6 @@ export function mobSheet(kind) {
     }
     s = { cv, meta, fw: FW * 2, fh: FH * 2, ax: AX * 2, ay: AY * 2, white: null };
   } else s = compose(paintRight, L);
-  sheetCache.set(key, s);
   return s;
 }
 
@@ -535,6 +665,29 @@ export const MOB_LOOKS = {
   capitaine_noye: { skin: 'drowned', undead: 1, hair: 6, hairStyle: 'long', top: 'capitaine', topCol: 'teal', pants: 'navy', boots: 'black', eyeCol: 0xc8fff4, hat: 'tricorne', hatCol: 'teal', beard: 1, beardCol: 6, seed: 9, big: 1 },
   boss: { skin: 'ash', undead: 1, hair: 4, top: 'capitaine', topCol: 'black', pants: 'black', boots: 'black', eyeCol: 0x9dff6a, hat: 'capitaine', hatCol: 'black', beard: 2, beardCol: 4, seed: 6 },
   roi_squelette: { hat: 'couronne', topCol: 'purple', eyeCol: 0xb8ff6a },
+  // 0.7 : les morts du Grand Large
+  flibustier: { skin: 'zombie', undead: 1, hair: 0, hairStyle: 'long', top: 'manteau', topCol: 'black', pants: 'brown', boots: 'black', eyeCol: 0xff8a3a, hat: 'tricorne', hatCol: 'red', beard: 1, seed: 11 },
+  chien_mort: { dog: 1, fur: [0x2a2418, 0x4a3e2a, 0x6a5a3e, 0x8a7a58], eyeCol: 0xffe14a },
+  molosse_damne: { dog: 1, fur: [0x101018, 0x1e1e2a, 0x30303e, 0x484858], eyeCol: 0x6aff9a, wound: 0x3a8a5a },
+  pendu: { skin: 'ghoul', undead: 1, hunch: 1, hair: 4, hairStyle: 'long', top: 'haillons', topCol: 'black', pants: 'black', boots: 'grey', eyeCol: 0xd8e0ff, hat: 'foulard', hatCol: 'brown', seed: 12 },
+  sorciere: { skin: 'zombie', hair: 4, hairStyle: 'long', top: 'vareuse', topCol: 'purple', pants: 'black', boots: 'black', hat: 'foulard', hatCol: 'purple', eyeCol: 0xc86aff, seed: 13 },
+  sirene: { skin: 'drowned', undead: 1, hair: 6, hairStyle: 'long', top: 'vareuse', topCol: 'teal', pants: 'teal', boots: 'teal', eyeCol: 0x9fffe8, seed: 14 },
+  crabe_corail: { crab: [0x5a1830, 0x9a2a48, 0xd84a62, 0xff7a84, 0xffb0a8] },
+  legionnaire: { skel: 1, hat: 'morion', topCol: 'red', eyeCol: 0xff6a3a },
+  pestifere: { skin: 'peste', undead: 1, hair: 4, hairStyle: 'hirsute', top: 'haillons', topCol: 'white', pants: 'grey', boots: 'grey', eyeCol: 0xd8ff6a, seed: 15 },
+  medecin_peste: { skin: 0, top: 'manteau', topCol: 'black', pants: 'black', boots: 'black', hat: 'bec', hatCol: 'black', eyeCol: 0xff3a2a, seed: 16 },
+  calcine: { skin: 'ash', undead: 1, hair: 0, hairStyle: 'chauve', top: 'haillons', topCol: 'black', pants: 'black', boots: 'black', eyeCol: 0xffa030, hat: 'tricorne', hatCol: 'black', seed: 17 },
+  golem_lave: { golem: 1, rock: [0x141014, 0x241c20, 0x3a2e30, 0x524244, 0x6a5656], fire: [0x8a1a0a, 0xe0501a, 0xff9a2a, 0xffe070], eyeCol: 0xffe070 },
+  damne: { skin: 'damne', undead: 1, hair: 4, hairStyle: 'long', top: 'armure', topCol: 'black', pants: 'black', boots: 'black', eyeCol: 0x6aff9a, hat: 'crane', seed: 18 },
+  arquebusier_damne: { skel: 1, bones: [0x2a2a34, 0x44444e, 0x62626e, 0x84848e], hat: 'tricorne', hatCol: 'black', topCol: 'black', eyeCol: 0x6aff9a },
+  bourreau: { big: 1, skin: 'ghoul', undead: 1, hair: 0, hairStyle: 'chauve', top: 'haillons', topCol: 'black', pants: 'black', boots: 'black', hat: 'cagoule', hatCol: 'black', eyeCol: 0xff3a3a, seed: 19 },
+  reine_sirenes: { big: 1, skin: 'drowned', undead: 1, hair: 6, hairStyle: 'long', top: 'vareuse', topCol: 'teal', pants: 'teal', boots: 'teal', hat: 'couronne', eyeCol: 0x9fffe8, seed: 20 },
+  general_os: { skel: 1, big: 1, hat: 'morion', topCol: 'red', eyeCol: 0xff6a3a },
+  docteur_corbeau: { big: 1, skin: 0, top: 'manteau', topCol: 'black', pants: 'black', boots: 'black', hat: 'bec', hatCol: 'black', cape: 'black', eyeCol: 0xff3a2a, seed: 21 },
+  brasier: { golem: 1, rock: [0x2a0a06, 0x4a1a0e, 0x6a2a14, 0x8a3a1a, 0xa84a22], fire: [0xe0501a, 0xff9a2a, 0xffd860, 0xfff6c0], eyeCol: 0xfff6c0 },
+  frere_fer: { big: 1, skin: 'zombie', undead: 1, hair: 0, hairStyle: 'chauve', beard: 2, top: 'armure', topCol: 'grey', pants: 'black', boots: 'black', hat: 'morion', eyeCol: 0xffe14a, seed: 22 },
+  frere_rouille: { big: 1, skin: 'zombie', undead: 1, hair: 2, hairStyle: 'hirsute', beard: 1, top: 'armure', topCol: 'orange', pants: 'brown', boots: 'brown', eyeCol: 0xffe14a, seed: 23 },
+  comte_vespere: { big: 1, skin: 'damne', undead: 1, hair: 4, hairStyle: 'long', top: 'capitaine', topCol: 'black', pants: 'black', boots: 'black', hat: 'capitaine', hatCol: 'black', cape: 'purple', eyeCol: 0xff3a6a, beard: 1, beardCol: 4, seed: 24 },
 };
 
 export function whiteSheet(s) {
@@ -553,6 +706,7 @@ const BLADES = {
   gold: [0x5a5c6a, 0x8c90a0, 0xc4c8d6, 0xffffff],
   coral: [0x7a1e3a, 0xc23a5a, 0xff6a84, 0xffc0c8],
   bone: [0x6c6450, 0x9a9076, 0xc8bfa2, 0xeee6cc],
+  dark: [0x1c1820, 0x34303c, 0x5a5668, 0x8a8698],
 };
 export function weaponSprite(kind, tint = 'steel') {
   const key = 'w' + kind + tint;
@@ -582,6 +736,12 @@ export function weaponSprite(kind, tint = 'steel') {
     if (big) { pb.vl(13, 1, 4, M[2]); pb.vl(14, 0, 6, M[1]); }
     pb.rect(1, 3, 4, 2, W[2]); pb.hl(1, 3, 4, W[3]); pb.rect(0, 4, 2, 3, W[1]);
     pb.set(4, 5, M[1]); pb.set(5, 4, W[1]);
+  } else if (kind === 'axe') { // hache à double tranchant
+    pb = new PB(18, 12); gx = 2; gy = 7;
+    const Bl = BLADES[tint] || BLADES.steel;
+    pb.hl(0, 7, 15, 0x5a3420); pb.hl(0, 8, 15, 0x3a2214);
+    for (let y = 1; y <= 11; y++) { const w = 4 - Math.round(Math.abs(y - 6) * 0.45); for (let k = 0; k < w; k++) pb.set(13 + k, y, Bl[k === w - 1 ? 3 : 2]); pb.set(12, y, Bl[1]); }
+    for (let y = 3; y <= 9; y++) pb.set(11, y, Bl[1]);
   } else if (kind === 'musket') {
     pb = new PB(20, 6); gx = 4; gy = 3;
     const W = [0x3a2214, 0x5a3820, 0x7a4f2c, 0x9c683a];

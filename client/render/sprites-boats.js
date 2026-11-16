@@ -10,7 +10,18 @@ const IRON = [0x1d1c24, 0x2c2b36, 0x403f4e, 0x5a596b, 0x7c7b8f];
 const PAL = {
   barque: { rim: WOOD[5], rimD: WOOD[3], plank: WOOD[2], plankD: WOOD[1], side: WOOD[1], keel: WOOD[0] },
   sloop: { rim: 0xd8b07a, rimD: WOOD[4], plank: WOOD[4], plankD: WOOD[3], side: 0x2a3a5a, keel: 0x141c2e },
+  // 0.7 : brick de course (coque rouge et noire), navires maudits (noir, fantôme)
+  brick: { rim: 0xe0c08a, rimD: 0x9a6a3a, plank: 0x8a5a30, plankD: 0x6a4224, side: 0x6a1418, keel: 0x1a0a0c },
+  noir: { rim: 0x5a4a3a, rimD: 0x3a2e24, plank: 0x3a2e24, plankD: 0x2a2018, side: 0x141418, keel: 0x08080a },
+  ghost: { rim: 0xc8f0d8, rimD: 0x7ab09a, plank: 0x6a9a86, plankD: 0x4a7a68, side: 0x2a4a44, keel: 0x10201c },
 };
+const SAILS = {
+  white: SAIL,
+  red: [0x6a1418, 0x9a2226, 0xc23a34, 0xe05a4a, 0xf08a6a],
+  black: [0x0c0a0e, 0x1a161c, 0x26222a, 0x34303a, 0x48424e],
+  ghost: [0x5a8a7a, 0x7ab09a, 0x9ad0b8, 0xbae8d0, 0xe0fff0],
+};
+let SP = SAIL; // voilure en cours de dessin
 
 // demi-largeur de la coque le long de l'axe (t = 0 poupe, 1 proue)
 const halfW = (t, max, stern) => max * (t < 0.55 ? stern + (1 - stern) * Math.sin(t / 0.55 * Math.PI / 2) : Math.sqrt(Math.max(0, 1 - Math.pow((t - 0.55) / 0.45, 2))));
@@ -88,11 +99,11 @@ function sloopSailSide(bowRight) {
     for (let i = 1; i <= back; i++) {
       const u = i / back;
       const k = u < 0.15 ? 4 : u > 0.85 ? 1 : (Math.floor((y + i * 0.3) / 6) % 2 ? 2 : 3);
-      pb.set(mx - i, y, SAIL[k]);
+      pb.set(mx - i, y, SP[k]);
     }
   }
   pb.line(mx, 6, mx - 5, 5, WOOD[2]); pb.line(mx, 44, mx - 22, 44, WOOD[2]);
-  for (let y = 9; y <= 40; y++) { const w = Math.round((y - 9) / 31 * 14); for (let i = 2; i <= w; i++) pb.set(mx + i, y, SAIL[i < 4 ? 4 : 2 + ((y >> 2) % 2)]); }
+  for (let y = 9; y <= 40; y++) { const w = Math.round((y - 9) / 31 * 14); for (let i = 2; i <= w; i++) pb.set(mx + i, y, SP[i < 4 ? 4 : 2 + ((y >> 2) % 2)]); }
   pb.rect(mx - 15, 20, 7, 6, 0x1c1418); pb.set(mx - 13, 22, 0xf0ece0); pb.set(mx - 11, 22, 0xf0ece0); pb.hl(mx - 13, 24, 3, 0xf0ece0);
   skullFlag(pb, mx + 2, 0);
   pb.outline('auto');
@@ -108,7 +119,7 @@ function sloopSailFront(front) {
   for (let y = 8; y < 32; y++) {
     const bul = Math.sin((y - 8) / 24 * Math.PI) * 3;
     const l = Math.round(5 - bul * 0.4), r = Math.round(35 + bul * 0.4);
-    for (let x = l; x <= r; x++) { const u = (x - l) / (r - l); pb.set(x, y, SAIL[u < 0.12 ? 1 : u > 0.88 ? 1 : (front ? 3 : 2) + (Math.abs(u - 0.5) < 0.2 ? 1 : 0) - (x % 7 === 0 ? 1 : 0)]); }
+    for (let x = l; x <= r; x++) { const u = (x - l) / (r - l); if (SP === SAILS.black && (x * 7 + y * 3) % 23 === 0) continue; pb.set(x, y, SP[u < 0.12 ? 1 : u > 0.88 ? 1 : (front ? 3 : 2) + (Math.abs(u - 0.5) < 0.2 ? 1 : 0) - (x % 7 === 0 ? 1 : 0)]); }
   }
   pb.hl(5, 32, 31, WOOD[2]);
   if (front) { pb.rect(16, 15, 9, 8, 0x1c1418); pb.set(18, 17, 0xf0ece0); pb.set(22, 17, 0xf0ece0); pb.hl(18, 20, 5, 0xf0ece0); pb.set(20, 18, 0xf0ece0); }
@@ -116,12 +127,13 @@ function sloopSailFront(front) {
   pb.outline('auto');
   return { cv: pb.toCanvas(), dx: -20, dy: -38 };
 }
-function sloop(dir) {
+function sloop(dir, P = PAL.sloop, sails = SAIL) {
+  SP = sails;
   let pb, seat, ax, ay, sail;
   if (dir === 1 || dir === 2) {
     pb = new PB(58, 28);
     const cy = 12;
-    hullH(pb, 2, 55, cy, 8.5, 0.78, 3, PAL.sloop, true);
+    hullH(pb, 2, 55, cy, 8.5, 0.78, 3, P, true);
     for (let x = 6; x < 50; x += 7) pb.vl(x, cy - 5, 11, WOOD[3]);
     pb.rect(36, cy - 3, 6, 6, WOOD[2]); pb.hl(36, cy - 3, 6, WOOD[4]);
     pb.disc(30, cy, 1.6, WOOD[0]);
@@ -136,7 +148,7 @@ function sloop(dir) {
     const down = dir === 0;
     pb = new PB(28, 58);
     const cx = 14;
-    hullV(pb, 2, 55, cx, 8.5, 0.78, 3, PAL.sloop, down);
+    hullV(pb, 2, 55, cx, 8.5, 0.78, 3, P, down);
     for (let y = 6; y < 52; y += 7) pb.hl(cx - 5, y, 11, WOOD[3]);
     const my = down ? 34 : 24;
     pb.disc(cx, my, 1.6, WOOD[0]);
@@ -152,11 +164,13 @@ function sloop(dir) {
 let cache = null;
 export function boatSprites() {
   if (cache) return cache;
-  cache = { barque: [], sloop: [] };
+  cache = { barque: [], sloop: [], brick: [], noir: [], ghost: [] };
   for (let d = 0; d < 4; d++) {
     cache.barque[d] = [barque(d, 0), barque(d, 1)];
     const s = sloop(d);
     cache.sloop[d] = [s, s];
+    for (const [k, P, S] of [['brick', PAL.brick, SAILS.red], ['noir', PAL.noir, SAILS.black], ['ghost', PAL.ghost, SAILS.ghost]]) { const v = sloop(d, P, S); cache[k][d] = [v, v]; }
   }
+  SP = SAIL;
   return cache;
 }

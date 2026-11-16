@@ -25,12 +25,16 @@ export const PAL = {
   [T.STONEF]: [0x2e2a2c, 0x45403f, 0x5a5452, 0x6e6863, 0x857e76],
   [T.CAVE]: [0x262130, 0x332c3e, 0x403849, 0x4e4558, 0x645a70],
   [T.CWALL]: [0x15121b, 0x262130, 0x383145, 0x4e465c, 0x6a6078],
+  [T.ASH]: [0x1c181c, 0x2c262a, 0x3c3438, 0x4e4447, 0x685c5c],
+  [T.DGRASS]: [0x1c2418, 0x283222, 0x34402a, 0x425032, 0x56663e],
+  [T.LAVA]: [0x3a1810, 0xe0501a, 0xff9a2a, 0xffd860, 0xfff2b0],
 };
 export const MINI_COL = {
   [T.DEEP]: 0x1b4f7c, [T.WATER]: 0x2f8fb6, [T.SAND]: 0xe4c98d, [T.GRASS]: 0x4f9c49, [T.JUNGLE]: 0x2c6c3f,
   [T.DIRT]: 0xa07a4e, [T.COBBLE]: 0xa69e93, [T.PLANK]: 0x83552f, [T.SWAMP]: 0x34442a, [T.MARSH]: 0x4b5d3a,
   [T.ROCK]: 0x6b697c, [T.MUD]: 0x554233, [T.VOID]: 0x07050b, [T.FLOOR]: 0x6b4527, [T.STONEF]: 0x5a5452,
   [T.CAVE]: 0x2c2733, [T.CWALL]: 0x15121b, [T.IWALL]: 0x2a1c14, [T.EXIT]: 0x6b4527,
+  [T.ASH]: 0x3c3438, [T.LAVA]: 0xff6a1a, [T.DGRASS]: 0x34402a,
 };
 // styles des murs intérieurs : soubassement lambrissé, cimaise, haut de mur, corniche
 const WALLS = {
@@ -38,13 +42,17 @@ const WALLS = {
   auberge: { up: 'plaster', U: [0x8a7c64, 0xa89878, 0xbcae90, 0xcfc2a6, 0xded3bc], N: [0x1a2a22, 0x223a2e, 0x2c4a3a, 0x3a5e4a, 0x4e765e], F: [0x3a2416, 0x55361f, 0x6b4527, 0x80552f, 0x96663a] },
   house: { up: 'plaster', U: [0x9a8c70, 0xb8a888, 0xcbbd9e, 0xdcd0b4, 0xeae0c8], N: [0x24160c, 0x3a2414, 0x553620, 0x6f482a, 0x8a5c36], F: [0x4a2e1a, 0x66402a, 0x7c5034, 0x92623e, 0xa87448] },
   forge: { up: 'bricks', U: [0x2a2426, 0x3e3436, 0x524648, 0x66585a, 0x7c6e6e], N: [0x1e1a1c, 0x2c2628, 0x3a3234, 0x4a4042, 0x5c5052], F: [0x2e2a2c, 0x45403f, 0x5a5452, 0x6e6863, 0x857e76] },
+  geole: { up: 'bricks', U: [0x1e1c20, 0x2e2a2e, 0x3e383c, 0x4e4648, 0x605858], N: [0x141216, 0x1e1c20, 0x2a2628, 0x383234, 0x4a4244], F: [0x2e2a2c, 0x45403f, 0x5a5452, 0x6e6863, 0x857e76] },
+  arene: { up: 'bricks', U: [0x2a2224, 0x3e3234, 0x524446, 0x665658, 0x7c6a6a], N: [0x1a1416, 0x2a2224, 0x3a3032, 0x4a3e40, 0x5c4e50], F: [0x2e2a2c, 0x45403f, 0x5a5452, 0x6e6863, 0x857e76] },
+  couture: { up: 'plaster', U: [0x6a5a7a, 0x84729a, 0x9a88ae, 0xb09ec2, 0xc8b8d6], N: [0x2a1a3a, 0x3a2650, 0x4a3264, 0x5a4078, 0x6c4e8c], F: [0x3a2416, 0x55361f, 0x6b4527, 0x80552f, 0x96663a] },
+  receleur: { up: 'planks', U: [0x24180e, 0x362416, 0x48301c, 0x5a3c24, 0x6c4a2c], N: [0x140c06, 0x24180e, 0x342214, 0x442c1a, 0x563820], F: [0x24180e, 0x362416, 0x48301c, 0x5a3c24, 0x6c4a2c] },
   chantier: { up: 'planks', U: [0x4a3220, 0x66462c, 0x7e5838, 0x966a44, 0xae7e52], N: [0x2a1a0e, 0x3e2816, 0x553820, 0x6b482a, 0x845a36], F: [0x5a3a22, 0x74502e, 0x8a6038, 0xa07244, 0xb88652] },
 };
 const isFloor = (t) => t === T.FLOOR || t === T.STONEF;
 
-const RAISED = new Uint8Array(16);
-RAISED[T.GRASS] = 1; RAISED[T.JUNGLE] = 1; RAISED[T.MARSH] = 1; RAISED[T.ROCK] = 1;
-const WATERY = new Uint8Array(16);
+const RAISED = new Uint8Array(32);
+RAISED[T.GRASS] = 1; RAISED[T.JUNGLE] = 1; RAISED[T.MARSH] = 1; RAISED[T.ROCK] = 1; RAISED[T.DGRASS] = 1;
+const WATERY = new Uint8Array(32);
 WATERY[T.DEEP] = 1; WATERY[T.WATER] = 1;
 
 const RING = [];
@@ -175,7 +183,7 @@ export class Terrain {
           if (RAISED[at(lx, ly - 1)] || RAISED[at(lx, ly - 2)]) col = shade(col, 0.82);
           break;
         }
-        case T.GRASS: case T.JUNGLE: case T.MARSH: {
+        case T.GRASS: case T.JUNGLE: case T.MARSH: case T.DGRASS: {
           let P = PAL[t];
           const n = valueNoise(wx / 19, wy / 19, 51 + t) * 0.6 + valueNoise(wx / 6, wy / 6, 52 + t) * 0.4;
           let k = n < 0.3 ? 1 : n < 0.68 ? 2 : 3;
@@ -214,6 +222,28 @@ export class Terrain {
             if ((z === Z.JUNGLE || z === Z.RUINS) && valueNoise(wx / 8, wy / 8, 66) > 0.56 && k > 1) col = mix(col, 0x3d7a3f, 0.7);
             else if (z === Z.PLAINS && valueNoise(wx / 8, wy / 8, 67) > 0.62 && k > 1) col = mix(col, 0x5a9a48, 0.55);
           }
+          break;
+        }
+        case T.ASH: { // cendres : braises éparses, halo rouge près de la lave
+          const P = PAL[T.ASH];
+          const n = valueNoise(wx / 9, wy / 9, 111) * 0.6 + valueNoise(wx / 3, wy / 3, 112) * 0.4;
+          let k = n < 0.38 ? 1 : n < 0.64 ? 2 : 3;
+          const h = hash2(wx, wy, 113);
+          if (h > 0.985) k = 4; else if (h < 0.015) k = 0;
+          col = P[k];
+          if (h > 0.9968) col = 0xff7a2a;
+          for (const [dx, dy, dd] of RING3) if (at(lx + dx, ly + dy) === T.LAVA) { col = mix(col, 0xb8381a, 0.55 * (1 - dd / 3.4)); break; }
+          if (RAISED[at(lx, ly - 1)] || RAISED[at(lx, ly - 2)]) col = shade(col, 0.8);
+          break;
+        }
+        case T.LAVA: { // lave : croûtes sombres sur un fond incandescent
+          const n = valueNoise(wx / 7, wy / 7, 121) * 0.6 + valueNoise(wx / 3, wy / 3, 122) * 0.4;
+          const crust = valueNoise(wx / 6 + 3, wy / 6, 123);
+          col = crust > 0.68 ? mix(0x2a120c, 0x5a2414, Math.min(1, (crust - 0.68) * 4)) : n > 0.64 ? 0xffd860 : n > 0.47 ? 0xff9a2a : 0xe0501a;
+          if (crust > 0.66 && crust < 0.69) col = 0xffb84a;
+          let edge = 9;
+          for (const [dx, dy, dd] of RING3) if (at(lx + dx, ly + dy) !== T.LAVA) { edge = dd; break; }
+          if (edge < 1.5) col = 0x2a120c; else if (edge < 2.6) col = mix(col, 0x5a1c10, 0.55);
           break;
         }
         case T.DIRT: case T.MUD: {
