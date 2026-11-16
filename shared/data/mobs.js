@@ -70,3 +70,20 @@ const ARMES = {
   roi_squelette: [['sabre_os', 0.3, 1, 1], ['mousquet_os', 0.25, 1, 1]],
 };
 for (const k in ARMES) MOBS[k].loot.push(...ARMES[k]);
+// 0.6 : boss à phases, attaques originales, et le Kraken
+Object.assign(MOBS.boss, { ai: 'cendre', phases: [0.6, 0.3], title: 'Le Fléau des Mers' });
+Object.assign(MOBS.roi_squelette, { ai: 'roi', phases: [0.66, 0.33], title: 'Souverain de l’Antre' });
+Object.assign(MOBS.crabroi, { ai: 'crabe', phases: [0.5], title: 'Seigneur des Grèves' });
+Object.assign(MOBS.goule_alpha, { ai: 'goule', phases: [0.6, 0.3], title: 'Terreur de Brumesel' });
+Object.assign(MOBS.capitaine_noye, { ai: 'noye', phases: [0.5], title: 'Revenant des Abysses' });
+MOBS.drowned.loot.push(['encre_noire', 0.3, 1, 1]);
+MOBS.capitaine_noye.loot.push(['encre_noire', 1, 2, 3]);
+MOBS.kraken = {
+  name: 'Le Kraken', level: 14, hp: 7000, dmg: 34, speed: 0, aggro: 420, leash: 99999, range: 0, atkCd: 99, windup: 1,
+  xp: 3000, gold: [500, 800], r: 34, respawn: 99999, elite: 1, sea: 1, ai: 'kraken', phases: [0.66, 0.33], title: 'Terreur des Abysses',
+  loot: [['oeil_kraken', 0.35, 1, 1], ['harpon_abysses', 0.3, 1, 1], ['bebe_kraken', 0.25, 1, 1], ['tentacule_fumee', 1, 2, 4], ['perle_ombre', 1, 3, 5], ['encre_noire', 1, 3, 6]],
+};
+MOBS.tentacule = {
+  name: 'Tentacule', level: 12, hp: 320, dmg: 22, speed: 0, aggro: 420, leash: 99999, range: 0, atkCd: 99, windup: 1,
+  xp: 40, gold: [0, 0], r: 10, respawn: 99999, sea: 1, ai: 'tentacle', loot: [['encre_noire', 0.3, 1, 1]],
+};

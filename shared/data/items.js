@@ -167,3 +167,39 @@ F('pistolet_cristal', { name: 'Pistolet de cristal', gun: 25, rarity: 2, value: 
 F('mortier_main', { name: 'Mortier à main', gun: 34, rarity: 2, value: 1700, cdMul: 2.2, shot: { n: 1, range: 150, speed: 170, kind: 'grenade', explode: 40 }, form: { k: 'gun', type: 'rifle', len: 7, muzzle: 'mortar', metal: 'bronze', wood: 'wood' }, desc: 'Lance un boulet qui explose à l’impact.' });
 F('mousquet_os', { name: 'Mousquet d’os royal', gun: 40, rarity: 2, value: 1900, cdMul: 1.6, shot: { n: 1, range: 260, speed: 420, pierce: 2, bleed: 0.25 }, form: { k: 'gun', type: 'rifle', len: 13, metal: 'bone', wood: 'bone', glow: 'green' }, desc: 'Ses balles d’os font saigner.' });
 F('couleuvrine', { name: 'Couleuvrine', gun: 52, rarity: 3, value: 3200, cdMul: 2.4, shot: { n: 1, range: 190, speed: 260, kind: 'cball', explode: 30, kb: 3 }, form: { k: 'gun', type: 'rifle', len: 11, muzzle: 'cannon', metal: 'bronze', wood: 'ebony' }, desc: 'Un canon de poche. Les morts ne s’en relèvent pas.' });
+// ----- 0.6 : maisons, animaux, cambriolages, Kraken, Jumeaux -----
+Object.assign(ITEMS, {
+  // mobilier (à placer dans votre maison, touche B)
+  table_bois: { name: 'Table en bois', place: 'table_h', home: 1, value: 25, icon: 'f_table', desc: 'Une solide table de taverne, pour vos cartes et vos chopes.' },
+  chaise_bois: { name: 'Chaise', place: 'chaise_h', home: 1, value: 10, icon: 'f_chair', desc: 'On y pose son séant et ses bottes.' },
+  etagere_bois: { name: 'Étagère garnie', place: 'etagere_h', home: 1, value: 30, icon: 'f_shelf', desc: 'Des bouteilles, des livres et des souvenirs de voyage.' },
+  armoire: { name: 'Armoire', place: 'armoire_h', home: 1, value: 40, icon: 'f_wardrobe', desc: 'Grande armoire de chêne. Décoration.' },
+  cheminee_pierre: { name: 'Cheminée', place: 'cheminee_h', home: 1, value: 60, icon: 'f_fireplace', desc: 'Un bon feu pour les nuits de Marée Morte.' },
+  plante_pot: { name: 'Plante en pot', place: 'plante_h', home: 1, value: 12, icon: 'f_plant', desc: 'Un petit palmier qui ne demande rien.' },
+  tableau_mer: { name: 'Tableau marin', place: 'tableau_h', home: 1, value: 45, icon: 'f_painting', desc: 'Un trois-mâts dans la tempête, sur son chevalet.' },
+  tapis_brode: { name: 'Tapis brodé', place: 'tapis_h', home: 1, value: 35, icon: 'f_rug', desc: 'Rouge et or, venu de très loin.' },
+  bibliotheque: { name: 'Bibliothèque', place: 'biblio_h', home: 1, value: 55, icon: 'f_books', desc: 'Des récits de naufrages et des cartes oubliées.' },
+  trophee_kraken: { name: 'Trophée du Kraken', place: 'trophee_h', home: 1, rarity: 3, value: 2500, icon: 'f_trophy', desc: 'Un œil géant dans un bocal. Les visiteurs ne restent pas longtemps.' },
+  serrure_renforcee: { name: 'Serrure renforcée', use: { lock: 1 }, value: 200, rarity: 1, icon: 'f_lock', desc: 'Utilisez-la chez vous : votre porte devient bien plus dure à crocheter.' },
+  // animaux de compagnie : à installer chez vous (B) ou à emmener (clic droit)
+  chaton: { name: 'Chaton de bord', pet: 'chat', place: 'pet_chat', home: 1, value: 120, icon: 'p_cat', desc: 'Il chasse les rats et ronronne. Clic droit : il vous suit.' },
+  chien: { name: 'Chien de garde', pet: 'chien', place: 'pet_chien', home: 1, value: 220, icon: 'p_dog', desc: 'Il aboie sur les voleurs. Chez vous, il rend votre porte plus dure à crocheter.' },
+  perroquet_vert: { name: 'Perroquet bavard', pet: 'perroquet', place: 'pet_perroquet', home: 1, value: 260, rarity: 1, icon: 'p_parrot', desc: 'Il répète tout. Surtout ce qu’il ne faut pas.' },
+  singe: { name: 'Singe chapardeur', pet: 'singe', place: 'pet_singe', home: 1, value: 320, rarity: 1, icon: 'p_monkey', desc: 'Adorable. Vérifiez vos poches.' },
+  bebe_kraken: { name: 'Bébé kraken', pet: 'kraken', place: 'pet_kraken', home: 1, value: 3000, rarity: 3, icon: 'p_kraken', desc: 'Retrouvé dans l’antre du Kraken. Il tient dans une main. Pour l’instant.' },
+  // cambriolage
+  crochets: { name: 'Crochets de serrurier', value: 30, icon: 'lockpick', desc: 'Devant la porte d’une maison qui n’est pas la vôtre : E pour crocheter. Un crochet casse souvent.' },
+  montre_gousset: { name: 'Montre à gousset en or', slot: 'trinket', crit: 0.05, spd: 0.03, value: 900, rarity: 2, icon: 'r_watch', desc: 'Volée dans une maison de corsaire. Elle tictaque encore.' },
+  bague_capitaine: { name: 'Bague de capitaine', slot: 'trinket', atk: 5, hp: 15, value: 1100, rarity: 2, icon: 'r_ring', desc: 'Une chevalière gravée d’une ancre. Pas à vous.' },
+  collier_perles_noires: { name: 'Collier de perles noires', slot: 'trinket', hp: 40, crit: 0.06, value: 2400, rarity: 3, icon: 'r_pearls', desc: 'Des perles des abysses. Introuvable autrement qu’en le volant.' },
+  coffret_bijoux: { name: 'Coffret à bijoux', value: 1500, rarity: 2, icon: 'r_casket', desc: 'Plein de bagues dépareillées. Un receleur en donnera un bon prix.' },
+  tableau_maitre: { name: 'Tableau de maître', place: 'tableau_maitre_h', home: 1, value: 3000, rarity: 3, icon: 'f_masterpiece', desc: 'Une toile inestimable, dérobée dans une maison de corsaire.' },
+  // Kraken
+  encre_noire: { name: 'Encre des abysses', value: 14, icon: 'ink', desc: 'Une encre glacée qui ne sèche jamais.' },
+  conque_abysses: { name: 'Conque des Abysses', quest: 1, use: { conch: 1 }, value: 500, rarity: 2, icon: 'conch', desc: 'À bord, dans le Gouffre du Kraken, utilisez-la (clic droit) pour appeler la bête.' },
+  oeil_kraken: { name: 'Œil du Kraken', slot: 'trinket', hp: 50, atk: 6, crit: 0.06, value: 4000, rarity: 3, icon: 'kraken_eye', desc: 'Il vous regarde encore. Il voit les morts venir.' },
+  tentacule_fumee: { name: 'Tentacule fumé', use: { heal: 120, en: 30 }, value: 40, rarity: 1, icon: 'tentacle_food', desc: 'Rend 120 PV et 30 d’énergie. Ça résiste sous la dent.' },
+});
+W('harpon_abysses', { name: 'Harpon des Abysses', atk: 34, speed: 0.55, reach: 42, arc: 0.6, kb: 2, leech: 0.06, rarity: 3, value: 4200, form: { k: 'spear', len: 17, head: 'harpoon', bl: 'teal', hi: 'dark', gu: 'teal', anim: 'thrust', glow: 'cold' }, desc: 'Forgé dans une dent du Kraken. Il a le goût de la mer.' });
+W('sabre_jumeaux', { name: 'Sabre des Jumeaux', atk: 33, speed: 0.4, arc: 1.3, crit: 0.1, leech: 0.05, rarity: 3, value: 3800, form: { k: 'blade', len: 15, w: 3, curve: 2.6, tip: 'point', guard: 'basket', bl: 'silver', hi: 'dark', gu: 'gold', glow: 'purple' }, desc: 'Deux lunes gravées sur la lame. Il ne s’ouvre qu’à ceux qui ne voyagent pas seuls.' });
+ITEMS.medaillon_lunes = { name: 'Médaillon des Deux Lunes', slot: 'trinket', atk: 4, hp: 30, crit: 0.08, value: 3600, rarity: 3, icon: 'r_moons', desc: 'Deux lunes d’argent qui se tiennent la main.' };

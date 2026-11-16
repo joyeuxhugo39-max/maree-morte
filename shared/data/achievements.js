@@ -16,5 +16,9 @@ export const ACHIEVEMENTS = {
   speleo: { name: 'Sous la roche', desc: 'Découvrir les trois grottes secrètes.', title: 'Rat des cavernes' },
   duel: { name: 'Premier duel', desc: 'Vaincre un autre pirate hors des zones sûres.', title: 'Duelliste' },
   fouineur: { name: 'Fouineur', desc: 'Trouver trois cachettes secrètes.', title: 'Fouineur des cales' },
+  proprietaire: { name: 'Pignon sur rue', desc: 'Acheter une maison au quartier des Corsaires.', title: 'Propriétaire' },
+  cambrioleur: { name: 'Doigts de fée', desc: 'Réussir un cambriolage.', title: 'Monte-en-l’air' },
+  jumeaux: { name: 'Les Deux Lunes', desc: 'Ouvrir le Sanctuaire des Jumeaux, à deux.', title: 'Âme jumelle' },
+  kraken: { name: 'Tueur de Kraken', desc: 'Vaincre le Kraken du Gouffre.', title: 'Fléau des Abysses' },
   roi_os: { name: 'Régicide', desc: 'Vaincre le Roi des Os, au fond de l’Antre du Crâne.', title: 'Briseur d’os' },
 };

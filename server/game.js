@@ -5,7 +5,7 @@ import {
   INTERACT_RANGE, PICKUP_RANGE, T, dayFrac, isNight, weatherAt, DAY_LENGTH as DAYLEN,
 } from '../shared/constants.js';
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
-import { HARVEST, STRUCTS, RECIPE, STATIONS, CLAIM_R, BASE_MAX, PLANTER_GROW } from '../shared/data/craft.js';
+import { HARVEST, STRUCTS, RECIPE, STATIONS, CLAIM_R, BASE_MAX, PLANTER_GROW, HOME_OK, HOME_MAX, HOME_PRICE } from '../shared/data/craft.js';
 import { generateWorld, canStand, moveWithCollision, zoneAt, tileAt, blocksShot, canSail, roomIdAt, Z, ZONES, SAFE } from '../shared/world.js';
 import { ITEMS, STACK_MAX, isStackable } from '../shared/data/items.js';
 import { MOBS } from '../shared/data/mobs.js';
@@ -29,6 +29,23 @@ const CHEST_LOOT = [
   { gold: [80, 160], items: [['rhum', 0.8, 1, 2], ['perle_ombre', 0.6, 1, 2], ['carte_dechiree', 0.5, 1, 2], ['eclat_cristal', 0.3, 1, 2], ['elixir_flamme', 0.3, 1, 1]] },
 ];
 const CHEST_COOLDOWN_MS = 15 * 60 * 1000;
+// cambriolage : les objets très rares qu'on ne trouve que chez les autres
+const BURGLE_RARE = [['montre_gousset', 30], ['bague_capitaine', 25], ['coffret_bijoux', 25], ['collier_perles_noires', 12], ['tableau_maitre', 8]];
+const HOME_STORE = 30;
+// répliques des boss quand ils changent de phase
+const BOSS_LINES = {
+  cendre: [null, 'Vous allez goûter à ma bordée !', 'Brûlez avec moi, chiens de terre !'],
+  roi: [null, 'Levez-vous, mes sujets !', 'Mon royaume sera votre tombeau !'],
+  crabe: [null, '*Les pinces du Crabe-Roi claquent de rage*'],
+  goule: [null, 'AOUUUUH ! La meute a faim !', '*La Goule Alpha entre en frénésie*'],
+  noye: [null, 'La mer réclame son dû !'],
+};
+// distance d'un point à un segment
+const segDist = (px, py, x0, y0, x1, y1) => {
+  const dx = x1 - x0, dy = y1 - y0, L = dx * dx + dy * dy;
+  const t = L ? Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / L)) : 0;
+  return Math.hypot(px - (x0 + dx * t), py - (y0 + dy * t));
+};
 const INV_WAVES = [[['zsailor', 6], ['crab', 3]], [['drowned', 5], ['buccaneer', 3]], [['capitaine_noye', 1], ['drowned', 3], ['zsailor', 3]]];
 
 export class Game {
@@ -44,7 +61,7 @@ export class Game {
     this.drops = new Map();
     this.projs = [];
     this.bombs = [];
-    this.teles = [];
+    this.teles = []; this.lteles = []; this.allies = []; this.kraken = null;
     this.timers = [];
     this.time = 0;
     this.worldTime = DAY_LENGTH * 0.08;
@@ -72,6 +89,7 @@ export class Game {
     this.invasion = null; this.invNight = -1;
     // artisanat et bases
     this.depleted = new Map();
+    this.homes = new Map(); this.plotByRoom = new Map(this.world.plots.map((pl) => [pl.room, pl.k])); this.seals = { jumeaux: 0 };
     this.structs = new Map(); this.floors = new Map(); this.bases = new Map();
     this.worldPersist = !!(storage && typeof storage.saveWorld === 'function');
     this.worldDirty = false; this.lastWorldSave = 0;
@@ -91,7 +109,7 @@ export class Game {
     if (!this.players.has(p.id)) return;
     this.save(p);
     this.players.delete(p.id);
-    if (!this.worldPersist) this.removeBase(p.key);
+    if (!this.worldPersist) { this.removeBase(p.key); this.removeHome(p.key); }
     for (const m of this.mobs) if (m.target === p.id) m.target = 0;
     this.broadcastChat(null, `${p.name} a quitté l'archipel.`, 'sys');
     this.log(`[jeu] ${p.name} déconnecté (${this.players.size} en ligne)`);
@@ -141,6 +159,8 @@ export class Game {
       case 'door': return this.onDoor(p, m.id | 0, !!m.out);
       case 'board': return this.board(p, +m.a, m.slot == null ? -1 : m.slot | 0);
       case 'land': return this.land(p, +m.a);
+      case 'home': return this.homeAction(p, String(m.a), m.k | 0);
+      case 'lock': return this.pickLock(p, m.k | 0, !!m.ok);
     }
   }
 
@@ -171,6 +191,7 @@ export class Game {
     s.player = p;
     this.players.set(p.id, p);
     if (p.pendingBase) { this.importBase(p.key, p.name, p.pendingBase); p.pendingBase = null; }
+    if (p.pendingHome) { this.importHome(p.key, p.name, p.pendingHome); p.pendingHome = null; }
     this.send(p, {
       t: 'welcome', id: p.id, seed: this.world.seed, wt: this.worldTime, solo: this.solo,
       me: this.meState(p), inv: p.inv, eq: p.eq, q: p.quests, chests: p.chests, look: p.look, base: p.base,
@@ -178,6 +199,7 @@ export class Game {
       history: (this.chatLog || []).slice(-12),
       build: this.buildSnapshot(p.key), dep: [...this.depleted].filter(([, t]) => t > this.time).map(([id, t]) => [id, Math.round(t - this.time)]),
       respawnAt: p.respawnAt, found: [...p.found], boat: p.boat, room: p.room,
+      kr: this.kraken ? 1 : 0, homes: this.homesList(), seals: { jumeaux: Math.max(0, Math.round(this.seals.jumeaux - this.time)) }, pet: p.pet,
     });
     this.broadcastChat(null, `${p.name} accoste à Port-Lanterne.`, 'sys');
     if (!res.data) this.toast(p, 'Bienvenue ! Parlez à la Capitaine Morgane, près des quais (touche E).', 'quest');
@@ -198,7 +220,7 @@ export class Game {
       known: new Map(), dirtyMe: true, dirtyInv: false, dirtyQ: false, lastSave: this.time,
       lastHurt: -99, lastChat: -9, zone: Z.TOWN, lookVer: 0, kills: 0,
       upg: {}, treasure: null, ach: {}, title: null, cnt: { crab: 0, fish: 0 }, fishing: null, respawnAt: null,
-      found: new Set(), boat: null, room: -1, pk: 0, pvpLog: new Map(), caches: {},
+      found: new Set(), boat: null, room: -1, pk: 0, pvpLog: new Map(), caches: {}, pet: null, burgle: null, thiefUntil: 0, robbed: {},
     };
     if (d) {
       p.level = Math.max(1, Math.min(MAX_LEVEL, d.level | 0 || 1));
@@ -215,6 +237,8 @@ export class Game {
       if (d.cnt) { p.cnt.crab = d.cnt.crab | 0; p.cnt.fish = d.cnt.fish | 0; }
       if (d.respawnAt && typeof d.respawnAt.tx === 'number') p.respawnAt = { tx: d.respawnAt.tx | 0, ty: d.respawnAt.ty | 0 };
       if (!this.worldPersist && d.base) p.pendingBase = d.base;
+      if (!this.worldPersist && d.home) p.pendingHome = d.home;
+      if (typeof d.pet === 'string') p.pet = d.pet;
       if (Array.isArray(d.found)) for (const id of d.found) if (this.world.doors[id | 0] && this.world.doors[id | 0].secret) p.found.add(id | 0);
       p.pk = d.pk | 0;
       if (d.caches && typeof d.caches === 'object') for (const k in d.caches) p.caches[k | 0] = 1;
@@ -234,7 +258,7 @@ export class Game {
     return p;
   }
   serialize(p) {
-    return { name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: p.quests, chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: p.ach, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
+    return { name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: p.quests, chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: p.ach, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
   }
   save(p) {
     p.lastSave = this.time;
@@ -278,7 +302,7 @@ export class Game {
     const m = {
       id: this.nextId++, type, def, x: sx, y: sy, sx, sy, hp: def.hp, maxHp: def.hp, dir: 0,
       state: 'idle', target: 0, nextAtk: 0, windup: 0, atkA: 0, wanderAt: this.time + rand(1, 6), wx: sx, wy: sy,
-      deadUntil: 0, tags: new Map(), moving: false, summoned, boss: !!def.boss, nextSummon: 0, nextVolley: 0, adds: [],
+      deadUntil: 0, tags: new Map(), moving: false, summoned, boss: !!def.boss, nextSummon: 0, nextVolley: 0, adds: [], phase: 0, cd: {}, pauseUntil: 0,
       room: roomIdAt(this.world, sx, sy),
     };
     this.mobs.push(m);
@@ -287,6 +311,7 @@ export class Game {
   respawnMob(m) {
     for (const b of this.bases.values()) if (Math.hypot(m.sx / TILE - b.tx, m.sy / TILE - b.ty) < CLAIM_R + 2) { m.deadUntil = this.time + 30; return; }
     m.x = m.sx; m.y = m.sy; m.hp = m.maxHp; m.state = 'idle'; m.target = 0; m.tags.clear(); m.windup = 0;
+    m.phase = 0; m.cd = {}; m.frenzy = 0; m.shieldUntil = 0; m.dash = null; m.leap = null; m.pauseUntil = 0;
     m.id = this.nextId++; // nouvel identifiant : les clients le voient « apparaître »
     this.ev(m.x, m.y, ['fx', 'spawn', m.x, m.y]);
     if (m.def.elite && this.players.size) this.broadcastChat(null, `☠ ${m.def.name} rôde à nouveau : ${m.room >= 0 ? this.world.rooms[m.room].name : ZONES[zoneAt(this.world, m.x, m.y)].name}.`, 'night');
@@ -326,16 +351,17 @@ export class Game {
         if (this.time >= m.deadUntil) this.respawnMob(m);
         continue;
       }
+      if (m.def.sea) { if (m.def.ai === 'kraken') this.krakenAI(m); else this.tentacleAI(m); continue; }
       // seuls les monstres proches d'un joueur réfléchissent
       let awake = false;
       for (const p of this.players.values()) if (Math.abs(p.x - m.x) < 700 && Math.abs(p.y - m.y) < 500) { awake = true; break; }
       if (!awake) { if (m.state !== 'idle') { m.x = m.sx; m.y = m.sy; m.hp = m.maxHp; m.state = 'idle'; m.target = 0; } m.moving = false; continue; }
       active.push(m);
       const def = m.def;
-      const speed = def.speed * spdMul * (m.boss && m.hp < m.maxHp * 0.25 ? 1.25 : 1);
+      const speed = def.speed * spdMul * (m.boss && m.hp < m.maxHp * 0.25 ? 1.25 : 1) * (m.frenzy ? 1.3 : 1);
       if (m.state === 'idle') {
         const t = this.nearestTarget(m, def.aggro);
-        if (t) { m.state = 'chase'; m.target = t.id; if (def.groan) this.ev(m.x, m.y, ['groan', m.id]); }
+        if (t) { m.state = 'chase'; m.target = t.id; if (def.groan) this.ev(m.x, m.y, ['groan', m.id]); if (def.ai) this.bossIntro(m); }
         else {
           if (this.time >= m.wanderAt) {
             const a = Math.random() * Math.PI * 2, r = rand(10, 46);
@@ -347,21 +373,24 @@ export class Game {
       } else if (m.state === 'return') {
         const d = this.stepMob(m, m.sx, m.sy, speed * 1.3);
         m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.05);
-        if (d < 6) { m.state = 'idle'; m.hp = m.maxHp; m.tags.clear(); }
+        if (d < 6) { m.state = 'idle'; m.hp = m.maxHp; m.tags.clear(); m.phase = 0; m.frenzy = 0; m.shieldUntil = 0; }
       } else if (m.state === 'chase') {
         const t = this.players.get(m.target);
         const leashed = Math.hypot(m.x - m.sx, m.y - m.sy) > def.leash;
         if (!t || !this.mobCanTarget(m, t) || leashed) {
           const other = !leashed && this.nearestTarget(m, def.aggro);
-          if (other) m.target = other.id; else { m.state = 'return'; m.target = 0; m.windup = 0; this.despawnAdds(m); }
+          if (other) m.target = other.id; else { m.state = 'return'; m.target = 0; m.windup = 0; m.dash = null; m.leap = null; m.pauseUntil = 0; this.despawnAdds(m); }
           continue;
         }
         const d = dist(m, t);
+        if (m.pauseUntil > this.time) { m.moving = false; continue; }
+        if (m.dash) { this.updateDash(m); continue; }
+        if (m.leap) { this.updateLeap(m); continue; }
         if (m.windup) {
           m.moving = false;
           if (this.time >= m.windup) {
             m.windup = 0;
-            m.nextAtk = this.time + def.atkCd * (m.boss && m.hp < m.maxHp * 0.25 ? 0.7 : 1);
+            m.nextAtk = this.time + def.atkCd * (m.boss && m.hp < m.maxHp * 0.25 ? 0.7 : 1) * (m.frenzy ? 0.6 : 1);
             this.resolveMobAttack(m, t, night);
           }
         } else if (def.ranged) {
@@ -382,12 +411,13 @@ export class Game {
             this.ev(m.x, m.y, ['wind', m.id, +m.atkA.toFixed(2), def.windup]);
           }
         }
-        if (m.boss) this.bossSpecials(m, t);
+        if (def.ai) this.bossAI(m, t);
       }
     }
     // séparation légère pour éviter les empilements
     for (let i = 0; i < active.length; i++) for (let j = i + 1; j < active.length; j++) {
       const a = active[i], b = active[j];
+      if (a.leap || b.leap) continue;
       const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy), min = (a.def.r + b.def.r) * 0.9;
       if (d > 0.01 && d < min) {
         const push = (min - d) * 0.25;
@@ -418,35 +448,361 @@ export class Game {
       if (!m.boss) break;
     }
   }
-  bossSpecials(m, t) {
-    if (this.time >= m.nextSummon) {
-      m.nextSummon = this.time + 15;
-      m.adds = m.adds.filter((a) => a.state !== 'dead' && this.mobs.includes(a));
-      if (m.adds.length < 4) {
-        for (let k = 0; k < 2; k++) {
-          const a = Math.random() * Math.PI * 2;
-          const x = m.x + Math.cos(a) * 26, y = m.y + Math.sin(a) * 20;
-          if (!canStand(this.world, x, y, true)) continue;
-          const add = this.addMob('zsailor', x, y, true);
-          add.state = 'chase'; add.target = t.id; add.sx = m.sx; add.sy = m.sy;
-          m.adds.push(add);
-          this.ev(x, y, ['fx', 'summon', x, y]);
+  // ------------------------------------------------------------ boss : entrée, phases, attaques
+  bossIntro(m) {
+    if (this.time - (m.introAt || -1e9) < 120) return;
+    m.introAt = this.time; m.pauseUntil = this.time + 2.4; m.windup = 0; m.cd = {};
+    this.ev(m.x, m.y, ['cine', 'boss', m.id, m.type]);
+    for (const p of this.players.values()) if (p.room === m.room && dist(p, m) < 360) p.invulnUntil = Math.max(p.invulnUntil, this.time + 2.4);
+  }
+  tele(x, y, r, dur, dmg, src, style = 0) {
+    this.teles.push({ x, y, r, at: this.time + dur, dmg, src });
+    this.ev(x, y, ['tele', Math.round(x), Math.round(y), r, dur, style]);
+  }
+  lineTele(x0, y0, x1, y1, w, dur, dmg, src, style = 0) {
+    if (dmg) this.lteles.push({ x0, y0, x1, y1, w, at: this.time + dur, dmg, src });
+    this.ev(x0, y0, ['teleL', Math.round(x0), Math.round(y0), Math.round(x1), Math.round(y1), w, dur, style]);
+  }
+  // les cibles d'un boss : les pirates proches, dans la même pièce
+  bossTargets(m, r) { return [...this.players.values()].filter((p) => !p.dead && !SAFE.has(p.zone) && p.room === m.room && dist(p, m) < r); }
+  summonAdds(m, t, type, n, max, line) {
+    m.adds = m.adds.filter((a) => a.state !== 'dead' && this.mobs.includes(a));
+    if (m.adds.length >= max) return;
+    for (let k = 0; k < n; k++) {
+      const a = Math.random() * Math.PI * 2;
+      const x = m.x + Math.cos(a) * 28, y = m.y + Math.sin(a) * 22;
+      if (!canStand(this.world, x, y, true) || roomIdAt(this.world, x, y) !== m.room) continue;
+      const add = this.addMob(type, x, y, true);
+      add.state = 'chase'; add.target = t.id; add.sx = m.sx; add.sy = m.sy;
+      m.adds.push(add);
+      this.ev(x, y, ['fx', 'summon', x, y]);
+    }
+    if (line) this.ev(m.x, m.y, ['shout', m.id, line]);
+  }
+  // charge en ligne droite, annoncée par une bande au sol
+  startDash(m, t, len, speed, dmg, warn = 0.8) {
+    const a = Math.atan2(t.y - m.y, t.x - m.x);
+    const x1 = m.x + Math.cos(a) * len, y1 = m.y + Math.sin(a) * len;
+    this.lineTele(m.x, m.y, x1, y1, m.def.r * 2 + 6, warn, 0, m, 1);
+    m.dash = { at: this.time + warn, until: this.time + warn + len / speed, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, dmg, hit: new Set() };
+    m.windup = 0; m.dir = dirOf(t.x - m.x, t.y - m.y);
+    this.ev(m.x, m.y, ['dash', m.id, +a.toFixed(2), warn]);
+  }
+  updateDash(m) {
+    const D = m.dash;
+    if (this.time < D.at) { m.moving = false; return; }
+    if (this.time >= D.until) { m.dash = null; m.moving = false; return; }
+    const [nx, ny] = moveWithCollision(this.world, m.x, m.y, D.vx * DT, D.vy * DT, true);
+    if (Math.abs(nx - m.x) + Math.abs(ny - m.y) < 0.2) { m.dash = null; m.moving = false; return; }
+    m.x = nx; m.y = ny; m.moving = true; m.dir = dirOf(D.vx, D.vy);
+    for (const p of this.players.values()) {
+      if (p.dead || SAFE.has(p.zone) || p.room !== m.room || D.hit.has(p.id) || Math.hypot(p.x - m.x, p.y - m.y) > m.def.r + 10) continue;
+      D.hit.add(p.id); this.damagePlayer(p, D.dmg, m);
+    }
+  }
+  updateLeap(m) {
+    const L = m.leap, k = Math.min(1, (this.time - L.at) / (L.until - L.at));
+    m.x = L.x0 + (L.x1 - L.x0) * k; m.y = L.y0 + (L.y1 - L.y0) * k; m.moving = true;
+    if (k >= 1) { m.leap = null; m.moving = false; m.pauseUntil = this.time + 0.35; }
+  }
+  bossAI(m, t) {
+    const def = m.def, ph = def.phases || [], now = this.time;
+    if (m.phase < ph.length && m.hp < m.maxHp * ph[m.phase]) {
+      m.phase++;
+      m.windup = 0; m.pauseUntil = now + 1.2;
+      this.ev(m.x, m.y, ['phase', m.id, m.phase]);
+      const line = BOSS_LINES[def.ai] && BOSS_LINES[def.ai][m.phase];
+      if (line) this.ev(m.x, m.y, ['shout', m.id, line]);
+      if (def.ai === 'goule' && m.phase === 2) m.frenzy = 1;
+      return;
+    }
+    if (m.windup) return;
+    // une capacité n'est prête qu'après la moitié de son temps de recharge au début du combat
+    const ready = (k, s) => { if (m.cd[k] == null) { m.cd[k] = now + s * 0.5; return false; } if (m.cd[k] > now) return false; m.cd[k] = now + s; return true; };
+    const P = m.phase;
+    switch (def.ai) {
+      case 'cendre': { // Capitaine Barbe-Cendre
+        if (ready('sum', P >= 2 ? 10 : 15)) this.summonAdds(m, t, 'zsailor', 2, 4, 'À moi, mes morts !');
+        if (P >= 1 && ready('vol', 8)) {
+          for (const p of this.bossTargets(m, 260)) for (let k = 0; k < 2; k++) this.tele(p.x + rand(-28, 28) * k, p.y + rand(-20, 20) * k, 26, 1.3, 34, m, 2);
+          this.ev(m.x, m.y, ['shout', m.id, 'Feu à volonté !']);
+        } else if (P >= 1 && ready('dash', 9)) { this.startDash(m, t, 150, 270, 32); this.ev(m.x, m.y, ['shout', m.id, 'À l’abordage !']); }
+        else if (P >= 2 && ready('ring', 11)) { // cercles de cendre
+          for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; this.tele(m.x + Math.cos(a) * 52, m.y + Math.sin(a) * 40, 20, 0.9, 30, m, 3); }
+          for (let k = 0; k < 9; k++) { const a = (k + 0.5) / 9 * Math.PI * 2; this.tele(m.x + Math.cos(a) * 100, m.y + Math.sin(a) * 76, 22, 1.6, 30, m, 3); }
+          m.pauseUntil = now + 0.9;
+          this.ev(m.x, m.y, ['shout', m.id, 'Que la cendre vous recouvre !']);
         }
-        this.ev(m.x, m.y, ['shout', m.id, 'À moi, mes morts !']);
+        break;
+      }
+      case 'roi': { // Roi des Os
+        if (ready('spk', P >= 2 ? 4 : 6)) {
+          for (const p of this.bossTargets(m, 230)) { this.tele(p.x, p.y, 18, 1.0, 28, m, 4); for (let k = 0; k < 2; k++) this.tele(p.x + rand(-30, 30), p.y + rand(-22, 22), 18, 1.0 + k * 0.25, 28, m, 4); }
+          this.ev(m.x, m.y, ['fx', 'bones', m.x, m.y]);
+        } else if (P >= 1 && ready('rise', 14)) this.summonAdds(m, t, 'skelgun', 2, 3, 'Levez-vous, canonniers !');
+        else if (P >= 2 && ready('storm', 7)) {
+          m.pauseUntil = now + 1.4;
+          this.ev(m.x, m.y, ['shout', m.id, 'Tempête d’os !']);
+          for (let w = 0; w < 2; w++) this.later(0.5 + w * 0.6, () => {
+            if (m.state === 'dead') return;
+            this.ev(m.x, m.y, ['atk', m.id, 0, 2]);
+            for (let k = 0; k < 12; k++) this.spawnProj(m.x, m.y - 10, (k + w * 0.5) / 12 * Math.PI * 2, 120, 210, 20, 'm', m.id, 'bone', 0);
+          });
+        }
+        break;
+      }
+      case 'crabe': { // Crabe-Roi
+        if (P >= 1 && ready('shell', 11)) { // carapace puis onde de choc
+          m.shieldUntil = now + 3; m.pauseUntil = now + 3;
+          this.ev(m.x, m.y, ['shield', m.id, 3]);
+          this.tele(m.x, m.y, 66, 3, 22, m, 5);
+        } else if (ready('dash', P >= 1 ? 5 : 7)) this.startDash(m, t, 130, 240, 18, 0.7);
+        break;
+      }
+      case 'goule': { // Goule Alpha
+        if (ready('leap', P >= 2 ? 4.5 : 7)) {
+          const tx = t.x, ty = t.y;
+          if (canStand(this.world, tx, ty, true) && roomIdAt(this.world, tx, ty) === m.room && dist(m, t) > 30) {
+            m.leap = { x0: m.x, y0: m.y, x1: tx, y1: ty, at: now, until: now + 0.9 };
+            this.tele(tx, ty, 30, 0.9, 26, m, 6);
+            this.ev(m.x, m.y, ['leap', m.id, Math.round(tx), Math.round(ty), 0.9]);
+          }
+        } else if (P >= 1 && ready('howl', 15)) { this.ev(m.x, m.y, ['howl', m.id]); this.summonAdds(m, t, 'ghoul', 2, 3, 'AOUUUUH !'); m.pauseUntil = now + 0.8; }
+        break;
+      }
+      case 'noye': { // Capitaine Noyé
+        if (ready('gey', 6)) {
+          for (const p of this.bossTargets(m, 240)) { this.tele(p.x, p.y, 22, 1.1, 26, m, 7); for (let k = 0; k < 2; k++) this.tele(p.x + rand(-34, 34), p.y + rand(-26, 26), 22, 1.3, 26, m, 7); }
+        } else if (P >= 1 && ready('anchor', 9)) {
+          const a = Math.atan2(t.y - m.y, t.x - m.x);
+          this.lineTele(m.x, m.y - 6, m.x + Math.cos(a) * 170, m.y - 6 + Math.sin(a) * 170, 24, 0.9, 34, m, 2);
+          this.ev(m.x, m.y, ['shout', m.id, 'Par le fond !']);
+          m.pauseUntil = now + 1.0;
+        } else if (P >= 1 && ready('sum', 16)) this.summonAdds(m, t, 'drowned', 2, 3, 'L’équipage, à moi !');
+        break;
       }
     }
-    if (m.hp < m.maxHp * 0.6 && this.time >= m.nextVolley) {
-      m.nextVolley = this.time + 8;
-      for (const p of this.players.values()) {
-        if (p.dead || SAFE.has(p.zone) || p.room !== m.room || dist(p, m) > 260) continue;
-        for (let k = 0; k < 2; k++) {
-          const x = p.x + rand(-28, 28) * k, y = p.y + rand(-20, 20) * k;
-          this.teles.push({ x, y, r: 26, at: this.time + 1.3, dmg: 34 });
-          this.ev(x, y, ['tele', Math.round(x), Math.round(y), 26, 1.3]);
-        }
-      }
-      this.ev(m.x, m.y, ['shout', m.id, 'Feu à volonté !']);
+  }
+  // ------------------------------------------------------------ le Kraken
+  seaPoint(cx, cy, r) {
+    for (let k = 0; k < 24; k++) { const a = Math.random() * Math.PI * 2, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r * 0.85; if (canSail(this.world, x, y)) return [x, y]; }
+    return [cx + r, cy];
+  }
+  blowConch(p, i) {
+    if (!p.boat) return this.toast(p, 'Soufflez dans la conque à bord d’un navire.', 'warn');
+    if (p.zone !== Z.GOUFFRE) return this.toast(p, 'Rien ne répond. Il faut être au-dessus du Gouffre du Kraken, au sud-est de Port-Lanterne.', 'warn');
+    if (this.kraken) return this.toast(p, 'Le Kraken est déjà là !', 'warn');
+    const s = p.inv[i]; s.n--; if (s.n <= 0) p.inv[i] = null; p.dirtyInv = true;
+    this.startKraken(p);
+  }
+  startKraken(p) {
+    const K = this.world.kraken, now = this.time;
+    const a = Math.atan2(p.y - K.y, p.x - K.x);
+    const sx = K.x + Math.cos(a) * 62, sy = K.y + Math.sin(a) * 52;
+    const kr = this.kraken = { t0: now, mob: null, tents: [], parts: new Set([p.id]), emptySince: 0, phase: 0, mouette: null };
+    // le Goéland d'Elouan ouvre la route... et paie le prix
+    const goe = this.addAlly('Le Goéland', 'Capitaine Elouan', sx + Math.cos(a) * 70, sy + Math.sin(a) * 60);
+    goe.path = { x: sx, y: sy, speed: 34 };
+    for (const q of this.players.values()) if (q.room === -1 && Math.hypot(q.x - K.x, q.y - K.y) < 900) this.send(q, { t: 'cine', id: 'kraken', x: Math.round(K.x), y: Math.round(K.y), sx: Math.round(sx), sy: Math.round(sy) });
+    this.broadcastAll({ t: 'kr', on: 1 });
+    this.broadcastChat(null, `🐚 ${p.name} a soufflé dans la Conque des Abysses... Le Gouffre se met à bouillonner !`, 'boss');
+    this.later(0.9, () => this.allyShout(goe, 'Le voilà ! Tenez-vous prêts !'));
+    this.later(3.0, () => { goe.sink = 1; goe.ver++; goe.path = null; this.allyShout(goe, 'Il nous tient ! Abandonnez le navire !'); this.ev(goe.x, goe.y, ['sink', goe.id]); });
+    this.later(5.2, () => this.removeAlly(goe));
+    this.later(4.4, () => {
+      if (this.kraken !== kr) return;
+      const n = Math.max(1, [...this.players.values()].filter((q) => !q.dead && q.room === -1 && Math.hypot(q.x - K.x, q.y - K.y) < 600).length);
+      const m = this.addMob('kraken', K.x, K.y, true);
+      m.bossEvent = true; m.state = 'chase';
+      m.hp = m.maxHp = Math.min(10000, 3500 + 2500 * (n - 1));
+      m.pauseUntil = this.time + 2.6;
+      kr.mob = m;
+      this.ev(m.x, m.y, ['cine', 'krakenrise', m.id]);
+    });
+    this.later(6.2, () => { if (this.kraken === kr) for (let k = 0; k < 4; k++) this.spawnTentacle(kr, (k + 0.5) / 4 * Math.PI * 2 + rand(-0.3, 0.3)); });
+    this.later(8.5, () => {
+      if (this.kraken !== kr) return;
+      const [mx, my] = this.seaPoint(K.x, K.y, 250);
+      const mo = this.addAlly('La Mouette Écarlate', 'Capitaine Morgane', mx, my);
+      const a0 = Math.atan2(my - K.y, mx - K.x);
+      mo.path = { x: K.x + Math.cos(a0) * 140, y: K.y + Math.sin(a0) * 112, speed: 70 };
+      mo.orbit = { r: 140, a: a0, speed: 0.2 }; mo.fireAt = this.time + 4;
+      kr.mouette = mo;
+      this.allyShout(mo, 'Tenez bon ! La Mouette Écarlate arrive !');
+      this.later(3, () => this.allyShout(mo, 'Feu à volonté sur la bête !'));
+    });
+  }
+  spawnTentacle(kr, a) {
+    if (!kr.mob || kr.mob.state === 'dead') return;
+    const K = this.world.kraken;
+    for (let k = 0; k < 8; k++) {
+      const r = rand(68, 98), x = K.x + Math.cos(a) * r, y = K.y + Math.sin(a) * r * 0.85;
+      if (!canSail(this.world, x, y)) { a += 0.7; continue; }
+      const t = this.addMob('tentacule', x, y, true);
+      t.bossEvent = true; t.state = 'chase'; t.pauseUntil = this.time + 1.2;
+      t.cd = { slam: this.time + rand(1.8, 3.6), grab: this.time + rand(4, 8) };
+      kr.tents.push(t);
+      this.ev(x, y, ['rise', t.id]);
+      return t;
     }
+    return null;
+  }
+  krakenTargets(r = 430) { const K = this.world.kraken; return [...this.players.values()].filter((p) => !p.dead && p.room === -1 && Math.hypot(p.x - K.x, p.y - K.y) < r); }
+  krakenAI(m) {
+    const kr = this.kraken, now = this.time;
+    m.moving = false;
+    if (!kr || kr.mob !== m) return;
+    if (m.under) { if (now >= m.under) { m.under = 0; m.x = m.nx; m.y = m.ny; this.ev(m.x, m.y, ['emerge', m.id, Math.round(m.x), Math.round(m.y)]); } return; }
+    if (m.pauseUntil > now) return;
+    const ph = m.def.phases;
+    if (m.phase < ph.length && m.hp < m.maxHp * ph[m.phase]) {
+      m.phase++; kr.phase = m.phase; m.pauseUntil = now + 1.8;
+      this.ev(m.x, m.y, ['phase', m.id, m.phase]);
+      this.ev(m.x, m.y, ['roar', m.id]);
+      if (kr.mouette) this.allyShout(kr.mouette, m.phase === 1 ? 'Il creuse un tourbillon ! Ne vous laissez pas aspirer !' : 'Il est furieux ! Gare aux vagues !');
+      if (m.phase === 2) for (let k = 0; k < 2; k++) this.spawnTentacle(kr, Math.random() * Math.PI * 2);
+      return;
+    }
+    const T = this.krakenTargets();
+    if (!T.length) return;
+    const ready = (k, s) => { if (m.cd[k] == null) { m.cd[k] = now + s * 0.5; return false; } if (m.cd[k] > now) return false; m.cd[k] = now + s; return true; };
+    const P = m.phase, pick = () => T[Math.floor(Math.random() * T.length)];
+    const close = T.filter((p) => Math.hypot(p.x - m.x, p.y - m.y) < 100);
+    if (close.length && ready('bite', 3.5)) { for (const p of close) this.tele(p.x, p.y, 30, 0.8, 40, m, 8); this.ev(m.x, m.y, ['atk', m.id, 0, 2]); return; }
+    if (ready('ink', P >= 2 ? 7 : 9)) {
+      const p = pick();
+      this.ev(m.x, m.y, ['ink', Math.round(p.x), Math.round(p.y), 150, 6, m.id]);
+      for (const q of T) if (Math.hypot(q.x - p.x, q.y - p.y) < 150) q.inkUntil = now + 6;
+      return;
+    }
+    if (P >= 1 && ready('pull', 14)) {
+      this.ev(m.x, m.y, ['pull', Math.round(m.x), Math.round(m.y), 270, 70, 5]);
+      for (const q of T) if (Math.hypot(q.x - m.x, q.y - m.y) < 270) q.pullUntil = now + 5.5;
+      for (let k = 1; k <= 5; k++) this.later(k, () => { if (this.kraken === kr && m.state !== 'dead') for (const q of this.krakenTargets(70)) this.damagePlayer(q, 26, m); });
+      return;
+    }
+    if (P >= 2 && ready('dive', 22)) {
+      const [nx, ny] = this.seaPoint(this.world.kraken.x, this.world.kraken.y, rand(20, 55));
+      m.under = now + 3; m.nx = nx; m.ny = ny;
+      this.ev(m.x, m.y, ['dive', m.id, 3]);
+      this.later(1.8, () => { if (m.state === 'dead') return; this.tele(nx, ny, 40, 1.2, 38, m, 8); for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; this.tele(nx + Math.cos(a) * 74, ny + Math.sin(a) * 60, 20, 1.2, 30, m, 8); } });
+      return;
+    }
+    if (P >= 2 && ready('wave', 10)) {
+      const p = pick(), a = Math.atan2(p.y - m.y, p.x - m.x);
+      this.lineTele(m.x, m.y, m.x + Math.cos(a) * 330, m.y + Math.sin(a) * 330, 46, 1.4, 42, m, 9);
+      this.ev(m.x, m.y, ['roar', m.id]);
+    }
+  }
+  tentacleAI(m) {
+    const kr = this.kraken, now = this.time;
+    m.moving = false;
+    if (!kr) return;
+    if (m.grab) {
+      const q = this.players.get(m.grab.pid);
+      if (!q || q.dead || now >= m.grab.until || m.grab.dmg >= 80) this.releaseGrab(m);
+      else if (now >= m.grab.tick) { m.grab.tick = now + 1; this.damagePlayer(q, 12, m, false, 'g'); }
+      return;
+    }
+    if (m.pauseUntil > now || (kr.mob && kr.mob.under > now)) return;
+    const T = this.krakenTargets().filter((p) => Math.hypot(p.x - m.x, p.y - m.y) < 160);
+    if (!T.length) return;
+    T.sort((a, b) => Math.hypot(a.x - m.x, a.y - m.y) - Math.hypot(b.x - m.x, b.y - m.y));
+    const p = T[0], d = Math.hypot(p.x - m.x, p.y - m.y);
+    if (kr.phase >= 1 && d < 64 && now >= m.cd.grab && now >= (p.grabbedUntil || 0)) {
+      m.cd.grab = now + rand(10, 14);
+      m.grab = { pid: p.id, until: now + 4, dmg: 0, tick: now + 1 };
+      p.grabbedUntil = now + 4;
+      this.ev(m.x, m.y, ['grab', m.id, p.id]);
+      return;
+    }
+    if (now >= m.cd.slam) {
+      m.cd.slam = now + rand(3.4, 5);
+      const a = Math.atan2(p.y - m.y, p.x - m.x);
+      this.lineTele(m.x, m.y, m.x + Math.cos(a) * 135, m.y + Math.sin(a) * 135, 28, 1.0, 30, m, 10);
+      this.ev(m.x, m.y, ['slam', m.id, +a.toFixed(2), 1.0]);
+    }
+  }
+  releaseGrab(m) {
+    if (!m.grab) return;
+    const q = this.players.get(m.grab.pid);
+    if (q) q.grabbedUntil = 0;
+    this.ev(m.x, m.y, ['ungrab', m.id, m.grab.pid]);
+    m.grab = null;
+  }
+  allyHit(m, v) {
+    if (!m || m.state === 'dead' || m.under) return;
+    const nv = Math.min(v, Math.floor(m.hp - m.maxHp * 0.1));
+    this.ev(m.x, m.y, ['boom', Math.round(m.x + rand(-14, 14)), Math.round(m.y - 6 + rand(-8, 8)), 16, 0]);
+    if (nv <= 0) return;
+    m.hp -= nv;
+    this.ev(m.x, m.y, ['dmg', m.id, nv, 0, 0]);
+  }
+  addAlly(name, cap, x, y) { const a = { id: this.nextId++, name, cap, x, y, dir: 0, ver: 1, sink: 0, room: -1, moving: false }; this.allies.push(a); return a; }
+  removeAlly(a) { const i = this.allies.indexOf(a); if (i >= 0) this.allies.splice(i, 1); }
+  allyShout(a, text) { if (this.allies.includes(a)) this.ev(a.x, a.y, ['shout', a.id, text]); }
+  updateAllies() {
+    const K = this.world.kraken;
+    for (const a of this.allies) {
+      a.moving = false;
+      if (a.sink) continue;
+      if (a.path) {
+        const dx = a.path.x - a.x, dy = a.path.y - a.y, d = Math.hypot(dx, dy);
+        if (d > 1.5) { const s = Math.min(d, a.path.speed * DT); a.x += dx / d * s; a.y += dy / d * s; a.dir = dirOf(dx, dy); a.moving = true; } else a.path = null;
+      } else if (a.orbit) {
+        a.orbit.a += a.orbit.speed * DT;
+        const nx = K.x + Math.cos(a.orbit.a) * a.orbit.r, ny = K.y + Math.sin(a.orbit.a) * a.orbit.r * 0.8;
+        a.dir = dirOf(nx - a.x, ny - a.y); a.x = nx; a.y = ny; a.moving = true;
+      }
+      const kr = this.kraken;
+      if (a.fireAt && kr && kr.mob && kr.mob.state !== 'dead' && !kr.mob.under && this.time >= a.fireAt) {
+        a.fireAt = this.time + 5;
+        const m = kr.mob, ang = Math.atan2(m.y - 8 - a.y, m.x - a.x), dd = Math.hypot(m.x - a.x, m.y - 8 - a.y);
+        this.ev(a.x, a.y, ['proj', this.nextId++, Math.round(a.x), Math.round(a.y - 8), +ang.toFixed(3), 240, Math.round(dd), 'cball', a.id]);
+        this.ev(a.x, a.y, ['atk', a.id, +ang.toFixed(2), 3]);
+        this.later(dd / 240, () => this.allyHit(m, 40));
+      }
+    }
+  }
+  updateKraken() {
+    const kr = this.kraken;
+    if (!kr) return;
+    const T = this.krakenTargets(480);
+    for (const p of T) kr.parts.add(p.id);
+    if (T.length) kr.emptySince = 0; else if (!kr.emptySince) kr.emptySince = this.time;
+    if ((kr.emptySince && this.time - kr.emptySince > 30 && this.time - kr.t0 > 10) || this.time - kr.t0 > 900) this.endKraken(false);
+  }
+  endKraken(won) {
+    const kr = this.kraken;
+    if (!kr) return;
+    this.kraken = null;
+    for (const t of kr.tents) if (t.state !== 'dead') { this.releaseGrab(t); t.state = 'dead'; this.ev(t.x, t.y, ['die', t.id]); }
+    const m = kr.mob;
+    if (!won && m && m.state !== 'dead') {
+      this.ev(m.x, m.y, ['dive', m.id, 2.5]);
+      m.under = this.time + 99;
+      this.later(2.5, () => { m.state = 'dead'; });
+      this.broadcastChat(null, 'Le Kraken retourne dans les abysses... La mer garde son secret.', 'night');
+    }
+    const mo = kr.mouette;
+    if (mo) {
+      mo.orbit = null; mo.fireAt = 0;
+      const [fx, fy] = this.seaPoint(this.world.kraken.x, this.world.kraken.y, 320);
+      this.later(won ? 4 : 1, () => { mo.path = { x: fx, y: fy, speed: 55 }; });
+      this.later(won ? 12 : 8, () => this.removeAlly(mo));
+    }
+    this.broadcastAll({ t: 'kr', on: 0 });
+  }
+  krakenDown(m) {
+    const kr = this.kraken;
+    const ids = new Set([...m.tags.keys(), ...(kr ? kr.parts : [])]);
+    const heroes = [...ids].map((id) => this.players.get(id)).filter((q) => q && Math.hypot(q.x - m.x, q.y - m.y) < 700);
+    this.ev(m.x, m.y, ['cine', 'krakendown', m.id, Math.round(m.x), Math.round(m.y)]);
+    for (const q of heroes) this.unlock(q, 'kraken');
+    const names = heroes.filter((q) => m.tags.has(q.id)).map((q) => q.name);
+    this.broadcastChat(null, `🐙 ${names.join(', ') || 'Des pirates'} ${names.length > 1 ? 'ont' : 'a'} renvoyé le Kraken au fond des abysses !`, 'boss');
+    if (kr && kr.mouette) this.allyShout(kr.mouette, 'Victoire ! La mer est à nous !');
+    this.endKraken(true);
   }
   despawnAdds(m) {
     if (!m.adds || !m.adds.length) return;
@@ -467,13 +823,15 @@ export class Game {
     return [v, crit];
   }
   damageMob(m, amount, p, crit, kx = 0, ky = 0, dot = 0) {
-    if (m.state === 'dead') return;
+    if (m.state === 'dead' || m.under) return;
+    if (m.shieldUntil > this.time) amount = Math.max(1, Math.round(amount * 0.3));
+    if (m.grab) m.grab.dmg += amount;
     m.hp -= amount;
     m.tags.set(p.id, (m.tags.get(p.id) || 0) + amount);
     if (m.event && this.invasion) this.invasion.parts.add(p.id);
     this.ev(m.x, m.y, dot ? ['dmg', m.id, amount, 0, p.id, dot] : ['dmg', m.id, amount, crit ? 1 : 0, p.id]);
     if (m.state !== 'chase') { m.state = 'chase'; m.target = p.id; }
-    if (!m.boss && (kx || ky)) { const [nx, ny] = moveWithCollision(this.world, m.x, m.y, kx, ky, true); m.x = nx; m.y = ny; }
+    if (!m.boss && !m.def.ai && (kx || ky)) { const [nx, ny] = moveWithCollision(this.world, m.x, m.y, kx, ky, true); m.x = nx; m.y = ny; }
     if (m.hp <= 0) this.killMob(m, p);
   }
   killMob(m, killer) {
@@ -481,14 +839,21 @@ export class Game {
     m.deadUntil = this.time + m.def.respawn * rand(0.85, 1.15);
     this.ev(m.x, m.y, ['die', m.id]);
     const def = m.def;
+    if (def.ai && !def.sea) { this.despawnAdds(m); this.ev(m.x, m.y, ['cine', 'bossdown', m.id, m.type, Math.round(m.x), Math.round(m.y)]); }
+    if (def.ai === 'kraken') this.krakenDown(m);
+    if (def.ai === 'tentacle') {
+      this.releaseGrab(m);
+      const kr = this.kraken;
+      if (kr) this.later(10, () => { if (this.kraken === kr && kr.tents.filter((t) => t.state !== 'dead').length < (kr.phase >= 2 ? 6 : 4)) this.spawnTentacle(kr, Math.random() * Math.PI * 2); });
+    }
     if (m.boss) {
       this.despawnAdds(m);
       const names = [...m.tags.keys()].map((id) => this.players.get(id)).filter(Boolean).map((p) => p.name);
       this.broadcastChat(null, `⚔ ${names.join(', ')} ${names.length > 1 ? 'ont' : 'a'} vaincu le Capitaine Barbe-Cendre ! La marée recule...`, 'boss');
     }
-    if (def.elite && !m.event) this.broadcastChat(null, `⚔ ${killer.name} a terrassé ${def.name} !`, 'boss');
+    if (def.elite && !m.event && !def.sea) this.broadcastChat(null, `⚔ ${killer.name} a terrassé ${def.name} !`, 'boss');
     if (m.type === 'roi_squelette') for (const pid of m.tags.keys()) { const q = this.players.get(pid); if (q) this.unlock(q, 'roi_os'); }
-    if (m.summoned && !m.event) return;
+    if (m.summoned && !m.event && !m.bossEvent) return;
     let top = killer, topD = 0;
     for (const [pid, d] of m.tags) {
       const p = this.players.get(pid);
@@ -645,7 +1010,7 @@ export class Game {
           const owner = this.players.get(pr.owner), fx = pr.fx || {};
           const kb = 3 * (fx.kb || 1);
           for (const m of this.mobs) {
-            if (m.state === 'dead' || pr.hit.has(m.id)) continue;
+            if (m.state === 'dead' || pr.hit.has(m.id) || m.under) continue;
             if (Math.hypot(m.x - pr.x, m.y - 8 - pr.y) < m.def.r + 4) {
               pr.hit.add(m.id);
               if (owner) { const n = Math.hypot(pr.vx, pr.vy); this.damageMob(m, pr.dmg, owner, pr.crit, pr.vx / n * kb, pr.vy / n * kb); this.hitEffects(owner, m, pr.dmg, fx); }
@@ -705,7 +1070,14 @@ export class Game {
       if (this.time < t.at) continue;
       this.teles.splice(i, 1);
       this.ev(t.x, t.y, ['boom', Math.round(t.x), Math.round(t.y), t.r, 1]);
-      for (const p of this.players.values()) if (!p.dead && !SAFE.has(p.zone) && Math.hypot(p.x - t.x, p.y - t.y) < t.r + 4) this.damagePlayer(p, t.dmg, null);
+      for (const p of this.players.values()) if (!p.dead && !SAFE.has(p.zone) && Math.hypot(p.x - t.x, p.y - t.y) < t.r + 4) this.damagePlayer(p, t.dmg, t.src || null);
+    }
+    for (let i = this.lteles.length - 1; i >= 0; i--) {
+      const t = this.lteles[i];
+      if (this.time < t.at) continue;
+      this.lteles.splice(i, 1);
+      this.ev(t.x1, t.y1, ['boomL', Math.round(t.x0), Math.round(t.y0), Math.round(t.x1), Math.round(t.y1), t.w]);
+      for (const p of this.players.values()) if (!p.dead && !SAFE.has(p.zone) && segDist(p.x, p.y - 4, t.x0, t.y0, t.x1, t.y1) < t.w / 2 + 5) this.damagePlayer(p, t.dmg, t.src || null);
     }
   }
 
@@ -826,11 +1198,13 @@ export class Game {
     if (p.dead) return;
     const x = +m.x, y = +m.y;
     if (!isFinite(x) || !isFinite(y)) return;
+    if (this.time < (p.grabbedUntil || 0)) { p.lastMoveAt = this.time; if (Math.hypot(x - p.x, y - p.y) > 3) this.sendPos(p); return; }
     const dt = Math.min(0.6, this.time - p.lastMoveAt);
     p.lastMoveAt = this.time;
     const boat = p.boat ? ITEMS[p.boat].boat : null;
     const spd = boat ? boat.speed : p.stats.speed * (this.time < p.cry ? 1.2 : 1);
-    p.moveBudget = Math.min(spd * 1.2 + ROLL_SPEED * ROLL_TIME + 30, p.moveBudget + spd * dt * 1.3 + 3);
+    const pull = this.time < (p.pullUntil || 0) ? 95 : 0;
+    p.moveBudget = Math.min(spd * 1.2 + ROLL_SPEED * ROLL_TIME + 30 + pull, p.moveBudget + (spd * 1.3 + pull) * dt + 3);
     const d = Math.hypot(x - p.x, y - p.y);
     const ok = (boat ? canSail(this.world, x, y) : canStand(this.world, x, y, false, p.key)) && roomIdAt(this.world, x, y) === p.room;
     if (d > p.moveBudget || !ok) {
@@ -879,6 +1253,13 @@ export class Game {
       this.teleport(p, d.rx, d.ry + 2, { door: d.id, out: 1 });
     } else {
       if (p.room !== -1 || Math.abs(p.x - d.ox) > 18 || Math.abs(p.y - d.oy) > 28) return;
+      if (d.seal && (this.seals[d.seal] || 0) < this.time) { p.cds.door = this.time + 1.5; return this.toast(p, 'La porte est scellée. Deux dalles, deux pirates…', 'warn'); }
+      if (d.plot != null) {
+        const h = this.homes.get(d.plot);
+        if (!h) { p.cds.door = this.time + 1.5; return this.toast(p, `Maison à vendre : ${HOME_PRICE} doublons (E devant la porte pour l'acheter).`, 'info'); }
+        const thief = p.burgle && p.burgle.k === d.plot && this.time < p.burgle.until;
+        if (h.key !== p.key && !thief) { p.cds.door = this.time + 1.5; return this.toast(p, `Maison de ${h.name} : fermée à clé.`, 'warn'); }
+      }
       p.cds.door = this.time + 0.6;
       if (d.secret) this.discover(p, d);
       this.teleport(p, d.ix, d.iy, { door: d.id });
@@ -976,6 +1357,10 @@ export class Game {
     if (it.slot) return this.equip(p, i);
     if (it.tool === 'fish') return this.toast(p, 'Face à l’eau, appuyez sur R pour pêcher.', 'info');
     if (it.boat) return p.boat ? this.land(p, NaN) : this.board(p, NaN, i);
+    if (it.pet) { // animal de compagnie : il vous suit, ou il se repose dans le sac
+      p.pet = p.pet === it.pet ? null : it.pet; p.lookVer++;
+      return this.toast(p, p.pet ? `${it.name} vous suit.` : `${it.name} se repose.`, 'info');
+    }
     if (!it.use) return this.toast(p, `${it.name} ne s'utilise pas.`, 'warn');
     if (it.use.combine) {
       if (this.countItem(p, s.id) < it.use.combine) return this.toast(p, `Il faut ${it.use.combine} fragments pour reconstituer une carte (vous en avez ${this.countItem(p, s.id)}).`, 'warn');
@@ -991,6 +1376,14 @@ export class Game {
       this.send(p, { t: 'treasure', x, y });
       return this.toast(p, `X marque l’emplacement : ${ZONES[zoneAt(this.world, x, y)].name}. Une flèche vous guide.`, 'quest');
     }
+    if (it.use.lock) {
+      const h = this.homeOf(p.key);
+      if (!h || p.room !== this.world.plots[h.k].room) return this.toast(p, 'Utilisez-la chez vous, dans votre maison.', 'warn');
+      if (h.lock >= 2) return this.toast(p, 'Votre porte a déjà la meilleure serrure.', 'warn');
+      h.lock++; s.n--; if (s.n <= 0) p.inv[i] = null; p.dirtyInv = true; this.worldDirty = true;
+      return this.toast(p, `Serrure renforcée posée (niveau ${h.lock}/2).`, 'quest');
+    }
+    if (it.use.conch) return this.blowConch(p, i);
     if (it.use.bottle) {
       s.n--; if (s.n <= 0) p.inv[i] = null; p.dirtyInv = true;
       const gold = Math.round(rand(8, 40)); p.gold += gold; p.dirtyMe = true;
@@ -1388,7 +1781,7 @@ export class Game {
     this.ev(p.x, p.y, ['fx', 'craft', p.x, p.y, p.id]);
   }
   // ------------------------------------------------------------ bases
-  structEntry(st) { return [st.type, st.tx, st.ty, this.bases.get(st.owner) ? this.bases.get(st.owner).name : '', st.data && st.data.t ? Math.round((Date.now() - st.data.t) / 1000) : 0]; }
+  structEntry(st) { return [st.type, st.tx, st.ty, st.oname || (this.bases.get(st.owner) ? this.bases.get(st.owner).name : ''), st.data && st.data.t ? Math.round((Date.now() - st.data.t) / 1000) : 0]; }
   buildSnapshot(key) {
     return {
       s: [...this.structs.values()].map((st) => this.structEntry(st)),
@@ -1396,18 +1789,20 @@ export class Game {
       b: [...this.bases.values()].map((b) => [b.name, b.tx, b.ty, b.key === key ? 1 : 0]),
     };
   }
-  addStruct(key, type, tx, ty, data = {}, broadcast = true) {
+  addStruct(key, type, tx, ty, data = {}, broadcast = true, homeK = null) {
     const W = this.world, i = ty * W.W + tx, def = STRUCTS[type];
     if (!def) return false;
-    if (def.floor) { if (this.floors.has(i)) return false; this.floors.set(i, { type, tx, ty, owner: key }); }
+    const home = homeK != null ? this.homes.get(homeK) : null;
+    if (def.floor) { if (this.floors.has(i)) return false; this.floors.set(i, { type, tx, ty, owner: key, home: homeK }); }
     else {
       if (this.structs.has(i) || W.solid[i]) return false;
-      const st = { id: this.nextId++, type, tx, ty, x: tx * TILE + 8, y: ty * TILE + 14, owner: key, data };
+      const st = { id: this.nextId++, type, tx, ty, x: tx * TILE + 8, y: ty * TILE + 14, owner: key, data, home: homeK, oname: home ? home.name : null };
       this.structs.set(i, st);
       if (def.solid) W.block[i] = def.solid;
       if (def.solid === 2) W.doorOwner.set(i, key);
     }
-    const b = this.bases.get(key); if (b) b.count++;
+    if (home) home.count++;
+    else { const b = this.bases.get(key); if (b) b.count++; }
     if (broadcast) { const st = this.structs.get(i); this.broadcastAll({ t: 'st', a: def.floor ? [] : [this.structEntry(st)], af: def.floor ? [[type, tx, ty]] : [] }); }
     this.worldDirty = true;
     return true;
@@ -1419,7 +1814,8 @@ export class Game {
     if (!st) return null;
     map.delete(i);
     if (!floor) { W.block[i] = 0; W.doorOwner.delete(i); }
-    const b = this.bases.get(st.owner); if (b) b.count--;
+    if (st.home != null) { const h = this.homes.get(st.home); if (h) h.count--; }
+    else { const b = this.bases.get(st.owner); if (b) b.count--; }
     if (broadcast) this.broadcastAll({ t: 'st', r: [[st.tx, st.ty, floor ? 1 : 0]] });
     this.worldDirty = true;
     return st;
@@ -1429,6 +1825,9 @@ export class Game {
     if (!s || p.dead || p.boat) return;
     const it = ITEMS[s.id];
     if (!it.place) return;
+    const myHome = this.homeOf(p.key);
+    if (myHome && p.room >= 0 && p.room === this.world.plots[myHome.k].room) return this.placeHome(p, slot, tx, ty, myHome);
+    if (STRUCTS[it.place].home && !HOME_OK.has(it.place)) return this.toast(p, 'Ce meuble s’installe chez vous, dans votre maison.', 'warn');
     if (ty >= this.world.OVER_H) return this.toast(p, 'Impossible de construire ici.', 'warn');
     const type = it.place, def = STRUCTS[type], W = this.world;
     if (tx < 1 || ty < 1 || tx >= W.W - 1 || ty >= W.H - 1) return;
@@ -1463,6 +1862,171 @@ export class Game {
     this.ev(tx * TILE + 8, ty * TILE + 10, ['fx', 'build', tx * TILE + 8, ty * TILE + 12]);
     if (type === 'pavillon') this.toast(p, 'Terrain revendiqué ! Construisez dans le cercle autour du pavillon (touche B).', 'quest');
   }
+  placeHome(p, slot, tx, ty, h) {
+    const s = p.inv[slot], it = ITEMS[s.id], type = it.place, def = STRUCTS[type], W = this.world;
+    if (!def.home && !HOME_OK.has(type)) return this.toast(p, 'Pas dans une maison !', 'warn');
+    const r = W.rooms[W.plots[h.k].room];
+    if (tx < r.x0 || ty < r.y0 || tx >= r.x0 + r.w || ty >= r.y0 + r.h) return this.toast(p, 'Hors de la pièce.', 'warn');
+    const exx = r.x0 + (r.w >> 1);
+    if (ty === r.y0 + r.h - 1 && Math.abs(tx - exx) <= 1) return this.toast(p, 'Laissez l’entrée libre.', 'warn');
+    if (W.tiles[ty * W.W + tx] !== T.FLOOR) return this.toast(p, 'Impossible ici.', 'warn');
+    if (h.count >= HOME_MAX) return this.toast(p, 'Votre maison est pleine.', 'warn');
+    if (!def.floor) for (const q of this.players.values()) if (q.room === p.room && Math.abs(q.x - (tx * TILE + 8)) < 12 && Math.abs(q.y - (ty * TILE + 10)) < 12) return this.toast(p, 'Quelqu’un se tient là.', 'warn');
+    if (!this.addStruct(p.key, type, tx, ty, def.planter ? { t: Date.now() } : {}, true, h.k)) return this.toast(p, 'Emplacement occupé.', 'warn');
+    s.n--; if (s.n <= 0) p.inv[slot] = null;
+    p.dirtyInv = true;
+    this.ev(tx * TILE + 8, ty * TILE + 10, ['fx', 'build', tx * TILE + 8, ty * TILE + 12]);
+  }
+  // ------------------------------------------------------------ maisons
+  homeOf(key) { for (const h of this.homes.values()) if (h.key === key) return h; return null; }
+  homesList() { return [...this.homes.values()].map((h) => [h.k, h.name]); }
+  broadcastHomes() { this.broadcastAll({ t: 'homes', list: this.homesList() }); }
+  homeAction(p, a, k) {
+    const pl = this.world.plots[k];
+    if (!pl || p.dead) return;
+    const d = this.world.doors[pl.door];
+    if (a === 'buy') {
+      if (p.room !== -1 || Math.hypot(p.x - d.ox, p.y - d.oy) > 40) return;
+      if (this.homes.has(k)) return this.toast(p, 'Cette maison a déjà un propriétaire.', 'warn');
+      if (this.homeOf(p.key)) return this.toast(p, 'Vous avez déjà une maison.', 'warn');
+      if (p.gold < HOME_PRICE) return this.toast(p, `Il vous faut ${HOME_PRICE} doublons.`, 'warn');
+      p.gold -= HOME_PRICE; p.dirtyMe = true;
+      this.homes.set(k, { k, key: p.key, name: p.name, storage: new Array(HOME_STORE).fill(null), lock: 0, count: 0, burgledAt: 0 });
+      this.broadcastHomes(); this.worldDirty = true;
+      this.unlock(p, 'proprietaire');
+      this.toast(p, `Vous voilà propriétaire ! Votre nom est sur la porte. Meublez-la avec la touche B.`, 'quest');
+      this.ev(d.ox, d.oy, ['fx', 'quest', d.ox, d.oy, p.id]);
+    } else if (a === 'sell') {
+      const h = this.homes.get(k);
+      if (!h || h.key !== p.key) return;
+      if (h.storage.some(Boolean)) return this.toast(p, 'Videz d’abord vos coffres.', 'warn');
+      for (const [i, st] of [...this.structs]) if (st.home === k) { this.removeStruct(i, false); this.giveOrDrop(p, STRUCTS[st.type].item, 1); }
+      for (const [i, f] of [...this.floors]) if (f.home === k) { this.removeStruct(i, true); this.giveOrDrop(p, STRUCTS[f.type].item, 1); }
+      this.homes.delete(k); p.gold += Math.floor(HOME_PRICE / 2); p.dirtyMe = true;
+      this.broadcastHomes(); this.worldDirty = true;
+      this.toast(p, `Maison vendue : +${Math.floor(HOME_PRICE / 2)} doublons.`, 'info');
+    }
+  }
+  exportHome(key) {
+    const h = this.homeOf(key);
+    if (!h) return null;
+    const r = this.world.rooms[this.world.plots[h.k].room];
+    return {
+      k: h.k, storage: h.storage, lock: h.lock,
+      s: [...this.structs.values()].filter((st) => st.home === h.k).map((st) => [st.type, st.tx - r.x0, st.ty - r.y0, st.data && st.data.t ? st.data.t : 0]),
+      f: [...this.floors.values()].filter((f) => f.home === h.k).map((f) => [f.type, f.tx - r.x0, f.ty - r.y0]),
+    };
+  }
+  importHome(key, name, d) {
+    if (!d || this.homeOf(key)) return;
+    let k = typeof d.k === 'number' && this.world.plots[d.k] && !this.homes.has(d.k) ? d.k : -1;
+    if (k < 0) k = this.world.plots.findIndex((pl) => !this.homes.has(pl.k));
+    if (k < 0) return;
+    const storage = new Array(HOME_STORE).fill(null);
+    if (Array.isArray(d.storage)) d.storage.slice(0, HOME_STORE).forEach((c, j) => { if (c && ITEMS[c.id]) storage[j] = { id: c.id, n: Math.max(1, Math.min(STACK_MAX, c.n | 0)) }; });
+    this.homes.set(k, { k, key, name, storage, lock: Math.max(0, Math.min(2, d.lock | 0)), count: 0, burgledAt: 0 });
+    const r = this.world.rooms[this.world.plots[k].room];
+    const add = [], addf = [];
+    for (const [type, dx, dy, t] of d.s || []) { const def = STRUCTS[type]; if (!def || def.floor) continue; const tx = r.x0 + (dx | 0), ty = r.y0 + (dy | 0); if (tx < r.x0 || ty < r.y0 || tx >= r.x0 + r.w || ty >= r.y0 + r.h) continue; if (this.addStruct(key, type, tx, ty, def.planter ? { t: t || Date.now() } : {}, false, k)) add.push(this.structEntry(this.structs.get(ty * this.world.W + tx))); }
+    for (const [type, dx, dy] of d.f || []) { const def = STRUCTS[type]; if (!def || !def.floor) continue; const tx = r.x0 + (dx | 0), ty = r.y0 + (dy | 0); if (this.addStruct(key, type, tx, ty, {}, false, k)) addf.push([type, tx, ty]); }
+    this.broadcastAll({ t: 'st', a: add, af: addf });
+    this.broadcastHomes();
+  }
+  removeHome(key) {
+    const h = this.homeOf(key);
+    if (!h) return;
+    const r = [];
+    for (const [i, st] of [...this.structs]) if (st.home === h.k) { this.structs.delete(i); this.world.block[i] = 0; this.world.doorOwner.delete(i); r.push([st.tx, st.ty, 0]); }
+    for (const [i, f] of [...this.floors]) if (f.home === h.k) { this.floors.delete(i); r.push([f.tx, f.ty, 1]); }
+    this.homes.delete(h.k);
+    // les visiteurs (et voleurs) sortent
+    const pl = this.world.plots[h.k], d = this.world.doors[pl.door];
+    for (const q of this.players.values()) if (q.room === pl.room) this.teleport(q, d.rx, d.ry + 2, { door: d.id, out: 1 });
+    this.broadcastAll({ t: 'st', r });
+    this.broadcastHomes();
+  }
+  // ------------------------------------------------------------ cambriolage
+  pickLock(p, k, ok) {
+    const pl = this.world.plots[k], h = this.homes.get(k);
+    if (!pl || !h || p.dead || p.boat || h.key === p.key) return;
+    const d = this.world.doors[pl.door];
+    if (p.room !== -1 || Math.hypot(p.x - d.ox, p.y - d.oy) > 44) return;
+    if ((p.cds.pick || 0) > this.time) return;
+    p.cds.pick = this.time + 4;
+    if (!this.countItem(p, 'crochets')) return this.toast(p, 'Il vous faut des crochets de serrurier.', 'warn');
+    if (Date.now() - (h.burgledAt || 0) < 10 * 60000) return this.toast(p, 'Cette maison vient d’être cambriolée : les volets sont cloués.', 'warn');
+    if (Date.now() - (p.robbed[k] || 0) < 30 * 60000) return this.toast(p, 'Vous avez déjà cambriolé cette maison. Faites-vous oublier.', 'warn');
+    const owner = [...this.players.values()].find((q) => q.key === h.key);
+    const dog = [...this.structs.values()].some((st) => st.home === k && st.type === 'pet_chien');
+    const chance = ok ? Math.max(0.15, 0.85 - 0.22 * h.lock - (dog ? 0.2 : 0)) : 0;
+    if (Math.random() >= chance) {
+      this.removeItem(p, 'crochets', 1);
+      if (dog) { this.ev(d.ox, d.oy, ['shout', 0, 'Ouaf ! Ouaf !']); if (owner) this.toast(owner, `Votre chien aboie : ${p.name} rôde autour de votre maison !`, 'warn'); }
+      return this.send(p, { t: 'lock', ok: 0, msg: ok ? 'La serrure résiste : votre crochet casse.' : 'Raté : votre crochet casse.' });
+    }
+    if (Math.random() < 0.5) this.removeItem(p, 'crochets', 1);
+    p.burgle = { k, until: this.time + 40, looted: false };
+    p.thiefUntil = this.time + 300; p.lookVer++;
+    this.send(p, { t: 'lock', ok: 1, msg: 'Clic ! La porte cède. 40 secondes pour fouiller un coffre.' });
+    if (owner) this.toast(owner, `⚠ ${p.name} a crocheté la porte de votre maison !`, 'warn');
+    p.cds.door = 0;
+    this.teleport(p, d.ix, d.iy, { door: d.id });
+  }
+  burgleChest(p, st) {
+    const h = this.homes.get(st.home);
+    if (!h || !p.burgle || p.burgle.k !== st.home) return;
+    if (p.burgle.looted) return this.toast(p, 'Vous avez déjà fouillé. Filez !', 'warn');
+    p.burgle.looted = true; p.robbed[st.home] = Date.now(); h.burgledAt = Date.now();
+    const got = [];
+    const full = h.storage.map((c, j) => [c, j]).filter(([c]) => c);
+    if (full.length) {
+      const [c, j] = full[Math.floor(Math.random() * full.length)];
+      const n = Math.max(1, Math.ceil(c.n / 2));
+      c.n -= n; if (c.n <= 0) h.storage[j] = null;
+      this.giveOrDrop(p, c.id, n); got.push([c.id, n]);
+    }
+    if (Math.random() < (full.length ? 0.2 : 0.4)) {
+      const tot = BURGLE_RARE.reduce((s2, [, w]) => s2 + w, 0);
+      let r = Math.random() * tot, pick = BURGLE_RARE[0][0];
+      for (const [id, w] of BURGLE_RARE) { if ((r -= w) <= 0) { pick = id; break; } }
+      this.giveOrDrop(p, pick, 1); got.push([pick, 1]);
+    }
+    if (!got.length) { const gold = Math.round(rand(20, 60)); p.gold += gold; p.dirtyMe = true; got.push(['or', gold]); }
+    this.send(p, { t: 'gather', got: got.filter(([id]) => id !== 'or') });
+    if (got.some(([id]) => id === 'or')) this.send(p, { t: 'loot', id: 'or', n: got.find(([id]) => id === 'or')[1] });
+    this.unlock(p, 'cambrioleur');
+    this.worldDirty = true;
+    this.broadcastChat(null, `🗝 ${p.name} a cambriolé la maison de ${h.name} !`, 'pvp');
+    const owner = [...this.players.values()].find((q) => q.key === h.key);
+    if (owner) this.toast(owner, `Votre maison a été cambriolée par ${p.name} !`, 'warn');
+  }
+  updateBurglars() {
+    for (const p of this.players.values()) {
+      if (!p.burgle) continue;
+      if (this.time < p.burgle.until && !p.dead) continue;
+      const pl = this.world.plots[p.burgle.k];
+      p.burgle = null;
+      if (pl && p.room === pl.room && !p.dead) { const d = this.world.doors[pl.door]; this.teleport(p, d.rx, d.ry + 2, { door: d.id, out: 1 }); this.toast(p, 'Vous filez par la fenêtre !', 'info'); }
+    }
+  }
+  // ------------------------------------------------------------ les dalles des Jumeaux
+  updateSeals() {
+    const T2 = this.world.twin;
+    if (!T2 || !T2.plates.length) return;
+    const on = T2.plates.map((pl) => [...this.players.values()].filter((q) => !q.dead && q.room === -1 && Math.hypot(q.x - pl.x, q.y - pl.y) < 11));
+    const both = on[0].length && on[1].length && (on[0].some((a2) => on[1].some((b2) => b2 !== a2)));
+    if (both && this.seals.jumeaux < this.time + 5) {
+      const was = this.seals.jumeaux > this.time;
+      this.seals.jumeaux = this.time + 90;
+      this.broadcastAll({ t: 'seal', id: 'jumeaux', open: 90 });
+      if (!was) {
+        const d = this.world.doors[T2.door];
+        this.ev(d.ox, d.oy, ['fx', 'seal', d.ox, d.oy - 16]);
+        const names = [...new Set([...on[0], ...on[1]])].map((q) => { this.unlock(q, 'jumeaux'); return q.name; });
+        this.broadcastChat(null, `🌗 ${names.join(' et ')} ont ouvert le Sanctuaire des Jumeaux !`, 'boss');
+      }
+    }
+  }
   unplace(p, tx, ty) {
     const W = this.world, i = ty * W.W + tx;
     let floor = false, st = this.structs.get(i);
@@ -1470,6 +2034,7 @@ export class Game {
     if (!st || st.owner !== p.key || p.dead) return;
     if (Math.hypot(tx * TILE + 8 - p.x, ty * TILE + 10 - p.y) > 96) return this.toast(p, 'Trop loin.', 'warn');
     const base = this.bases.get(p.key);
+    if (st.type === 'coffre' && st.home != null) { const h = this.homes.get(st.home); const others = [...this.structs.values()].filter((o) => o.home === st.home && o.type === 'coffre').length; if (h && others <= 1 && h.storage.some(Boolean)) return this.toast(p, 'Videz d’abord votre coffre.', 'warn'); }
     if (st.type === 'pavillon') {
       if (base && base.count > 1) return this.toast(p, 'Démontez d’abord le reste de votre base.', 'warn');
       if (base && base.storage.some(Boolean)) return this.toast(p, 'Videz d’abord votre coffre.', 'warn');
@@ -1483,12 +2048,18 @@ export class Game {
     const W = this.world, st = this.structs.get(ty * W.W + tx);
     if (!st || p.dead || Math.hypot(st.x - p.x, st.y - p.y) > 40) return;
     const mine = st.owner === p.key;
+    if (st.home != null && !mine && st.type === 'coffre') return this.burgleChest(p, st);
+    if (STRUCTS[st.type].pet) {
+      if (!mine) return this.toast(p, 'Il vous regarde de travers.', 'info');
+      p.pet = p.pet === STRUCTS[st.type].pet ? null : STRUCTS[st.type].pet; p.lookVer++;
+      return this.toast(p, p.pet ? 'Votre compagnon vous suit.' : 'Votre compagnon reste à la maison.', 'info');
+    }
     if (st.type === 'lit') {
       if (!mine) return this.toast(p, 'Ce n’est pas votre lit.', 'warn');
       p.respawnAt = { tx, ty }; p.hp = p.stats.maxHp; p.dirtyMe = true;
       return this.toast(p, 'Vous vous reposez. Vous réapparaîtrez ici.', 'quest');
     }
-    if (st.type === 'coffre') { if (!mine) return this.toast(p, 'Ce coffre est verrouillé.', 'warn'); return this.chestAction(p, 'open', 0); }
+    if (st.type === 'coffre') { if (!mine) return this.toast(p, 'Ce coffre est verrouillé.', 'warn'); p.store = st.home != null ? { home: st.home } : { base: 1 }; return this.chestAction(p, 'open', 0); }
     if (st.type === 'jardiniere') {
       const ready = Date.now() - (st.data.t || 0) >= PLANTER_GROW * 1000;
       if (!ready) return this.toast(p, `Ça pousse… encore ${Math.ceil((PLANTER_GROW * 1000 - (Date.now() - st.data.t)) / 60000)} min.`, 'info');
@@ -1502,12 +2073,15 @@ export class Game {
     }
   }
   chestAction(p, a, slot) {
-    const base = this.bases.get(p.key);
-    if (!base || p.dead) return;
+    if (p.dead) return;
+    const homeK = p.store && p.store.home != null ? p.store.home : null;
+    const h = homeK != null ? this.homes.get(homeK) : null;
+    const base = homeK == null ? this.bases.get(p.key) : null;
+    if ((homeK != null && (!h || h.key !== p.key)) || (homeK == null && !base)) return;
     let near = false;
-    for (const st of this.structs.values()) if (st.type === 'coffre' && st.owner === p.key && Math.hypot(st.x - p.x, st.y - p.y) < 48) near = true;
+    for (const st of this.structs.values()) if (st.type === 'coffre' && st.owner === p.key && (st.home ?? null) === homeK && Math.hypot(st.x - p.x, st.y - p.y) < 48) near = true;
     if (!near) return;
-    const S = base.storage;
+    const S = h ? h.storage : base.storage;
     if (a === 'put') {
       const it = p.inv[slot];
       if (!it || ITEMS[it.id].quest || this.boatInUse(p, it.id)) return;
@@ -1568,10 +2142,11 @@ export class Game {
     this.bases.delete(key);
     this.broadcastAll({ t: 'st', r, rb: [b.name] });
   }
-  exportWorld() { return { v: 1, bases: [...this.bases.values()].map((b) => ({ ...this.exportBase(b.key), key: b.key, name: b.name })) }; }
+  exportWorld() { return { v: 1, bases: [...this.bases.values()].map((b) => ({ ...this.exportBase(b.key), key: b.key, name: b.name })), homes: [...this.homes.values()].map((h) => ({ ...this.exportHome(h.key), key: h.key, name: h.name })) }; }
   importWorld(w) {
     if (!w || !Array.isArray(w.bases)) return;
     for (const b of w.bases) this.importBase(b.key, b.name, b);
+    for (const h of w.homes || []) this.importHome(h.key, h.name, h);
     this.log(`[monde] ${this.bases.size} base(s) chargée(s)`);
   }
 
@@ -1603,6 +2178,9 @@ export class Game {
     if (this.tickCount % 10 === 0) this.updateInvasion(f);
     if (this.tickCount % 5 === 0) this.updateTurrets();
     if (this.tickCount % 10 === 0) this.updateDots();
+    if (this.tickCount % 5 === 0) { this.updateSeals(); this.updateBurglars(); }
+    if (this.tickCount % 10 === 0) this.updateKraken();
+    this.updateAllies();
     if (this.worldPersist && this.worldDirty && this.time - this.lastWorldSave > 8) { this.worldDirty = false; this.lastWorldSave = this.time; Promise.resolve(this.storage.saveWorld(this.exportWorld())).catch(() => {}); }
     this.updateMobs();
     this.updateProjs();
@@ -1616,7 +2194,7 @@ export class Game {
     if (p.dirtyQ) { p.dirtyQ = false; this.send(p, { t: 'q', q: p.quests }); }
   }
   entMeta(e, kind) {
-    if (kind === 'p') return { id: e.id, k: 'p', name: e.name, look: e.look, lvl: e.level, x: Math.round(e.x), y: Math.round(e.y), w: e.eq.weapon, g: e.eq.gun, dead: e.dead, ti: e.title ? ACHIEVEMENTS[e.title].title : '', bt: e.boat ? ITEMS[e.boat].boat.kind : '' };
+    if (kind === 'p') return { id: e.id, k: 'p', name: e.name, look: e.look, lvl: e.level, x: Math.round(e.x), y: Math.round(e.y), w: e.eq.weapon, g: e.eq.gun, dead: e.dead, ti: e.title ? ACHIEVEMENTS[e.title].title : '', bt: e.boat ? ITEMS[e.boat].boat.kind : '', pt: e.pet || '', vo: this.time < e.thiefUntil ? 1 : 0 };
     if (kind === 'm') return { id: e.id, k: 'm', type: e.type, x: Math.round(e.x), y: Math.round(e.y), hp: Math.ceil(e.hp), mhp: e.maxHp };
     return { id: e.id, k: 'd', item: e.item, n: e.n, x: Math.round(e.x), y: Math.round(e.y), own: e.owner, ou: Math.max(0, +(e.ownUntil - this.time).toFixed(1)) };
   }
@@ -1636,7 +2214,13 @@ export class Game {
         if (m.state === 'dead' || !near(m)) continue;
         seen.set(m.id, 0);
         if (!p.known.has(m.id)) ent.push(this.entMeta(m, 'm'));
-        pos.push([m.id, Math.round(m.x), Math.round(m.y), m.dir, (m.moving ? 1 : 0) | (m.windup ? 2 : 0) | (m.state === 'return' ? 4 : 0), Math.round(m.hp / m.maxHp * 100)]);
+        pos.push([m.id, Math.round(m.x), Math.round(m.y), m.dir, (m.moving ? 1 : 0) | (m.windup ? 2 : 0) | (m.state === 'return' ? 4 : 0) | (m.under ? 8 : 0) | (m.shieldUntil > this.time ? 16 : 0) | (m.phase ? m.phase << 5 : 0), Math.round(m.hp / m.maxHp * 100)]);
+      }
+      for (const a of this.allies) {
+        if (!near(a)) continue;
+        seen.set(a.id, a.ver);
+        if (p.known.get(a.id) !== a.ver) ent.push({ id: a.id, k: 'a', name: a.name, cap: a.cap, x: Math.round(a.x), y: Math.round(a.y), sink: a.sink });
+        pos.push([a.id, Math.round(a.x), Math.round(a.y), a.dir, (a.moving ? 1 : 0) | (a.sink ? 2 : 0), 100]);
       }
       for (const d of this.drops.values()) {
         if (!near(d)) continue;

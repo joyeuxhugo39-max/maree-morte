@@ -124,6 +124,39 @@ QUESTS.oeil_guetteur = {
   progress: "L'Île au Crâne est au sud-est : il te faudra un bateau.",
   done: "Je les ai entendus se taire, un par un. Voilà mon long fusil. Prends le temps de viser : il ne pardonne pas l'impatience.",
 };
+// ----- La Chanson des Abysses (0.6) -----
+QUESTS.disparus = {
+  name: 'Disparus en mer', giver: 'ysaline', turnin: 'elouan', level: 9, requires: ['traversee'],
+  goals: [{ type: 'talk', npc: 'elouan', text: 'Parler au capitaine Elouan, sur le quai de Havre' }],
+  rewards: { xp: 300, gold: 60, items: [] },
+  offer: "Trois navires ont disparu cette lune, tous près du Gouffre, entre Port-Lanterne et l'Île au Crâne. Pas d'épave, pas de survivant. Juste des chants, la nuit, qui montent de l'eau. Le capitaine Elouan dit savoir ce qui se passe. Va le voir sur le quai, il ne parle qu'aux gens qui ont du cran.",
+  progress: 'Elouan attend au bout du quai de Havre-des-Brumes.',
+  done: "Ysaline t'envoie ? Bien. Assieds-toi. Ce que je vais te dire, personne ne veut l'entendre : il y a quelque chose sous le Gouffre. Quelque chose d'énorme.",
+};
+QUESTS.encre_abysses = {
+  name: "L'encre des profondeurs", giver: 'elouan', turnin: 'elouan', level: 10, requires: ['disparus'],
+  goals: [{ type: 'collect', item: 'encre_noire', n: 5, text: 'Encre des abysses (noyés)' }],
+  rewards: { xp: 520, gold: 120, items: [['conque_abysses', 1]] },
+  offer: "Les noyés ont tous de l'encre dans les veines. L'encre de la bête. Rapporte-m'en cinq fioles et je te taillerai la Conque des Abysses : le seul appel auquel le Kraken répond. Les noyés hantent le marais, et le Capitaine Noyé en est plein.",
+  progress: 'Les noyés du Marais des Noyés en portent souvent. Le Capitaine Noyé, toujours.',
+  done: "Voilà ta conque. Souffle dedans à bord, au-dessus du Gouffre, et il viendra. Je t'accompagnerai avec le Goéland. Ne me remercie pas : remercie-moi si on en revient.",
+};
+QUESTS.kraken = {
+  name: 'Le chant de la conque', giver: 'elouan', turnin: 'elouan', level: 11, requires: ['encre_abysses'],
+  goals: [{ type: 'kill', mob: 'kraken', n: 1, text: 'Le Kraken renvoyé aux abysses' }],
+  rewards: { xp: 2600, gold: 600, items: [['tentacule_fumee', 3]] },
+  offer: "Le moment est venu. Prends le meilleur navire que tu trouves, des amis, du rhum et toute ta poudre. Mets le cap sur le Gouffre et souffle dans la conque. Le Goéland ouvrira la route. La Mouette Écarlate de Morgane nous couvrira de ses canons.",
+  progress: "Le Gouffre est au sud-est de Port-Lanterne. À bord, utilisez la Conque des Abysses (clic droit dans le sac).",
+  done: "Tu l'as fait... Le Goéland gît au fond, mais moi je suis vivant, et la mer se tait enfin. Va voir Morgane. Elle voudra entendre ça de ta bouche.",
+};
+QUESTS.dernier_chant = {
+  name: 'Le dernier chant', giver: 'elouan', turnin: 'morgane', level: 11, requires: ['kraken'],
+  goals: [{ type: 'talk', npc: 'morgane', text: 'Raconter la bataille à la Capitaine Morgane' }],
+  rewards: { xp: 800, gold: 300, items: [['trophee_kraken', 1]] },
+  offer: "Morgane a perdu son équipage à cause du Cœur de Corail. Va lui dire que le Kraken est mort. Ça ne les ramènera pas, mais ça l'aidera à dormir.",
+  progress: 'Morgane se tient près des quais de Port-Lanterne.',
+  done: "Le Kraken... Tu as tué le Kraken. Tiens, prends ce trophée : on en fera une légende, et ta maison en sera le musée. Bienvenue parmi les capitaines dont on chante le nom.",
+};
 // Primes répétables du tableau de la place (toutes les 10 minutes)
 const prime = (name, mob, n, level, xp, gold, text) => ({ name, giver: 'primes', turnin: 'primes', level, repeat: 600, goals: [{ type: 'kill', mob, n, text }], rewards: { xp, gold, items: [] },
   offer: `AVIS DE PRIME — ${text} : ${n}. Récompense : ${gold} doublons, payés par la Capitainerie de Port-Lanterne.`, progress: 'Revenez au tableau une fois la prime remplie.', done: 'La Capitainerie vous paie votre dû. Une nouvelle prime sera affichée dans 10 minutes.' });

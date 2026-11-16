@@ -1,6 +1,6 @@
 // Récolte, recettes d'artisanat et structures de base.
 export const STATIONS = { main: 'À la main', feu: 'Feu de camp', etabli: 'Établi', forge: 'Forge' };
-export const CATEGORIES = { mat: 'Matériaux', outil: 'Outils', arme: 'Armes', armure: 'Armures', talisman: 'Talismans', cuisine: 'Cuisine', base: 'Construction', nav: 'Navigation' };
+export const CATEGORIES = { mat: 'Matériaux', outil: 'Outils', arme: 'Armes', armure: 'Armures', talisman: 'Talismans', cuisine: 'Cuisine', base: 'Construction', nav: 'Navigation', maison: 'Maison' };
 
 // Décors récoltables : outil requis (null = à la main), butin [objet, min, max] ou [objet, chance]
 export const HARVEST = {
@@ -39,7 +39,29 @@ export const STRUCTS = {
   jardiniere: { item: 'jardiniere', solid: 1, planter: 1 },
   tonneau: { item: 'tonneau_deco', solid: 1 },
   caisse: { item: 'caisse_deco', solid: 1 },
+  // mobilier des maisons
+  table_h: { item: 'table_bois', solid: 1, home: 1 },
+  chaise_h: { item: 'chaise_bois', solid: 0, home: 1 },
+  etagere_h: { item: 'etagere_bois', solid: 1, home: 1 },
+  armoire_h: { item: 'armoire', solid: 1, home: 1 },
+  cheminee_h: { item: 'cheminee_pierre', solid: 1, home: 1, light: 90 },
+  plante_h: { item: 'plante_pot', solid: 1, home: 1 },
+  tableau_h: { item: 'tableau_mer', solid: 1, home: 1 },
+  tapis_h: { item: 'tapis_brode', floor: 1, home: 1 },
+  biblio_h: { item: 'bibliotheque', solid: 1, home: 1 },
+  trophee_h: { item: 'trophee_kraken', solid: 1, home: 1, light: 40 },
+  tableau_maitre_h: { item: 'tableau_maitre', solid: 1, home: 1 },
+  pet_chat: { item: 'chaton', solid: 0, home: 1, pet: 'chat' },
+  pet_chien: { item: 'chien', solid: 0, home: 1, pet: 'chien' },
+  pet_perroquet: { item: 'perroquet_vert', solid: 0, home: 1, pet: 'perroquet' },
+  pet_singe: { item: 'singe', solid: 0, home: 1, pet: 'singe' },
+  pet_kraken: { item: 'bebe_kraken', solid: 0, home: 1, pet: 'kraken' },
 };
+// ce qu'on peut installer chez soi (en plus du mobilier marqué home)
+export const HOME_OK = new Set(['coffre', 'lit', 'tapis', 'torche', 'lanterne', 'tonneau', 'caisse', 'jardiniere', 'etabli', 'sol']);
+export const HOME_MAX = 60;       // objets par maison
+export const HOME_PRICE = 800;    // prix d'une maison
+
 export const CLAIM_R = 7;          // rayon du terrain revendiqué (tuiles)
 export const BASE_MAX = 160;       // nombre maximal de structures par base
 export const PLANTER_GROW = 300;   // secondes pour qu'une jardinière donne
@@ -130,5 +152,18 @@ export const RECIPES = [
   // navigation
   R('barque', 'barque', 1, 'etabli', 'nav', [['planche', 14], ['corde', 4], ['toile', 2]]),
   R('sloop', 'sloop', 1, 'etabli', 'nav', [['planche', 40], ['toile', 10], ['corde', 10], ['lingot_fer', 8], ['poudre_noire', 4]]),
+  // maison
+  R('table_bois', 'table_bois', 1, 'etabli', 'maison', [['planche', 4]]),
+  R('chaise_bois', 'chaise_bois', 2, 'etabli', 'maison', [['planche', 3]]),
+  R('etagere_bois', 'etagere_bois', 1, 'etabli', 'maison', [['planche', 5], ['corde', 1]]),
+  R('armoire', 'armoire', 1, 'etabli', 'maison', [['planche', 8], ['lingot_fer', 1]]),
+  R('cheminee_pierre', 'cheminee_pierre', 1, 'forge', 'maison', [['pierre', 12], ['charbon', 3]]),
+  R('plante_pot', 'plante_pot', 1, 'main', 'maison', [['pierre', 2], ['herbes', 3], ['fibre', 2]]),
+  R('tableau_mer', 'tableau_mer', 1, 'etabli', 'maison', [['toile', 2], ['planche', 2], ['baies', 6]]),
+  R('tapis_brode', 'tapis_brode', 1, 'etabli', 'maison', [['toile', 4], ['baies', 4]]),
+  R('bibliotheque', 'bibliotheque', 1, 'etabli', 'maison', [['planche', 8], ['toile', 2], ['carte_dechiree', 1]]),
+  R('serrure_renforcee', 'serrure_renforcee', 1, 'forge', 'maison', [['lingot_fer', 4], ['poudre_noire', 1]]),
+  R('crochets', 'crochets', 3, 'forge', 'maison', [['lingot_fer', 1]]),
+  R('tentacule_fumee', 'tentacule_fumee', 1, 'feu', 'cuisine', [['encre_noire', 1], ['dorade', 1], ['herbes', 1]]),
 ];
 export const RECIPE = Object.fromEntries(RECIPES.map((r) => [r.id, r]));

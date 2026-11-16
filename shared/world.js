@@ -3,7 +3,7 @@
 import { TILE, MAP_W as W, MAP_H as H, OVER_H, T } from './constants.js';
 import { mulberry32, hash2, valueNoise, fbm, shuffle } from './rng.js';
 
-export const Z = { SEA: 0, TOWN: 1, BEACH: 2, PLAINS: 3, JUNGLE: 4, RUINS: 5, SWAMP: 6, WRECK: 7, HAVRE: 8, CRANE: 9, ILOT: 10, INTERIOR: 11, CAVE: 12 };
+export const Z = { SEA: 0, TOWN: 1, BEACH: 2, PLAINS: 3, JUNGLE: 4, RUINS: 5, SWAMP: 6, WRECK: 7, HAVRE: 8, CRANE: 9, ILOT: 10, INTERIOR: 11, CAVE: 12, GOUFFRE: 13 };
 export const SAFE = new Set([1, 8, 11]);
 export const ZONES = [
   { name: 'Haute mer', lvl: 'Eaux profondes' },
@@ -19,6 +19,7 @@ export const ZONES = [
   { name: 'Îlots perdus', lvl: 'Niveaux 3-8' },
   { name: 'Intérieur', lvl: 'Zone sûre', safe: true },
   { name: 'Grotte', lvl: 'Danger' },
+  { name: 'Gouffre du Kraken', lvl: 'Niveaux 10-14' },
 ];
 
 // Propriétés partagées des décors. solid = bloque le déplacement (sur sa tuile de base).
@@ -37,6 +38,7 @@ export const PROPS = {
   house: { solid: 1 }, tavern: { solid: 1 }, forge: { solid: 1 }, lighthouse: { solid: 1 },
   comptoir: { solid: 1 }, etagere: { solid: 1 }, cheminee: { solid: 1 }, table: { solid: 1 }, chaise: {}, ratelier: { solid: 1 },
   plante: { solid: 1 }, lit_deco: { solid: 1 }, fourneau: { solid: 1 }, tapis_deco: { ground: 1 }, grotte: {}, crane_rock: { solid: 1 }, cristal: { solid: 1 }, tonneau_d: { solid: 1 },
+  home: { solid: 1 }, dalle: { ground: 1 }, sceau: { solid: 1 },
   ship: { solid: 1 }, wreck: { solid: 1 }, boat: { solid: 1 },
 };
 
@@ -265,6 +267,30 @@ export function generateWorld(seed = 7) {
   stampPath([[162, 104], [159, 101], [155, 99]], 0.9, T.COBBLE);
   stampPath([[130, 92], [132, 95], [137, 97]], 0.9, T.COBBLE);
 
+  // quartier des Corsaires : six maisons à vendre, au nord de la place (zone sûre)
+  const plots = [];
+  for (let y = 68; y <= 82; y++) for (let x = 130; x <= 172; x++) {
+    if (!inMap(x, y)) continue;
+    const i = idx(x, y);
+    if (y >= 83) continue;
+    if (tiles[i] !== T.COBBLE) tiles[i] = y < 70 || x < 131 || x > 171 ? (tiles[i] === T.ROCK ? T.GRASS : tiles[i]) : T.GRASS;
+    zones[i] = Z.TOWN; occ[i] = 1;
+  }
+  stampPath([[132, 78], [170, 78]], 1.0, T.COBBLE);
+  stampPath([[149, 78], [149, 90]], 1.0, T.COBBLE);
+  for (let k = 0; k < 6; k++) {
+    const b = { type: 'home', v: k % 3, x: 133 + k * 6, y: 72, w: 5, h: 4, door: 2, name: `Maison n° ${k + 1}`, plot: k };
+    for (let y = b.y - 1; y <= b.y + b.h; y++) for (let x = b.x - 1; x <= b.x + b.w; x++) {
+      const i = idx(x, y);
+      if (tiles[i] !== T.COBBLE) tiles[i] = T.GRASS;
+      occ[i] = 1;
+      if (y < b.y + b.h && x >= b.x && x < b.x + b.w && y >= b.y) solid[i] = 1;
+    }
+    stampPath([[b.x + b.door, b.y + b.h], [b.x + b.door, b.y + b.h + 1]], 0.9, T.COBBLE);
+    props.push({ id: pid++, type: 'home', v: b.v, x: (b.x + b.w / 2) * TILE, y: (b.y + b.h) * TILE, tx: b.x, ty: b.y, w: b.w, h: b.h, door: b.door, name: b.name, plot: k });
+    plots.push(b);
+  }
+
   // quais : on descend jusqu'à la mer
   let coastY = TC.y + 6;
   while (coastY < H - 2 && tiles[idx(TC.x, coastY)] !== T.WATER && tiles[idx(TC.x, coastY)] !== T.DEEP) coastY++;
@@ -399,6 +425,18 @@ export function generateWorld(seed = 7) {
   addProp('idol', RC.x, RC.y - 2);
   const tonnelet = addProp('tonnelet', RC.x + 2, RC.y + 1);
   tonnelet.quest = 'tonnelet';
+  // le sanctuaire des Jumeaux : deux dalles, une porte scellée au nord de l'idole
+  for (let y = RC.y - 5; y <= RC.y - 3; y++) for (let x = RC.x - 1; x <= RC.x + 1; x++) { setT(x, y, T.COBBLE); solid[idx(x, y)] = 0; occ[idx(x, y)] = 1; }
+  for (const dx of [-1, 0, 1]) { solid[idx(RC.x + dx, RC.y - 5)] = 1; }
+  props.push({ id: pid++, type: 'sceau', v: 0, x: RC.x * TILE + 8, y: (RC.y - 5) * TILE + 14, tx: RC.x, ty: RC.y - 5 });
+  const twinPlates = [];
+  for (const [dx, v] of [[-4, 0], [4, 1]]) {
+    const x = RC.x + dx, y = RC.y + 2;
+    setT(x, y, T.COBBLE); solid[idx(x, y)] = 0;
+    for (let yy = y - 1; yy <= y + 1; yy++) for (let xx = x - 1; xx <= x + 1; xx++) if (inMap(xx, yy)) { solid[idx(xx, yy)] = 0; occ[idx(xx, yy)] = 1; }
+    props.push({ id: pid++, type: 'dalle', v, x: x * TILE + 8, y: y * TILE + 14, tx: x, ty: y });
+    twinPlates.push({ x: x * TILE + 8, y: y * TILE + 10 });
+  }
 
   // ---------- 8. Cimetière du marais ----------
   const CEM = { x: 33, y: 76 };
@@ -650,6 +688,22 @@ export function generateWorld(seed = 7) {
     if (best) caveSpawns.push({ mob: 'roi_squelette', x: best[0] * TILE + 8, y: best[1] * TILE + 10 });
   }
 
+  // ---------- 11b'. Maisons des pirates (vides) et sanctuaire des Jumeaux ----------
+  for (const b of plots) {
+    const r = room(b.name, 'home', 10, 7, T.FLOOR, { x: b.x + b.door, y: b.y + b.h });
+    b.room = r.id; b.doorId = doors.length - 1; doors[b.doorId].plot = b.plot;
+  }
+  const sanct = room('Sanctuaire des Jumeaux', 'sanctuaire', 12, 8, T.STONEF, { x: RC.x, y: RC.y - 4 });
+  doors[doors.length - 1].seal = 'jumeaux';
+  {
+    const { x0, y0, w: rw, h: rh } = sanct;
+    put('idol', x0 + (rw >> 1), y0);
+    for (const [x, y] of [[x0, y0], [x0 + rw - 1, y0], [x0, y0 + rh - 1], [x0 + rw - 1, y0 + rh - 1]]) put('pillar', x, y, 0);
+    put('brazier', x0 + 2, y0); put('brazier', x0 + rw - 3, y0);
+    for (const [x, t] of [[x0 + 3, 'medaillon_lunes'], [x0 + rw - 4, 'sabre_jumeaux']]) { const c = put('chest', x, y0 + 2, 2); if (c) { c.chest = 2; c.cache = t; c.twin = 1; chests.push(c); } }
+    put('tapis_deco', x0 + (rw >> 1) - 1, y0 + 4);
+  }
+
   // ---------- 11c. Cachettes : des coffres oubliés, chacun garde une arme ----------
   const cacheAt = (cx, cy, r, item) => {
     for (let d = 0; d <= r; d++) for (let dy = -d; dy <= d; dy++) for (let dx = -d; dx <= d; dx++) {
@@ -685,7 +739,31 @@ export function generateWorld(seed = 7) {
     cacheInCave(r, r.name.includes('Crâne') ? 'couleuvrine' : r.name.includes('Cristal') ? 'dague_cristal' : 'poivriere');
   }
 
+  // ---------- 11d. Le Gouffre du Kraken : eau profonde entre l'archipel et l'Île au Crâne ----------
+  let KR = { x: 206, y: 152 };
+  {
+    let best = null, bs = -1;
+    for (let y = 130; y <= 175; y++) for (let x = 190; x <= 230; x++) {
+      let ok = true;
+      for (let dy = -10; dy <= 10 && ok; dy++) for (let dx = -10; dx <= 10; dx++) { if (dx * dx + dy * dy > 100) continue; const t = tiles[idx(x + dx, y + dy)]; if (t !== T.DEEP || solid[idx(x + dx, y + dy)]) { ok = false; break; } }
+      if (!ok) continue;
+      const s = -Math.hypot(x - 208, y - 152);
+      if (s > bs) { bs = s; best = { x, y }; }
+    }
+    if (best) KR = best;
+    for (let dy = -16; dy <= 16; dy++) for (let dx = -16; dx <= 16; dx++) { const x = KR.x + dx, y = KR.y + dy; if (inMap(x, y) && dx * dx + dy * dy <= 256 && (tiles[idx(x, y)] === T.DEEP || tiles[idx(x, y)] === T.WATER)) zones[idx(x, y)] = Z.GOUFFRE; }
+  }
+
   // ---------- 12. Personnages non-joueurs ----------
+  const freeNear = (x, y) => {
+    for (let d = 0; d <= 6; d++) for (let dy = -d; dy <= d; dy++) for (let dx = -d; dx <= d; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== d) continue;
+      const i = idx(x + dx, y + dy), t = tiles[i];
+      if (!solid[i] && t !== T.DEEP && t !== T.WATER && t !== T.ROCK && t !== T.SWAMP) return [x + dx, y + dy];
+    }
+    return [x, y];
+  };
+  const [ax0, ay0] = freeNear(151, 80), [fx0, fy0] = freeNear(132, 94), [lx0, ly0] = freeNear(HC.x + 4, HC.y + 1), [ex0, ey0] = freeNear(havreDock.x + 5, havreDock.y + 1);
   const npcs = [
     { id: 'morgane', x: TC.x * TILE + 8, y: (coastY - 2) * TILE + 12, dir: 0 },
     { id: 'isa', x: 155 * TILE + 8, y: 94 * TILE + 8, dir: 0 },
@@ -695,6 +773,10 @@ export function generateWorld(seed = 7) {
     { id: 'coco', x: 144 * TILE + 8, y: 93 * TILE + 14, dir: 0, fixed: true },
     { id: 'primes', x: 141 * TILE + 8, y: 99 * TILE + 18, dir: 0, fixed: true },
     { id: 'corentin', x: (TC.x - 3) * TILE + 8, y: (dockEnd - 1) * TILE + 10, dir: 0 },
+    { id: 'anselme', x: ax0 * TILE + 8, y: ay0 * TILE + 10, dir: 0 },
+    { id: 'fouine', x: fx0 * TILE + 8, y: fy0 * TILE + 10, dir: 0 },
+    { id: 'lison', x: lx0 * TILE + 8, y: ly0 * TILE + 10, dir: 0 },
+    { id: 'elouan', x: ex0 * TILE + 8, y: ey0 * TILE + 10, dir: 0 },
     ...innerNpcs,
   ];
 
@@ -774,6 +856,8 @@ export function generateWorld(seed = 7) {
   return {
     block: new Uint8Array(N), // constructions des joueurs : 1 bloque tout, 2 bloque les morts
     doorOwner: new Map(), rooms, doors, sail, roomGrid, havre: HC, havreDock, OVER_H,
+    plots: plots.map((b) => ({ k: b.plot, name: b.name, room: b.room, door: b.doorId, tx: b.x, ty: b.y, w: b.w, h: b.h })),
+    twin: { plates: twinPlates, door: doors.findIndex((d) => d.seal === 'jumeaux'), room: sanct.id }, kraken: { x: KR.x * TILE + 8, y: KR.y * TILE + 8 },
     seed, W, H, tiles, zones, solid, plankDir, waterDist, props, buildings, npcs, spawns, chests,
     spawnPoint, town: TC, lighthouse: LH, ruins: RC, cemetery: CEM, wreck: WR, coastY, dockEnd,
   };

@@ -100,3 +100,44 @@ Object.assign(NPCS, {
     ],
   },
 });
+Object.assign(NPCS, {
+  anselme: {
+    name: 'Maître Anselme', title: 'Notaire et ébéniste',
+    look: { skin: 0, hair: 4, hairStyle: 'court', beard: 1, top: 'manteau', topCol: 'brown', pants: 'black', boots: 'black', hat: 'tricorne', hatCol: 'black' },
+    greet: ['Une maison, un nom sur la porte, et un endroit où mourir au chaud. Que demander de plus ?', 'Les six maisons du quartier des Corsaires sont à vendre. Enfin, celles qui restent.'],
+    shop: ['table_bois', 'chaise_bois', 'etagere_bois', 'armoire', 'plante_pot', 'tableau_mer', 'tapis_brode', 'bibliotheque', 'serrure_renforcee', 'coffre_base', 'lit'],
+    topics: [
+      { q: 'Comment acheter une maison ?', a: "Approchez-vous de la porte d'une maison à vendre et appuyez sur E : 800 doublons et elle est à vous, avec votre nom sur la plaque. Une seule par pirate. Dedans, tout est vide : meublez-la avec la touche B." },
+      { q: 'Et les voleurs ?', a: "Il y en a. Une porte se crochette, avec des crochets et des doigts agiles. Une serrure renforcée et un chien de garde les découragent. Rangez vos trésors dans vos coffres : un voleur n'emporte qu'une poignée de choses." },
+    ],
+  },
+  fouine: {
+    name: 'La Fouine', title: 'Receleuse',
+    look: { skin: 1, hair: 0, hairStyle: 'long', top: 'gilet', topCol: 'black', pants: 'black', boots: 'black', hat: 'bandana', hatCol: 'black' },
+    greet: ['Tu ne m’as jamais vue. Moi non plus.', 'Des crochets ? Des bijoux à revendre ? Parle bas.'],
+    shop: ['crochets', 'poudre_noire', 'carte_dechiree'],
+    topics: [
+      { q: 'Comment on crochète ?', a: "Devant la porte d'une maison qui n'est pas la tienne, E. Une goupille après l'autre : appuie sur E quand l'aiguille passe dans le vert. Rate et ton crochet casse. Réussis et tu as quarante secondes pour fouiller un coffre." },
+      { q: 'Ça rapporte ?', a: "Une poignée d'objets du propriétaire... et parfois mieux : des montres, des bagues, des perles noires qu'on ne trouve nulle part ailleurs. Mais attention : tout le monde saura que tu es un voleur." },
+    ],
+  },
+  lison: {
+    name: 'Lison', title: 'Animalière',
+    look: { skin: 2, hair: 2, hairStyle: 'queue', top: 'tablier', topCol: 'green', pants: 'brown', boots: 'brown', hat: 'paille' },
+    greet: ['Mes petits cherchent une famille. Et une maison, de préférence.', 'Le singe ? Il mord. Mais seulement les gens qu’il aime.'],
+    shop: ['chaton', 'chien', 'perroquet_vert', 'singe'],
+    topics: [
+      { q: 'Un animal de compagnie ?', a: "Installez-le chez vous avec la touche B : il vivra dans votre maison. Ou faites un clic droit dessus dans votre sac : il vous suivra partout. Le chien de garde rend votre porte plus difficile à crocheter." },
+    ],
+  },
+  elouan: {
+    name: 'Capitaine Elouan', title: 'Capitaine du Goéland',
+    look: { skin: 1, hair: 1, hairStyle: 'long', beard: 1, top: 'capitaine', topCol: 'navy', pants: 'navy', boots: 'black', hat: 'tricorne', hatCol: 'navy' },
+    greet: ['La mer chante, ces temps-ci. Une chanson que je n’aime pas.', 'Le Goéland est prêt. Moi, presque.'],
+    shop: ['conque_abysses', 'sloop', 'tentacule_fumee'],
+    topics: [
+      { q: 'Le Kraken ?', a: "Il dort dans le Gouffre, entre Port-Lanterne et l'Île au Crâne. Le Cœur de Corail l'a réveillé. Il ne vient que si on l'appelle, avec la Conque des Abysses, à bord, dans le Gouffre. Venez à plusieurs, avec des canons." },
+      { q: 'Comment le combattre ?', a: "Restez en mouvement. Quand l'eau rougit sous vous, virez de bord : une tentacule va frapper. Si une tentacule vous saisit, tirez-lui dessus. L'encre aveugle et ralentit ; le tourbillon vous aspire vers sa gueule. Et quand il plonge... priez." },
+    ],
+  },
+});
