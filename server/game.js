@@ -669,10 +669,10 @@ export class Game {
     const P = m.phase, pick = () => T[Math.floor(Math.random() * T.length)];
     const close = T.filter((p) => Math.hypot(p.x - m.x, p.y - m.y) < 100);
     if (close.length && ready('bite', 3.5)) { for (const p of close) this.tele(p.x, p.y, 30, 0.8, 40, m, 8); this.ev(m.x, m.y, ['atk', m.id, 0, 2]); return; }
-    if (ready('ink', P >= 2 ? 7 : 9)) {
+    if (ready('ink', P >= 2 ? 11 : 13)) {
       const p = pick();
-      this.ev(m.x, m.y, ['ink', Math.round(p.x), Math.round(p.y), 150, 6, m.id]);
-      for (const q of T) if (Math.hypot(q.x - p.x, q.y - p.y) < 150) q.inkUntil = now + 6;
+      this.ev(m.x, m.y, ['ink', Math.round(p.x), Math.round(p.y), 130, 4.5, m.id]);
+      for (const q of T) if (Math.hypot(q.x - p.x, q.y - p.y) < 130) q.inkUntil = now + 4.5;
       return;
     }
     if (P >= 1 && ready('pull', 14)) {

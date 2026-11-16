@@ -313,7 +313,7 @@ export class Renderer {
     this.drawLabels(ctx, G, draw, camX, camY, now);
     this.drawTexts(ctx, camX, camY, dt);
     if (room) ctx.restore();
-    else this.drawObjective(ctx, G, camX, camY, now);
+    else if (!G.cine) this.drawObjective(ctx, G, camX, camY, now);
     ctx.restore();
     this.drawBossBar(ctx, G);
   }
@@ -560,7 +560,7 @@ export class Renderer {
       const t = this.inks[i], k = (now - t.t0) / t.dur;
       if (k >= 1) { this.inks.splice(i, 1); continue; }
       const a = Math.min(1, k * 8) * Math.min(1, (1 - k) * 3), r = t.r * (0.5 + 0.5 * Math.min(1, k * 5));
-      ctx.fillStyle = `rgba(6,4,14,${0.62 * a})`;
+      ctx.fillStyle = `rgba(6,4,14,${0.4 * a})`;
       for (let q = 0; q < 5; q++) { const an = q * 1.26 + t.x, rr = r * (q ? 0.55 : 1); ctx.beginPath(); ctx.ellipse(t.x - camX + (q ? Math.cos(an) * r * 0.5 : 0), t.y - camY + (q ? Math.sin(an) * r * 0.35 : 0), rr + Math.sin(now * 2 + q) * 2, rr * 0.7, 0, 0, TAU); ctx.fill(); }
     }
     const P = G.pull;

@@ -386,10 +386,11 @@ function onEvent(ev, t) {
     }
     case 'cine': {
       if (!G.player) break;
-      if (ev[1] === 'boss' && e) bossIntro(G, e, ev[3], now);
+      const ce = entOf(ev[2]);
+      if (ev[1] === 'boss' && ce) bossIntro(G, ce, ev[3], now);
       else if (ev[1] === 'bossdown') bossDown(G, ev[3], ev[4], ev[5], now);
-      else if (ev[1] === 'krakenrise' && e) { e.upT = now; e.firstRise = 1; R.shake(7, 1.6); G.sfx.play('roar', 1.2); G.sfx.play('splash'); R.burst(e.x, e.y, 80, { z: 2, col: ['#ffffff', '#d8f6ff', '#9fd8ff'], up: 150, speed: 90, life: 1.1, g: 200 }); }
-      else if (ev[1] === 'krakendown') krakenDown(G, ev[3], ev[4], now);
+      else if (ev[1] === 'krakenrise' && ce) { const e = ce; e.upT = now; e.firstRise = 1; R.shake(7, 1.6); G.sfx.play('roar', 1.2); G.sfx.play('splash'); R.burst(e.x, e.y, 80, { z: 2, col: ['#ffffff', '#d8f6ff', '#9fd8ff'], up: 150, speed: 90, life: 1.1, g: 200 }); }
+      else if (ev[1] === 'krakendown') { G.inkUntil = 0; G.pull = null; G.grabUntil = 0; R.inks.length = 0; krakenDown(G, ev[3], ev[4], now); }
       break;
     }
     case 'phase': if (e) {

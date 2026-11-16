@@ -25,6 +25,16 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Nouveautés de la version 0.6 : le Kraken
+
+- **Le Kraken** : une chaîne de quatre quêtes (Ysaline → capitaine Elouan, à Havre-des-Brumes) mène à la Conque des Abysses. Soufflez dedans à bord, au-dessus du Gouffre : cinématique (le Goéland d'Elouan est happé par les tentacules), puis combat naval en trois phases — encre qui aveugle, tentacules qui frappent et saisissent les navires, tourbillon, vagues, plongée. La Mouette Écarlate de Morgane vient vous couvrir de ses canons. Les PV du Kraken s'adaptent au nombre de pirates.
+- **Boss à phases** : Barbe-Cendre, le Roi des Os, le Crabe-Roi, la Goule Alpha et le Capitaine Noyé ont une entrée en scène, des attaques propres (charges, cercles de cendre, tempête d'os, carapace, bonds, geysers, ancre) annoncées au sol, des phases marquées sur leur barre de vie, et une cinématique de mort.
+- **Maisons** : six maisons à vendre au Quartier des Corsaires (800 doublons). Votre nom s'affiche sur la porte ; la pièce est vide et se meuble avec B (coffres, lit, cheminée, tables, tapis, tableaux, trophée…). Maître Anselme vend les meubles, Lison les animaux de compagnie (chat, chien, perroquet, singe ; le bébé kraken se gagne), qui vous suivent ou dorment chez vous.
+- **Cambriolage** : avec des crochets (la Fouine, sur les quais), E devant la maison d'un autre lance un mini-jeu de crochetage. Réussi, vous avez 40 secondes pour fouiller un coffre : la moitié d'une pile au hasard, et parfois un objet très rare introuvable autrement. Serrures renforcées et chien de garde compliquent la tâche ; le propriétaire est prévenu et le voleur est marqué.
+- **Un secret à deux** : dans les ruines, deux dalles à fouler en même temps par deux pirates ouvrent le Sanctuaire des Jumeaux.
+- **Musiques originales** : une gigue de flibustiers en mer, un thème de bataille navale, un thème épique pour les boss (toutes composées pour le jeu, synthétisées dans le navigateur).
+- Correctif : les cases de l'épée et de la roulade ne clignotent plus dans la barre d'action ; nouvelles icônes pour la roulade et la banane.
+
 ## Nouveautés de la version 0.5 : l'arsenal
 
 - **36 armes** (25 nouvelles), chacune avec son comportement :
