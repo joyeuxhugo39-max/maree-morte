@@ -736,7 +736,8 @@ function ambience(now) {
   if (G.zone === Z.INTERIOR) theme = 'day';
   if (p.boat) theme = now < G.seaFight ? 'naval' : 'sea';
   if (G.evt && G.evt.state === 'on' && Math.hypot(G.evt.x - p.x, G.evt.y - p.y) < 420) theme = 'boss';
-  for (const e of G.ents.values()) if (e.k === 'm' && !e.dyingT && MOBS[e.type] && MOBS[e.type].ai && !MOBS[e.type].sea && Math.hypot(e.x - p.x, e.y - p.y) < 280) theme = 'epic';
+  for (const e of G.ents.values()) if (e.k === 'm' && !e.dyingT && MOBS[e.type] && MOBS[e.type].ai && !MOBS[e.type].sea && Math.hypot(e.x - p.x, e.y - p.y) < 280) G.epicUntil = now + 6;
+  if (now < (G.epicUntil || 0)) theme = 'epic';
   if (G.kraken && Math.hypot(G.world.kraken.x - p.x, G.world.kraken.y - p.y) < 560) theme = 'naval';
   if (G.cine && G.cine.theme) theme = G.cine.theme;
   G.sfx.setTheme(theme);
