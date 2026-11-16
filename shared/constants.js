@@ -1,9 +1,9 @@
 import { hash2 } from './rng.js';
 
 export const TILE = 16;
-export const MAP_W = 320;
-export const MAP_H = 304;
-export const OVER_H = 224; // hauteur de l'archipel ; en dessous : intérieurs et grottes
+export const MAP_W = 640;
+export const MAP_H = 560;
+export const OVER_H = 448; // hauteur de l'archipel ; en dessous : intérieurs et grottes
 export const TICK_RATE = 20;
 export const PLAYER_SPEED = 76; // pixels / seconde
 export const ROLL_SPEED = 210;
@@ -20,9 +20,10 @@ export const T = {
   DEEP: 0, WATER: 1, SAND: 2, GRASS: 3, JUNGLE: 4, DIRT: 5, COBBLE: 6,
   PLANK: 7, SWAMP: 8, MARSH: 9, ROCK: 10, MUD: 11,
   VOID: 12, FLOOR: 13, STONEF: 14, CAVE: 15, CWALL: 16, IWALL: 17, EXIT: 18,
+  ASH: 19, LAVA: 20, DGRASS: 21,
 };
 
-export const SPEED_MUL = { [T.WATER]: 0.62, [T.SWAMP]: 0.55, [T.MUD]: 0.86 };
+export const SPEED_MUL = { [T.WATER]: 0.62, [T.SWAMP]: 0.55, [T.MUD]: 0.86, [T.ASH]: 0.94 };
 
 export const SLOTS = ['weapon', 'gun', 'hat', 'body', 'boots', 'trinket'];
 export const SLOT_NAMES = {

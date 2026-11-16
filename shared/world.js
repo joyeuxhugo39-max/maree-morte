@@ -3,8 +3,9 @@
 import { TILE, MAP_W as W, MAP_H as H, OVER_H, T } from './constants.js';
 import { mulberry32, hash2, valueNoise, fbm, shuffle } from './rng.js';
 
-export const Z = { SEA: 0, TOWN: 1, BEACH: 2, PLAINS: 3, JUNGLE: 4, RUINS: 5, SWAMP: 6, WRECK: 7, HAVRE: 8, CRANE: 9, ILOT: 10, INTERIOR: 11, CAVE: 12, GOUFFRE: 13 };
-export const SAFE = new Set([1, 8, 11]);
+export const Z = { SEA: 0, TOWN: 1, BEACH: 2, PLAINS: 3, JUNGLE: 4, RUINS: 5, SWAMP: 6, WRECK: 7, HAVRE: 8, CRANE: 9, ILOT: 10, INTERIOR: 11, CAVE: 12, GOUFFRE: 13,
+  RADE: 14, COLLINES: 15, PENDUS: 16, SIRENES: 17, ANSE: 18, OSSEMENTS: 19, QUARANTAINE: 20, VOLCAN: 21, DAMNES: 22, BRUMES: 23, ERMITE: 24 };
+export const SAFE = new Set([1, 8, 11, 14, 18]);
 export const ZONES = [
   { name: 'Haute mer', lvl: 'Eaux profondes' },
   { name: 'Port-Lanterne', lvl: 'Zone sûre', safe: true },
@@ -20,6 +21,17 @@ export const ZONES = [
   { name: 'Intérieur', lvl: 'Zone sûre', safe: true },
   { name: 'Grotte', lvl: 'Danger' },
   { name: 'Gouffre du Kraken', lvl: 'Niveaux 10-14' },
+  { name: 'Rade-aux-Flibustiers', lvl: 'Zone sûre', safe: true },
+  { name: 'Collines de la Rade', lvl: 'Niveaux 12-15' },
+  { name: 'Forêt des Pendus', lvl: 'Niveaux 14-18' },
+  { name: 'Lagon des Sirènes', lvl: 'Niveaux 13-17' },
+  { name: 'Anse-Tranquille', lvl: 'Zone sûre', safe: true },
+  { name: 'Atoll des Ossements', lvl: 'Niveaux 16-20' },
+  { name: 'Île de la Quarantaine', lvl: 'Niveaux 18-22' },
+  { name: 'Volcan de Cendrelune', lvl: 'Niveaux 20-25' },
+  { name: 'Île des Damnés', lvl: 'Niveaux 26-30 · Extrême', hard: true },
+  { name: 'Brumes Éternelles', lvl: 'Niveaux 20-28 · Mer hantée' },
+  { name: "Îlot de l'Ermite", lvl: 'Niveaux 8-12' },
 ];
 
 // Propriétés partagées des décors. solid = bloque le déplacement (sur sa tuile de base).
@@ -39,6 +51,8 @@ export const PROPS = {
   comptoir: { solid: 1 }, etagere: { solid: 1 }, cheminee: { solid: 1 }, table: { solid: 1 }, chaise: {}, ratelier: { solid: 1 },
   plante: { solid: 1 }, lit_deco: { solid: 1 }, fourneau: { solid: 1 }, tapis_deco: { ground: 1 }, grotte: {}, crane_rock: { solid: 1 }, cristal: { solid: 1 }, tonneau_d: { solid: 1 },
   home: { solid: 1 }, dalle: { ground: 1 }, sceau: { solid: 1 },
+  gibet: { solid: 1 }, corail: { solid: 1 }, obelisque: { solid: 1 }, fumerolle: { ground: 1 }, tente: { solid: 1 }, barreaux: { solid: 1 },
+  mannequin: { solid: 1 }, lavarock: { solid: 1 }, cage: { solid: 1 }, fort: { solid: 1 }, ruine: { solid: 1 }, totem: { solid: 1 },
   ship: { solid: 1 }, wreck: { solid: 1 }, boat: { solid: 1 },
 };
 
@@ -62,16 +76,44 @@ export function generateWorld(seed = 7) {
     [96, 66, 66, 48], [147, 97, 32, 21], [44, 40, 30, 26], [46, 98, 32, 28],
     [150, 40, 28, 24], [174, 96, 9, 6], [112, 110, 34, 15], [70, 118, 22, 12],
     [262, 80, 24, 17], [246, 92, 10, 8], [252, 178, 22, 16], [238, 188, 9, 7], [186, 196, 9, 7], [300, 136, 8, 6],
+    // 0.7 : le Grand Large
+    [410, 78, 34, 25], [440, 100, 18, 13], [384, 62, 13, 11], // Île de la Rade
+    [540, 52, 40, 28], [582, 80, 18, 15], [506, 34, 14, 10], // Forêt des Pendus
+    [500, 160, 10, 8], [526, 148, 12, 9], [544, 170, 10, 8], [516, 186, 12, 7], [488, 178, 8, 6], // Lagon des Sirènes
+    [352, 150, 11, 9], // Îlot de l'Ermite
+    [150, 268, 27, 16], [174, 282, 12, 9], // Anse-Tranquille
+    [70, 330, 32, 24], [44, 352, 12, 10], // Atoll des Ossements
+    [300, 330, 36, 27], [332, 352, 16, 12], // Île de la Quarantaine
+    [470, 330, 34, 30], // Volcan de Cendrelune
+    [590, 402, 34, 26], [560, 420, 14, 10], // Île des Damnés
+    [402, 204, 7, 5], [244, 262, 6, 5], [522, 252, 6, 5], [384, 402, 8, 6], [204, 404, 9, 7], [114, 414, 6, 5], // îlots
   ];
+  const RD = { x: 408, y: 84 }, AT = { x: 150, y: 266 }, EM = { x: 352, y: 150 }, VC = { x: 470, y: 328 }, QC = { x: 298, y: 326 }, AO = { x: 70, y: 330 }, DM = { x: 590, y: 400 }, LG = { x: 516, y: 166 };
   const HC = { x: 262, y: 78 }; // Havre-des-Brumes
+  const BC = 16, bcw = Math.ceil(W / BC), blobCells = [];
+  for (let cy = 0; cy * BC < OVER_H; cy++) for (let cx = 0; cx < bcw; cx++) {
+    blobCells[cy * bcw + cx] = blobs.filter(([bx, by, rx, ry]) => bx + 2 * rx >= cx * BC && bx - 2 * rx <= cx * BC + BC && by + 2 * ry >= cy * BC && by - 2 * ry <= cy * BC + BC);
+  }
   function landValue(x, y) {
     let v = -1;
-    for (const [bx, by, rx, ry] of blobs) {
+    for (const [bx, by, rx, ry] of blobCells[((y / BC) | 0) * bcw + ((x / BC) | 0)]) {
       const dx = (x - bx) / rx, dy = (y - by) / ry;
+      if (dx > 2 || dx < -2 || dy > 2 || dy < -2) continue; // trop loin : ne change rien
       const d = 1 - Math.sqrt(dx * dx + dy * dy);
       if (d > v) v = d;
     }
+    if (v < -0.62) return v; // pleine mer : le bruit ne ferait pas émerger de terre
     v += (fbm(x / 20, y / 20, seed, 4) - 0.5) * 0.6;
+    for (const [cx, cy, rx, ry, k] of [[70, 327, 17, 11, 1.4], [516, 166, 11, 8, 1.6]]) { // lagons de l'atoll et des sirènes
+      const dx = (x - cx) / rx, dy = (y - cy) / ry;
+      const d = 1 - Math.sqrt(dx * dx + dy * dy);
+      if (d > 0) v -= d * k;
+    }
+    for (const [cx, cy, r] of [[RD.x, RD.y, 14], [AT.x, AT.y, 12], [EM.x, EM.y, 6]]) { // les villes restent sur la terre ferme
+      const dx = x - cx, dy = (y - cy) * 1.25;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < r) v = Math.max(v, 0.3 * (1 - d / r) + 0.1);
+    }
     { // baie de l'épave
       const dx = (x - 27) / 13, dy = (y - 27) / 11;
       const d = 1 - Math.sqrt(dx * dx + dy * dy);
@@ -93,7 +135,7 @@ export function generateWorld(seed = 7) {
   }
 
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const i = idx(x, y), v = landValue(x, y);
+    const i = idx(x, y), v = y >= OVER_H ? -1 : landValue(x, y);
     lv[i] = v;
     tiles[i] = v < -0.13 ? T.DEEP : v < 0 ? T.WATER : T.GRASS;
   }
@@ -107,14 +149,28 @@ export function generateWorld(seed = 7) {
     [Z.SWAMP, 44, 98, 1.1], [Z.SWAMP, 30, 72, 0.95], [Z.SWAMP, 62, 84, 0.75],
     [Z.WRECK, 40, 34, 0.95],
     [Z.HAVRE, 262, 80, 1.3], [Z.CRANE, 250, 180, 1.2], [Z.ILOT, 186, 196, 0.6], [Z.ILOT, 300, 136, 0.6],
+    [Z.COLLINES, 412, 66, 1.2], [Z.COLLINES, 442, 98, 0.9], [Z.COLLINES, 384, 62, 0.8], [Z.COLLINES, 396, 96, 0.9],
+    [Z.PENDUS, 540, 52, 1.5], [Z.PENDUS, 582, 80, 1], [Z.PENDUS, 506, 34, 0.9],
+    [Z.SIRENES, 516, 168, 1.4], [Z.ERMITE, 352, 150, 0.9], [Z.ANSE, 152, 270, 1.4],
+    [Z.OSSEMENTS, 70, 330, 1.5], [Z.OSSEMENTS, 44, 352, 0.8],
+    [Z.QUARANTAINE, 300, 330, 1.5], [Z.QUARANTAINE, 332, 352, 0.9],
+    [Z.VOLCAN, 470, 330, 1.6], [Z.DAMNES, 590, 402, 1.5], [Z.DAMNES, 560, 420, 0.9],
+    [Z.ILOT, 402, 204, 0.5], [Z.ILOT, 244, 262, 0.5], [Z.ILOT, 522, 252, 0.5], [Z.ILOT, 384, 402, 0.5], [Z.ILOT, 204, 404, 0.5], [Z.ILOT, 114, 414, 0.5],
   ];
+  const RC8 = 8, rcw = Math.ceil(W / RC8), regCells = [];
+  for (let cy = 0; cy * RC8 < OVER_H; cy++) for (let cx = 0; cx < rcw; cx++) {
+    const px = cx * RC8 + RC8 / 2, py = cy * RC8 + RC8 / 2, R = RC8 * 0.71 + 11.5; // demi-diagonale + déformation maximale
+    let m = 1e9;
+    for (const [, rx, ry, w] of regions) m = Math.min(m, (Math.hypot(px - rx, py - ry) + R) / w);
+    regCells[cy * rcw + cx] = regions.filter(([, rx, ry, w]) => (Math.hypot(px - rx, py - ry) - R) / w <= m);
+  }
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const i = idx(x, y);
     if (tiles[i] === T.DEEP) { zones[i] = Z.SEA; continue; }
     const wx = x + (fbm(x / 14, y / 14, seed + 5, 3) - 0.5) * 22;
     const wy = y + (fbm(x / 14, y / 14, seed + 9, 3) - 0.5) * 22;
     let best = 1e9, bz = Z.PLAINS;
-    for (const [z, rx, ry, w] of regions) {
+    for (const [z, rx, ry, w] of regCells[((y / RC8) | 0) * rcw + ((x / RC8) | 0)]) {
       const dx = wx - rx, dy = wy - ry;
       const d = Math.sqrt(dx * dx + dy * dy) / w;
       if (d < best) { best = d; bz = z; }
@@ -122,6 +178,7 @@ export function generateWorld(seed = 7) {
     const tdx = x - TC.x, tdy = (y - TC.y) * 1.2;
     if (Math.sqrt(tdx * tdx + tdy * tdy) < 17 + (fbm(x / 6, y / 6, seed + 1, 2) - 0.5) * 6) bz = Z.TOWN;
     if (Math.hypot(x - HC.x, (y - HC.y) * 1.2) < 14 + (fbm(x / 6, y / 6, seed + 2, 2) - 0.5) * 5) bz = Z.HAVRE;
+    if (Math.hypot(x - RD.x, (y - RD.y) * 1.2) < 16 + (fbm(x / 6, y / 6, seed + 3, 2) - 0.5) * 5 || (x >= 392 && x <= 426 && y >= 58 && y <= 72)) bz = Z.RADE;
     zones[i] = bz;
   }
 
@@ -146,9 +203,25 @@ export function generateWorld(seed = 7) {
       case Z.HAVRE: t = v < 0.08 ? T.SAND : T.GRASS; break;
       case Z.CRANE: t = v < 0.12 ? T.SAND : (n > 0.5 ? T.JUNGLE : T.GRASS); break;
       case Z.ILOT: t = v < 0.25 ? T.SAND : T.GRASS; break;
+      case Z.RADE: t = v < 0.08 ? T.SAND : (n > 0.6 ? T.DIRT : T.GRASS); break;
+      case Z.COLLINES: t = v < 0.1 ? T.SAND : (n > 0.57 ? T.DIRT : T.GRASS); break;
+      case Z.PENDUS: t = v < 0.06 ? T.SAND : (n > 0.63 ? T.MARSH : T.DGRASS); break;
+      case Z.SIRENES: t = v < 0.32 ? T.SAND : T.GRASS; break;
+      case Z.ERMITE: t = v < 0.22 ? T.SAND : T.GRASS; break;
+      case Z.ANSE: t = v < 0.14 ? T.SAND : T.GRASS; break;
+      case Z.OSSEMENTS: t = v < 0.4 || n < 0.55 ? T.SAND : T.DIRT; break;
+      case Z.QUARANTAINE: t = v < 0.08 ? T.SAND : (n > 0.6 ? T.MUD : n > 0.47 ? T.DIRT : T.GRASS); break;
+      case Z.VOLCAN: {
+        const dc = Math.hypot(x - VC.x, (y - VC.y) * 1.15);
+        const lava = fbm(x / 5, y / 5, seed + 41, 2);
+        t = dc < 7.5 ? T.LAVA : dc < 10.5 ? T.ROCK : (v < 0.05 ? T.SAND : (lava > 0.7 && dc < 24 ? T.LAVA : T.ASH));
+        break;
+      }
+      case Z.DAMNES: t = v < 0.06 ? T.ASH : (n > 0.58 ? T.ASH : T.DGRASS); break;
     }
     const r = fbm(x / 8, y / 8, seed + 21, 3);
-    if ((z === Z.JUNGLE || z === Z.PLAINS || z === Z.WRECK || z === Z.CRANE) && r > 0.69 && v > 0.12) t = T.ROCK;
+    if ((z === Z.JUNGLE || z === Z.PLAINS || z === Z.WRECK || z === Z.CRANE || z === Z.COLLINES || z === Z.DAMNES || z === Z.PENDUS) && r > 0.69 && v > 0.12) t = T.ROCK;
+    if (z === Z.VOLCAN && r > 0.66 && v > 0.12 && t === T.ASH) t = T.ROCK;
     tiles[i] = t;
   }
   // l'eau peu profonde du marais devient vase
@@ -490,7 +563,7 @@ export function generateWorld(seed = 7) {
     if (!inMap(x, y)) return false;
     const i = idx(x, y);
     const t = tiles[i];
-    return !solid[i] && t !== T.DEEP && t !== T.ROCK;
+    return !solid[i] && t !== T.DEEP && t !== T.ROCK && t !== T.LAVA;
   }
   function findFree(x, y) {
     for (let r = 0; r < 8; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
@@ -499,6 +572,175 @@ export function generateWorld(seed = 7) {
     }
     return null;
   }
+
+  // ---------- 6e. Le Grand Large (0.7) ----------
+  const buildings2 = [], plots2 = [], npcs2 = [], docks = {}, lavaLights = [], hard = {};
+  const forceLand = (x0, y0, x1, y1, t = T.GRASS, zone = -1) => { // sans toucher au rivage
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      if (!inMap(x, y)) continue;
+      const i = idx(x, y);
+      if (tiles[i] === T.DEEP || tiles[i] === T.WATER) continue;
+      if (tiles[i] !== T.COBBLE && tiles[i] !== T.PLANK) tiles[i] = t;
+      if (zone >= 0) zones[i] = zone;
+    }
+  };
+  const facade = (b, zone, list = buildings2) => { // bâtiment dont l'intérieur est créé à la fin (les anciens identifiants ne bougent pas)
+    for (let y = b.y - 1; y <= b.y + b.h; y++) for (let x = b.x - 1; x <= b.x + b.w; x++) {
+      if (!inMap(x, y)) continue;
+      const i = idx(x, y);
+      if (tiles[i] !== T.COBBLE) tiles[i] = b.ground || T.GRASS;
+      occ[i] = 1; zones[i] = zone;
+      if (y < b.y + b.h && x >= b.x && x < b.x + b.w && y >= b.y) solid[i] = 1;
+    }
+    stampPath([[b.x + b.door, b.y + b.h], [b.x + b.door, b.y + b.h + 1]], 0.9, T.COBBLE);
+    props.push({ id: pid++, type: b.type, v: b.v || 0, x: (b.x + b.w / 2) * TILE, y: (b.y + b.h) * TILE, tx: b.x, ty: b.y, w: b.w, h: b.h, door: b.door, name: b.name, plot: b.plot });
+    if (list) list.push(b);
+    return b;
+  };
+  const toCoast = (x, y, dx, dy, max = 60) => { // marche jusqu'à l'eau
+    let k = 0;
+    while (k < max && inMap(x, y) && tiles[idx(x, y)] !== T.WATER && tiles[idx(x, y)] !== T.DEEP) { x += dx; y += dy; k++; }
+    return [x, y];
+  };
+  const pier = (x0, y0, dx, dy, len, zone) => { // ponton de planches qui s'avance dans l'eau
+    const cells = [];
+    for (let k = -1; k <= len; k++) for (let s = -1; s <= 1; s++) {
+      const x = x0 + dx * k + (dy ? s : 0), y = y0 + dy * k + (dx ? s : 0);
+      if (!inMap(x, y)) continue;
+      const i = idx(x, y);
+      tiles[i] = T.PLANK; plankDir[i] = dx ? 1 : 0; path[i] = 1; occ[i] = 1; if (zone >= 0) zones[i] = zone;
+      cells.push([x, y]);
+    }
+    for (let k = len - 3; k <= len + 6; k++) for (let s = -5; s <= 5; s++) { // eau profonde au bout, pour accoster
+      const x = x0 + dx * k + (dy ? s : 0), y = y0 + dy * k + (dx ? s : 0);
+      if (inMap(x, y) && tiles[idx(x, y)] === T.WATER) tiles[idx(x, y)] = T.DEEP;
+    }
+    return { x: (x0 + dx * len) * TILE + 8, y: (y0 + dy * len) * TILE + 8, dx, dy };
+  };
+  // --- Rade-aux-Flibustiers : le repaire de tous les forbans
+  for (let y = RD.y - 26; y <= RD.y + 14; y++) for (let x = RD.x - 18; x <= RD.x + 18; x++) if (inMap(x, y) && tiles[idx(x, y)] !== T.DEEP) zones[idx(x, y)] = Z.RADE;
+  disc(RD.x, RD.y, 5.2, T.COBBLE);
+  stampPath([[RD.x - 16, RD.y], [RD.x + 16, RD.y]], 1.0, T.COBBLE);
+  stampPath([[RD.x, RD.y - 22], [RD.x, RD.y + 12]], 1.0, T.COBBLE);
+  stampPath([[RD.x - 16, RD.y - 18], [RD.x + 16, RD.y - 18]], 1.0, T.COBBLE);
+  facade({ type: 'tavern', x: RD.x - 14, y: RD.y - 12, w: 8, h: 5, door: 3, name: 'Le Perroquet Pendu', kind: 'tavern', npc: 'mama_lune' }, Z.RADE);
+  facade({ type: 'forge', x: RD.x + 6, y: RD.y - 11, w: 6, h: 4, door: 2, name: 'La Geôle', kind: 'geole' }, Z.RADE);
+  facade({ type: 'house', v: 3, x: RD.x - 13, y: RD.y + 4, w: 5, h: 4, door: 2, name: 'Couture du Corsaire', kind: 'couture' }, Z.RADE);
+  facade({ type: 'house', v: 4, x: RD.x + 8, y: RD.y + 4, w: 5, h: 4, door: 2, name: 'Chez le Receleur', kind: 'receleur' }, Z.RADE);
+  stampPath([[RD.x - 11, RD.y - 6], [RD.x - 11, RD.y]], 0.9, T.COBBLE); stampPath([[RD.x + 8, RD.y - 6], [RD.x + 8, RD.y]], 0.9, T.COBBLE);
+  for (let k = 0; k < 4; k++) {
+    const b = facade({ type: 'home', v: (k + 1) % 3, x: RD.x - 12 + k * 6, y: RD.y - 25, w: 5, h: 4, door: 2, name: `Maison de la Rade n° ${k + 1}`, plot: 6 + k }, Z.RADE, null);
+    plots2.push(b);
+  }
+  addProp('brazier', RD.x, RD.y - 1); addProp('well', RD.x - 4, RD.y + 3); addProp('stall', RD.x + 3, RD.y + 3, 1); addProp('stall', RD.x - 3, RD.y - 3, 0);
+  addProp('gibet', RD.x + 4, RD.y - 3, 0); addProp('cage', RD.x + 13, RD.y - 4, 0);
+  for (const [x, y] of [[RD.x - 6, RD.y - 4], [RD.x + 6, RD.y - 4], [RD.x - 6, RD.y + 4], [RD.x + 6, RD.y + 4], [RD.x - 15, RD.y - 16], [RD.x + 15, RD.y - 16], [RD.x - 2, RD.y - 20], [RD.x + 2, RD.y - 20]]) if (!solid[idx(x, y)]) addProp('lamp', x, y);
+  for (const [x, y] of [[RD.x - 16, RD.y - 6], [RD.x - 5, RD.y - 13], [RD.x + 13, RD.y - 9], [RD.x + 14, RD.y + 7], [RD.x - 15, RD.y + 8]]) if (!solid[idx(x, y)] && !path[idx(x, y)]) addProp(hash2(x, y, 3) > 0.5 ? 'barrel' : 'crate', x, y, (hash2(x, y, 4) * 3) | 0);
+  { // quai de la Rade, vers le sud
+    const [cx, cy] = toCoast(RD.x, RD.y + 6, 0, 1);
+    stampPath([[RD.x, RD.y + 5], [RD.x, cy]], 1.0, T.COBBLE);
+    for (let y = RD.y + 5; y <= cy; y++) for (let x = RD.x - 2; x <= RD.x + 2; x++) if (inMap(x, y) && tiles[idx(x, y)] !== T.DEEP) zones[idx(x, y)] = Z.RADE;
+    docks.rade = pier(RD.x, cy, 0, 1, 7, Z.RADE);
+    addProp('anchor', RD.x - 3, cy - 2); addProp('nets', RD.x + 3, cy - 2);
+  }
+  // --- le Fort des Deux Clés : une porte, deux leviers de pierre, il faut être deux
+  const FT = { x: 444, y: 100 };
+  forceLand(FT.x - 7, FT.y - 4, FT.x + 7, FT.y + 6, T.DIRT);
+  for (let y = FT.y - 4; y <= FT.y + 6; y++) for (let x = FT.x - 7; x <= FT.x + 7; x++) { occ[idx(x, y)] = 1; zones[idx(x, y)] = Z.COLLINES; }
+  for (let y = FT.y - 3; y <= FT.y; y++) for (let x = FT.x - 3; x <= FT.x + 3; x++) solid[idx(x, y)] = 1;
+  solid[idx(FT.x, FT.y)] = 1;
+  props.push({ id: pid++, type: 'fort', v: 0, x: FT.x * TILE + 8, y: FT.y * TILE + 14, tx: FT.x, ty: FT.y });
+  const fortPlates = [];
+  for (const [dx, v] of [[-5, 0], [5, 1]]) {
+    const x = FT.x + dx, y = FT.y + 4;
+    setT(x, y, T.COBBLE); solid[idx(x, y)] = 0;
+    props.push({ id: pid++, type: 'dalle', v: v + 2, x: x * TILE + 8, y: y * TILE + 14, tx: x, ty: y });
+    fortPlates.push({ x: x * TILE + 8, y: y * TILE + 10 });
+  }
+  stampPath([[RD.x + 14, RD.y], [430, 90], [FT.x, FT.y + 6]], 1.0, T.DIRT);
+  // --- Anse-Tranquille : un village de pêcheurs, à l'abri de tout
+  disc(AT.x, AT.y, 4.2, T.COBBLE);
+  stampPath([[AT.x - 17, AT.y - 6], [AT.x + 17, AT.y - 6]], 1.0, T.COBBLE);
+  stampPath([[AT.x, AT.y - 6], [AT.x, AT.y + 10]], 1.0, T.COBBLE);
+  stampPath([[AT.x - 15, AT.y + 8], [AT.x + 15, AT.y + 8]], 1.0, T.COBBLE);
+  const ansePlots = [[AT.x - 15, AT.y - 10], [AT.x - 8, AT.y - 10], [AT.x + 3, AT.y - 10], [AT.x + 10, AT.y - 10], [AT.x - 14, AT.y + 4], [AT.x + 9, AT.y + 4]];
+  ansePlots.forEach(([x, y], k) => plots2.push(facade({ type: 'home', v: k % 3, x, y, w: 5, h: 4, door: 2, name: `Maison de l'Anse n° ${k + 1}`, plot: 10 + k }, Z.ANSE, null)));
+  for (const [x, y] of [[AT.x - 5, AT.y - 3], [AT.x + 5, AT.y - 3], [AT.x - 5, AT.y + 4], [AT.x + 5, AT.y + 4]]) if (!solid[idx(x, y)]) addProp('lamp', x, y);
+  addProp('well', AT.x - 3, AT.y - 2); addProp('bench', AT.x + 3, AT.y - 2); addProp('stall', AT.x + 3, AT.y + 3, 0);
+  for (let k = 0; k < 7; k++) { const x = AT.x - 18 + k * 2, y = AT.y + 10; if (!solid[idx(x, y)] && !path[idx(x, y)]) addProp('fence', x, y, 0); }
+  { const [cx, cy] = toCoast(AT.x, AT.y + 9, 0, 1); stampPath([[AT.x, AT.y + 9], [AT.x, cy]], 1.0, T.COBBLE); docks.anse = pier(AT.x, cy, 0, 1, 6, Z.ANSE); addProp('nets', AT.x - 3, cy - 1); addProp('boat', AT.x + 5, cy + 3, 0); }
+  // --- l'Îlot de l'Ermite : trois maisons au bout du monde (pas de Flamme Bénite ici)
+  forceLand(EM.x - 10, EM.y - 8, EM.x + 10, EM.y + 7, T.GRASS);
+  [[EM.x - 9, EM.y - 3], [EM.x - 2, EM.y - 7], [EM.x + 5, EM.y - 3]].forEach(([x, y], k) => plots2.push(facade({ type: 'home', v: (k + 2) % 3, x, y, w: 5, h: 4, door: 2, name: `Maison de l'Ermite n° ${k + 1}`, plot: 16 + k }, Z.ERMITE, null)));
+  stampPath([[EM.x - 8, EM.y + 2], [EM.x + 8, EM.y + 2]], 0.9, T.DIRT); stampPath([[EM.x, EM.y - 3], [EM.x, EM.y + 2]], 0.9, T.DIRT);
+  addProp('torch', EM.x - 4, EM.y + 4); addProp('torch', EM.x + 4, EM.y + 4); addProp('tente', EM.x + 2, EM.y + 5, 0);
+  // --- Forêt des Pendus : la clairière du Bourreau
+  const FP = { x: 548, y: 46 };
+  forceLand(FP.x - 5, FP.y - 4, FP.x + 5, FP.y + 4, T.DIRT, Z.PENDUS);
+  for (let y = FP.y - 4; y <= FP.y + 4; y++) for (let x = FP.x - 5; x <= FP.x + 5; x++) occ[idx(x, y)] = 1;
+  for (const [dx, dy] of [[-4, -3], [0, -4], [4, -3], [-4, 3], [4, 3]]) addProp('gibet', FP.x + dx, FP.y + dy, (dx + 4) % 2);
+  stampPath([[520, 74], [532, 60], [FP.x, FP.y + 4]], 1.0, T.DIRT);
+  // --- Atoll des Ossements : le désert d'os
+  // --- Île de la Quarantaine : une colonie abandonnée à la peste
+  forceLand(QC.x - 12, QC.y - 10, QC.x + 12, QC.y + 10, T.DIRT, Z.QUARANTAINE);
+  for (let y = QC.y - 10; y <= QC.y + 10; y++) for (let x = QC.x - 12; x <= QC.x + 12; x++) if (hash2(x, y, 71) < 0.35 && tiles[idx(x, y)] === T.DIRT) tiles[idx(x, y)] = T.MUD;
+  disc(QC.x, QC.y, 4.5, T.COBBLE);
+  stampPath([[QC.x - 12, QC.y], [QC.x + 12, QC.y]], 1.0, T.COBBLE); stampPath([[QC.x, QC.y - 10], [QC.x, QC.y + 10]], 1.0, T.COBBLE);
+  for (const [dx, dy, v] of [[-9, -7, 0], [6, -7, 1], [-9, 4, 1], [6, 5, 0], [-4, -9, 0], [9, -2, 1]]) {
+    for (let y = QC.y + dy; y < QC.y + dy + 3; y++) for (let x = QC.x + dx; x < QC.x + dx + 4; x++) occ[idx(x, y)] = 1;
+    addProp('ruine', QC.x + dx + 1, QC.y + dy + 2, v);
+  }
+  addProp('well', QC.x + 3, QC.y - 3); addProp('cross', QC.x - 3, QC.y + 3, 1); addProp('cage', QC.x - 3, QC.y - 3, 1);
+  const camp = { x: QC.x + 22, y: QC.y - 12 }; // le campement des survivants, sur la falaise
+  forceLand(camp.x - 4, camp.y - 3, camp.x + 4, camp.y + 3, T.DIRT, Z.QUARANTAINE);
+  for (let y = camp.y - 3; y <= camp.y + 3; y++) for (let x = camp.x - 4; x <= camp.x + 4; x++) occ[idx(x, y)] = 1;
+  addProp('tente', camp.x - 2, camp.y - 1, 1); addProp('tente', camp.x + 2, camp.y - 1, 0); addProp('torch', camp.x, camp.y + 1);
+  stampPath([[QC.x + 12, QC.y], [camp.x, camp.y + 2]], 0.9, T.DIRT);
+  // --- Volcan de Cendrelune : fumerolles et coulées
+  for (let k = 0; k < 18; k++) {
+    const a = k / 18 * Math.PI * 2, r = 12 + hash2(k, 3, 77) * 10;
+    const x = Math.round(VC.x + Math.cos(a) * r), y = Math.round(VC.y + Math.sin(a) * r * 0.85);
+    if (inMap(x, y) && tiles[idx(x, y)] === T.ASH && !occ[idx(x, y)]) addProp('fumerolle', x, y, k % 3);
+  }
+  for (let y = VC.y - 30; y <= VC.y + 30; y += 3) for (let x = VC.x - 34; x <= VC.x + 34; x += 3) if (inMap(x, y) && tiles[idx(x, y)] === T.LAVA) lavaLights.push({ x: x * TILE + 8, y: y * TILE + 8 });
+  // --- Île des Damnés : obélisques et ruines d'un château
+  forceLand(DM.x - 6, DM.y - 7, DM.x + 6, DM.y + 3, T.ASH, Z.DAMNES);
+  for (let y = DM.y - 7; y <= DM.y + 3; y++) for (let x = DM.x - 6; x <= DM.x + 6; x++) occ[idx(x, y)] = 1;
+  for (const [dx, dy] of [[-5, -5], [5, -5], [-5, 2], [5, 2]]) addProp('obelisque', DM.x + dx, DM.y + dy, 0);
+  for (let k = 0; k < 14; k++) {
+    const a = k / 14 * Math.PI * 2 + 0.3, r = 14 + hash2(k, 9, 31) * 12;
+    const x = Math.round(DM.x + Math.cos(a) * r), y = Math.round(DM.y + Math.sin(a) * r * 0.8);
+    if (inMap(x, y) && (tiles[idx(x, y)] === T.DGRASS || tiles[idx(x, y)] === T.ASH) && !occ[idx(x, y)] && !solid[idx(x, y)]) addProp(k % 3 ? 'totem' : 'obelisque', x, y, k % 2);
+  }
+  // --- Lagon des Sirènes : coraux et coquillages
+  for (let k = 0; k < 26; k++) {
+    const a = k / 26 * Math.PI * 2, r = 9 + hash2(k, 5, 13) * 8;
+    const x = Math.round(LG.x + Math.cos(a) * r), y = Math.round(LG.y + Math.sin(a) * r * 0.8);
+    if (inMap(x, y) && tiles[idx(x, y)] === T.SAND && !occ[idx(x, y)]) addProp('corail', x, y, k % 3);
+  }
+  // --- entrées des trois nouveaux donjons
+  const mouthNear = (cx, cy, v, okT) => {
+    for (let r = 0; r < 30; r++) for (let a = 0; a < 32; a++) {
+      const x = Math.round(cx + Math.cos(a / 32 * 6.283) * r), y = Math.round(cy + Math.sin(a / 32 * 6.283) * r * 0.8);
+      if (!inMap(x, y + 3)) continue;
+      let ok = true;
+      for (let dy = -1; dy <= 2 && ok; dy++) for (let dx = -2; dx <= 2; dx++) { const i = idx(x + dx, y + dy); if (!okT(tiles[i]) || occ[i] || path[i]) { ok = false; break; } }
+      if (!ok) continue;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -3; dx <= 3; dx++) if (inMap(x + dx, y + dy)) occ[idx(x + dx, y + dy)] = 1;
+      return addProp('grotte', x, y, v);
+    }
+    return null;
+  };
+  const walkT = (t) => t === T.SAND || t === T.GRASS || t === T.DIRT || t === T.ASH || t === T.DGRASS || t === T.MARSH;
+  const mouthOs = mouthNear(AO.x, AO.y - 20, 1, walkT);
+  const mouthBrasier = mouthNear(VC.x, VC.y + 16, 0, (t) => t === T.ASH);
+  const mouthComte = mouthNear(DM.x, DM.y - 12, 1, walkT);
+  // --- coffres du Grand Large (le dernier palier ne s'ouvre qu'aux plus forts)
+  for (const c of [
+    { x: 432, y: 62, tier: 2 }, { x: 560, y: 36, tier: 3 }, { x: 590, y: 82, tier: 2 }, { x: 526, y: 150, tier: 3 }, { x: 352, y: 156, tier: 1 },
+    { x: 52, y: 352, tier: 3 }, { x: 90, y: 318, tier: 2 }, { x: 318, y: 348, tier: 3 }, { x: 280, y: 312, tier: 2 }, { x: 490, y: 344, tier: 3 },
+    { x: 452, y: 316, tier: 3 }, { x: 572, y: 418, tier: 4 }, { x: 606, y: 392, tier: 4 }, { x: 402, y: 204, tier: 2 }, { x: 204, y: 404, tier: 3 }, { x: 114, y: 414, tier: 2 },
+  ]) { const s = findFree(c.x, c.y); if (s) { const p = addProp('chest', s.x, s.y, Math.min(3, c.tier)); p.chest = c.tier; chests.push(p); } }
 
   // ---------- 11. Végétation et décors ----------
   const clear = (x, y, r) => {
@@ -509,16 +751,39 @@ export function generateWorld(seed = 7) {
     }
     return true;
   };
-  const nearTown = (x, y) => Math.hypot(x - TC.x, (y - TC.y) * 1.2) < 15 || Math.hypot(x - HC.x, (y - HC.y) * 1.2) < 12;
-  for (let y = 2; y < H - 2; y++) for (let x = 2; x < W - 2; x++) {
+  const nearTown = (x, y) => Math.hypot(x - TC.x, (y - TC.y) * 1.2) < 15 || Math.hypot(x - HC.x, (y - HC.y) * 1.2) < 12 || Math.hypot(x - RD.x, (y - RD.y) * 1.2) < 18 || zones[idx(x, y)] === Z.ANSE;
+  for (let y = 2; y < OVER_H - 2; y++) for (let x = 2; x < W - 2; x++) {
     const i = idx(x, y);
     if (occ[i] || path[i] || solid[i]) continue;
     const t = tiles[i], z = zones[i];
+    if (t === T.DEEP || t === T.LAVA) continue;
     const dens = fbm(x / 6, y / 6, seed + 31, 2);
     const r = hash2(x, y, seed + 99);
     const v = (hash2(x, y, seed + 7) * 4) | 0;
     const ox = ((hash2(x, y, seed + 8) - 0.5) * 8) | 0, oy = ((hash2(x, y, seed + 6) - 0.5) * 4) | 0;
     const town = nearTown(x, y);
+    if (t === T.SAND && z === Z.OSSEMENTS) { // désert d'os : peu de palmiers, beaucoup de restes
+      if (r < 0.006 && clear(x, y, 1)) addProp('palm', x, y, v, ox, 0);
+      else if (r < 0.05) addProp(r < 0.035 ? 'bones' : 'skull', x, y, v, ox, oy);
+      else if (r < 0.058 && clear(x, y, 0)) addProp('rock', x, y, v % 2, ox, 0);
+      else if (r < 0.064 && clear(x, y, 1)) addProp('totem', x, y, 1, ox, 0);
+      continue;
+    }
+    if (t === T.DGRASS) { // terre hantée : arbres morts, gibets, champignons
+      if (dens > 0.42 && r < 0.12 && clear(x, y, 1)) addProp('deadtree', x, y, v, ox, 0);
+      else if (r < 0.135 && clear(x, y, 1) && z === Z.PENDUS) addProp('gibet', x, y, v % 2, 0, 0);
+      else if (r < 0.2 && clear(x, y, 0)) addProp('mushroom', x, y, v, ox, oy);
+      else if (r < 0.24) addProp(r < 0.225 ? 'bones' : 'skull', x, y, v, ox, oy);
+      else if (r < 0.25 && clear(x, y, 0)) addProp('rock', x, y, 4, ox, 0);
+      continue;
+    }
+    if (t === T.ASH) { // cendres : rochers de lave, os calcinés
+      if (r < 0.05 && clear(x, y, 1)) addProp('lavarock', x, y, v % 3, ox, 0);
+      else if (r < 0.07 && clear(x, y, 1) && z === Z.DAMNES) addProp('deadtree', x, y, v, ox, 0);
+      else if (r < 0.085) addProp(r < 0.08 ? 'bones' : 'skull', x, y, v, ox, oy);
+      else if (r < 0.095 && z === Z.VOLCAN && clear(x, y, 1)) addProp('fumerolle', x, y, v % 3, 0, 0);
+      continue;
+    }
     if (t === T.SAND) {
       if (r < 0.016 + dens * 0.025 && clear(x, y, 1) && !town) addProp('palm', x, y, v, ox, 0);
       else if (r < 0.06) addProp(r < 0.045 ? 'shell' : 'starfish', x, y, v, ox, oy);
@@ -535,7 +800,8 @@ export function generateWorld(seed = 7) {
       else if (r < 0.03 && clear(x, y, 0)) addProp('bush', x, y, v, ox, 0);
       else if (r < 0.07) addProp('flower', x, y, v, ox, oy);
       else if (r < 0.076 && clear(x, y, 0)) addProp('rock', x, y, 2 + (v % 2), ox, 0);
-      else if (r < 0.082 && z === Z.WRECK) addProp('bones', x, y, v, ox, oy);
+      else if (r < 0.082 && (z === Z.WRECK || z === Z.QUARANTAINE)) addProp('bones', x, y, v, ox, oy);
+      else if (r < 0.09 && z === Z.QUARANTAINE && clear(x, y, 0)) addProp(r < 0.086 ? 'grave' : 'cross', x, y, v % 3, 0, 0);
     } else if (t === T.JUNGLE) {
       if (z === Z.RUINS && Math.hypot(x - RC.x, y - RC.y) < 8) { if (r < 0.08) addProp('fern', x, y, v, ox, oy); continue; }
       if (dens > 0.4 && r < 0.21 && clear(x, y, 1)) addProp('jtree', x, y, v, ox, 0);
@@ -591,7 +857,23 @@ export function generateWorld(seed = 7) {
       put('cheminee', x0 + w - 2, y0);
       for (const [tx, ty] of [[x0 + 9, y0 + 2], [x0 + 12, y0 + 4], [x0 + 8, y0 + 6], [x0 + 3, y0 + 6]]) if (tx < x0 + w - 1 && ty < y0 + h - 1) { put('table', tx, ty); put('chaise', tx - 1, ty, 0); put('chaise', tx + 1, ty, 1); }
       put('tonneau_d', x0, y0 + h - 1); put('tonneau_d', x0 + w - 1, y0 + h - 1);
-      innerNpcs.push({ id: kind === 'tavern' ? 'rosalie' : 'ysolde', x: (x0 + 3) * TILE + 8, y: (y0 + 1) * TILE + 12, dir: 0 });
+      innerNpcs.push({ id: r.npc || (kind === 'tavern' ? 'rosalie' : 'ysolde'), x: (x0 + 3) * TILE + 8, y: (y0 + 1) * TILE + 12, dir: 0 });
+    } else if (kind === 'geole') { // trois cellules ; le capitaine dans celle du milieu
+      for (let c = 0; c < 3; c++) { const cx = x0 + 1 + c * 4; for (let y = y0; y < y0 + 3; y++) { put('barreaux', cx + 3, y, 0); } put('barreaux', cx, y0 + 3, 1); put('barreaux', cx + 1, y0 + 3, 1); put('barreaux', cx + 2, y0 + 3, 1); }
+      put('table', x0 + 5, y0 + h - 2); put('chaise', x0 + 4, y0 + h - 2, 0); put('ratelier', x0 + w - 1, y0 + h - 2, 1);
+      innerNpcs.push({ id: 'vif_argent', x: (x0 + 6) * TILE + 8, y: (y0 + 1) * TILE + 12, dir: 0 });
+      innerNpcs.push({ id: 'geolier', x: (x0 + 3) * TILE + 8, y: (y0 + h - 2) * TILE + 12, dir: 0 });
+    } else if (kind === 'couture') {
+      for (const x of [x0 + 1, x0 + 3, x0 + 5]) put('mannequin', x, y0, (x - x0) % 3);
+      put('etagere', x0 + w - 1, y0, 1); put('table', x0 + 3, y0 + 3); put('tapis_deco', x0 + 1, y0 + 3);
+      innerNpcs.push({ id: 'madame_soie', x: (x0 + 6) * TILE + 8, y: (y0 + 2) * TILE + 12, dir: 0 });
+    } else if (kind === 'receleur') {
+      put('etagere', x0, y0, 0); put('etagere', x0 + 1, y0, 1); put('comptoir', x0 + 3, y0 + 2); put('comptoir', x0 + 4, y0 + 2); put('comptoir', x0 + 5, y0 + 2);
+      put('crate', x0 + w - 1, y0, 2); put('tonneau_d', x0 + w - 1, y0 + h - 1);
+      innerNpcs.push({ id: 'receleur', x: (x0 + 4) * TILE + 8, y: (y0 + 1) * TILE + 12, dir: 0 });
+    } else if (kind === 'arene') {
+      for (const [x, y] of [[x0, y0], [x0 + w - 1, y0], [x0, y0 + h - 1], [x0 + w - 1, y0 + h - 1], [x0 + (w >> 1) - 4, y0], [x0 + (w >> 1) + 4, y0]]) put('pillar', x, y, 1);
+      put('brazier', x0 + 2, y0); put('brazier', x0 + w - 3, y0);
     } else if (kind === 'forge') {
       put('fourneau', x0 + 1, y0); put('ratelier', x0 + 4, y0, 0); put('ratelier', x0 + 6, y0, 1);
       put('anvil', x0 + 3, y0 + 3); put('tonneau_d', x0 + w - 1, y0 + h - 1); put('crate', x0 + w - 2, y0 + h - 1, 1); put('crate', x0, y0 + h - 1, 0);
@@ -704,6 +986,38 @@ export function generateWorld(seed = 7) {
     put('tapis_deco', x0 + (rw >> 1) - 1, y0 + 4);
   }
 
+  // ---------- 11e. Les pièces du Grand Large (0.7, ajoutées après les anciennes) ----------
+  for (const b of buildings2) {
+    const kind = b.kind;
+    const [rw, rh] = kind === 'tavern' ? [15, 8] : kind === 'geole' ? [13, 7] : [9, 6];
+    const r = room(b.name, kind, rw, rh, kind === 'geole' ? T.STONEF : T.FLOOR, { x: b.x + b.door, y: b.y + b.h });
+    r.npc = b.npc;
+    furnish(r);
+  }
+  for (const b of plots2) {
+    const r = room(b.name, 'home', 10, 7, T.FLOOR, { x: b.x + b.door, y: b.y + b.h });
+    b.room = r.id; b.doorId = doors.length - 1; doors[b.doorId].plot = b.plot;
+    plots.push(b);
+  }
+  const arena = room('Fort des Deux Clés', 'arene', 22, 12, T.STONEF, { x: FT.x, y: FT.y + 1 });
+  doors[doors.length - 1].seal = 'freres';
+  furnish(arena);
+  const bossIn = (r, mob, far = true) => { // le boss attend au fond, loin de l'entrée
+    let best = null;
+    for (let y = r.y0; y < r.y0 + r.h; y++) for (let x = r.x0; x < r.x0 + r.w; x++) {
+      const t = tiles[idx(x, y)];
+      if ((t === T.CAVE || t === T.STONEF || t === T.FLOOR) && !occ[idx(x, y)] && (!best || (far ? y < best[1] : false))) best = [x, y];
+    }
+    if (best) caveSpawns.push({ mob, x: best[0] * TILE + 8, y: best[1] * TILE + 10 });
+  };
+  caveSpawns.push({ mob: 'frere_fer', x: (arena.x0 + 6) * TILE + 8, y: (arena.y0 + 4) * TILE + 10 });
+  caveSpawns.push({ mob: 'frere_rouille', x: (arena.x0 + arena.w - 7) * TILE + 8, y: (arena.y0 + 4) * TILE + 10 });
+  const caves2 = [];
+  if (mouthOs) { const r = cave('Crypte du Général d’Os', 34, 20, mouthOs, 2718, [['legionnaire', 8], ['skelgun', 4]]); bossIn(r, 'general_os'); caves2.push([r, 'mousquet_general']); }
+  if (mouthBrasier) { const r = cave('Forge du Brasier', 34, 22, mouthBrasier, 1618, [['calcine', 7], ['golem_lave', 4]]); bossIn(r, 'brasier'); caves2.push([r, 'marteau_brasier']); }
+  if (mouthComte) { const r = cave('Crypte du Comte', 38, 22, mouthComte, 6626, [['damne', 8], ['arquebusier_damne', 5], ['molosse_damne', 3]]); bossIn(r, 'comte_vespere'); caves2.push([r, 'lame_vespere']); }
+  if (ay + rowH + 2 > H) throw new Error('bande des intérieurs trop petite');
+
   // ---------- 11c. Cachettes : des coffres oubliés, chacun garde une arme ----------
   const cacheAt = (cx, cy, r, item) => {
     for (let d = 0; d <= r; d++) for (let dy = -d; dy <= d; dy++) for (let dx = -d; dx <= d; dx++) {
@@ -735,9 +1049,14 @@ export function generateWorld(seed = 7) {
   cacheAt(300, 136, 5, 'cimeterre');
   cacheAt(CEM.x + 5, CEM.y - 6, 5, 'faux');
   for (const r of rooms) {
-    if (r.kind !== 'cave') continue;
+    if (r.kind !== 'cave' || caves2.some(([c]) => c === r)) continue;
     cacheInCave(r, r.name.includes('Crâne') ? 'couleuvrine' : r.name.includes('Cristal') ? 'dague_cristal' : 'poivriere');
   }
+  for (const [r, item] of caves2) cacheInCave(r, item);
+  cacheAt(FP.x + 2, FP.y, 4, 'hache_bourreau');
+  cacheAt(LG.x + 10, LG.y - 18, 6, 'trident_sirene');
+  cacheAt(EM.x, EM.y + 6, 5, 'tromblon_ermite');
+  cacheAt(QC.x - 10, QC.y + 8, 6, 'scalpel_corbeau');
 
   // ---------- 11d. Le Gouffre du Kraken : eau profonde entre l'archipel et l'Île au Crâne ----------
   let KR = { x: 206, y: 152 };
@@ -753,13 +1072,15 @@ export function generateWorld(seed = 7) {
     if (best) KR = best;
     for (let dy = -16; dy <= 16; dy++) for (let dx = -16; dx <= 16; dx++) { const x = KR.x + dx, y = KR.y + dy; if (inMap(x, y) && dx * dx + dy * dy <= 256 && (tiles[idx(x, y)] === T.DEEP || tiles[idx(x, y)] === T.WATER)) zones[idx(x, y)] = Z.GOUFFRE; }
   }
+  const BR = { x: 566, y: 270 }; // les Brumes Éternelles : la mer hantée du sud-est
+  for (let y = BR.y - 64; y <= BR.y + 64; y++) for (let x = BR.x - 74; x <= BR.x + 74; x++) if (inMap(x, y) && y < OVER_H && Math.hypot((x - BR.x) / 74, (y - BR.y) / 64) < 1 && zones[idx(x, y)] === Z.SEA) zones[idx(x, y)] = Z.BRUMES;
 
   // ---------- 12. Personnages non-joueurs ----------
   const freeNear = (x, y) => {
     for (let d = 0; d <= 6; d++) for (let dy = -d; dy <= d; dy++) for (let dx = -d; dx <= d; dx++) {
       if (Math.max(Math.abs(dx), Math.abs(dy)) !== d) continue;
       const i = idx(x + dx, y + dy), t = tiles[i];
-      if (!solid[i] && t !== T.DEEP && t !== T.WATER && t !== T.ROCK && t !== T.SWAMP) return [x + dx, y + dy];
+      if (!solid[i] && t !== T.DEEP && t !== T.WATER && t !== T.ROCK && t !== T.SWAMP && t !== T.LAVA) return [x + dx, y + dy];
     }
     return [x, y];
   };
@@ -779,6 +1100,22 @@ export function generateWorld(seed = 7) {
     { id: 'elouan', x: ex0 * TILE + 8, y: ey0 * TILE + 10, dir: 0 },
     ...innerNpcs,
   ];
+  { // 0.7 : passeurs, Rade, Anse, Ermite, Quarantaine
+    const at = (id, x, y) => { const [fx, fy] = freeNear(x, y); npcs.push({ id, x: fx * TILE + 8, y: fy * TILE + 10, dir: 0 }); };
+    const dockTile = (d) => [Math.floor(d.x / TILE) - d.dy * 2 + (d.dx ? 0 : 2), Math.floor(d.y / TILE) - d.dy * 3];
+    docks.port = { x: TC.x * TILE + 8, y: (dockEnd - 1) * TILE + 8 };
+    docks.havre = { x: havreDock.x * TILE + 8, y: havreDock.y * TILE + 8 };
+    at('passeur', TC.x + 3, dockEnd - 1);
+    at('passeur_havre', havreDock.x + 2, havreDock.y - 1);
+    if (docks.rade) at('passeur_rade', ...dockTile(docks.rade));
+    if (docks.anse) at('passeur_anse', ...dockTile(docks.anse));
+    at('vif_quai', RD.x + 3, RD.y + 8);
+    at('kerbrat', FT.x - 2, FT.y + 7);
+    at('maelys', AT.x - 3, AT.y + 2);
+    at('ermite', EM.x - 1, EM.y + 4);
+    at('agathe', camp.x, camp.y + 1);
+    at('tailleur_rade', RD.x - 6, RD.y + 2);
+  }
 
   // ---------- 13. Points d'apparition des monstres ----------
   const spawnPlan = [
@@ -790,13 +1127,22 @@ export function generateWorld(seed = 7) {
     [Z.WRECK, 'skelgun', 8], [Z.WRECK, 'drowned', 7],
     [Z.BEACH, 'crabroi', 1], [Z.JUNGLE, 'goule_alpha', 1],
     [Z.CRANE, 'skelgun', 7], [Z.CRANE, 'buccaneer', 6], [Z.CRANE, 'ghoul', 4], [Z.ILOT, 'crab', 6], [Z.ILOT, 'zsailor', 3],
+    [Z.COLLINES, 'flibustier', 20], [Z.COLLINES, 'chien_mort', 10],
+    [Z.PENDUS, 'pendu', 24], [Z.PENDUS, 'sorciere', 9], [Z.PENDUS, 'bourreau', 1],
+    [Z.SIRENES, 'sirene', 12], [Z.SIRENES, 'crabe_corail', 12], [Z.SIRENES, 'reine_sirenes', 1],
+    [Z.ERMITE, 'zsailor', 3], [Z.ERMITE, 'crab', 4],
+    [Z.OSSEMENTS, 'legionnaire', 22], [Z.OSSEMENTS, 'skelgun', 10],
+    [Z.QUARANTAINE, 'pestifere', 30], [Z.QUARANTAINE, 'medecin_peste', 9], [Z.QUARANTAINE, 'docteur_corbeau', 1],
+    [Z.VOLCAN, 'calcine', 20], [Z.VOLCAN, 'golem_lave', 9],
+    [Z.DAMNES, 'damne', 22], [Z.DAMNES, 'arquebusier_damne', 11], [Z.DAMNES, 'molosse_damne', 9],
   ];
   const candidates = {};
   for (let y = 2; y < H - 2; y++) for (let x = 2; x < W - 2; x++) {
     const i = idx(x, y), z = zones[i];
-    if (z === Z.SEA || z === Z.TOWN || z === Z.HAVRE || z === Z.INTERIOR || z === Z.CAVE || y >= OVER_H || solid[i] || path[i]) continue;
+    if (z === Z.SEA || z === Z.TOWN || z === Z.HAVRE || z === Z.RADE || z === Z.ANSE || z === Z.BRUMES || z === Z.GOUFFRE || z === Z.INTERIOR || z === Z.CAVE || y >= OVER_H || solid[i] || path[i]) continue;
     const t = tiles[i];
-    if (t === T.DEEP || t === T.ROCK || t === T.PLANK || t === T.COBBLE && z !== Z.RUINS) continue;
+    if (t === T.DEEP || t === T.ROCK || t === T.LAVA || t === T.PLANK || t === T.COBBLE && z !== Z.RUINS && z !== Z.QUARANTAINE) continue;
+    if (Math.hypot(x - RD.x, (y - RD.y) * 1.2) < 24 || Math.hypot(x - FT.x, y - FT.y) < 7 || Math.hypot(x - camp.x, y - camp.y) < 7) continue;
     if (Math.hypot(x - TC.x, (y - TC.y) * 1.2) < 24 || Math.hypot(x - HC.x, (y - HC.y) * 1.2) < 18) continue;
     if (x > 123 && x < 179 && y > 61 && y < 91) continue; // pas de morts aux portes du Quartier des Corsaires
     (candidates[z] = candidates[z] || []).push([x, y]);
@@ -810,6 +1156,7 @@ export function generateWorld(seed = 7) {
     for (let k = 0; k < list.length && n < count; k++) {
       const [x, y] = list[k];
       if (taken.some(([a, b]) => Math.abs(a - x) + Math.abs(b - y) < 4)) continue;
+        if ((mob === 'bourreau' || mob === 'reine_sirenes' || mob === 'docteur_corbeau') && Math.hypot(x - (mob === 'bourreau' ? FP.x : mob === 'reine_sirenes' ? 526 : QC.x), y - (mob === 'bourreau' ? FP.y : mob === 'reine_sirenes' ? 148 : QC.y)) > 12) continue;
       if (mob === 'drowned' && tiles[idx(x, y)] !== T.SWAMP && tiles[idx(x, y)] !== T.MUD && tiles[idx(x, y)] !== T.WATER && hash2(x, y, 5) < 0.5) continue;
       taken.push([x, y]);
       spawns.push({ mob, x: x * TILE + 8, y: y * TILE + 10 });
@@ -821,20 +1168,23 @@ export function generateWorld(seed = 7) {
 
   // ---------- 14. Distance à la côte (pour la couleur de l'eau) ----------
   const waterDist = new Uint8Array(N).fill(255);
-  const q = [];
+  const q = new Int32Array(N);
+  let qn = 0;
+  const wet = (t) => t === T.DEEP || t === T.WATER;
   for (let i = 0; i < N; i++) {
-    const t = tiles[i];
-    if (t !== T.DEEP && t !== T.WATER) { waterDist[i] = 0; q.push(i); }
+    if (wet(tiles[i])) continue;
+    waterDist[i] = 0;
+    const x = i % W; // seules les tuiles de rivage propagent quelque chose
+    if ((x > 0 && wet(tiles[i - 1])) || (x < W - 1 && wet(tiles[i + 1])) || (i >= W && wet(tiles[i - W])) || (i + W < N && wet(tiles[i + W]))) q[qn++] = i;
   }
-  for (let h = 0; h < q.length; h++) {
-    const i = q[h], x = i % W, y = (i / W) | 0, d = waterDist[i];
+  for (let h = 0; h < qn; h++) {
+    const i = q[h], x = i % W, d = waterDist[i];
     if (d >= 8) continue;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const nx = x + dx, ny = y + dy;
-      if (!inMap(nx, ny)) continue;
-      const j = idx(nx, ny);
-      if (waterDist[j] > d + 1) { waterDist[j] = d + 1; q.push(j); }
-    }
+    const nd = d + 1;
+    if (x > 0 && waterDist[i - 1] > nd) { waterDist[i - 1] = nd; q[qn++] = i - 1; }
+    if (x < W - 1 && waterDist[i + 1] > nd) { waterDist[i + 1] = nd; q[qn++] = i + 1; }
+    if (i >= W && waterDist[i - W] > nd) { waterDist[i - W] = nd; q[qn++] = i - W; }
+    if (i + W < N && waterDist[i + W] > nd) { waterDist[i + W] = nd; q[qn++] = i + W; }
   }
 
   // navigation : eau libre (pas les quais ni les coques)
@@ -843,12 +1193,48 @@ export function generateWorld(seed = 7) {
   // la mer profonde, les rochers et le bord de carte bloquent
   for (let i = 0; i < N; i++) {
     const t = tiles[i];
-    if (t === T.DEEP || t === T.ROCK || t === T.VOID || t === T.CWALL || t === T.IWALL) solid[i] = 1;
+    if (t === T.DEEP || t === T.ROCK || t === T.LAVA || t === T.VOID || t === T.CWALL || t === T.IWALL) solid[i] = 1;
     if (t === T.PLANK) solid[i] = solid[i] && occ[i] ? 1 : 0;
   }
   // les décors solides posés sur les ponts/quais ne doivent pas bloquer
   for (const p of props) if ((p.type === 'lamp' || p.type === 'barrel' || p.type === 'crate') && tiles[idx(p.tx, p.ty)] === T.PLANK) solid[idx(p.tx, p.ty)] = 1;
 
+  const seaRoutes = [];
+  {
+    const free = (x, y) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const tx = x + dx, ty = y + dy; if (!inMap(tx, ty) || !sail[idx(tx, ty)] || tiles[idx(tx, ty)] !== T.DEEP) return false; } return true; };
+    const snap = ([x, y]) => { for (let r = 0; r < 14; r++) for (let a = 0; a < 16; a++) { const tx = Math.round(x + Math.cos(a / 16 * 6.283) * r), ty = Math.round(y + Math.sin(a / 16 * 6.283) * r); if (free(tx, ty)) return [tx, ty]; } return null; };
+    const clearSeg = ([x0, y0], [x1, y1]) => { const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0)); for (let k = 0; k <= n; k++) { const x = Math.round(x0 + (x1 - x0) * k / n), y = Math.round(y0 + (y1 - y0) * k / n); if (!free(x, y)) return false; } return true; };
+    const loops = [
+      { ship: 'brick_noye', n: 2, pts: [[195, 20], [312, 24], [330, 120], [312, 210], [200, 222], [190, 120]] },
+      { ship: 'brick_noye', n: 2, pts: [[14, 150], [60, 180], [130, 200], [100, 236], [20, 230]] },
+      { ship: 'brick_noye', n: 1, pts: [[340, 20], [470, 18], [470, 120], [366, 124]] },
+      { ship: 'fregate_maudite', n: 2, pts: [[180, 300], [250, 380], [380, 380], [400, 270], [300, 250]] },
+      { ship: 'fregate_maudite', n: 2, pts: [[20, 270], [120, 300], [150, 440], [20, 432]] },
+      { ship: 'fregate_maudite', n: 1, pts: [[380, 220], [460, 230], [440, 290], [390, 290]] },
+      { ship: 'galion_fantome', n: 1, pts: [[520, 230], [620, 240], [620, 320], [540, 350], [510, 290]] },
+      { ship: 'fregate_maudite', n: 1, pts: [[600, 150], [630, 200], [560, 220], [580, 140]] },
+    ];
+    for (const L of loops) {
+      const pts = L.pts.map(snap).filter(Boolean);
+      if (pts.length < 3) continue;
+      // un tronçon qui coupe une île est remplacé par un détour par le large
+      const route = [];
+      for (let k = 0; k < pts.length; k++) {
+        const a = pts[k], b = pts[(k + 1) % pts.length];
+        route.push(a);
+        if (!clearSeg(a, b)) {
+          let best = null;
+          for (let r = 6; r < 60 && !best; r += 3) for (let s = -1; s <= 1 && !best; s += 2) {
+            const mx = (a[0] + b[0]) / 2 - (b[1] - a[1]) / Math.hypot(b[0] - a[0], b[1] - a[1]) * r * s, my = (a[1] + b[1]) / 2 + (b[0] - a[0]) / Math.hypot(b[0] - a[0], b[1] - a[1]) * r * s;
+            const m = snap([Math.round(mx), Math.round(my)]);
+            if (m && clearSeg(a, m) && clearSeg(m, b)) best = m;
+          }
+          if (best) route.push(best);
+        }
+      }
+      seaRoutes.push({ ship: L.ship, n: L.n, pts: route.map(([x, y]) => [x * TILE + 8, y * TILE + 8]) });
+    }
+  }
   const spawnPoint = { x: TC.x * TILE + 8, y: (TC.y + 2) * TILE + 8 };
   // numéro de pièce de chaque tuile (-1 = archipel)
   const roomGrid = new Int16Array(N).fill(-1);
@@ -859,6 +1245,11 @@ export function generateWorld(seed = 7) {
     doorOwner: new Map(), rooms, doors, sail, roomGrid, havre: HC, havreDock, OVER_H,
     plots: plots.map((b) => ({ k: b.plot, name: b.name, room: b.room, door: b.doorId, tx: b.x, ty: b.y, w: b.w, h: b.h })),
     twin: { plates: twinPlates, door: doors.findIndex((d) => d.seal === 'jumeaux'), room: sanct.id }, kraken: { x: KR.x * TILE + 8, y: KR.y * TILE + 8 },
+    seals: [
+      { id: 'jumeaux', plates: twinPlates, door: doors.findIndex((d) => d.seal === 'jumeaux'), room: sanct.id, open: 90 },
+      { id: 'freres', plates: fortPlates, door: doors.findIndex((d) => d.seal === 'freres'), room: arena.id, open: 120 },
+    ],
+    docks, lavaLights, seaRoutes, rade: RD, anse: AT, ermite: EM, volcan: VC, quarantaine: QC, ossements: AO, damnes: DM, lagon: LG, pendus: FP, fort: FT, brumes: BR,
     seed, W, H, tiles, zones, solid, plankDir, waterDist, props, buildings, npcs, spawns, chests,
     spawnPoint, town: TC, lighthouse: LH, ruins: RC, cemetery: CEM, wreck: WR, coastY, dockEnd,
   };
@@ -931,6 +1322,6 @@ export function blocksShot(world, px, py) {
   const i = idx(tx, ty);
   const t = world.tiles[i];
   if (world.block && world.block[i]) return true;
-  if (t === T.DEEP || t === T.WATER) return false;
+  if (t === T.DEEP || t === T.WATER || t === T.LAVA) return false;
   return world.solid[i] === 1;
 }
