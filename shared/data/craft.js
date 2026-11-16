@@ -1,6 +1,6 @@
 // Récolte, recettes d'artisanat et structures de base.
-export const STATIONS = { main: 'À la main', feu: 'Feu de camp', etabli: 'Établi', forge: 'Forge' };
-export const CATEGORIES = { mat: 'Matériaux', outil: 'Outils', arme: 'Armes', armure: 'Armures', talisman: 'Talismans', cuisine: 'Cuisine', base: 'Construction', nav: 'Navigation', maison: 'Maison' };
+export const STATIONS = { main: 'À la main', feu: 'Feu de camp', etabli: 'Établi', forge: 'Forge', couture: 'Table de couture (la Rade)' };
+export const CATEGORIES = { mat: 'Matériaux', outil: 'Outils', arme: 'Armes', armure: 'Armures', tenue: 'Tenues', talisman: 'Talismans', cuisine: 'Cuisine', base: 'Construction', nav: 'Navigation', maison: 'Maison' };
 
 // Décors récoltables : outil requis (null = à la main), butin [objet, min, max] ou [objet, chance]
 export const HARVEST = {
@@ -165,5 +165,15 @@ export const RECIPES = [
   R('serrure_renforcee', 'serrure_renforcee', 1, 'forge', 'maison', [['lingot_fer', 4], ['poudre_noire', 1]]),
   R('crochets', 'crochets', 3, 'forge', 'maison', [['lingot_fer', 1]]),
   R('tentacule_fumee', 'tentacule_fumee', 1, 'feu', 'cuisine', [['encre_noire', 1], ['dorade', 1], ['herbes', 1]]),
+  // 0.7 : tenues (table de couture de la Rade, ou forge pour les armures)
+  R('tenue_mousse', 'tenue_mousse', 1, 'couture', 'tenue', [['mariniere', 1], ['corde', 2], ['fibre', 6]]),
+  R('tenue_boucanier', 'tenue_boucanier', 1, 'couture', 'tenue', [['gilet_cuir', 1], ['bandana_noir', 1], ['cuir_molosse', 2]]),
+  R('tenue_corsaire', 'tenue_corsaire', 1, 'couture', 'tenue', [['manteau_corsaire', 1], ['tricorne', 1], ['fil_or', 1]]),
+  R('tenue_sables', 'tenue_sables', 1, 'couture', 'tenue', [['toile', 4], ['coquillage', 6], ['cuir_molosse', 2], ['chapeau_paille', 1]]),
+  R('tenue_brumes', 'tenue_brumes', 1, 'couture', 'tenue', [['soie_pendu', 10], ['fil_or', 2], ['ecaille_sirene', 2]]),
+  R('tenue_sirene', 'tenue_sirene', 1, 'couture', 'tenue', [['ecaille_sirene', 12], ['perle_ombre', 2], ['fil_or', 2]]),
+  R('tenue_peste', 'tenue_peste', 1, 'couture', 'tenue', [['plume_corbeau', 12], ['cuir_molosse', 4], ['soie_pendu', 4]]),
+  R('armure_conquistador', 'armure_conquistador', 1, 'forge', 'tenue', [['lingot_fer', 12], ['coeur_golem', 2], ['braise', 4]]),
+  R('armure_damnee', 'armure_damnee', 1, 'forge', 'tenue', [['essence_damnee', 6], ['os_legionnaire', 10], ['lingot_fer', 10], ['coeur_golem', 2]]),
 ];
 export const RECIPE = Object.fromEntries(RECIPES.map((r) => [r.id, r]));

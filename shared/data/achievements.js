@@ -21,4 +21,13 @@ export const ACHIEVEMENTS = {
   jumeaux: { name: 'Les Deux Lunes', desc: 'Ouvrir le Sanctuaire des Jumeaux, à deux.', title: 'Âme jumelle' },
   kraken: { name: 'Tueur de Kraken', desc: 'Vaincre le Kraken du Gouffre.', title: 'Fléau des Abysses' },
   roi_os: { name: 'Régicide', desc: 'Vaincre le Roi des Os, au fond de l’Antre du Crâne.', title: 'Briseur d’os' },
+  rade: { name: 'Pas de roi, pas de loi', desc: 'Atteindre Rade-aux-Flibustiers.', title: 'Flibustier' },
+  freres: { name: 'Frères de la Côte', desc: 'Vaincre les Frères Ferrailleurs, à deux.', title: 'Frère de la Côte' },
+  naufrageur: { name: 'Naufrageur', desc: 'Couler dix navires maudits.', title: 'Naufrageur' },
+  horde: { name: 'Nuit de pleine lune', desc: 'Abattre trente morts de la Horde, une nuit de pleine lune.', title: 'Chasseur de lune' },
+  elegance: { name: 'L’habit fait le pirate', desc: 'Porter une tenue légendaire.', title: 'Dandy des mers' },
+  damnes: { name: 'Plus mort que mort', desc: 'Vaincre Vespère, Comte des Marées.', title: 'Fléau des Damnés' },
+  gardien: { name: 'Gardien des marées', desc: 'Rendre la Couronne des Marées à Morgane.', title: 'Gardien des marées' },
+  complice: { name: 'Complice du Fanfaron', desc: 'Laisser la Couronne à Ambroise Vif-Argent.', title: 'Fanfaron' },
+  explorateur: { name: 'Grand Large', desc: 'Poser le pied sur toutes les îles du Grand Large.', title: 'Explorateur' },
 };

@@ -25,9 +25,9 @@ export const T = {
 
 export const SPEED_MUL = { [T.WATER]: 0.62, [T.SWAMP]: 0.55, [T.MUD]: 0.86, [T.ASH]: 0.94 };
 
-export const SLOTS = ['weapon', 'gun', 'hat', 'body', 'boots', 'trinket'];
+export const SLOTS = ['weapon', 'gun', 'hat', 'body', 'boots', 'trinket', 'outfit'];
 export const SLOT_NAMES = {
-  weapon: 'Arme', gun: 'Pistolet', hat: 'Chapeau', body: 'Torse', boots: 'Bottes', trinket: 'Talisman',
+  weapon: 'Arme', gun: 'Pistolet', hat: 'Chapeau', body: 'Torse', boots: 'Bottes', trinket: 'Talisman', outfit: 'Tenue',
 };
 export const RARITY = [
   { name: 'Commun', color: '#efe6d2' },
@@ -47,6 +47,9 @@ export function darkness(f) {
   return 1 - (f - 0.9) / 0.1;
 }
 export function isNight(f) { return f > 0.62 && f < 0.92; }
+// la lune : pleine une nuit sur trois (le jour du cycle qui suit compte comme la même lune)
+export function moonPhase(wt) { return ((Math.floor(wt / DAY_LENGTH) % 3) + 3) % 3; }
+export function isFullMoon(wt) { return moonPhase(wt) === 2; }
 export function clockString(f) {
   // 0 => 7h00, cycle de 24h
   const h = (7 + f * 24) % 24;

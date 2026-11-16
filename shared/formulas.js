@@ -41,6 +41,8 @@ export function displayLook(base, eq) {
   if (hat && hat.lookCol) L.hatCol = hat.lookCol;
   if (body) { L.top = body.look; if (body.lookCol) L.topCol = body.lookCol; }
   if (boots && boots.lookCol) L.boots = boots.lookCol;
+  const o = eq && eq.outfit && ITEMS[eq.outfit] && ITEMS[eq.outfit].outfit; // une tenue recouvre le reste
+  if (o) { for (const k of ['top', 'topCol', 'pants', 'boots', 'hatCol', 'cape']) if (o[k]) L[k] = o[k]; if (o.hat !== undefined) L.hat = o.hat; }
   return L;
 }
 export function sanitizeLook(l) {

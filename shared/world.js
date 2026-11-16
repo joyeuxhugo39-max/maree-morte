@@ -1002,6 +1002,7 @@ export function generateWorld(seed = 7) {
   const arena = room('Fort des Deux Clés', 'arene', 22, 12, T.STONEF, { x: FT.x, y: FT.y + 1 });
   doors[doors.length - 1].seal = 'freres';
   furnish(arena);
+  for (let y = arena.y0 - 2; y <= arena.y0 + arena.h; y++) for (let x = arena.x0 - 1; x <= arena.x0 + arena.w; x++) zones[idx(x, y)] = Z.CAVE; // pas de Flamme Bénite dans l'arène
   const bossIn = (r, mob, far = true) => { // le boss attend au fond, loin de l'entrée
     let best = null;
     for (let y = r.y0; y < r.y0 + r.h; y++) for (let x = r.x0; x < r.x0 + r.w; x++) {
@@ -1114,6 +1115,7 @@ export function generateWorld(seed = 7) {
     at('maelys', AT.x - 3, AT.y + 2);
     at('ermite', EM.x - 1, EM.y + 4);
     at('agathe', camp.x, camp.y + 1);
+    at('vif_camp', camp.x + 3, camp.y + 2);
     at('tailleur_rade', RD.x - 6, RD.y + 2);
   }
 

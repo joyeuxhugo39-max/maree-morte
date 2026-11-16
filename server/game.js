@@ -2,14 +2,14 @@
 // aussi dans le navigateur pour le mode solo.
 import {
   TILE, TICK_RATE, AOI_X, AOI_Y, INV_SIZE, SLOTS, DAY_LENGTH, ROLL_TIME, ROLL_SPEED,
-  INTERACT_RANGE, PICKUP_RANGE, T, dayFrac, isNight, weatherAt, DAY_LENGTH as DAYLEN,
+  INTERACT_RANGE, PICKUP_RANGE, T, dayFrac, isNight, weatherAt, DAY_LENGTH as DAYLEN, isFullMoon,
 } from '../shared/constants.js';
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { HARVEST, STRUCTS, RECIPE, STATIONS, CLAIM_R, BASE_MAX, PLANTER_GROW, HOME_OK, HOME_MAX, HOME_PRICE } from '../shared/data/craft.js';
-import { generateWorld, canStand, moveWithCollision, zoneAt, tileAt, blocksShot, canSail, roomIdAt, Z, ZONES, SAFE } from '../shared/world.js';
+import { generateWorld, canStand, moveWithCollision, moveBoat, zoneAt, tileAt, blocksShot, canSail, roomIdAt, Z, ZONES, SAFE } from '../shared/world.js';
 import { ITEMS, STACK_MAX, isStackable } from '../shared/data/items.js';
 import { MOBS } from '../shared/data/mobs.js';
-import { QUESTS, questState, goalsMet } from '../shared/data/quests.js';
+import { QUESTS, questState, goalsMet, npcVisible } from '../shared/data/quests.js';
 import { NPCS } from '../shared/data/npcs.js';
 import { SKILLS } from '../shared/data/skills.js';
 import { computeStats, xpToNext, mitigate, displayLook, sanitizeLook, MAX_LEVEL, UPG_SLOTS, UPG_MAX, upgradeCost } from '../shared/formulas.js';
@@ -28,7 +28,10 @@ const CHEST_LOOT = [
   { gold: [90, 160], items: [['rhum', 0.9, 1, 3], ['perle_ombre', 0.6, 1, 2], ['tromblon', 0.12, 1, 1], ['manteau_corsaire', 0.15, 1, 1], ['amulette_lanterne', 0.08, 1, 1], ['carte_dechiree', 0.5, 1, 2], ['cimeterre', 0.1, 1, 1], ['poivriere', 0.08, 1, 1], ['carabine', 0.06, 1, 1], ['crache_feu', 0.04, 1, 1]] },
   { gold: [80, 160], items: [['rhum', 0.8, 1, 2], ['perle_ombre', 0.6, 1, 2], ['carte_dechiree', 0.5, 1, 2], ['eclat_cristal', 0.3, 1, 2], ['elixir_flamme', 0.3, 1, 1]] },
 ];
+CHEST_LOOT[4] = { gold: [400, 700], items: [['essence_damnee', 0.8, 1, 2], ['perle_ombre', 1, 2, 4], ['faux_damnee', 0.06, 1, 1], ['canon_damne', 0.06, 1, 1], ['armure_damnee', 0.05, 1, 1], ['tenue_comte', 0.04, 1, 1], ['dent_comte', 0.04, 1, 1], ['carte_tresor', 0.4, 1, 1]] };
 const CHEST_COOLDOWN_MS = 15 * 60 * 1000;
+// les îles du Grand Large, pour le haut fait d'explorateur
+const FAR_ZONES = [Z.RADE, Z.COLLINES, Z.PENDUS, Z.SIRENES, Z.ANSE, Z.OSSEMENTS, Z.QUARANTAINE, Z.VOLCAN, Z.DAMNES, Z.BRUMES, Z.ERMITE];
 // cambriolage : les objets très rares qu'on ne trouve que chez les autres
 const BURGLE_RARE = [['montre_gousset', 30], ['bague_capitaine', 25], ['coffret_bijoux', 25], ['collier_perles_noires', 12], ['tableau_maitre', 8]];
 const HOME_STORE = 30;
@@ -39,6 +42,13 @@ const BOSS_LINES = {
   crabe: [null, '*Les pinces du Crabe-Roi claquent de rage*'],
   goule: [null, 'AOUUUUH ! La meute a faim !', '*La Goule Alpha entre en frénésie*'],
   noye: [null, 'La mer réclame son dû !'],
+  bourreau: [null, 'Le tribunal est ouvert !', 'Plus de grâce pour personne !'],
+  sirene: [null, 'Vous n’entendrez plus jamais la mer !'],
+  general: [null, 'Deuxième ligne, en avant !', 'Toute la Légion, à l’assaut !'],
+  corbeau: [null, 'Votre maladie s’aggrave, je le crains.', 'Il est l’heure de votre dernier traitement.'],
+  brasier: [null, 'LE VOLCAN SE RÉVEILLE !', 'TOUT BRÛLERA !'],
+  frere: [null, 'Tu vas le regretter !'],
+  vespere: [null, 'Vous osez profaner ma crypte ?', 'La Couronne ne quittera pas ma tête !', 'Si je tombe, la mer tombera avec moi !'],
 };
 // distance d'un point à un segment
 const segDist = (px, py, x0, y0, x1, y1) => {
@@ -70,7 +80,15 @@ export class Game {
     this.propById = new Map(this.world.props.map((p) => [p.id, p]));
     this.npcPos = new Map(this.world.npcs.map((n) => [n.id, n]));
     this.secretDoors = this.world.doors.filter((d) => d.secret);
-    for (const s of this.world.spawns) this.addMob(s.mob, s.x, s.y);
+    this.world.spawns.forEach((s, k) => { const m = this.addMob(s.mob, s.x, s.y); m.sunproof = MOBS[s.mob].night ? ((k * 2654435761) >>> 0) % 1000 < 180 : true; });
+    this.night = isNight(dayFrac(this.worldTime));
+    if (!this.night) for (const m of this.mobs) if (!m.sunproof) this.bury(m); // le jour, la plupart des morts dorment sous terre
+    this.clouds = []; this.hordeAt = 0;
+    for (const r of this.world.seaRoutes || []) for (let k = 0; k < r.n; k++) { // navires maudits sur leurs routes
+      const wp = Math.floor(k * r.pts.length / r.n), [x, y] = r.pts[wp];
+      const m = this.addMob(r.ship, x, y, true);
+      m.summoned = false; m.route = r.pts; m.wp = (wp + 1) % r.pts.length; m.sx = x; m.sy = y; m.room = -1; m.state = 'idle';
+    }
     this.tickCount = 0;
     // emplacements possibles des trésors enterrés
     const W = this.world;
@@ -89,12 +107,12 @@ export class Game {
     this.invasion = null; this.invNight = -1;
     // artisanat et bases
     this.depleted = new Map();
-    this.homes = new Map(); this.plotByRoom = new Map(this.world.plots.map((pl) => [pl.room, pl.k])); this.seals = { jumeaux: 0 };
+    this.homes = new Map(); this.plotByRoom = new Map(this.world.plots.map((pl) => [pl.room, pl.k])); this.seals = Object.fromEntries((this.world.seals || []).map((s) => [s.id, 0]));
     this.structs = new Map(); this.floors = new Map(); this.bases = new Map();
     this.worldPersist = !!(storage && typeof storage.saveWorld === 'function');
     this.worldDirty = false; this.lastWorldSave = 0;
     const at = (type) => this.world.props.filter((pp) => pp.type === type).map((pp) => [pp.x, pp.y]);
-    this.townStations = { feu: at('brazier'), etabli: at('workbench'), forge: [...at('anvil'), ...at('forge')] };
+    this.townStations = { feu: at('brazier'), etabli: at('workbench'), forge: [...at('anvil'), ...at('forge')], couture: at('mannequin') };
     if (this.worldPersist && storage.loadWorld) Promise.resolve(storage.loadWorld()).then((w) => this.importWorld(w)).catch((e) => this.log('[monde] chargement impossible', e && e.message));
   }
 
@@ -199,7 +217,7 @@ export class Game {
       history: (this.chatLog || []).slice(-12),
       build: this.buildSnapshot(p.key), dep: [...this.depleted].filter(([, t]) => t > this.time).map(([id, t]) => [id, Math.round(t - this.time)]),
       respawnAt: p.respawnAt, found: [...p.found], boat: p.boat, room: p.room,
-      kr: this.kraken ? 1 : 0, homes: this.homesList(), seals: { jumeaux: Math.max(0, Math.round(this.seals.jumeaux - this.time)) }, pet: p.pet,
+      kr: this.kraken ? 1 : 0, homes: this.homesList(), seals: Object.fromEntries(Object.entries(this.seals).map(([k, v]) => [k, Math.max(0, Math.round(v - this.time))])), pet: p.pet,
     });
     this.broadcastChat(null, `${p.name} accoste à Port-Lanterne.`, 'sys');
     if (!res.data) this.toast(p, 'Bienvenue ! Parlez à la Capitaine Morgane, près des quais (touche E).', 'quest');
@@ -214,12 +232,12 @@ export class Game {
       x: sp.x, y: sp.y, dir: 0, moving: false,
       level: 1, xp: 0, gold: 15, hp: 0, en: 60,
       inv: new Array(INV_SIZE).fill(null),
-      eq: { weapon: 'sabre_rouille', gun: null, hat: null, body: 'chemise', boots: null, trinket: null },
+      eq: { weapon: 'sabre_rouille', gun: null, hat: null, body: 'chemise', boots: null, trinket: null, outfit: null },
       quests: {}, chests: {}, cds: {}, cry: 0, rumUntil: 0, rumRate: 0, drunkUntil: 0,
       dead: false, deathAt: 0, moveBudget: 80, lastMoveAt: this.time, invulnUntil: this.time + 2,
       known: new Map(), dirtyMe: true, dirtyInv: false, dirtyQ: false, lastSave: this.time,
       lastHurt: -99, lastChat: -9, zone: Z.TOWN, lookVer: 0, kills: 0,
-      upg: {}, treasure: null, ach: {}, title: null, cnt: { crab: 0, fish: 0 }, fishing: null, respawnAt: null,
+      upg: {}, treasure: null, ach: {}, title: null, cnt: { crab: 0, fish: 0, ships: 0, horde: 0 }, zs: new Set(), fishing: null, respawnAt: null,
       found: new Set(), boat: null, room: -1, pk: 0, pvpLog: new Map(), caches: {}, pet: null, burgle: null, thiefUntil: 0, robbed: {},
     };
     if (d) {
@@ -234,14 +252,15 @@ export class Game {
       if (d.treasure && typeof d.treasure.x === 'number') p.treasure = { x: d.treasure.x, y: d.treasure.y };
       if (d.ach && typeof d.ach === 'object') for (const k in d.ach) if (ACHIEVEMENTS[k]) p.ach[k] = d.ach[k];
       if (d.title && p.ach[d.title]) p.title = d.title;
-      if (d.cnt) { p.cnt.crab = d.cnt.crab | 0; p.cnt.fish = d.cnt.fish | 0; }
+      if (d.cnt) { p.cnt.crab = d.cnt.crab | 0; p.cnt.fish = d.cnt.fish | 0; p.cnt.ships = d.cnt.ships | 0; }
       if (d.respawnAt && typeof d.respawnAt.tx === 'number') p.respawnAt = { tx: d.respawnAt.tx | 0, ty: d.respawnAt.ty | 0 };
       if (!this.worldPersist && d.base) p.pendingBase = d.base;
       if (!this.worldPersist && d.home) p.pendingHome = d.home;
       if (typeof d.pet === 'string') p.pet = d.pet;
       if (Array.isArray(d.found)) for (const id of d.found) if (this.world.doors[id | 0] && this.world.doors[id | 0].secret) p.found.add(id | 0);
       p.pk = d.pk | 0;
-      if (d.caches && typeof d.caches === 'object') for (const k in d.caches) p.caches[k | 0] = 1;
+      if (d.caches && typeof d.caches === 'object') for (const k in d.caches) if (String(k).startsWith('i:')) p.caches[k] = 1;
+      if (Array.isArray(d.zs)) for (const z of d.zs) if (FAR_ZONES.includes(z | 0)) p.zs.add(z | 0);
       if (typeof d.x === 'number' && typeof d.y === 'number') {
         const bt = d.boat && ITEMS[d.boat] && ITEMS[d.boat].boat && p.inv.some((s) => s && s.id === d.boat) ? d.boat : null;
         if (bt && canSail(this.world, d.x, d.y)) { p.x = d.x; p.y = d.y; p.boat = bt; }
@@ -258,7 +277,7 @@ export class Game {
     return p;
   }
   serialize(p) {
-    return { name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: p.quests, chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: p.ach, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
+    return { name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: p.quests, chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: p.ach, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
   }
   save(p) {
     p.lastSave = this.time;
@@ -308,12 +327,129 @@ export class Game {
     this.mobs.push(m);
     return m;
   }
-  respawnMob(m) {
+  // ------------------------------------------------------------ navires maudits
+  shipAI(m) {
+    const def = m.def, now = this.time;
+    let near = false;
+    for (const p of this.players.values()) if (p.room === -1 && Math.abs(p.x - m.x) < 950 && Math.abs(p.y - m.y) < 750) { near = true; break; }
+    if (!near) { m.moving = false; return; }
+    if (m.pauseUntil > now) { m.moving = false; return; }
+    const ph = def.phases || [];
+    if (m.phase < ph.length && m.hp < m.maxHp * ph[m.phase]) {
+      m.phase++; m.pauseUntil = now + 1.4;
+      this.ev(m.x, m.y, ['phase', m.id, m.phase]);
+      this.ev(m.x, m.y, ['shout', m.id, 'Feu des âmes ! Coulez-les tous !']);
+      return;
+    }
+    const valid = (p) => p && !p.dead && p.room === -1 && !SAFE.has(p.zone) && Math.hypot(p.x - m.x, p.y - m.y) < def.aggro * (m.target === p.id ? 1.4 : 1);
+    let t = m.target ? this.players.get(m.target) : null;
+    if (!valid(t)) {
+      t = null; m.target = 0;
+      let bd = 1e9;
+      for (const p of this.players.values()) { if (!valid(p)) continue; const d = Math.hypot(p.x - m.x, p.y - m.y) * (p.boat ? 1 : 1.5); if (d < bd) { bd = d; t = p; } }
+      if (t) {
+        m.target = t.id; m.state = 'chase';
+        if (def.ai && this.time - (m.introAt || -1e9) > 120) { this.bossIntro(m); return; }
+      } else m.state = 'idle';
+    }
+    let gx = 0, gy = 0, sp = def.speed;
+    if (t) {
+      const dx = t.x - m.x, dy = t.y - m.y, d = Math.hypot(dx, dy) || 1;
+      const radial = Math.max(-1, Math.min(1, (d - 175) / 60)), o = m.orbitDir || 1;
+      const vx = dx / d * radial - dy / d * o * 0.9, vy = dy / d * radial + dx / d * o * 0.9, L = Math.hypot(vx, vy) || 1;
+      gx = vx / L; gy = vy / L;
+      if (now >= m.nextAtk && d < def.range) {
+        m.nextAtk = now + def.atkCd * rand(0.85, 1.15);
+        const guns = def.ship.guns || 1, a0 = Math.atan2(t.y - m.y, t.x - m.x);
+        this.ev(m.x, m.y, ['atk', m.id, +a0.toFixed(2), 3]);
+        for (let k = 0; k < guns; k++) {
+          const off = (k - (guns - 1) / 2) * 0.13 + rand(-0.04, 0.04);
+          this.later(k * 0.14, () => { if (m.state !== 'dead') this.spawnProj(m.x + Math.cos(a0) * 16, m.y - 8 + Math.sin(a0) * 10, a0 + off, 210, def.range * 1.15, def.dmg * rand(0.9, 1.1), 'm', m.id, 'cball', 0); });
+        }
+      }
+      if (def.ai === 'galion' && m.phase >= 1 && now >= (m.cd.ghost || 0)) { // feu fantôme autour de la cible
+        m.cd.ghost = now + 9;
+        for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; this.tele(t.x + Math.cos(a) * rand(20, 60), t.y + Math.sin(a) * rand(16, 48), 26, 1.4, 52, m, 8); }
+        this.tele(t.x, t.y, 30, 1.6, 60, m, 8);
+      }
+    } else {
+      const [wx, wy] = m.route ? m.route[m.wp] : [m.sx, m.sy];
+      const dx = wx - m.x, dy = wy - m.y, d = Math.hypot(dx, dy) || 1;
+      if (d < 26 && m.route) m.wp = (m.wp + 1) % m.route.length;
+      gx = dx / d; gy = dy / d; sp *= 0.6;
+    }
+    m.vx = (m.vx || 0) + (gx * sp - (m.vx || 0)) * 0.06;
+    m.vy = (m.vy || 0) + (gy * sp - (m.vy || 0)) * 0.06;
+    const [nx, ny] = moveBoat(this.world, m.x, m.y, m.vx * DT, m.vy * DT);
+    if (Math.abs(nx - m.x) + Math.abs(ny - m.y) < 0.02 && Math.hypot(m.vx, m.vy) > 10) { // coincé contre la côte : on vire de bord
+      m.orbitDir = -(m.orbitDir || 1); m.vx *= -0.5; m.vy *= -0.5;
+      if (!t && m.route) m.wp = (m.wp + 1) % m.route.length;
+    }
+    m.moving = Math.abs(nx - m.x) + Math.abs(ny - m.y) > 0.02;
+    m.x = nx; m.y = ny;
+    if (Math.hypot(m.vx, m.vy) > 8) m.dir = dirOf(m.vx, m.vy);
+  }
+  // Fer et Rouille : tant qu'ils se tiennent côte à côte, leurs armures se renvoient les coups
+  updateLink(m) {
+    const tw = m.twinRef || (m.twinRef = this.mobs.find((o) => o !== m && o.type === m.def.twin && o.room === m.room));
+    const linked = !!tw && tw.state !== 'dead' && !tw.fallen && dist(m, tw) < 150;
+    if (linked !== !!m.linked) { m.linked = linked; this.ev(m.x, m.y, ['link', m.id, linked ? 1 : 0]); if (linked && m.state === 'chase') this.ev(m.x, m.y, ['shout', m.id, 'Ensemble, on est invincibles !']); }
+    if (linked) m.shieldUntil = this.time + 0.3;
+  }
+  // nuages de peste : ils empoisonnent ceux qui s'y attardent
+  addCloud(x, y, r, dur, dps) { this.clouds.push({ x, y, r, until: this.time + dur, dps }); this.ev(x, y, ['cloud', Math.round(x), Math.round(y), r, dur]); }
+  updateClouds() {
+    this.clouds = this.clouds.filter((c) => c.until > this.time);
+    for (const c of this.clouds) for (const p of this.players.values()) if (!p.dead && !SAFE.has(p.zone) && Math.hypot(p.x - c.x, p.y - c.y) < c.r) this.damagePlayer(p, c.dps * 0.5, null, false, 'p');
+  }
+  mobSplash(pr) {
+    const r = pr.fx.msplash, src = this.mobs.find((m) => m.id === pr.owner) || null;
+    this.ev(pr.x, pr.y, ['boom', Math.round(pr.x), Math.round(pr.y + 8), r, 1]);
+    for (const q of this.players.values()) if (!q.dead && !SAFE.has(q.zone) && q.id !== pr.hitP && Math.hypot(q.x - pr.x, q.y - 9 - pr.y) < r) this.damagePlayer(q, pr.dmg * 0.6, src);
+    this.addCloud(pr.x, pr.y + 8, r * 0.8, 3, 8);
+  }
+  // ------------------------------------------------------------ soleil, lune et Horde
+  bury(m) { m.state = 'dead'; m.buried = true; m.deadUntil = Infinity; m.hp = m.maxHp; m.target = 0; m.windup = 0; m.burnAt = 0; }
+  rise(m) {
+    m.buried = false;
+    if (m.summoned) return;
+    this.respawnMob(m, true);
+  }
+  burnInSun(m) {
+    m.burnAt = 0;
+    if (m.state === 'dead') return;
+    this.ev(m.x, m.y, ['burn', m.id]);
+    if (m.summoned) { m.state = 'dead'; return; }
+    this.bury(m);
+  }
+  updateHorde() {
+    this.hordeAt = this.time + 18;
+    const pool = (z) => z === Z.DAMNES ? ['damne', 'molosse_damne'] : z === Z.VOLCAN ? ['calcine', 'pestifere'] : z === Z.QUARANTAINE ? ['pestifere', 'pestifere', 'chien_mort'] : z === Z.OSSEMENTS ? ['legionnaire', 'flibustier'] : z === Z.PENDUS ? ['pendu', 'chien_mort'] : z === Z.COLLINES || z === Z.SIRENES || z === Z.ERMITE ? ['flibustier', 'chien_mort', 'zsailor'] : z === Z.SWAMP || z === Z.WRECK || z === Z.CRANE ? ['drowned', 'buccaneer', 'ghoul'] : ['zsailor', 'zsailor', 'buccaneer', 'ghoul'];
+    for (const p of this.players.values()) {
+      if (p.dead || p.room !== -1 || p.boat || SAFE.has(p.zone) || p.zone === Z.SEA) continue;
+      const mine = this.mobs.filter((m) => m.horde && m.state !== 'dead' && m.hordeFor === p.id).length;
+      if (mine >= 8) continue;
+      const list = pool(p.zone), n = Math.min(8 - mine, 3 + Math.floor(Math.random() * 3));
+      let made = 0;
+      for (let k = 0; k < n * 4 && made < n; k++) {
+        const a = Math.random() * Math.PI * 2, r = rand(150, 230);
+        const x = p.x + Math.cos(a) * r, y = p.y + Math.sin(a) * r * 0.75;
+        if (!canStand(this.world, x, y, true) || roomIdAt(this.world, x, y) !== -1 || SAFE.has(zoneAt(this.world, x, y))) continue;
+        const m = this.addMob(list[Math.floor(Math.random() * list.length)], x, y, true);
+        m.horde = true; m.hordeFor = p.id; m.state = 'chase'; m.target = p.id; m.sx = x; m.sy = y;
+        this.ev(x, y, ['fx', 'rise', x, y]);
+        made++;
+      }
+      if (made) this.toast(p, '🌕 La Horde vous a repéré !', 'warn');
+    }
+  }
+  respawnMob(m, rising = false) {
     for (const b of this.bases.values()) if (Math.hypot(m.sx / TILE - b.tx, m.sy / TILE - b.ty) < CLAIM_R + 2) { m.deadUntil = this.time + 30; return; }
     m.x = m.sx; m.y = m.sy; m.hp = m.maxHp; m.state = 'idle'; m.target = 0; m.tags.clear(); m.windup = 0;
     m.phase = 0; m.cd = {}; m.frenzy = 0; m.shieldUntil = 0; m.dash = null; m.leap = null; m.pauseUntil = 0;
     m.id = this.nextId++; // nouvel identifiant : les clients le voient « apparaître »
-    this.ev(m.x, m.y, ['fx', 'spawn', m.x, m.y]);
+    if (m.def.night && !m.sunproof && !this.night) { this.bury(m); return; } // le jour, il reste sous terre
+    this.ev(m.x, m.y, ['fx', rising ? 'rise' : 'spawn', m.x, m.y]);
     if (m.def.elite && this.players.size) this.broadcastChat(null, `☠ ${m.def.name} rôde à nouveau : ${m.room >= 0 ? this.world.rooms[m.room].name : ZONES[zoneAt(this.world, m.x, m.y)].name}.`, 'night');
   }
   // un mort ne poursuit pas un pirate en zone sûre, dans une autre pièce, ou en mer (sauf s'il tire)
@@ -351,6 +487,9 @@ export class Game {
         if (this.time >= m.deadUntil) this.respawnMob(m);
         continue;
       }
+      if (m.burnAt && this.time >= m.burnAt) { this.burnInSun(m); continue; }
+      if (m.def.twin) this.updateLink(m);
+      if (m.def.ship) { this.shipAI(m); continue; }
       if (m.def.sea) { if (m.def.ai === 'kraken') this.krakenAI(m); else this.tentacleAI(m); continue; }
       // seuls les monstres proches d'un joueur réfléchissent
       let awake = false;
@@ -429,10 +568,10 @@ export class Game {
   }
   resolveMobAttack(m, t, night) {
     const def = m.def;
-    const dmg = def.dmg * (night ? 1.15 : 1) * rand(0.9, 1.1);
+    const dmg = def.dmg * (night ? (isFullMoon(this.worldTime) ? 1.3 : 1.15) : 1) * rand(0.9, 1.1);
     if (def.ranged) {
       const sp = def.ranged.speed;
-      this.spawnProj(m.x, m.y - 9, m.atkA, sp, sp * def.ranged.life, dmg, 'm', m.id, 'ball', 0);
+      this.spawnProj(m.x, m.y - 9, m.atkA, sp, sp * def.ranged.life, dmg, 'm', m.id, def.ranged.kind || 'ball', 0, false, false, def.ranged.splash ? { msplash: def.ranged.splash } : null);
       this.ev(m.x, m.y, ['atk', m.id, +m.atkA.toFixed(2), 1]);
       return;
     }
@@ -445,6 +584,7 @@ export class Game {
       const a = Math.atan2(p.y - m.y, p.x - m.x);
       if (d > 10 && angDiff(a, m.atkA) > arc) continue;
       this.damagePlayer(p, dmg, m);
+      if (def.burnHit) this.addDot(p, 'f', dmg * def.burnHit, m);
       if (!m.boss) break;
     }
   }
@@ -568,6 +708,106 @@ export class Game {
             this.ev(m.x, m.y, ['leap', m.id, Math.round(tx), Math.round(ty), 0.9]);
           }
         } else if (P >= 1 && ready('howl', 15)) { this.ev(m.x, m.y, ['howl', m.id]); this.summonAdds(m, t, 'ghoul', 2, 3, 'AOUUUUH !'); m.pauseUntil = now + 0.8; }
+        break;
+      }
+      case 'bourreau': { // Le Bourreau
+        const cleave = (a, dmg) => { for (const [d, r, o] of [[22, 22, 0], [42, 26, 0], [34, 20, 0.55], [34, 20, -0.55]]) this.tele(m.x + Math.cos(a + o) * d, m.y + Math.sin(a + o) * d * 0.8, r, 0.9, dmg, m, 1); };
+        if (P >= 1 && ready('sum', 15)) this.summonAdds(m, t, 'pendu', 2, 3, 'Que la sentence soit exécutée !');
+        else if (P >= 2 && ready('spin', 11)) {
+          this.ev(m.x, m.y, ['shout', m.id, 'À genoux, tous !']);
+          this.startDash(m, t, 130, 280, 40, 0.7);
+          for (const k of [1, 2]) this.later(k * 1.25, () => { const q = this.players.get(m.target); if (m.state !== 'dead' && q && !q.dead) this.startDash(m, q, 130, 280, 40, 0.55); });
+        } else if (ready('cleave', 6)) { cleave(Math.atan2(t.y - m.y, t.x - m.x), 42); m.pauseUntil = now + 0.9; }
+        else if (P >= 1 && ready('rope', 9)) { const a = Math.atan2(t.y - m.y, t.x - m.x); this.lineTele(m.x, m.y - 6, m.x + Math.cos(a) * 180, m.y - 6 + Math.sin(a) * 180, 22, 0.9, 34, m, 2); this.ev(m.x, m.y, ['shout', m.id, 'La corde !']); }
+        break;
+      }
+      case 'sirene': { // La Reine des Sirènes
+        if (ready('song', 8)) { for (const p of this.bossTargets(m, 280)) this.tele(p.x, p.y, 30, 1.2, 30, m, 9); this.ev(m.x, m.y, ['shout', m.id, '♪ Viens... viens sous les flots... ♪']); }
+        else if (P >= 1 && ready('tide', 13)) {
+          this.summonAdds(m, t, 'sirene', 2, 3, 'Mes sœurs, chantez !');
+          for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; this.tele(m.x + Math.cos(a) * 70, m.y + Math.sin(a) * 56, 22, 1.3, 30, m, 7); }
+        }
+        break;
+      }
+      case 'general': { // Le Général d'Os
+        if (ready('sum', 14)) this.summonAdds(m, t, 'legionnaire', 2, 4, 'Légion ! En rang !');
+        else if (ready('line', 7)) {
+          const a = Math.atan2(t.y - m.y, t.x - m.x), nx = -Math.sin(a), ny = Math.cos(a);
+          for (const o of [-26, 0, 26]) this.lineTele(m.x + nx * o, m.y + ny * o, m.x + nx * o + Math.cos(a) * 200, m.y + ny * o + Math.sin(a) * 200, 18, 1.0, 34, m, 4);
+          this.ev(m.x, m.y, ['shout', m.id, 'Lances, en avant !']);
+        } else if (P >= 1 && ready('charge', 9)) { this.startDash(m, t, 170, 260, 38); this.ev(m.x, m.y, ['shout', m.id, 'Chargez !']); }
+        else if (P >= 2 && ready('volley', 10)) {
+          for (const p of this.bossTargets(m, 300)) for (let k = 0; k < 5; k++) this.tele(p.x + rand(-50, 50), p.y + rand(-38, 38), 18, 1.2 + k * 0.1, 30, m, 4);
+          this.ev(m.x, m.y, ['shout', m.id, 'Archers ! Tirez !']);
+        }
+        break;
+      }
+      case 'corbeau': { // Le Docteur Corbeau
+        if (ready('bomb', 5)) {
+          const spots = [[t.x, t.y], [t.x + rand(-40, 40), t.y + rand(-30, 30)], [t.x + rand(-40, 40), t.y + rand(-30, 30)]];
+          for (const [x, y] of spots) { this.tele(x, y, 24, 1.1, 32, m, 6); this.later(1.1, () => { if (m.state !== 'dead') this.addCloud(x, y, 26, 4, 12); }); }
+          this.ev(m.x, m.y, ['atk', m.id, +Math.atan2(t.y - m.y, t.x - m.x).toFixed(2), 2]);
+        } else if (P >= 1 && ready('crows', 8)) {
+          this.ev(m.x, m.y, ['shout', m.id, 'Mes petits, à table !']);
+          for (let k = 0; k < 12; k++) this.spawnProj(m.x, m.y - 12, k / 12 * Math.PI * 2, 130, 220, 26, 'm', m.id, 'crow', 0);
+        } else if (ready('sum', 15)) this.summonAdds(m, t, 'pestifere', 2, 3, 'Levez-vous, mes patients !');
+        else if (P >= 2 && ready('blink', 7)) {
+          for (let k = 0; k < 10; k++) {
+            const a = Math.random() * Math.PI * 2, x = t.x + Math.cos(a) * rand(60, 90), y = t.y + Math.sin(a) * rand(50, 70);
+            if (!canStand(this.world, x, y, true) || roomIdAt(this.world, x, y) !== m.room) continue;
+            this.ev(m.x, m.y, ['fx', 'blink', m.x, m.y]); m.x = x; m.y = y; this.ev(x, y, ['fx', 'blink', x, y]);
+            this.tele(t.x, t.y, 30, 1.0, 36, m, 6); m.pauseUntil = now + 0.6;
+            break;
+          }
+        }
+        break;
+      }
+      case 'brasier': { // Le Brasier
+        if (ready('erupt', 6)) { for (const p of this.bossTargets(m, 300)) { this.tele(p.x, p.y, 26, 1.0, 44, m, 3); this.tele(p.x + rand(-50, 50), p.y + rand(-40, 40), 24, 1.3, 40, m, 3); } }
+        else if (ready('wave', 9)) {
+          const a0 = Math.random() * Math.PI / 2;
+          for (let k = 0; k < 4; k++) { const a = a0 + k * Math.PI / 2; this.lineTele(m.x, m.y, m.x + Math.cos(a) * 220, m.y + Math.sin(a) * 220, 28, 1.2, 46, m, 1); }
+          m.pauseUntil = now + 1.2; this.ev(m.x, m.y, ['shout', m.id, 'BRÛLEZ !']);
+        } else if (P >= 1 && ready('meteor', 11)) { for (let k = 0; k < 9; k++) this.tele(m.x + rand(-160, 160), m.y + rand(-120, 120), 24, 1.4 + k * 0.08, 42, m, 3); this.ev(m.x, m.y, ['roar', m.id]); }
+        else if (P >= 2 && ready('ring', 12)) {
+          for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; this.tele(m.x + Math.cos(a) * 80, m.y + Math.sin(a) * 62, 22, 1.2, 44, m, 3); }
+          this.summonAdds(m, t, 'calcine', 2, 3, 'Que la cendre vous engloutisse !');
+        }
+        break;
+      }
+      case 'frere': { // Fer et Rouille : côte à côte, invulnérables
+        const tw = m.twinRef;
+        if (tw && tw.state !== 'dead' && tw.target === m.target && ready('swap', 2.5)) { const other = this.bossTargets(m, def.aggro).find((p) => p.id !== tw.target); if (other) m.target = other.id; }
+        if (def.twin === 'frere_rouille' ? ready('slam', 6) : ready('chain', 7)) {
+          if (def.twin === 'frere_rouille') { this.tele(t.x, t.y, 30, 1.0, 38, m, 5); this.ev(m.x, m.y, ['atk', m.id, 0, 2]); }
+          else { const a = Math.atan2(t.y - m.y, t.x - m.x); this.lineTele(m.x, m.y - 6, m.x + Math.cos(a) * 170, m.y - 6 + Math.sin(a) * 170, 22, 0.9, 34, m, 2); }
+        }
+        if (P >= 1 && !m.frenzy) { m.frenzy = 1; this.ev(m.x, m.y, ['shout', m.id, 'Tu vas payer pour mon frère !']); }
+        break;
+      }
+      case 'vespere': { // Vespère, Comte des Marées
+        if (ready('blood', 6)) {
+          for (const p of this.bossTargets(m, 320)) { const a = Math.atan2(p.y - m.y, p.x - m.x); this.lineTele(m.x, m.y, m.x + Math.cos(a) * 280, m.y + Math.sin(a) * 280, 34, 1.1, 74, m, 10); }
+          this.ev(m.x, m.y, ['shout', m.id, 'La marée de sang monte !']);
+        } else if (ready('sum', 16)) this.summonAdds(m, t, 'damne', 2, 3, 'Mes damnés, levez-vous !');
+        else if (P >= 1 && ready('tide', 14)) {
+          this.ev(m.x, m.y, ['pull', Math.round(m.x), Math.round(m.y), 240, 62, 4]);
+          for (const q of this.bossTargets(m, 240)) q.pullUntil = now + 4.5;
+          for (let k = 1; k <= 4; k++) this.later(k, () => { if (m.state !== 'dead') for (const q of this.bossTargets(m, 64)) this.damagePlayer(q, 55, m); });
+          m.pauseUntil = now + 4;
+        } else if (P >= 2 && ready('blink', 8)) {
+          const a = Math.atan2(m.y - t.y, m.x - t.x) + Math.PI, x = t.x + Math.cos(a) * 40, y = t.y + Math.sin(a) * 32;
+          if (canStand(this.world, x, y, true) && roomIdAt(this.world, x, y) === m.room) {
+            this.ev(m.x, m.y, ['fx', 'blink', m.x, m.y]); m.x = x; m.y = y; this.ev(x, y, ['fx', 'blink', x, y]);
+            const b = Math.atan2(t.y - y, t.x - x);
+            for (const [d, r, o] of [[24, 24, 0], [46, 28, 0], [36, 22, 0.6], [36, 22, -0.6]]) this.tele(x + Math.cos(b + o) * d, y + Math.sin(b + o) * d * 0.8, r, 0.8, 84, m, 10);
+            m.pauseUntil = now + 0.8;
+          }
+        } else if (P >= 3 && ready('storm', 10)) {
+          for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; this.tele(m.x + Math.cos(a) * 60, m.y + Math.sin(a) * 46, 22, 1.0, 70, m, 10); this.tele(m.x + Math.cos(a + 0.4) * 120, m.y + Math.sin(a + 0.4) * 92, 24, 1.6, 70, m, 10); }
+          for (let k = 0; k < 16; k++) this.spawnProj(m.x, m.y - 12, k / 16 * Math.PI * 2, 140, 260, 60, 'm', m.id, 'curse', 0);
+          this.ev(m.x, m.y, ['roar', m.id]);
+        }
         break;
       }
       case 'noye': { // Capitaine Noyé
@@ -824,6 +1064,11 @@ export class Game {
   }
   damageMob(m, amount, p, crit, kx = 0, ky = 0, dot = 0) {
     if (m.state === 'dead' || m.under) return;
+    if (m.linked) { // les Frères Ferrailleurs côte à côte : rien ne passe
+      if (this.time - (m.immT || 0) > 0.6) { m.immT = this.time; this.ev(m.x, m.y, ['immune', m.id]); }
+      if (m.state !== 'chase') { m.state = 'chase'; m.target = p.id; }
+      return;
+    }
     if (m.shieldUntil > this.time) amount = Math.max(1, Math.round(amount * 0.3));
     if (m.grab) m.grab.dmg += amount;
     m.hp -= amount;
@@ -834,11 +1079,30 @@ export class Game {
     if (!m.boss && !m.def.ai && (kx || ky)) { const [nx, ny] = moveWithCollision(this.world, m.x, m.y, kx, ky, true); m.x = nx; m.y = ny; }
     if (m.hp <= 0) this.killMob(m, p);
   }
-  killMob(m, killer) {
+  killMob(m, killer, force = false) {
     m.state = 'dead'; m.hp = 0;
     m.deadUntil = this.time + m.def.respawn * rand(0.85, 1.15);
     this.ev(m.x, m.y, ['die', m.id]);
     const def = m.def;
+    if (def.ai === 'frere' && !force) { // il faut abattre les deux frères presque en même temps
+      const tw = this.mobs.find((o) => o !== m && o.type === def.twin && o.room === m.room);
+      if (tw && tw.state !== 'dead') {
+        m.fallen = this.time; m.deadUntil = Infinity;
+        this.ev(tw.x, tw.y, ['shout', tw.id, 'Frangin ! Tiens bon, j’arrive !']);
+        this.later(8, () => {
+          if (m.state !== 'dead' || !m.fallen || tw.state === 'dead') return;
+          m.fallen = 0; m.state = 'chase'; m.hp = Math.round(m.maxHp * 0.45); m.tags.clear(); m.target = tw.target; m.id = this.nextId++;
+          this.ev(m.x, m.y, ['fx', 'rise', m.x, m.y]); this.ev(tw.x, tw.y, ['shout', tw.id, 'Debout, frangin ! On n’a pas fini !']);
+        });
+        return;
+      }
+      if (tw && tw.fallen) { // victoire : chaque pirate qui a frappé l'un des frères compte pour les deux
+        for (const [pid] of tw.tags) if (!m.tags.has(pid)) m.tags.set(pid, 1);
+        for (const [pid] of m.tags) if (!tw.tags.has(pid)) tw.tags.set(pid, 1);
+        tw.fallen = 0; tw.deadUntil = this.time + tw.def.respawn; this.killMob(tw, killer, true);
+      }
+    }
+    if (def.plague && !m.summoned) this.addCloud(m.x, m.y, 30, 5, 10);
     if (def.ai && !def.sea) { this.despawnAdds(m); this.ev(m.x, m.y, ['cine', 'bossdown', m.id, m.type, Math.round(m.x), Math.round(m.y)]); }
     if (def.ai === 'kraken') this.krakenDown(m);
     if (def.ai === 'tentacle') {
@@ -853,7 +1117,7 @@ export class Game {
     }
     if (def.elite && !m.event && !def.sea) this.broadcastChat(null, `⚔ ${killer.name} a terrassé ${def.name} !`, 'boss');
     if (m.type === 'roi_squelette') for (const pid of m.tags.keys()) { const q = this.players.get(pid); if (q) this.unlock(q, 'roi_os'); }
-    if (m.summoned && !m.event && !m.bossEvent) return;
+    if (m.summoned && !m.event && !m.bossEvent && !m.horde) return;
     let top = killer, topD = 0;
     for (const [pid, d] of m.tags) {
       const p = this.players.get(pid);
@@ -868,9 +1132,11 @@ export class Game {
       if (m.type === 'crab' && ++p.cnt.crab >= 50) this.unlock(p, 'crabes');
       if (p.kills >= 250) this.unlock(p, 'faucheur');
       if (def.elite) this.unlock(p, 'elite');
+      if (m.horde && ++p.cnt.horde >= 30) this.unlock(p, 'horde');
+      if (def.ship && ++p.cnt.ships >= 10) this.unlock(p, 'naufrageur');
       if (m.boss) this.unlock(p, 'boss');
     }
-    if (m.event) { if (Math.random() < 0.5) this.spawnDrop(m.x, m.y, 'or', Math.round(rand(def.gold[0], def.gold[1]) / 2), top.id); if (!def.elite) return; }
+    if (m.event || m.horde) { if (Math.random() < 0.5) this.spawnDrop(m.x, m.y, 'or', Math.round(rand(def.gold[0], def.gold[1]) / 2), top.id); if (!def.elite) return; }
     // butin
     const [g0, g1] = def.gold;
     const gold = Math.round(rand(g0, g1));
@@ -1031,7 +1297,7 @@ export class Game {
             if (p.dead || SAFE.has(p.zone)) continue;
             if (Math.hypot(p.x - pr.x, p.y - 9 - pr.y) < 8) {
               const src = this.mobs.find((m) => m.id === pr.owner);
-              this.damagePlayer(p, pr.dmg, src);
+              this.damagePlayer(p, pr.dmg, src); pr.hitP = p.id;
               dead = true; this.ev(pr.x, pr.y, ['ph', pr.id, Math.round(pr.x), Math.round(pr.y)]); break;
             }
           }
@@ -1039,6 +1305,7 @@ export class Game {
       }
       if (dead || pr.left <= 0) {
         if (pr.fx && pr.fx.explode) this.explode(pr.x, pr.y + 6, pr.fx.explode, pr.dmg, this.players.get(pr.owner), pr.pvp);
+        if (pr.team === 'm' && pr.fx && pr.fx.msplash) this.mobSplash(pr);
         this.projs.splice(i, 1);
       }
     }
@@ -1128,10 +1395,13 @@ export class Game {
       case 'shot': {
         p.dir = dirOf(Math.cos(a), Math.sin(a));
         const pvp = !SAFE.has(p.zone);
-        if (cannon) { // canon du sloop
+        if (cannon) { // canon du sloop (deux pour le brick)
           this.ev(p.x, p.y, ['atk', p.id, +a.toFixed(2), 3]);
-          const [v, crit] = this.rollDamage(p, 24 + p.level * 4);
-          this.spawnProj(p.x + Math.cos(a) * 12, p.y - 8 + Math.sin(a) * 8, a, 250, 240, v, 'p', p.id, 'cball', 1, crit, pvp);
+          for (let k = 0; k < cannon; k++) {
+            const off = cannon > 1 ? (k - (cannon - 1) / 2) * 0.09 : 0;
+            const [v, crit] = this.rollDamage(p, 24 + p.level * 4);
+            this.spawnProj(p.x + Math.cos(a) * 12, p.y - 8 + Math.sin(a) * 8, a + off, 250, 240, v, 'p', p.id, 'cball', 1, crit, pvp);
+          }
           break;
         }
         const gun = ITEMS[p.eq.gun];
@@ -1228,6 +1498,9 @@ export class Game {
     p.zone = z;
     this.questZone(p, z);
     if (z === Z.HAVRE) this.unlock(p, 'navigateur');
+    if (z === Z.RADE) this.unlock(p, 'rade');
+    if (FAR_ZONES.includes(z) && !p.zs.has(z)) { p.zs.add(z); if (p.zs.size >= FAR_ZONES.length) this.unlock(p, 'explorateur'); }
+    if (ZONES[z] && ZONES[z].hard && !p.hardWarned) { p.hardWarned = 1; this.toast(p, 'Île des Damnés : zone extrême. Ici, même les morts ont peur.', 'warn'); }
   }
   teleport(p, x, y, extra) {
     p.x = x; p.y = y; p.moveBudget = 0; p.moving = false; p.lastMoveAt = this.time;
@@ -1384,6 +1657,17 @@ export class Game {
       return this.toast(p, `Serrure renforcée posée (niveau ${h.lock}/2).`, 'quest');
     }
     if (it.use.conch) return this.blowConch(p, i);
+    if (it.use.travel) {
+      const dest = this.world.docks && this.world.docks[it.use.travel];
+      if (!dest) return;
+      if (!SAFE.has(p.zone) || p.boat) return this.toast(p, 'Le passeur n’embarque que depuis une ville, à pied.', 'warn');
+      if (this.time - p.lastHurt < 8) return this.toast(p, 'Pas en plein combat !', 'warn');
+      let tx = dest.x, ty = dest.y;
+      for (let r = 0; r < 60 && !canStand(this.world, tx, ty, false, p.key); r += 6) { tx = dest.x + (Math.random() - 0.5) * r; ty = dest.y - r; }
+      s.n--; if (s.n <= 0) p.inv[i] = null; p.dirtyInv = true;
+      this.teleport(p, tx, ty, { travel: it.use.travel });
+      return this.toast(p, `Le passeur vous dépose à ${ZONES[zoneAt(this.world, tx, ty)].name}.`, 'quest');
+    }
     if (it.use.bottle) {
       s.n--; if (s.n <= 0) p.inv[i] = null; p.dirtyInv = true;
       const gold = Math.round(rand(8, 40)); p.gold += gold; p.dirtyMe = true;
@@ -1423,6 +1707,7 @@ export class Game {
     p.inv[i] = prev ? { id: prev, n: 1 } : null;
     this.recalc(p);
     p.dirtyInv = true;
+    if (it.slot === 'outfit') { this.toast(p, `Vous enfilez : ${it.name}.`, 'info'); if ((it.rarity || 0) >= 3) this.unlock(p, 'elegance'); }
   }
   unequip(p, slot) {
     if (!SLOTS.includes(slot) || !p.eq[slot]) return;
@@ -1451,7 +1736,7 @@ export class Game {
   }
   nearNpc(p, id, range = INTERACT_RANGE + 16) {
     const n = this.npcPos.get(id);
-    return n && Math.hypot(n.x - p.x, n.y - p.y) <= range;
+    return n && Math.hypot(n.x - p.x, n.y - p.y) <= range && npcVisible(NPCS[id], p.quests, p.level);
   }
   buy(p, npc, item) {
     const N = NPCS[npc];
@@ -1539,6 +1824,7 @@ export class Game {
     p.dirtyQ = true; p.dirtyMe = true;
     this.send(p, { t: 'qdone', q: qid });
     this.ev(p.x, p.y, ['fx', 'quest', p.x, p.y, p.id]);
+    if (q.ach) this.unlock(p, q.ach);
   }
   questKill(p, type) {
     for (const qid in p.quests) {
@@ -2012,20 +2298,19 @@ export class Game {
   }
   // ------------------------------------------------------------ les dalles des Jumeaux
   updateSeals() {
-    const T2 = this.world.twin;
-    if (!T2 || !T2.plates.length) return;
-    const on = T2.plates.map((pl) => [...this.players.values()].filter((q) => !q.dead && q.room === -1 && Math.hypot(q.x - pl.x, q.y - pl.y) < 11));
-    const both = on[0].length && on[1].length && (on[0].some((a2) => on[1].some((b2) => b2 !== a2)));
-    if (both && this.seals.jumeaux < this.time + 5) {
-      const was = this.seals.jumeaux > this.time;
-      this.seals.jumeaux = this.time + 90;
-      this.broadcastAll({ t: 'seal', id: 'jumeaux', open: 90 });
-      if (!was) {
-        const d = this.world.doors[T2.door];
-        this.ev(d.ox, d.oy, ['fx', 'seal', d.ox, d.oy - 16]);
-        const names = [...new Set([...on[0], ...on[1]])].map((q) => { this.unlock(q, 'jumeaux'); return q.name; });
-        this.broadcastChat(null, `🌗 ${names.join(' et ')} ont ouvert le Sanctuaire des Jumeaux !`, 'boss');
-      }
+    for (const S of this.world.seals || []) {
+      if (!S.plates || S.plates.length < 2) continue;
+      const on = S.plates.map((pl) => [...this.players.values()].filter((q) => !q.dead && q.room === -1 && Math.hypot(q.x - pl.x, q.y - pl.y) < 11));
+      const both = on[0].length && on[1].length && (on[0].some((a2) => on[1].some((b2) => b2 !== a2)));
+      if (!both || this.seals[S.id] >= this.time + 5) continue;
+      const was = this.seals[S.id] > this.time;
+      this.seals[S.id] = this.time + S.open;
+      this.broadcastAll({ t: 'seal', id: S.id, open: S.open });
+      if (was) continue;
+      const d = this.world.doors[S.door];
+      this.ev(d.ox, d.oy, ['fx', 'seal', d.ox, d.oy - 16]);
+      const names = [...new Set([...on[0], ...on[1]])].map((q) => { if (S.id === 'jumeaux') this.unlock(q, 'jumeaux'); return q.name; });
+      this.broadcastChat(null, S.id === 'jumeaux' ? `🌗 ${names.join(' et ')} ont ouvert le Sanctuaire des Jumeaux !` : `🗝 ${names.join(' et ')} ont ouvert le Fort des Deux Clés !`, 'boss');
     }
   }
   unplace(p, tx, ty) {
@@ -2159,8 +2444,17 @@ export class Game {
     const f = dayFrac(this.worldTime), n = isNight(f);
     if (n !== this.night) {
       this.night = n;
-      this.broadcastChat(null, n ? 'La nuit tombe... La Marée Morte se lève, les morts deviennent plus forts.' : "Le jour se lève. Les morts retournent dans l'ombre.", 'night');
+      const full = isFullMoon(this.worldTime);
+      if (n) {
+        this.broadcastChat(null, full ? '🌕 La pleine lune se lève : la Horde des morts déferle sur l’archipel !' : 'La nuit tombe... Les morts sortent de terre et deviennent plus forts.', full ? 'boss' : 'night');
+        for (const m of this.mobs) if (m.buried) this.later(rand(0.5, 9), () => { if (m.buried && this.night) this.rise(m); });
+        this.hordeAt = this.time + 6;
+      } else {
+        this.broadcastChat(null, 'Le soleil se lève : les morts qui ne le supportent pas brûlent et retournent sous terre.', 'night');
+        for (const m of this.mobs) if (m.state !== 'dead' && ((m.def.night && !m.sunproof) || m.horde)) m.burnAt = this.time + rand(0.3, 7);
+      }
     }
+    if (this.night && isFullMoon(this.worldTime) && this.time >= this.hordeAt) this.updateHorde();
     // joueurs : régénération, effets
     for (const p of this.players.values()) {
       if (p.dead) continue;
@@ -2178,9 +2472,13 @@ export class Game {
     }
     if (this.tickCount % 10 === 0) this.updateInvasion(f);
     if (this.tickCount % 5 === 0) this.updateTurrets();
-    if (this.tickCount % 10 === 0) this.updateDots();
+    if (this.tickCount % 10 === 0) { this.updateDots(); this.updateClouds(); }
     if (this.tickCount % 5 === 0) { this.updateSeals(); this.updateBurglars(); }
     if (this.tickCount % 10 === 0) this.updateKraken();
+    if (this.tickCount % 40 === 0 && this.players.size > 1) { // les autres pirates sur la carte
+      const pl = [...this.players.values()].map((q) => [q.id, q.name, Math.round(q.x), Math.round(q.y), q.room, q.dead ? 1 : 0]);
+      for (const p of this.players.values()) this.send(p, { t: 'map', pl });
+    }
     this.updateAllies();
     if (this.worldPersist && this.worldDirty && this.time - this.lastWorldSave > 8) { this.worldDirty = false; this.lastWorldSave = this.time; Promise.resolve(this.storage.saveWorld(this.exportWorld())).catch(() => {}); }
     this.updateMobs();
@@ -2196,7 +2494,7 @@ export class Game {
   }
   entMeta(e, kind) {
     if (kind === 'p') return { id: e.id, k: 'p', name: e.name, look: e.look, lvl: e.level, x: Math.round(e.x), y: Math.round(e.y), w: e.eq.weapon, g: e.eq.gun, dead: e.dead, ti: e.title ? ACHIEVEMENTS[e.title].title : '', bt: e.boat ? ITEMS[e.boat].boat.kind : '', pt: e.pet || '', vo: this.time < e.thiefUntil ? 1 : 0 };
-    if (kind === 'm') return { id: e.id, k: 'm', type: e.type, x: Math.round(e.x), y: Math.round(e.y), hp: Math.ceil(e.hp), mhp: e.maxHp };
+    if (kind === 'm') return { id: e.id, k: 'm', type: e.type, x: Math.round(e.x), y: Math.round(e.y), hp: Math.ceil(e.hp), mhp: e.maxHp, sun: e.def.night && e.sunproof && !e.horde ? 1 : 0 };
     return { id: e.id, k: 'd', item: e.item, n: e.n, x: Math.round(e.x), y: Math.round(e.y), own: e.owner, ou: Math.max(0, +(e.ownUntil - this.time).toFixed(1)) };
   }
   broadcastState() {

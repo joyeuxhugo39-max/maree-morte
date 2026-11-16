@@ -141,3 +141,85 @@ Object.assign(NPCS, {
     ],
   },
 });
+
+// ----- 0.7 : le Grand Large -----
+const VIF = { skin: 1, hair: 0, hairStyle: 'long', beard: 1, top: 'manteau', topCol: 'purple', pants: 'black', boots: 'black', hat: 'plume', hatCol: 'purple' };
+const vifTopics = [
+  { q: 'Qui êtes-vous ?', a: "Ambroise Vif-Argent. Capitaine. Le meilleur de ces eaux, de l'avis de tous ceux qui ont eu la chance de me rencontrer. Les autres ne comptent pas, ils sont jaloux." },
+  { q: 'La Couronne des Marées ?', a: "Une couronne d'or et de nacre qui commande aux marées. Le Comte Vespère l'a volée il y a cent ans, et depuis, la mer recrache ses morts. Celui qui la reprend... eh bien, il fait ce qu'il veut. Moi, par exemple." },
+];
+Object.assign(NPCS, {
+  mama_lune: {
+    name: 'Mama Lune', title: 'Tenancière du Perroquet Pendu',
+    look: { skin: 3, hair: 4, hairStyle: 'long', top: 'vareuse', topCol: 'purple', pants: 'black', boots: 'black', hat: 'foulard', hatCol: 'orange' },
+    greet: ['Assieds-toi, mon cœur. La Rade ne pose pas de questions, mais elle écoute.', 'Le rhum d’ici brûle la gorge et les remords.', 'Tu as la tête de quelqu’un qui cherche un capitaine. Ou des ennuis.'],
+    shop: ['rhum', 'grog', 'poisson_grille', 'tentacule_fumee'],
+    topics: [
+      { q: 'La Rade ?', a: "Rade-aux-Flibustiers. Pas de roi, pas de loi, juste un pacte : on ne se tue pas dans les rues. Au-delà des palissades, sur les collines, les flibustiers maudits ne respectent plus rien." },
+      { q: 'Vif-Argent ?', a: "J'ai été son second, autrefois. Il a le cœur gros comme un boulet de canon, et il le perd aussi vite. Ne lui prête jamais d'argent. Ni de navire. Ni ton dos." },
+    ],
+  },
+  vif_argent: { name: 'Ambroise Vif-Argent', title: 'Prisonnier, momentanément', look: VIF, vis: { q: 'evasion', s: ['locked', 'available'] },
+    greet: ['Ah ! Enfin une tête qui ne sent pas la vase. Approchez, approchez.', 'Ces barreaux ? Une simple formalité.', 'Le geôlier a un faible pour le rhum. Moi aussi, mais ça, c’est une autre histoire.'], topics: vifTopics },
+  vif_quai: { name: 'Ambroise Vif-Argent', title: 'Capitaine sans navire (pour l’instant)', look: VIF, vis: { q: 'evasion', s: ['active', 'ready', 'done'], not: { q: 'trois_fragments', s: ['done'] } },
+    greet: ['L’air libre ! Rien de tel. Sauf peut-être un navire. Et de l’or. Et un navire en or.', 'Ne restez pas planté là, on a une Couronne à voler. À reprendre, pardon.'], topics: vifTopics },
+  vif_camp: { name: 'Ambroise Vif-Argent', title: 'Rescapé, et fier de l’être', look: VIF, vis: { q: 'docteur', s: ['done'] },
+    greet: ['Vous revoilà ! Je savais que vous viendriez. Enfin, je l’espérais. Très fort.', 'Pour la carte, je peux tout expliquer. Plus tard.'], topics: vifTopics },
+  geolier: {
+    name: 'Grosbec', title: 'Geôlier de la Rade',
+    look: { skin: 0, hair: 1, hairStyle: 'chauve', beard: 2, top: 'gilet', topCol: 'black', pants: 'brown', boots: 'black' },
+    greet: ['Hic. On ne touche pas aux barreaux.', 'Le prisonnier ? Il parle, il parle... Hic.', 'Personne ne sort d’ici. Sauf avec la clé. Que j’ai. Quelque part.'],
+    topics: [{ q: 'Une bouteille ?', a: "Une bouteille ? Hic. Six, oui. Six, ça c'est une conversation." }],
+  },
+  madame_soie: {
+    name: 'Madame Soie', title: 'Couturière des forbans',
+    look: { skin: 2, hair: 0, hairStyle: 'queue', top: 'capitaine', topCol: 'teal', pants: 'black', boots: 'black', hat: 'plume', hatCol: 'teal' },
+    greet: ['On ne vient pas à la Rade pour être discret, mon chou. On vient pour être vu.', 'Une tenue, ça se mérite. Ou ça s’achète.', 'Ce manteau ? Pris sur un amiral. Il n’en avait plus besoin.'],
+    shop: ['tenue_mousse', 'tenue_boucanier', 'tenue_corsaire', 'tenue_sables', 'fil_or'],
+    topics: [
+      { q: 'Les tenues ?', a: "Une tenue se porte par-dessus tout le reste : elle change votre allure et vous donne ses propres bonus. Je vends les classiques. Les grandes tenues, il faut les coudre ici, à ma table de couture, ou les arracher à ceux qui les portent." },
+    ],
+  },
+  receleur: {
+    name: 'Le Receleur', title: 'Achète tout, ne demande rien',
+    look: { skin: 2, hair: 0, hairStyle: 'court', beard: 1, top: 'manteau', topCol: 'black', pants: 'black', boots: 'black', hat: 'tricorne', hatCol: 'black', eye: 'patch' },
+    greet: ['Je n’ai rien vu. Vous non plus.', 'Un coffret à bijoux ? Je ne demande pas d’où il vient.', 'Les meilleures affaires se font la nuit.'],
+    shop: ['crochets', 'serrure_renforcee', 'carte_dechiree', 'poudre_noire', 'billet_port'],
+  },
+  passeur: { name: 'Joseph', title: 'Passeur', look: { skin: 1, hair: 3, hairStyle: 'court', beard: 1, top: 'vareuse', topCol: 'navy', pants: 'brown', boots: 'brown', hat: 'bonnet', hatCol: 'navy' },
+    greet: ['Une traversée ? Le billet, et je m’occupe du reste.', 'Mon bateau n’a jamais coulé. Pas encore.'], shop: ['billet_havre', 'billet_rade', 'billet_anse'],
+    topics: [{ q: 'Comment voyager ?', a: "Achetez un billet, puis utilisez-le depuis n'importe quelle ville (clic droit dans le sac) : je vous dépose sur le quai. Pour le reste du monde, il vous faudra votre propre navire." }] },
+  passeur_havre: { name: 'Gwenola', title: 'Passeuse', look: { skin: 0, hair: 2, hairStyle: 'queue', top: 'vareuse', topCol: 'teal', pants: 'brown', boots: 'brown', hat: 'bonnet', hatCol: 'teal' },
+    greet: ['On lève l’ancre quand vous voulez.'], shop: ['billet_port', 'billet_rade', 'billet_anse'] },
+  passeur_rade: { name: 'Baltazar', title: 'Charpentier et passeur de la Rade', look: { skin: 3, hair: 0, hairStyle: 'chauve', beard: 2, top: 'tablier', topCol: 'brown', pants: 'black', boots: 'black' },
+    greet: ['Un brick ? J’en ai un. Il est cher. Il le vaut.', 'Les frégates maudites rôdent au sud. Prenez un bon navire.'], shop: ['billet_port', 'billet_havre', 'billet_anse', 'sloop', 'brick'],
+    topics: [{ q: 'Les navires maudits ?', a: "Des bricks de noyés au nord et à l'ouest, des frégates au sud, et dans les Brumes Éternelles, le Galion Fantôme du Comte. Ils tirent à vue sur tout ce qui flotte. Coulez-les : leurs cales sont pleines." }] },
+  passeur_anse: { name: 'Pépin', title: 'Passeur d’Anse-Tranquille', look: { skin: 1, hair: 5, hairStyle: 'court', top: 'rayee', pants: 'navy', boots: 'brown', hat: 'paille' },
+    greet: ['Bienvenue à l’Anse ! Ici, même les mouettes font la sieste.'], shop: ['billet_port', 'billet_havre', 'billet_rade'] },
+  kerbrat: {
+    name: 'Vieux Kerbrat', title: 'Ancien des Frères de la Côte',
+    look: { skin: 0, hair: 4, hairStyle: 'hirsute', beard: 2, beardCol: 4, top: 'gilet', topCol: 'red', pants: 'black', boots: 'black', hat: 'bandana', hatCol: 'red' },
+    greet: ['Un Frère de la Côte ne se bat jamais seul. C’est la seule règle.', 'Le Fort ? Il faut être deux. Toujours.'],
+    topics: [{ q: 'Le Fort des Deux Clés ?', a: "Deux dalles devant la porte : il faut un pirate sur chacune, en même temps. À l'intérieur, Fer et Rouille. Tant qu'ils sont côte à côte, leurs armures se renvoient les coups. Éloignez-les l'un de l'autre, et frappez." }],
+  },
+  maelys: {
+    name: 'Maëlys', title: 'Pêcheuse d’Anse-Tranquille',
+    look: { skin: 2, hair: 3, hairStyle: 'long', top: 'chemise', topCol: 'white', pants: 'navy', boots: 'brown', hat: 'paille' },
+    greet: ['Les maisons d’ici sont à vendre, et la mer est calme. Enfin, presque.', 'Tu entends ? C’est le lagon qui chante. Ne l’écoute pas trop.'],
+    shop: ['sardine', 'poisson_grille', 'canne_peche', 'banane'],
+    topics: [{ q: 'Habiter ici ?', a: "Six maisons à vendre, 800 doublons chacune. L'Anse est protégée comme une ville : ni morts, ni duels. Les cambrioleurs, par contre..." }],
+  },
+  ermite: {
+    name: 'L’Ermite', title: 'Il a tout vu, tout oublié',
+    look: { skin: 1, hair: 4, hairStyle: 'hirsute', beard: 2, beardCol: 4, top: 'haillons', topCol: 'brown', pants: 'brown', boots: 'brown', hat: 'paille' },
+    greet: ['Trois maisons, zéro voisin. Le paradis. Enfin, il y a les crabes.', 'Personne ne protège cet îlot. Ni Flamme, ni loi. Vous êtes prévenu.'],
+  },
+  agathe: {
+    name: 'Sœur Agathe', title: 'Dernière soignante de la Quarantaine',
+    look: { skin: 0, hair: 1, hairStyle: 'court', top: 'tablier', topCol: 'white', pants: 'black', boots: 'black', hat: 'foulard', hatCol: 'white' },
+    greet: ['Ne touchez à rien. Surtout pas aux morts.', 'La peste n’a pas tué cette colonie. Le Docteur, si.'],
+    shop: ['herbes', 'grog', 'rhum'],
+  },
+  tailleur_rade: { name: 'Rodrigue', title: 'Marchand d’étoffes', look: { skin: 1, hair: 1, hairStyle: 'queue', top: 'gilet', topCol: 'yellow', pants: 'brown', boots: 'brown', hat: 'foulard', hatCol: 'red' },
+    greet: ['Soie, fil d’or, cuir de molosse : tout pour coudre une légende.'], shop: ['fil_or', 'toile', 'corde', 'cuir_molosse'] },
+});
