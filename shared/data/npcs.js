@@ -13,7 +13,7 @@ export const NPCS = {
     name: 'Isa Main-de-Fer', title: 'Forgeronne',
     look: { skin: 1, hair: 0, hairStyle: 'queue', top: 'gilet', topCol: 'brown', pants: 'brown', boots: 'brown', hat: 'bandana', hatCol: 'red' },
     greet: ["Le métal ne ment jamais. Les hommes, si.", "Approche, approche ! L'acier est encore chaud.", 'Un sabre émoussé, c’est un pirate mort.'],
-    shop: ['coutelas', 'sabre_abordage', 'pistolet_silex', 'tromblon', 'mousquet', 'tricorne', 'bandana_noir', 'gilet_cuir', 'manteau_corsaire', 'bottes_pont', 'mariniere'],
+    shop: ['poignard', 'coutelas', 'machette', 'sabre_abordage', 'pistolet_silex', 'pistolet_double', 'escopette', 'tromblon', 'carabine', 'mousquet', 'tricorne', 'bandana_noir', 'gilet_cuir', 'manteau_corsaire', 'bottes_pont', 'mariniere'],
     topics: [
       { q: 'Comment devenir plus fort ?', a: "Abats des morts, gagne de l'expérience et équipe-toi mieux. Le Tourbillon d'acier s'apprend au niveau 2, la Rasade de rhum au 3, les Bombes au 4 et le Cri d'abordage au 6." },
     ],
@@ -94,7 +94,7 @@ Object.assign(NPCS, {
     name: 'Ysaline', title: 'Charpentière de marine',
     look: { skin: 1, hair: 0, hairStyle: 'queue', top: 'gilet', topCol: 'brown', pants: 'navy', boots: 'brown', hat: 'bandana', hatCol: 'teal' },
     greet: ["Une coque, c'est comme un cœur : il faut l'écouter.", 'Attention aux copeaux !', 'Le sloop là-bas ? Le plus rapide de l’archipel. Et il a du répondant.'],
-    shop: ['barque', 'sloop', 'planche', 'corde', 'toile'],
+    shop: ['barque', 'sloop', 'fusil_harpon', 'pistolet_double', 'planche', 'corde', 'toile'],
     topics: [
       { q: 'Barque ou sloop ?', a: "La barque, c'est pour se promener. Le sloop file bien plus vite et porte un canon : clic droit pour tirer, sur les morts comme sur les pirates trop curieux. Tu peux aussi les construire toi-même à l'établi, si tu as le bois et la toile." },
     ],

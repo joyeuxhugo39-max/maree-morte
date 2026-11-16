@@ -1,5 +1,7 @@
 // Icônes 16x16 des objets et des compétences.
 import { PB, shade, mix } from './pixel.js';
+import { ITEMS } from '../../shared/data/items.js';
+import { drawWeaponIcon } from './weapons.js';
 
 const GOLD = [0x7a4a12, 0xa86e1c, 0xd49a2a, 0xf2c14a, 0xffe58a];
 const IRON = [0x1d1c24, 0x2c2b36, 0x403f4e, 0x5a596b, 0x7c7b8f, 0xa2a1b2];
@@ -291,7 +293,8 @@ export function iconCanvas(icon, tint, scale = 1) {
   if (c) return c;
   const pb = new PB(16, 16);
   const fn = P[icon] || P.map;
-  if (icon === 'tricorne_big') P.tricorne(pb, true);
+  if (icon && icon.startsWith('w:')) drawWeaponIcon(pb, ITEMS[icon.slice(2)] && ITEMS[icon.slice(2)].form);
+  else if (icon === 'tricorne_big') P.tricorne(pb, true);
   else if (icon === 'shirt_striped') P.shirt(pb, 'white', true);
   else if (icon === 'vest') P.shirt(pb, 'white', false, true);
   else if (icon === 'captaincoat') P.coat(pb, tint || 'navy', true);
@@ -302,9 +305,18 @@ export function iconCanvas(icon, tint, scale = 1) {
   cache.set(key, c);
   return c;
 }
+// icône d'interface : 32x32 (pixels nets à 2x) avec une petite ombre portée dessinée
 export function iconURL(icon, tint) {
   const key = 'url|' + icon + '|' + (tint || '');
   let u = cache.get(key);
-  if (!u) { u = iconCanvas(icon, tint, 3).toDataURL(); cache.set(key, u); }
+  if (!u) {
+    const src = iconCanvas(icon, tint, 2);
+    const c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
+    const x = c.getContext('2d');
+    x.drawImage(src, 2, 2);
+    x.globalCompositeOperation = 'source-in'; x.fillStyle = 'rgba(12, 6, 4, 0.42)'; x.fillRect(0, 0, c.width, c.height);
+    x.globalCompositeOperation = 'source-over'; x.drawImage(src, 0, 0);
+    u = c.toDataURL(); cache.set(key, u);
+  }
   return u;
 }

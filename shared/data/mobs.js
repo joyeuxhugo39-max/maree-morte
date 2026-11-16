@@ -57,3 +57,16 @@ MOBS.roi_squelette = {
   xp: 720, gold: [120, 200], r: 13, respawn: 300, elite: 1, groan: 1, weapon: ['bigsaber', 'bone'],
   loot: [['lame_corail', 0.1, 1, 1], ['chapeau_capitaine', 0.2, 1, 1], ['perle_ombre', 1, 2, 4], ['carte_dechiree', 1, 1, 2], ['boussole_maudite', 0.15, 1, 1]],
 };
+// 0.5 : armes dans le butin (les boss et élites gardent les plus belles)
+const ARMES = {
+  buccaneer: [['crochet', 0.012, 1, 1], ['machette', 0.02, 1, 1]],
+  ghoul: [['machette', 0.025, 1, 1]],
+  skelgun: [['poivriere', 0.015, 1, 1], ['carabine', 0.01, 1, 1]],
+  drowned: [['harpon', 0.012, 1, 1]],
+  boss: [['ancre', 0.2, 1, 1], ['couleuvrine', 0.12, 1, 1], ['faux', 0.06, 1, 1]],
+  crabroi: [['mortier_main', 0.1, 1, 1], ['harpon', 0.15, 1, 1]],
+  goule_alpha: [['mortier_main', 0.12, 1, 1], ['machette', 0.4, 1, 1], ['cimeterre', 0.12, 1, 1]],
+  capitaine_noye: [['trident', 0.35, 1, 1], ['fusil_harpon', 0.12, 1, 1]],
+  roi_squelette: [['sabre_os', 0.3, 1, 1], ['mousquet_os', 0.25, 1, 1]],
+};
+for (const k in ARMES) MOBS[k].loot.push(...ARMES[k]);

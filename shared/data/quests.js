@@ -92,6 +92,38 @@ QUESTS.roi_os = {
   progress: "L'Île au Crâne est au sud de Havre. L'entrée de l'antre est dans la bouche du crâne.",
   done: "Tu l'as fait ! Les barques pourront sortir la nuit. Ce manteau appartenait au dernier capitaine de Havre : il est à toi.",
 };
+QUESTS.acier_duel = {
+  name: 'Acier de duelliste', giver: 'isa', turnin: 'isa', level: 5, requires: ['pinces'],
+  goals: [{ type: 'collect', item: 'lingot_fer', n: 4, text: 'Lingots de fer' }, { type: 'collect', item: 'dent_zombie', n: 6, text: 'Dents de zombie' }],
+  rewards: { xp: 300, gold: 60, items: [['rapiere', 1]] },
+  offer: "J'ai le dessin d'une rapière de duelliste, mais pas le métal. Apporte-moi quatre lingots de fer (le minerai se fond à la forge) et six dents de zombie pour la trempe. Je te forgerai la lame la plus fine de l'archipel.",
+  progress: 'Le minerai se trouve dans les rochers, à la pioche. Les boucaniers de la jungle ont de bonnes dents.',
+  done: "Regarde-moi ce fil ! Une rapière, ça ne tranche pas : ça transperce. Vise juste, et loin devant toi.",
+};
+QUESTS.duel_aube = {
+  name: "Le duel de l'aube", giver: 'morgane', turnin: 'morgane', level: 6, requires: ['matelots'],
+  goals: [{ type: 'kill', mob: 'buccaneer', n: 10, text: 'Boucaniers zombies défaits' }],
+  rewards: { xp: 380, gold: 90, items: [['pistolet_duel', 1]] },
+  offer: "Les boucaniers de la jungle ont pillé la cabine de mon père. Abats-en dix, et je te confierai ce qu'ils n'ont pas trouvé : son pistolet de duel. Il n'a jamais raté un duel.",
+  progress: 'Les boucaniers rôdent dans la jungle de Brumesel, au nord.',
+  done: "Tiens. Le pistolet de duel de mon père. Il a mis fin à plus de querelles que tous les juges de l'archipel.",
+};
+QUESTS.bois_marine = {
+  name: 'Bois de marine', giver: 'ysaline', turnin: 'ysaline', level: 4, requires: ['traversee'],
+  goals: [{ type: 'collect', item: 'planche', n: 12, text: 'Planches' }, { type: 'collect', item: 'toile', n: 4, text: 'Toile' }],
+  rewards: { xp: 260, gold: 50, items: [['harpon', 1]] },
+  offer: "Mon chantier manque de tout. Douze planches et quatre toiles, et je te donne le harpon de mon grand-père : avec ça, les noyés gardent leurs distances.",
+  progress: "Les planches se scient à l'établi, la toile se tisse avec de la fibre.",
+  done: "Parfait, c'est du bon bois. Voilà le harpon. Frappe de loin, et ne le perds pas dans un noyé.",
+};
+QUESTS.oeil_guetteur = {
+  name: "L'œil du guetteur", giver: 'gaspard', turnin: 'gaspard', level: 9, requires: ['marais'],
+  goals: [{ type: 'explore', zone: Z.CRANE, text: "Débarquer sur l'Île au Crâne" }, { type: 'kill', mob: 'skelgun', n: 8, text: 'Squelettes canonniers abattus' }],
+  rewards: { xp: 700, gold: 150, items: [['fusil_long', 1]] },
+  offer: "Du haut de mon phare, je vois les canonniers de l'Île au Crâne astiquer leurs mousquets. Va là-bas et fais-en taire huit. En échange, je te donnerai mon long fusil de guetteur : il porte plus loin que mes yeux.",
+  progress: "L'Île au Crâne est au sud-est : il te faudra un bateau.",
+  done: "Je les ai entendus se taire, un par un. Voilà mon long fusil. Prends le temps de viser : il ne pardonne pas l'impatience.",
+};
 // Primes répétables du tableau de la place (toutes les 10 minutes)
 const prime = (name, mob, n, level, xp, gold, text) => ({ name, giver: 'primes', turnin: 'primes', level, repeat: 600, goals: [{ type: 'kill', mob, n, text }], rewards: { xp, gold, items: [] },
   offer: `AVIS DE PRIME — ${text} : ${n}. Récompense : ${gold} doublons, payés par la Capitainerie de Port-Lanterne.`, progress: 'Revenez au tableau une fois la prime remplie.', done: 'La Capitainerie vous paie votre dû. Une nouvelle prime sera affichée dans 10 minutes.' });

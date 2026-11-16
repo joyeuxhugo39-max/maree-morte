@@ -310,7 +310,7 @@ function onEvent(ev, t) {
       if (!e || ev[1] === me) break;
       e.atkT = now; e.atkA = ev[2]; e.atkKind = ev[3];
       if (ev[3] === 3) { G.sfx.play('boom', vol(e.x, e.y) * 0.6); R.smoke(e.x + Math.cos(ev[2]) * 14, e.y - 4 + Math.sin(ev[2]) * 8, 8, 'rgba(220,220,220,0.55)', { size: 3, life: 0.9 }); }
-      else if (ev[3] !== 1) { R.addFx({ kind: 'slash', follow: () => e, a: ev[2], dur: 0.2, r: e.type === 'boss' ? 30 : 17, big: e.type === 'boss' }); G.sfx.play('slash', vol(e.x, e.y) * 0.7); }
+      else if (ev[3] !== 1) { if (e.k === 'p') weaponFx(e, e.weapon, ev[2], 0.2); else R.addFx({ kind: 'slash', follow: () => e, a: ev[2], dur: 0.2, r: e.type === 'boss' ? 30 : 17, big: e.type === 'boss' }); G.sfx.play('slash', vol(e.x, e.y) * 0.7); }
       else if (e.k === 'm') { G.sfx.play('musket', vol(e.x, e.y)); }
       break;
     }
@@ -319,9 +319,10 @@ function onEvent(ev, t) {
       break;
     case 'dmg': {
       if (!e) break;
-      const [, id, v, crit, by] = ev;
-      e.hitT = now;
+      const [, id, v, crit, by, dot] = ev;
       const mine = id === me;
+      if (dot) { R.text(e.x, e.y - 6, v, dot === 'f' ? '#ffa040' : '#d83a3a'); R.burst(e.x, e.y - 6, 3, { z: 10, col: dot === 'f' ? ['#ffd24a', '#ff8a2a'] : ['#a01818', '#d83a3a'], speed: 20, up: dot === 'f' ? 30 : 10, life: 0.4, g: dot === 'f' ? -20 : 120 }); break; }
+      e.hitT = now;
       R.text(e.x, e.y - (e.type === 'boss' ? 24 : 0), v, mine ? '#ff6a5a' : crit ? '#ffd23a' : '#ffffff', !!crit);
       R.burst(e.x, e.y, crit ? 10 : 6, { z: 10, col: HIT_COL[e.type] || HIT_COL.p, speed: 50, up: 40, life: 0.45 });
       if (mine) { G.ui.hurtFlash(); R.shake(2.5, 0.15); G.sfx.play('hurt'); }
@@ -433,9 +434,15 @@ function tryAttack(aim, now) {
   const spd = (G.eq.weapon && ITEMS[G.eq.weapon].speed) || 0.55;
   G.cd.slash = now + spd; G.cdTotal.slash = spd;
   p.atkT = now; p.atkA = aim; p.atkKind = 0;
-  G.renderer.addFx({ kind: 'slash', follow: () => p, a: aim, dur: 0.18 });
+  weaponFx(p, G.eq.weapon, aim, 0.18);
   G.sfx.play('slash');
   G.send({ t: 'atk', a: +aim.toFixed(3) });
+}
+// trace du coup : arc large pour les haches et les faux, estocade pour les lances et rapières
+function weaponFx(e, wid, a, dur) {
+  const w = (wid && ITEMS[wid]) || {}, f = w.form || {};
+  if (f.anim === 'thrust') G.renderer.addFx({ kind: 'thrust', follow: () => e, a, dur: dur * 0.9, r: w.reach || 30 });
+  else G.renderer.addFx({ kind: 'slash', follow: () => e, a, dur, r: Math.max(15, Math.min(30, (w.reach || 27) * 0.7)), span: Math.min(1.9, Math.max(0.9, (w.arc || 1.15) * 1.08)), big: (w.reach || 27) > 30 || (w.arc || 1.15) > 1.6 });
 }
 function useSkill(id) {
   const s = SKILLS[id], me = G.me, p = G.player, now = nowS();
@@ -459,7 +466,7 @@ function useSkill(id) {
     G.renderer.smoke(p.x, p.y, 5, 'rgba(220,200,160,0.5)', { size: 2, life: 0.5 });
     G.sfx.play('roll');
   }
-  if (id === 'shot') { p.atkT = now; p.atkA = G.aim; p.atkKind = cannon ? 3 : 1; if (cannon) { G.sfx.play('boom', 0.6); G.renderer.smoke(p.x + Math.cos(G.aim) * 14, p.y - 4 + Math.sin(G.aim) * 8, 8, 'rgba(220,220,220,0.55)', { size: 3, life: 0.9 }); } else G.sfx.play(ITEMS[G.eq.gun].wkind === 'musket' ? 'musket' : 'shot'); G.renderer.shake(cannon ? 2.5 : 1, cannon ? 0.12 : 0.06); }
+  if (id === 'shot') { p.atkT = now; p.atkA = G.aim; p.atkKind = cannon ? 3 : 1; const gk = !cannon && ITEMS[G.eq.gun].shot && ITEMS[G.eq.gun].shot.burst; if (gk) for (let b = 1; b < gk; b++) setTimeout(() => G.sfx.play('shot', 0.8), b * ITEMS[G.eq.gun].shot.gap * 1000); if (cannon) { G.sfx.play('boom', 0.6); G.renderer.smoke(p.x + Math.cos(G.aim) * 14, p.y - 4 + Math.sin(G.aim) * 8, 8, 'rgba(220,220,220,0.55)', { size: 3, life: 0.9 }); } else { const sh = ITEMS[G.eq.gun].shot || {}; G.sfx.play(sh.explode || sh.kind === 'cball' ? 'boom' : sh.kind === 'flame' ? 'throw' : ITEMS[G.eq.gun].form && ITEMS[G.eq.gun].form.type === 'rifle' ? 'musket' : 'shot', sh.explode ? 0.4 : 1); } G.renderer.shake(cannon ? 2.5 : 1, cannon ? 0.12 : 0.06); }
   G.send(msg);
   G.ui.flashSkill(id);
   me.en = Math.max(0, me.en - s.cost);

@@ -10,6 +10,7 @@ import { buildEnvSprites, buildStructSprites } from './sprites-env.js';
 import { STRUCTS, CLAIM_R, PLANTER_GROW } from '../../shared/data/craft.js';
 import { humanSheet, mobSheet, whiteSheet, weaponSprite, parrotSheet, catSheet, FW, FH } from './sprites-chars.js';
 import { iconCanvas } from './sprites-items.js';
+import { heldWeapon } from './weapons.js';
 import { textCanvas, textWidth } from './font.js';
 import { PB } from './pixel.js';
 import { hash2 } from '../../shared/rng.js';
@@ -475,7 +476,7 @@ export class Renderer {
     let spr = null, kind = null;
     if (e.k === 'p') {
       const w = e.weapon && ITEMS[e.weapon];
-      if (w) spr = weaponSprite('saber', w.wtint || 'steel');
+      if (w) spr = w.form ? heldWeapon(w.form, e.weapon) : weaponSprite('saber', w.wtint || 'steel');
       kind = 'p';
     } else if (e.type && MOBS[e.type] && MOBS[e.type].weapon) {
       const [k, t] = MOBS[e.type].weapon; spr = weaponSprite(k, t);
@@ -483,7 +484,7 @@ export class Renderer {
     const atk = now - (e.atkT || -9);
     const shooting = (e.atkKind === 1 && atk < 0.4) || (e.type === 'skelgun' && e.windT && now - e.windT < e.windDur + 0.2);
     if (shooting) {
-      if (e.k === 'p') { const g = e.gun && ITEMS[e.gun]; spr = weaponSprite(g ? (g.wkind || 'pistol') : 'pistol', g ? (g.wtint || 'steel') : 'steel'); }
+      if (e.k === 'p') { const g = e.gun && ITEMS[e.gun]; spr = g && g.form ? heldWeapon(g.form, e.gun) : weaponSprite('pistol', 'steel'); }
       else spr = weaponSprite('musket', 'steel');
     }
     if (!spr) return;
@@ -493,16 +494,30 @@ export class Renderer {
     else if (atk < 0.22 && e.atkKind !== 1) {
       const k = atk / 0.18, ease = 1 - Math.pow(1 - Math.min(1, k), 3);
       const side = Math.cos(e.atkA) >= 0 ? 1 : -1;
+      if (spr.thrust) { // estocade : la pointe file droit devant
+        ang = e.atkA; const d = Math.sin(Math.min(1, k) * Math.PI) * 8;
+        ctx.save(); ctx.translate(Math.cos(ang) * d, Math.sin(ang) * d);
+        this.blitWeapon(ctx, spr, hx, hy, ang); ctx.restore(); return;
+      }
       ang = e.atkA - side * 1.35 + side * 2.7 * ease;
       if (e.atkKind === 2) ang = e.atkA - side * 1.6 + side * 3.2 * ease;
     } else if (e.windT && now - e.windT < e.windDur) ang = (e.windA ?? 0) - 2.2;
     else ang = [1.95, Math.PI - 0.85, 0.85, -2.0][dir];
+    this.blitWeapon(ctx, spr, hx, hy, ang);
+  }
+  blitWeapon(ctx, spr, hx, hy, ang) {
     ctx.save();
     ctx.translate(hx, hy);
     ctx.rotate(ang);
     if (Math.cos(ang) < 0) ctx.scale(1, -1);
     ctx.drawImage(spr.cv, -spr.gx, -spr.gy);
     ctx.restore();
+    if (spr.glow) { // lueur des armes enchantées
+      const g = this.glows[spr.glow] || this.glows.cold, L = (spr.w - spr.gx) * 0.65;
+      ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.45 + 0.15 * Math.sin(performance.now() / 260);
+      ctx.drawImage(g, hx + Math.cos(ang) * L - 9, hy + Math.sin(ang) * L - 9, 18, 18);
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    }
   }
   drawDrop(ctx, e, camX, camY, now, G) {
     const it = e.item === 'or' ? null : ITEMS[e.item];
@@ -536,8 +551,16 @@ export class Renderer {
       const k = t / f.dur;
       const o = f.follow && f.follow();
       const x = (o ? o.x : f.x) - camX, y = (o ? o.y : f.y) - camY;
-      if (f.kind === 'slash') {
-        const r = f.r || 19, a0 = f.a - 1.25 + 2.5 * Math.max(0, k - 0.15), a1 = f.a - 1.25 + 2.5 * Math.min(1, k * 1.6);
+      if (f.kind === 'thrust') {
+        const r = f.r || 30, d0 = 6 + r * 0.25 * k, d1 = 8 + r * Math.min(1, k * 1.8);
+        ctx.strokeStyle = `rgba(255,255,255,${0.9 * (1 - k)})`; ctx.lineWidth = 2; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(x + Math.cos(f.a) * d0, y - 9 + Math.sin(f.a) * d0); ctx.lineTo(x + Math.cos(f.a) * d1, y - 9 + Math.sin(f.a) * d1); ctx.stroke();
+        ctx.strokeStyle = `rgba(150,210,255,${0.6 * (1 - k)})`; ctx.lineWidth = 1;
+        for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x + Math.cos(f.a + s * 0.12) * d0, y - 9 + Math.sin(f.a + s * 0.12) * d0); ctx.lineTo(x + Math.cos(f.a + s * 0.05) * d1 * 0.8, y - 9 + Math.sin(f.a + s * 0.05) * d1 * 0.8); ctx.stroke(); }
+        ctx.lineCap = 'butt';
+      } else if (f.kind === 'slash') {
+        const span = f.span || 1.25;
+        const r = f.r || 19, a0 = f.a - span + 2 * span * Math.max(0, k - 0.15), a1 = f.a - span + 2 * span * Math.min(1, k * 1.6);
         if (a1 > a0) {
           ctx.lineCap = 'butt';
           ctx.strokeStyle = `rgba(255,255,255,${0.95 * (1 - k)})`; ctx.lineWidth = f.big ? 4 : 3;
@@ -599,6 +622,41 @@ export class Renderer {
       p.x += p.vx * dt; p.y += p.vy * dt; p.left -= step;
       if (p.left <= 0) { this.projs.delete(id); continue; }
       const x = p.x - camX, y = p.y - camY;
+      const dx = p.vx / p.speed, dy = p.vy / p.speed;
+      if (p.kind === 'flame') {
+        const s = 2 + Math.round(Math.sin(p.t * 40) + p.t * 6);
+        ctx.fillStyle = p.t < 0.12 ? '#fff2b0' : '#ffb43a'; ctx.fillRect(Math.round(x) - (s >> 1), Math.round(y) - (s >> 1), s, s);
+        ctx.fillStyle = '#ff6a1e'; ctx.fillRect(Math.round(x - dx * 3), Math.round(y - dy * 3), 2, 2);
+        ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.6; ctx.drawImage(this.glows.warm, x - 8, y - 8, 16, 16); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+        if (rnd() < 0.5) this.burst(p.x, p.y + 9, 1, { z: 9, col: ['#ffd24a', '#ff8a2a', '#ff5a1a'], up: 10, speed: 8, life: 0.35, g: -20 });
+        continue;
+      }
+      if (p.kind === 'bolt' || p.kind === 'slug') {
+        const L = p.kind === 'bolt' ? 7 : 11;
+        ctx.strokeStyle = p.kind === 'bolt' ? '#dff6ff' : '#fffbe0'; ctx.lineWidth = p.kind === 'bolt' ? 2 : 1;
+        ctx.beginPath(); ctx.moveTo(Math.round(x), Math.round(y)); ctx.lineTo(Math.round(x - dx * L), Math.round(y - dy * L)); ctx.stroke();
+        ctx.strokeStyle = p.kind === 'bolt' ? 'rgba(90,170,255,0.55)' : 'rgba(255,220,140,0.45)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(Math.round(x - dx * L), Math.round(y - dy * L)); ctx.lineTo(Math.round(x - dx * (L + 10)), Math.round(y - dy * (L + 10))); ctx.stroke();
+        if (p.kind === 'bolt') { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.7; ctx.drawImage(this.glows.cold, x - 9, y - 9, 18, 18); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; }
+        continue;
+      }
+      if (p.kind === 'harpoon') {
+        ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(Math.round(x), Math.round(y)); ctx.lineTo(Math.round(x - dx * 10), Math.round(y - dy * 10)); ctx.stroke();
+        ctx.fillStyle = '#c8ccd8'; ctx.fillRect(Math.round(x + dx * 1) - 1, Math.round(y + dy * 1) - 1, 3, 3);
+        ctx.strokeStyle = 'rgba(220,200,160,0.5)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(Math.round(x - dx * 10), Math.round(y - dy * 10)); ctx.quadraticCurveTo(x - dx * 18 + dy * 4, y - dy * 18 - dx * 4, x - dx * 26, y - dy * 26); ctx.stroke();
+        continue;
+      }
+      if (p.kind === 'grenade') {
+        const h = Math.sin(Math.min(1, p.t / 0.6) * Math.PI) * 6;
+        ctx.fillStyle = 'rgba(20,12,34,0.3)'; ctx.fillRect(Math.round(x) - 2, Math.round(y) + 8, 4, 1);
+        ctx.fillStyle = '#1a1418'; ctx.fillRect(Math.round(x) - 2, Math.round(y - h) - 2, 5, 5);
+        ctx.fillStyle = '#5a5262'; ctx.fillRect(Math.round(x) - 1, Math.round(y - h) - 2, 2, 1);
+        ctx.fillStyle = Math.floor(p.t * 20) % 2 ? '#ffe14a' : '#ff8a2a'; ctx.fillRect(Math.round(x) + 2, Math.round(y - h) - 4, 1, 1);
+        if (rnd() < 0.5) this.smoke(p.x, p.y + 9 - h, 1, 'rgba(200,200,200,0.35)', { z: 9, size: 2, life: 0.5 });
+        continue;
+      }
       if (p.kind === 'cball') {
         ctx.fillStyle = '#100c10'; ctx.fillRect(Math.round(x) - 2, Math.round(y) - 2, 4, 4);
         ctx.fillStyle = '#5a5a6a'; ctx.fillRect(Math.round(x) - 1, Math.round(y) - 2, 1, 1);

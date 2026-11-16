@@ -15,5 +15,6 @@ export const ACHIEVEMENTS = {
   navigateur: { name: 'Cap à l’est', desc: 'Rejoindre Havre-des-Brumes par la mer.', title: 'Navigateur' },
   speleo: { name: 'Sous la roche', desc: 'Découvrir les trois grottes secrètes.', title: 'Rat des cavernes' },
   duel: { name: 'Premier duel', desc: 'Vaincre un autre pirate hors des zones sûres.', title: 'Duelliste' },
+  fouineur: { name: 'Fouineur', desc: 'Trouver trois cachettes secrètes.', title: 'Fouineur des cales' },
   roi_os: { name: 'Régicide', desc: 'Vaincre le Roi des Os, au fond de l’Antre du Crâne.', title: 'Briseur d’os' },
 };

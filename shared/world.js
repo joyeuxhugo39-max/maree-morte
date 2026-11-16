@@ -650,6 +650,41 @@ export function generateWorld(seed = 7) {
     if (best) caveSpawns.push({ mob: 'roi_squelette', x: best[0] * TILE + 8, y: best[1] * TILE + 10 });
   }
 
+  // ---------- 11c. Cachettes : des coffres oubliés, chacun garde une arme ----------
+  const cacheAt = (cx, cy, r, item) => {
+    for (let d = 0; d <= r; d++) for (let dy = -d; dy <= d; dy++) for (let dx = -d; dx <= d; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== d) continue;
+      const x = cx + dx, y = cy + dy;
+      if (!inMap(x, y)) continue;
+      const i = idx(x, y), t = tiles[i];
+      if (solid[i] || occ[i] || path[i] || t === T.DEEP || t === T.WATER || t === T.SWAMP || t === T.ROCK || t === T.VOID || t === T.PLANK) continue;
+      const c = addProp('chest', x, y, 3); c.chest = 3; c.cache = item; chests.push(c);
+      return c;
+    }
+    return null;
+  };
+  const cacheInCave = (r, item) => {
+    const ex = r.x0 + (r.w >> 1), ey = r.y0 + r.h;
+    let best = null, bd = -1;
+    for (let y = r.y0 + 1; y < r.y0 + r.h - 1; y++) for (let x = r.x0 + 1; x < r.x0 + r.w - 1; x++) {
+      let ok = true;
+      for (let dy = -1; dy <= 1 && ok; dy++) for (let dx = -1; dx <= 1; dx++) if (tiles[idx(x + dx, y + dy)] !== T.CAVE || occ[idx(x + dx, y + dy)]) { ok = false; break; }
+      if (!ok) continue;
+      const d = Math.hypot(x - ex, (y - ey) * 1.3);
+      if (d > bd) { bd = d; best = [x, y]; }
+    }
+    if (!best) return null;
+    const c = addProp('chest', best[0], best[1], 3, 0, -2); c.chest = 3; c.cache = item; chests.push(c);
+    return c;
+  };
+  cacheAt(LH.x + 3, LH.y + 3, 6, 'crochet');
+  cacheAt(300, 136, 5, 'cimeterre');
+  cacheAt(CEM.x + 5, CEM.y - 6, 5, 'faux');
+  for (const r of rooms) {
+    if (r.kind !== 'cave') continue;
+    cacheInCave(r, r.name.includes('Crâne') ? 'couleuvrine' : r.name.includes('Cristal') ? 'dague_cristal' : 'poivriere');
+  }
+
   // ---------- 12. Personnages non-joueurs ----------
   const npcs = [
     { id: 'morgane', x: TC.x * TILE + 8, y: (coastY - 2) * TILE + 12, dir: 0 },

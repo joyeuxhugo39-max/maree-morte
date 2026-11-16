@@ -23,9 +23,10 @@ const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI;
 const dirOf = (dx, dy) => Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 1 : 2) : (dy < 0 ? 3 : 0);
 
 const CHEST_LOOT = [
-  { gold: [15, 35], items: [['banane', 0.8, 2, 4], ['noix_coco', 0.5, 1, 2], ['bandana', 0.15, 1, 1], ['chapeau_paille', 0.15, 1, 1], ['bottes_usees', 0.2, 1, 1], ['carte_dechiree', 0.3, 1, 1]] },
-  { gold: [40, 80], items: [['poisson_grille', 0.8, 2, 3], ['grog', 0.6, 1, 2], ['coutelas', 0.2, 1, 1], ['gilet_cuir', 0.15, 1, 1], ['collier_requin', 0.1, 1, 1], ['carte_dechiree', 0.4, 1, 1], ['perle_ombre', 0.15, 1, 1]] },
-  { gold: [90, 160], items: [['rhum', 0.9, 1, 3], ['perle_ombre', 0.6, 1, 2], ['tromblon', 0.12, 1, 1], ['manteau_corsaire', 0.15, 1, 1], ['amulette_lanterne', 0.08, 1, 1], ['carte_dechiree', 0.5, 1, 2]] },
+  { gold: [15, 35], items: [['banane', 0.8, 2, 4], ['noix_coco', 0.5, 1, 2], ['bandana', 0.15, 1, 1], ['chapeau_paille', 0.15, 1, 1], ['bottes_usees', 0.2, 1, 1], ['carte_dechiree', 0.3, 1, 1], ['poignard', 0.12, 1, 1]] },
+  { gold: [40, 80], items: [['poisson_grille', 0.8, 2, 3], ['grog', 0.6, 1, 2], ['coutelas', 0.2, 1, 1], ['gilet_cuir', 0.15, 1, 1], ['collier_requin', 0.1, 1, 1], ['carte_dechiree', 0.4, 1, 1], ['perle_ombre', 0.15, 1, 1], ['pistolet_double', 0.06, 1, 1], ['machette', 0.08, 1, 1], ['poivriere', 0.03, 1, 1]] },
+  { gold: [90, 160], items: [['rhum', 0.9, 1, 3], ['perle_ombre', 0.6, 1, 2], ['tromblon', 0.12, 1, 1], ['manteau_corsaire', 0.15, 1, 1], ['amulette_lanterne', 0.08, 1, 1], ['carte_dechiree', 0.5, 1, 2], ['cimeterre', 0.1, 1, 1], ['poivriere', 0.08, 1, 1], ['carabine', 0.06, 1, 1], ['crache_feu', 0.04, 1, 1]] },
+  { gold: [80, 160], items: [['rhum', 0.8, 1, 2], ['perle_ombre', 0.6, 1, 2], ['carte_dechiree', 0.5, 1, 2], ['eclat_cristal', 0.3, 1, 2], ['elixir_flamme', 0.3, 1, 1]] },
 ];
 const CHEST_COOLDOWN_MS = 15 * 60 * 1000;
 const INV_WAVES = [[['zsailor', 6], ['crab', 3]], [['drowned', 5], ['buccaneer', 3]], [['capitaine_noye', 1], ['drowned', 3], ['zsailor', 3]]];
@@ -44,6 +45,7 @@ export class Game {
     this.projs = [];
     this.bombs = [];
     this.teles = [];
+    this.timers = [];
     this.time = 0;
     this.worldTime = DAY_LENGTH * 0.08;
     this.events = [];
@@ -196,7 +198,7 @@ export class Game {
       known: new Map(), dirtyMe: true, dirtyInv: false, dirtyQ: false, lastSave: this.time,
       lastHurt: -99, lastChat: -9, zone: Z.TOWN, lookVer: 0, kills: 0,
       upg: {}, treasure: null, ach: {}, title: null, cnt: { crab: 0, fish: 0 }, fishing: null, respawnAt: null,
-      found: new Set(), boat: null, room: -1, pk: 0, pvpLog: new Map(),
+      found: new Set(), boat: null, room: -1, pk: 0, pvpLog: new Map(), caches: {},
     };
     if (d) {
       p.level = Math.max(1, Math.min(MAX_LEVEL, d.level | 0 || 1));
@@ -215,6 +217,7 @@ export class Game {
       if (!this.worldPersist && d.base) p.pendingBase = d.base;
       if (Array.isArray(d.found)) for (const id of d.found) if (this.world.doors[id | 0] && this.world.doors[id | 0].secret) p.found.add(id | 0);
       p.pk = d.pk | 0;
+      if (d.caches && typeof d.caches === 'object') for (const k in d.caches) p.caches[k | 0] = 1;
       if (typeof d.x === 'number' && typeof d.y === 'number') {
         const bt = d.boat && ITEMS[d.boat] && ITEMS[d.boat].boat && p.inv.some((s) => s && s.id === d.boat) ? d.boat : null;
         if (bt && canSail(this.world, d.x, d.y)) { p.x = d.x; p.y = d.y; p.boat = bt; }
@@ -231,7 +234,7 @@ export class Game {
     return p;
   }
   serialize(p) {
-    return { name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: p.quests, chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: p.ach, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
+    return { name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: p.quests, chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: p.ach, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
   }
   save(p) {
     p.lastSave = this.time;
@@ -463,12 +466,12 @@ export class Game {
     const v = Math.max(1, Math.round(base * this.dmgMul(p) * rand(0.9, 1.1) * (crit ? 1.8 : 1)));
     return [v, crit];
   }
-  damageMob(m, amount, p, crit, kx = 0, ky = 0) {
+  damageMob(m, amount, p, crit, kx = 0, ky = 0, dot = 0) {
     if (m.state === 'dead') return;
     m.hp -= amount;
     m.tags.set(p.id, (m.tags.get(p.id) || 0) + amount);
     if (m.event && this.invasion) this.invasion.parts.add(p.id);
-    this.ev(m.x, m.y, ['dmg', m.id, amount, crit ? 1 : 0, p.id]);
+    this.ev(m.x, m.y, dot ? ['dmg', m.id, amount, 0, p.id, dot] : ['dmg', m.id, amount, crit ? 1 : 0, p.id]);
     if (m.state !== 'chase') { m.state = 'chase'; m.target = p.id; }
     if (!m.boss && (kx || ky)) { const [nx, ny] = moveWithCollision(this.world, m.x, m.y, kx, ky, true); m.x = nx; m.y = ny; }
     if (m.hp <= 0) this.killMob(m, p);
@@ -511,15 +514,60 @@ export class Game {
       if (Math.random() < ch) this.spawnDrop(m.x, m.y, item, Math.round(rand(a, b)), top.id);
     }
   }
+  // ---- effets des armes : saignement (b), brûlure (f), vol de vie
+  addDot(t, kind, total, src, dur = 3) {
+    if (!t || total < 1 || t.dead || t.state === 'dead') return;
+    t.dots = (t.dots || []).filter((d) => !(d.kind === kind && d.src === src.id));
+    t.dots.push({ kind, left: total, dps: total / dur, src: src.id });
+  }
+  hitEffects(p, t, v, fx) {
+    if (fx.bleed) this.addDot(t, 'b', v * fx.bleed, p);
+    if (fx.burn) this.addDot(t, 'f', v * fx.burn, p);
+    if (fx.leech && !p.dead) { const h = Math.min(p.stats.maxHp - p.hp, v * fx.leech); if (h >= 1) { p.hp += h; p.dirtyMe = true; } }
+  }
+  updateDots() {
+    const tick = (t, isMob) => {
+      if (!t.dots || !t.dots.length) return;
+      for (const d of t.dots) {
+        const v = Math.min(d.left, d.dps * 0.5);
+        d.left -= v;
+        const src = this.players.get(d.src);
+        if (isMob) { if (src && t.state !== 'dead') this.damageMob(t, Math.max(1, Math.round(v)), src, false, 0, 0, d.kind); }
+        else if (!t.dead && !SAFE.has(t.zone)) this.damagePlayer(t, v, src || null, false, d.kind);
+      }
+      t.dots = t.dots.filter((d) => d.left >= 0.5);
+    };
+    for (const m of this.mobs) if (m.state !== 'dead') tick(m, true); else if (m.dots) m.dots.length = 0;
+    for (const p of this.players.values()) if (!p.dead) tick(p, false); else if (p.dots) p.dots.length = 0;
+  }
+  later(delay, fn) { this.timers.push({ at: this.time + delay, fn }); }
+  explode(x, y, r, dmg, owner, pvp) {
+    this.ev(x, y, ['boom', Math.round(x), Math.round(y), r, 0]);
+    if (!owner) return;
+    for (const m of this.mobs) {
+      if (m.state === 'dead') continue;
+      const d = Math.hypot(m.x - x, m.y - y);
+      if (d > r + m.def.r) continue;
+      const [v, crit] = this.rollDamage(owner, dmg * (1 - 0.45 * Math.min(1, d / r)));
+      this.damageMob(m, v, owner, crit, (m.x - x) / (d || 1) * 8, (m.y - y) / (d || 1) * 8);
+    }
+    if (pvp) for (const q of this.players.values()) {
+      if (!this.canPvp(owner, q)) continue;
+      const d = Math.hypot(q.x - x, q.y - y);
+      if (d > r + 4) continue;
+      const [v, crit] = this.rollDamage(owner, dmg * 0.5 * (1 - 0.45 * Math.min(1, d / r)));
+      this.damagePlayer(q, v, owner, crit);
+    }
+  }
   // JcJ : partout, sauf dans les zones sûres (villes, intérieurs)
   canPvp(a, b) { return !!a && !!b && a !== b && !a.dead && !b.dead && !SAFE.has(a.zone) && !SAFE.has(b.zone) && a.room === b.room; }
-  damagePlayer(p, raw, src, crit = false) {
+  damagePlayer(p, raw, src, crit = false, dot = 0) {
     if (p.dead) return;
-    if (this.time < p.invulnUntil) { this.ev(p.x, p.y, ['dodge', p.id]); return; }
-    const dmg = mitigate(raw, p.stats.def);
+    if (this.time < p.invulnUntil && !dot) { this.ev(p.x, p.y, ['dodge', p.id]); return; }
+    const dmg = dot ? Math.max(1, Math.round(raw)) : mitigate(raw, p.stats.def);
     p.hp -= dmg; p.lastHurt = this.time; p.dirtyMe = true;
     if (src && src.key) { p.lastPvp = this.time; src.lastPvp = this.time; }
-    this.ev(p.x, p.y, ['dmg', p.id, dmg, crit ? 1 : 0, src ? src.id : 0]);
+    this.ev(p.x, p.y, dot ? ['dmg', p.id, dmg, 0, src ? src.id : 0, dot] : ['dmg', p.id, dmg, crit ? 1 : 0, src ? src.id : 0]);
     if (p.hp <= 0) this.killPlayer(p, src);
   }
   killPlayer(p, src) {
@@ -577,8 +625,8 @@ export class Game {
       if (p.level >= 10) this.unlock(p, 'niveau10');
     }
   }
-  spawnProj(x, y, a, speed, range, dmg, team, owner, kind, pierce = 0, crit = false, pvp = false) {
-    const pr = { id: this.nextId++, x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, left: range, dmg, team, owner, kind, pierce, hit: new Set(), crit, pvp };
+  spawnProj(x, y, a, speed, range, dmg, team, owner, kind, pierce = 0, crit = false, pvp = false, fx = null) {
+    const pr = { id: this.nextId++, x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, left: range, dmg, team, owner, kind, pierce, hit: new Set(), crit, pvp, fx };
     this.projs.push(pr);
     this.ev(x, y, ['proj', pr.id, Math.round(x), Math.round(y), +a.toFixed(3), speed, Math.round(range), kind, owner]);
     return pr;
@@ -594,21 +642,23 @@ export class Game {
         if (pr.left <= 0) { dead = true; break; }
         if (blocksShot(this.world, pr.x, pr.y + 8)) { dead = true; this.ev(pr.x, pr.y, ['ph', pr.id, Math.round(pr.x), Math.round(pr.y)]); break; }
         if (pr.team === 'p') {
-          const owner = this.players.get(pr.owner);
+          const owner = this.players.get(pr.owner), fx = pr.fx || {};
+          const kb = 3 * (fx.kb || 1);
           for (const m of this.mobs) {
             if (m.state === 'dead' || pr.hit.has(m.id)) continue;
             if (Math.hypot(m.x - pr.x, m.y - 8 - pr.y) < m.def.r + 4) {
               pr.hit.add(m.id);
-              if (owner) this.damageMob(m, pr.dmg, owner, pr.crit, pr.vx / Math.hypot(pr.vx, pr.vy) * 3, pr.vy / Math.hypot(pr.vx, pr.vy) * 3);
-              if (pr.pierce > 0) pr.pierce--; else { dead = true; this.ev(pr.x, pr.y, ['ph', pr.id, Math.round(pr.x), Math.round(pr.y)]); break; }
+              if (owner) { const n = Math.hypot(pr.vx, pr.vy); this.damageMob(m, pr.dmg, owner, pr.crit, pr.vx / n * kb, pr.vy / n * kb); this.hitEffects(owner, m, pr.dmg, fx); }
+              if (pr.pierce > 0 && !fx.explode) pr.pierce--; else { dead = true; this.ev(pr.x, pr.y, ['ph', pr.id, Math.round(pr.x), Math.round(pr.y)]); break; }
             }
           }
           if (!dead && pr.pvp && owner) for (const q of this.players.values()) {
             if (q === owner || pr.hit.has(q.id) || !this.canPvp(owner, q)) continue;
             if (Math.hypot(q.x - pr.x, q.y - 9 - pr.y) < (q.boat ? 11 : 8)) {
               pr.hit.add(q.id);
-              this.damagePlayer(q, Math.max(1, Math.round(pr.dmg * PVP_MUL)), owner, pr.crit);
-              if (pr.pierce > 0) pr.pierce--; else { dead = true; this.ev(pr.x, pr.y, ['ph', pr.id, Math.round(pr.x), Math.round(pr.y)]); break; }
+              const v = Math.max(1, Math.round(pr.dmg * PVP_MUL));
+              this.damagePlayer(q, v, owner, pr.crit); this.hitEffects(owner, q, v, fx);
+              if (pr.pierce > 0 && !fx.explode) pr.pierce--; else { dead = true; this.ev(pr.x, pr.y, ['ph', pr.id, Math.round(pr.x), Math.round(pr.y)]); break; }
             }
           }
         } else {
@@ -622,8 +672,12 @@ export class Game {
           }
         }
       }
-      if (dead || pr.left <= 0) this.projs.splice(i, 1);
+      if (dead || pr.left <= 0) {
+        if (pr.fx && pr.fx.explode) this.explode(pr.x, pr.y + 6, pr.fx.explode, pr.dmg, this.players.get(pr.owner), pr.pvp);
+        this.projs.splice(i, 1);
+      }
     }
+    for (let i = this.timers.length - 1; i >= 0; i--) { const t = this.timers[i]; if (this.time >= t.at) { this.timers.splice(i, 1); try { t.fn(); } catch (e) { /* */ } } }
     for (let i = this.bombs.length - 1; i >= 0; i--) {
       const b = this.bombs[i];
       if (this.time < b.at) continue;
@@ -663,23 +717,26 @@ export class Game {
     p.cds.slash = this.time + cd;
     p.dir = dirOf(Math.cos(a), Math.sin(a));
     this.ev(p.x, p.y, ['atk', p.id, +a.toFixed(2), 0]);
-    const range = 27;
+    const W = ITEMS[p.eq.weapon] || {};
+    const range = W.reach || 27, arc = W.arc || 1.15, kb = 5 * (W.kb || 1);
     for (const m of this.mobs) {
-      if (m.state === 'dead') continue;
+      if (m.state === 'dead' || m.room !== p.room) continue;
       const dx = m.x - p.x, dy = (m.y - 6) - (p.y - 8);
       const d = Math.hypot(dx, dy);
       if (d > range + m.def.r) continue;
-      if (d > 8 && angDiff(Math.atan2(dy, dx), a) > 1.15) continue;
+      if (d > 8 && angDiff(Math.atan2(dy, dx), a) > arc) continue;
       const [v, crit] = this.rollDamage(p, p.stats.atk);
-      this.damageMob(m, v, p, crit, Math.cos(a) * 5, Math.sin(a) * 5);
+      this.damageMob(m, v, p, crit, Math.cos(a) * kb, Math.sin(a) * kb);
+      this.hitEffects(p, m, v, W);
     }
     for (const q of this.players.values()) {
       if (!this.canPvp(p, q)) continue;
       const dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy);
       if (d > range + 6) continue;
-      if (d > 8 && angDiff(Math.atan2(dy, dx), a) > 1.15) continue;
+      if (d > 8 && angDiff(Math.atan2(dy, dx), a) > arc) continue;
       const [v, crit] = this.rollDamage(p, p.stats.atk * PVP_MUL);
       this.damagePlayer(q, v, p, crit);
+      this.hitEffects(p, q, v, W);
     }
   }
   onSkill(p, m) {
@@ -707,12 +764,17 @@ export class Game {
         }
         const gun = ITEMS[p.eq.gun];
         const s = gun.shot;
-        this.ev(p.x, p.y, ['atk', p.id, +a.toFixed(2), 1]);
-        for (let k = 0; k < s.n; k++) {
-          const off = s.n > 1 ? (k / (s.n - 1) - 0.5) * s.spread + rand(-0.04, 0.04) : 0;
-          const [v, crit] = this.rollDamage(p, p.stats.gun);
-          this.spawnProj(p.x + Math.cos(a) * 8, p.y - 9 + Math.sin(a) * 6, a + off, s.speed, s.range, v, 'p', p.id, s.n > 1 ? 'pellet' : 'bullet', s.pierce || 0, crit, pvp);
-        }
+        const fx = s.explode || s.burn || s.bleed || s.kb ? { explode: s.explode, burn: s.burn, bleed: s.bleed, kb: s.kb } : null;
+        const fire = (aa) => {
+          this.ev(p.x, p.y, ['atk', p.id, +aa.toFixed(2), 1]);
+          for (let k = 0; k < s.n; k++) {
+            const off = (s.n > 1 ? (k / (s.n - 1) - 0.5) * s.spread : 0) + (s.n > 1 || s.burst ? rand(-0.04, 0.04) : 0);
+            const [v, crit] = this.rollDamage(p, p.stats.gun);
+            this.spawnProj(p.x + Math.cos(aa) * 8, p.y - 9 + Math.sin(aa) * 6, aa + off, s.speed, s.range, v, 'p', p.id, s.kind || (s.n > 1 ? 'pellet' : 'bullet'), s.pierce || 0, crit, pvp, fx);
+          }
+        };
+        fire(a);
+        for (let b = 1; b < (s.burst || 1); b++) this.later(s.gap * b, () => { if (!p.dead && this.players.has(p.id)) fire(a + rand(-0.05, 0.05)); });
         break;
       }
       case 'whirl': {
@@ -1026,6 +1088,13 @@ export class Game {
     if (!pr || p.dead || Math.hypot(pr.x - p.x, pr.y - p.y) > INTERACT_RANGE + 10) return;
     if (pr.type === 'chest') {
       const now = Date.now();
+      if (pr.cache && !p.caches[id]) { // une cachette : l'arme est à vous, une fois
+        p.caches[id] = 1;
+        this.giveOrDrop(p, pr.cache, 1);
+        this.send(p, { t: 'loot', id: pr.cache, n: 1 });
+        this.toast(p, `Cachette découverte : ${ITEMS[pr.cache].name} !`, 'quest');
+        if (Object.keys(p.caches).length >= 3) this.unlock(p, 'fouineur');
+      }
       if ((p.chests[id] || 0) > now) return this.toast(p, `Ce coffre est vide. Il se remplira dans ${Math.ceil((p.chests[id] - now) / 60000)} min.`, 'warn');
       const L = CHEST_LOOT[pr.chest || 0];
       const gold = Math.round(rand(L.gold[0], L.gold[1]));
@@ -1173,7 +1242,7 @@ export class Game {
     const t = p.treasure; p.treasure = null;
     const gold = Math.round(rand(120, 260)); p.gold += gold; p.dirtyMe = true;
     const got = [];
-    for (const [item, ch, a, b] of [['perle_ombre', 0.8, 1, 2], ['rhum', 0.7, 1, 2], ['collier_requin', 0.15, 1, 1], ['boussole_maudite', 0.06, 1, 1], ['tromblon', 0.1, 1, 1], ['manteau_corsaire', 0.12, 1, 1], ['chapeau_capitaine', 0.05, 1, 1], ['carte_dechiree', 0.35, 1, 1]]) {
+    for (const [item, ch, a, b] of [['perle_ombre', 0.8, 1, 2], ['rhum', 0.7, 1, 2], ['collier_requin', 0.15, 1, 1], ['boussole_maudite', 0.06, 1, 1], ['tromblon', 0.1, 1, 1], ['manteau_corsaire', 0.12, 1, 1], ['chapeau_capitaine', 0.05, 1, 1], ['carte_dechiree', 0.35, 1, 1], ['cimeterre', 0.08, 1, 1], ['pistolet_duel', 0.04, 1, 1], ['faux', 0.03, 1, 1], ['couleuvrine', 0.02, 1, 1]]) {
       if (Math.random() < ch) { const n = Math.round(rand(a, b)); this.giveOrDrop(p, item, n); got.push(ITEMS[item].name + (n > 1 ? ' x' + n : '')); }
     }
     this.send(p, { t: 'treasure', x: null });
@@ -1533,6 +1602,7 @@ export class Game {
     }
     if (this.tickCount % 10 === 0) this.updateInvasion(f);
     if (this.tickCount % 5 === 0) this.updateTurrets();
+    if (this.tickCount % 10 === 0) this.updateDots();
     if (this.worldPersist && this.worldDirty && this.time - this.lastWorldSave > 8) { this.worldDirty = false; this.lastWorldSave = this.time; Promise.resolve(this.storage.saveWorld(this.exportWorld())).catch(() => {}); }
     this.updateMobs();
     this.updateProjs();

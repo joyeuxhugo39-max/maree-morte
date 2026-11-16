@@ -9,6 +9,7 @@ import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { UPG_SLOTS, UPG_MAX, upgradeCost, UPG_TEXT } from '../shared/formulas.js';
 import { RECIPES, STATIONS, CATEGORIES } from '../shared/data/craft.js';
 import { iconURL } from './render/sprites-items.js';
+import { slotFrameURL, plankURL, mouseURL, lockURL } from './render/ui-art.js';
 import { humanSheet, SKINS, HAIRS, CLOTH, CLOTH_KEYS, FW, FH } from './render/sprites-chars.js';
 import { MINI_COL } from './render/terrain.js';
 
@@ -218,41 +219,67 @@ export class UI {
   buildHotbar() {
     const hb = $('hotbar');
     hb.innerHTML = '';
+    hb.style.backgroundImage = `url(${plankURL()})`;
+    document.documentElement.style.setProperty('--slot', `url(${slotFrameURL('brass')})`);
+    document.documentElement.style.setProperty('--slot-gold', `url(${slotFrameURL('gold')})`);
     this.hk = {};
-    const keys = { slash: 'G', shot: '1', whirl: '2', rum: '3', bomb: '4', cry: '5', roll: '␣' };
-    for (const id of HOTBAR) {
-      const s = SKILLS[id];
-      const el = document.createElement('div'); el.className = 'hk';
-      el.innerHTML = `<img src="${iconURL(s.icon)}"><span class="key">${keys[id]}</span><div class="cd"></div>`;
-      el.onmouseenter = (e) => this.tip(e, `<div class="tn">${esc(s.name)}</div><div class="tt">${esc(s.key)} · ${s.cost ? s.cost + ' énergie · ' : ''}recharge ${s.cd}s</div><div class="td">${esc(s.desc)}</div>${s.lvl > 1 ? `<div class="tv">Niveau ${s.lvl} requis</div>` : ''}`);
+    const group = () => { const g = document.createElement('div'); g.className = 'hb-group'; hb.appendChild(g); return g; };
+    const sep = () => { const d = document.createElement('div'); d.className = 'hb-sep'; hb.appendChild(d); };
+    const slot = (parent, id, icon, key, tip, click, cls = '') => {
+      const el = document.createElement('div'); el.className = 'hk ' + cls;
+      el.innerHTML = `<img class="ic" src="${icon}"><span class="key">${key}</span><div class="cd"></div><span class="cdt"></span><span class="lv"><img src="${lockURL()}"><b></b></span>`;
+      el.onmouseenter = (e) => this.tip(e, tip());
       el.onmouseleave = () => this.untip();
-      el.onclick = () => this.G.useSkill(id, true);
-      hb.appendChild(el);
+      el.onclick = click;
+      parent.appendChild(el);
       this.hk[id] = el;
-      if (id === 'cry') { const sp = document.createElement('div'); sp.className = 'sep'; hb.appendChild(sp); }
-    }
-    const food = document.createElement('div'); food.className = 'hk';
-    food.innerHTML = `<img src="${iconURL('banana')}"><span class="key">F</span><span class="cnt" id="food-n">0</span>`;
-    food.onclick = () => this.G.send({ t: 'eat' });
-    food.onmouseenter = (e) => this.tip(e, '<div class="tn">Manger / boire</div><div class="td">Utilise le soin le plus adapté de votre sac.</div>');
-    food.onmouseleave = () => this.untip();
-    hb.appendChild(food);
+      return el;
+    };
+    const skTip = (id) => () => { const s = SKILLS[id]; return `<div class="tn">${esc(s.name)}</div><div class="tt">${esc(s.key)} · ${s.cost ? s.cost + ' énergie · ' : ''}recharge ${s.cd}s</div><div class="td">${esc(s.desc)}</div>${s.lvl > 1 ? `<div class="tv">Niveau ${s.lvl} requis</div>` : ''}`; };
+    const eqTip = (slotName, label) => () => { const id = this.G.eq && this.G.eq[slotName]; return id ? this.itemTip(id, 1, 'eq') + `<div class="tv">${label}</div>` : `<div class="tn">${slotName === 'gun' ? 'Aucune arme à feu' : 'Mains nues'}</div><div class="td">${slotName === 'gun' ? 'Équipez un pistolet ou un fusil (inventaire, I).' : 'Équipez une arme (inventaire, I).'}</div>`; };
+    const g1 = group();
+    slot(g1, 'slash', iconURL('sk_slash'), `<img src="${mouseURL('L')}">`, eqTip('weapon', 'Clic gauche : frapper vers le curseur'), () => this.G.useSkill('slash', true), 'hbeq');
+    slot(g1, 'shot', iconURL('sk_shot'), `<img src="${mouseURL('R')}">`, eqTip('gun', 'Clic droit ou 1 : tirer'), () => this.G.useSkill('shot', true), 'hbeq');
+    sep();
+    const g2 = group();
+    for (const [id, k] of [['whirl', '2'], ['rum', '3'], ['bomb', '4'], ['cry', '5']]) slot(g2, id, iconURL(SKILLS[id].icon), k, skTip(id), () => this.G.useSkill(id, true));
+    sep();
+    const g3 = group();
+    slot(g3, 'roll', iconURL(SKILLS.roll.icon), '␣', skTip('roll'), () => this.G.useSkill('roll', true));
+    const food = slot(g3, 'food', iconURL('banana'), 'F', () => '<div class="tn">Manger / boire</div><div class="td">Utilise le soin le plus adapté de votre sac.</div>', () => this.G.send({ t: 'eat' }));
+    const cnt = document.createElement('span'); cnt.className = 'cnt'; cnt.id = 'food-n'; cnt.textContent = '0'; food.appendChild(cnt);
+    this.hbEq = {};
   }
   updateHotbar(now) {
-    const G = this.G, me = G.me;
+    const G = this.G, me = G.me, eq = G.eq || {};
+    // l'emplacement des armes montre l'arme équipée
+    for (const [id, s] of [['slash', 'weapon'], ['shot', 'gun']]) {
+      if (this.hbEq[s] === eq[s]) continue;
+      this.hbEq[s] = eq[s];
+      const it = eq[s] && ITEMS[eq[s]];
+      this.hk[id].querySelector('.ic').src = it ? iconURL(it.icon, it.tint) : iconURL(id === 'slash' ? 'sk_fists' : 'sk_shot');
+      this.hk[id].classList.toggle('empty', !it);
+    }
+    const boat = G.player && G.player.boat && ITEMS[G.player.boat] && ITEMS[G.player.boat].boat;
     for (const id of HOTBAR) {
       const el = this.hk[id], s = SKILLS[id];
-      const locked = me.lvl < s.lvl || (s.needGun && !(G.eq && G.eq.gun));
+      if (!el) continue;
+      const needLvl = me.lvl < s.lvl;
+      const locked = needLvl || (s.needGun && !eq.gun && !(boat && boat.cannon));
       el.classList.toggle('locked', locked);
-      el.dataset.lvl = me.lvl < s.lvl ? 'Niv ' + s.lvl : (locked ? '—' : '');
+      el.querySelector('.lv b').textContent = needLvl ? s.lvl : '';
+      el.querySelector('.lv').style.display = needLvl ? '' : 'none';
       el.classList.toggle('noen', !locked && me.en < s.cost);
       const ready = G.cd[id] || 0, total = G.cdTotal[id] || 1;
       const left = Math.max(0, ready - now);
       el.querySelector('.cd').style.setProperty('--cd', (left / total * 100).toFixed(1) + '%');
+      const t = left > 0.95 ? String(Math.ceil(left)) : '';
+      const cdt = el.querySelector('.cdt'); if (cdt.textContent !== t) cdt.textContent = t;
     }
     let food = 0;
     for (const s of G.inv || []) if (s && ITEMS[s.id].use && ITEMS[s.id].use.heal) food += s.n;
     $('food-n').textContent = food;
+    this.hk.food.classList.toggle('locked', !food);
   }
   flashSkill(id) { const el = this.hk[id]; if (!el) return; el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 150); }
 
@@ -275,8 +302,22 @@ export class UI {
     const lines = [];
     const stat = (k, label, pct) => { if (it[k]) lines.push(`<div class="ts">+${pct ? Math.round(it[k] * 100) + ' %' : it[k]} ${label}</div>`); };
     stat('atk', 'attaque'); stat('gun', 'puissance de tir'); stat('def', 'défense'); stat('hp', 'PV max'); stat('crit', 'coup critique', true); stat('spd', 'vitesse', true); stat('regen', 'régénération PV/s');
-    if (it.speed) lines.push(`<div class="tt">Vitesse d'attaque : ${it.speed}s</div>`);
-    if (it.shot) lines.push(`<div class="tt">${it.shot.n > 1 ? it.shot.n + ' plombs · ' : ''}portée ${it.shot.range}${it.shot.pierce ? ' · perforant' : ''}</div>`);
+    if (it.slot === 'weapon') {
+      const reach = it.reach || 27, arc = it.arc || 1.15;
+      lines.push(`<div class="tt">Cadence ${String(it.speed || 0.5).replace('.', ',')} s · portée ${reach < 25 ? 'courte' : reach <= 30 ? 'moyenne' : 'longue'} · ${arc < 0.8 ? 'estocade' : arc > 1.6 ? 'balayage très large' : arc > 1.25 ? 'balayage large' : 'taille'}</div>`);
+      if (it.kb && it.kb > 1) lines.push(`<div class="ts">Repousse ${it.kb >= 2.5 ? 'très ' : ''}fort</div>`);
+      if (it.bleed) lines.push(`<div class="ts">Saignement : ${Math.round(it.bleed * 100)} % des dégâts en 3 s</div>`);
+      if (it.leech) lines.push(`<div class="ts">Vol de vie : ${Math.round(it.leech * 100)} %</div>`);
+    }
+    if (it.shot) {
+      const s = it.shot;
+      lines.push(`<div class="tt">${s.n > 1 ? s.n + ' projectiles · ' : ''}${s.burst ? 'rafale de ' + s.burst + ' · ' : ''}portée ${s.range < 110 ? 'courte' : s.range < 230 ? 'moyenne' : 'longue'} (${s.range})${it.cdMul && it.cdMul !== 1 ? ` · recharge ×${String(it.cdMul).replace('.', ',')}` : ''}</div>`);
+      if (s.pierce) lines.push(`<div class="ts">Traverse ${s.pierce} ennemi${s.pierce > 1 ? 's' : ''}</div>`);
+      if (s.explode) lines.push(`<div class="ts">Explose à l'impact</div>`);
+      if (s.burn) lines.push(`<div class="ts">Enflamme : ${Math.round(s.burn * 100)} % des dégâts en 3 s</div>`);
+      if (s.bleed) lines.push(`<div class="ts">Saignement : ${Math.round(s.bleed * 100)} % des dégâts en 3 s</div>`);
+      if (s.kb) lines.push(`<div class="ts">Repousse</div>`);
+    }
     if (it.use && (it.use.heal || it.use.en)) { const u = it.use; lines.push(`<div class="ts">${u.heal ? '+' + u.heal + ' PV ' : ''}${u.en ? '+' + u.en + ' énergie ' : ''}${u.drunk ? '(ivresse)' : ''}</div>`); }
     if (it.use && it.use.combine) lines.push(`<div class="ts">Fragments : ${this.G.countItem(id)} / ${it.use.combine}</div>`);
     const up = ctx === 'eq' && it.slot && this.G.me && this.G.me.upg ? this.G.me.upg[it.slot] || 0 : 0;

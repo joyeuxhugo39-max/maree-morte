@@ -17,13 +17,22 @@ tient les morts à distance.
   et 4 compétences débloquées par niveau (Tourbillon, Rasade de rhum, Bombe, Cri d'abordage).
 - **Ennemis** : crabes putrides, matelots zombies, boucaniers, goules, noyés, squelettes
   canonniers (à distance), et le boss **Capitaine Barbe-Cendre** (invocations et tirs de canon).
-- **Objets** : 103 objets (armes, pistolets, tromblon, mousquet, chapeaux, manteaux, bottes,
+- **Objets** : plus de 130 objets (armes, pistolets, fusils, chapeaux, manteaux, bottes,
   talismans, nourriture, rhum, matériaux), raretés, équipement visible sur le personnage.
 - **Quêtes** : 8 quêtes enchaînées (parler, tuer, collecter, explorer) jusqu'au boss, plus 4 primes répétables.
 - **PNJ** : Capitaine Morgane, Isa la forgeronne (boutique), Bartholomé le tavernier (boutique),
   le vieux Gaspard, Léon le mousse, et Coco le perroquet.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
+
+## Nouveautés de la version 0.5 : l'arsenal
+
+- **36 armes** (25 nouvelles), chacune avec son comportement :
+  - mêlée : poignard rapide, machette, crochet (saignement), rapière et harpon (estocades à longue portée), cimeterre (large balayage), brise-crâne (repousse fort), dague de cristal (critiques), trident (vol de vie), sabre d'os (saignement), flamberge, faux du Passeur, ancre de l'Abysse ;
+  - armes à feu : pistolet à deux coups, poivrière (rafale de 3), escopette (plombs à bout portant), carabine, pistolet de duel, crache-feu (brûlure), fusil-harpon (traverse 4 ennemis), long fusil du guetteur (très longue portée), pistolet de cristal, mortier à main et couleuvrine (explosions), mousquet d'os.
+- **Où les trouver** : artisanat à la forge (11 recettes), boutiques d'Isa et d'Ysaline, quatre nouvelles quêtes (Acier de duelliste, Le duel de l'aube, Bois de marine, L'œil du guetteur), butin des boss et des élites, coffres, trésors enterrés, et **6 cachettes secrètes** (des coffres moussus : chacune garde une arme pour chaque pirate). Haut fait « Fouineur ».
+- **Nouveau dessin des armes** : icônes et armes tenues en main générées à partir d'une même description (lames ombrées, gardes, poignées, crosses, canons, lueurs), estocade pour les lances et les rapières, projectiles propres à chaque arme (flammes, éclats de cristal, harpons, grenades, balles traçantes).
+- **Nouvelle barre d'action** : planche de bois, emplacements de laiton, arme et arme à feu équipées visibles, recharge chiffrée, cadenas et niveau requis pour les compétences pas encore apprises. Inventaire aux mêmes cadres, avec un liseré de couleur selon la rareté.
 
 ## Nouveautés de la version 0.4
 

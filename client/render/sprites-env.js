@@ -482,8 +482,8 @@ function perch() {
 }
 function chest(v, open = false) {
   const pb = new PB(18, 17);
-  const W = v === 2 ? [0x5a3a10, 0x8a5a14, 0xb8801e, 0xe0a832, 0xf8cc58, 0xfff0a0] : v === 1 ? [0x24160c, 0x3a2414, 0x54361e, 0x6e4828, 0x8a5c34, 0xa87444] : WOOD;
-  const band = v === 0 ? IRON : GOLD;
+  const W = v === 3 ? [0x1c2016, 0x2a3020, 0x3a4228, 0x4c5630, 0x606c3a, 0x768446] : v === 2 ? [0x5a3a10, 0x8a5a14, 0xb8801e, 0xe0a832, 0xf8cc58, 0xfff0a0] : v === 1 ? [0x24160c, 0x3a2414, 0x54361e, 0x6e4828, 0x8a5c34, 0xa87444] : WOOD;
+  const band = v === 0 || v === 3 ? IRON : GOLD;
   pb.rect(1, 7, 16, 9, W[3]);
   for (let y = 8; y < 16; y += 3) pb.hl(2, y, 14, W[2]);
   if (open) {
@@ -494,6 +494,10 @@ function chest(v, open = false) {
   }
   pb.rect(4, 2, 2, 14, band[2]); pb.rect(12, 2, 2, 14, band[2]); pb.vl(4, 2, 14, band[3]); pb.vl(12, 2, 14, band[3]);
   if (!open) { pb.rect(7, 7, 4, 4, band[3]); pb.set(8, 8, band[0]); pb.set(8, 9, band[0]); pb.hl(7, 7, 4, band[4]); }
+  if (v === 3) { // mousse et lianes : une cachette oubliée
+    for (const [x, y] of [[2, 2], [3, 2], [6, 3], [10, 2], [14, 3], [15, 4], [2, 9], [16, 12], [3, 14], [9, 15], [14, 15]]) { pb.set(x, open ? y + 1 : y, 0x4e8a3a); pb.set(x + 1, open ? y + 1 : y, 0x3a6e30); }
+    pb.vl(16, 6, 6, 0x3a6e30); pb.vl(1, 8, 5, 0x4e8a3a);
+  }
   pb.outline('auto');
   return mk(pb, 9, 16);
 }
@@ -1193,7 +1197,7 @@ export function buildEnvSprites() {
   S.stall = many(stall, 2); S.well = [well()]; S.brazier = [brazier()]; S.anvil = [anvil()]; S.bench = [bench()]; S.sign = [sign()];
   S.cannon = many(cannon, 2); S.anchor = [anchor()]; S.boat = [boat()]; S.workbench = [workbench()];
   S.pillar = many(pillar, 2); S.ruinwall = many(ruinwall, 2); S.idol = [idol()]; S.perch = [perch()];
-  S.chest = [chest(0), chest(1), chest(2)]; S.chestOpen = [chest(0, true), chest(1, true), chest(2, true)];
+  S.chest = [chest(0), chest(1), chest(2), chest(3)]; S.chestOpen = [chest(0, true), chest(1, true), chest(2, true), chest(3, true)];
   S.tonnelet = [tonnelet()];
   S.tavern = [building({ w: 8, h: 5, floors: 2, wall: 'plaster', roof: 'thatch', door: 3, sign: 'mug', chimney: true, winCols: [0, 1, 5, 6, 7], shutter: [0x1c3a2a, 0x2a5438, 0x3a7048, 0x56905a], flowers: [0xff5a6e, 0xffd34a, 0xffffff] })];
   S.forge = [building({ w: 6, h: 4, wall: 'stone', roof: 'slate', door: 2, sign: 'anvil', chimney: true, winCols: [0, 4, 5],
