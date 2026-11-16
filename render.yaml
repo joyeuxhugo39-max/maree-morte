@@ -1,0 +1,12 @@
+# Déploiement en un clic sur Render.com (offre gratuite) : « New > Blueprint » puis ce dépôt.
+services:
+  - type: web
+    name: maree-morte
+    runtime: node
+    plan: free
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /sante
+    envVars:
+      - key: NODE_VERSION
+        value: "22"

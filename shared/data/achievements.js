@@ -1,0 +1,19 @@
+// Hauts faits : chacun débloque un titre affiché sous le nom du pirate.
+export const ACHIEVEMENTS = {
+  premier_sang: { name: 'Premier sang', desc: 'Abattre votre premier mort-vivant.', title: 'Moussaillon' },
+  crabes: { name: 'Fléau des crabes', desc: 'Écraser 50 crabes putrides.', title: 'Écraseur de crabes' },
+  faucheur: { name: 'Faucheur', desc: 'Abattre 250 morts-vivants.', title: 'Faucheur des marées' },
+  riche: { name: 'Fortune de pirate', desc: 'Posséder 1 000 doublons.', title: 'Pirate fortuné' },
+  niveau10: { name: 'Vieux loup', desc: 'Atteindre le niveau 10.', title: 'Vieux loup de mer' },
+  elite: { name: 'Tueur de géants', desc: 'Vaincre une créature d’élite.', title: 'Tueur de géants' },
+  boss: { name: 'Briseur de malédiction', desc: 'Vaincre le Capitaine Barbe-Cendre.', title: 'Briseur de malédiction' },
+  invasion: { name: 'Défenseur du port', desc: 'Repousser la Marée Morte.', title: 'Défenseur de Port-Lanterne' },
+  peche: { name: 'Loup de mer', desc: 'Pêcher votre premier poisson.', title: 'Pêcheur' },
+  espadon: { name: 'Prise légendaire', desc: 'Pêcher un espadon.', title: 'Maître pêcheur' },
+  tresor: { name: 'Chasseur de trésor', desc: 'Déterrer un trésor.', title: 'Chasseur de trésor' },
+  forge: { name: 'Acier trempé', desc: 'Renforcer une pièce d’équipement à +3.', title: 'Forgé dans le sel' },
+  navigateur: { name: 'Cap à l’est', desc: 'Rejoindre Havre-des-Brumes par la mer.', title: 'Navigateur' },
+  speleo: { name: 'Sous la roche', desc: 'Découvrir les trois grottes secrètes.', title: 'Rat des cavernes' },
+  duel: { name: 'Premier duel', desc: 'Vaincre un autre pirate hors des zones sûres.', title: 'Duelliste' },
+  roi_os: { name: 'Régicide', desc: 'Vaincre le Roi des Os, au fond de l’Antre du Crâne.', title: 'Briseur d’os' },
+};

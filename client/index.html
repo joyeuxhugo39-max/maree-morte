@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Marée Morte</title>
+<meta name="description" content="Marée Morte — MMORPG 2D en ligne : pirates contre zombies.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Pixelify+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/client/style.css">
+</head>
+<body>
+<div id="game">
+  <canvas id="view"></canvas>
+  <div id="vignette"></div>
+
+  <div id="hud" class="hidden">
+    <div id="card" class="frame">
+      <canvas id="portrait" width="20" height="22"></canvas>
+      <div class="card-body">
+        <div class="card-name"><span id="hud-name">Pirate</span> <span id="hud-lvl" class="lvl">1</span></div>
+        <div class="bar hp"><div class="fill" id="hp-fill"></div><span id="hp-txt">90 / 90</span></div>
+        <div class="bar en"><div class="fill" id="en-fill"></div><span id="en-txt">60 / 60</span></div>
+        <div id="buffs"></div>
+      </div>
+    </div>
+
+    <div id="topright">
+      <div id="mini-wrap" class="frame"><canvas id="minimap" width="150" height="150"></canvas></div>
+      <div id="zone-info" class="frame small">
+        <div id="zone-name">Port-Lanterne</div>
+        <div id="zone-lvl">Zone sûre</div>
+        <div id="zone-pvp" class="safe">Zone sûre</div>
+        <div class="row"><span id="clock">☀ 07h00</span><span id="gold"><i class="coin"></i><b id="gold-n">0</b></span></div>
+        <div class="row dim"><span id="online">1 pirate en ligne</span><span id="ping"></span></div>
+      </div>
+      <div id="tracker"></div>
+    </div>
+
+    <div id="bottom">
+      <div id="xpbar"><div class="fill" id="xp-fill"></div><span id="xp-txt">0 / 80 XP</span></div>
+      <div id="hotbar"></div>
+    </div>
+
+    <div id="gold-wrap"><i class="coin"></i><b id="gold-mini">0</b></div>
+    <div id="lootfeed"></div>
+    <div id="buildbar" class="hidden"></div>
+    <div id="chat" class="frame">
+      <div id="chat-log"></div>
+      <input id="chat-input" maxlength="160" placeholder="Entrée pour parler…" autocomplete="off">
+    </div>
+
+    <div id="menu-btns">
+      <button data-open="inventory" title="Inventaire (I)">🎒<kbd>I</kbd></button>
+      <button data-open="craft" title="Artisanat (C)">⚒<kbd>C</kbd></button>
+      <button id="build-btn" title="Construire (B)">🏠<kbd>B</kbd></button>
+      <button data-open="quests" title="Journal (J)">📜<kbd>J</kbd></button>
+      <button data-open="map" title="Carte (M)">🗺<kbd>M</kbd></button>
+      <button data-open="ach" title="Hauts faits (K)">🏆<kbd>K</kbd></button>
+      <button data-open="help" title="Aide (H)">?<kbd>H</kbd></button>
+      <button data-open="settings" title="Réglages">⚙</button>
+      <button id="mute" title="Son">🔊</button>
+    </div>
+  </div>
+
+  <div id="toasts"></div>
+  <div id="banner" class="hidden"><div class="b-line"></div><div id="banner-title"></div><div id="banner-sub"></div><div class="b-line"></div></div>
+
+  <!-- panneaux -->
+  <div id="panel-inventory" class="panel hidden">
+    <div class="panel-head"><h2>Inventaire</h2><button class="x" data-close>✕</button></div>
+    <div class="inv-wrap">
+      <div class="equip">
+        <div class="paperdoll">
+          <div class="eslot" data-slot="hat"></div>
+          <div class="eslot" data-slot="weapon"></div>
+          <canvas id="doll" width="20" height="28"></canvas>
+          <div class="eslot" data-slot="gun"></div>
+          <div class="eslot" data-slot="body"></div>
+          <div class="eslot" data-slot="trinket"></div>
+          <div class="eslot" data-slot="boots"></div>
+        </div>
+        <div id="stats"></div>
+      </div>
+      <div class="bag">
+        <div id="bag"></div>
+        <div class="hint">Clic droit : utiliser / équiper · Glisser : ranger · <span id="sell-hint">Maj + clic : jeter</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="panel-quests" class="panel hidden">
+    <div class="panel-head"><h2>Journal de bord</h2><button class="x" data-close>✕</button></div>
+    <div class="quests-wrap"><div id="qlist"></div><div id="qdetail"></div></div>
+  </div>
+
+  <div id="panel-shop" class="panel hidden">
+    <div class="panel-head"><h2 id="shop-title">Boutique</h2><button class="x" data-close>✕</button></div>
+    <div id="shop-list"></div>
+    <div class="hint">Vos doublons : <b id="shop-gold">0</b> · Clic droit sur un objet de votre sac pour le vendre.</div>
+  </div>
+
+  <div id="panel-map" class="panel hidden">
+    <div class="panel-head"><h2>Carte de l'archipel</h2><button class="x" data-close>✕</button></div>
+    <canvas id="bigmap"></canvas>
+  </div>
+
+  <div id="panel-craft" class="panel hidden">
+    <div class="panel-head"><h2>Artisanat</h2><button class="x" data-close>✕</button></div>
+    <div id="craft-tabs"></div>
+    <div id="craft-list"></div>
+    <div class="hint">Récoltez avec <kbd>E</kbd> : arbres (hache), rochers (pioche ou à la main), buissons, palmiers, roseaux, coquillages… Maj + clic : fabriquer ×5. Les postes : feu de camp ou Flamme de la place, établi et forge près d'Isa, ou ceux de votre base.</div>
+  </div>
+
+  <div id="panel-storage" class="panel hidden">
+    <div class="panel-head"><h2>Coffre de la base</h2><button class="x" data-close>✕</button></div>
+    <div id="stor-grid"></div>
+    <div class="hint">Clic : reprendre · Clic droit sur votre sac : ranger. Tous les coffres de votre base partagent ce contenu.</div>
+  </div>
+
+  <div id="panel-forge" class="panel hidden">
+    <div class="panel-head"><h2>Forge d'Isa</h2><button class="x" data-close>✕</button></div>
+    <div id="forge-list"></div>
+    <div class="hint">Un renforcement reste sur l'emplacement : il profite à toute pièce que vous y équipez ensuite.</div>
+  </div>
+
+  <div id="panel-ach" class="panel hidden">
+    <div class="panel-head"><h2>Hauts faits</h2><button class="x" data-close>✕</button></div>
+    <div id="ach-list"></div>
+  </div>
+
+  <div id="panel-settings" class="panel hidden">
+    <div class="panel-head"><h2>Réglages</h2><button class="x" data-close>✕</button></div>
+    <div class="settings">
+      <label for="set-music">Musique <input id="set-music" type="range" min="0" max="1" step="0.05"></label>
+      <label for="set-sfx">Effets sonores <input id="set-sfx" type="range" min="0" max="1" step="0.05"></label>
+      <label for="set-aide">Aides à l'écran <select id="set-aide"><option value="discret">Discrètes</option><option value="complet">Complètes (minimap, flèche, suivi)</option><option value="aucune">Aucune</option></select></label>
+      <label for="set-zoom">Zoom <select id="set-zoom"><option value="0">Automatique</option><option value="1">×1</option><option value="2">×2</option><option value="3">×3</option><option value="4">×4</option><option value="5">×5</option><option value="6">×6</option></select> <small>(ou la molette)</small></label>
+      <label for="set-shake"><input id="set-shake" type="checkbox"> Tremblements de l'écran</label>
+      <label for="set-myname"><input id="set-myname" type="checkbox"> Afficher mon nom au-dessus de moi</label>
+    </div>
+  </div>
+
+  <div id="panel-help" class="panel hidden">
+    <div class="panel-head"><h2>Aide du pirate</h2><button class="x" data-close>✕</button></div>
+    <div class="help">
+      <div><kbd>Z Q S D</kbd> / <kbd>W A S D</kbd> / flèches — se déplacer</div>
+      <div><kbd>Clic gauche</kbd> — coup de sabre vers le curseur</div>
+      <div><kbd>Clic droit</kbd> ou <kbd>1</kbd> — tirer (arme à feu requise)</div>
+      <div><kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> <kbd>5</kbd> — compétences (débloquées par niveau)</div>
+      <div><kbd>Espace</kbd> — roulade d'esquive (invulnérable)</div>
+      <div><kbd>E</kbd> — parler, ouvrir un coffre, ramasser, entrer dans un bâtiment</div>
+      <div><kbd>E</kbd> face à l'eau — mettre votre barque ou votre sloop à l'eau · <kbd>E</kbd> près du rivage — accoster</div>
+      <div><kbd>F</kbd> — manger / boire le meilleur soin du sac</div>
+      <div><kbd>C</kbd> — artisanat · <kbd>B</kbd> — construire votre base (plantez d'abord un pavillon pirate)</div>
+      <div><kbd>R</kbd> — pêcher face à l'eau (canne à pêche requise), puis <kbd>R</kbd> quand ça mord</div>
+      <div><kbd>K</kbd> — hauts faits et titres · <kbd>/danse</kbd> <kbd>/salut</kbd> <kbd>/rire</kbd> <kbd>/assis</kbd> dans le chat</div>
+      <div><kbd>I</kbd> inventaire · <kbd>J</kbd> quêtes · <kbd>M</kbd> carte · <kbd>Entrée</kbd> chat · <kbd>Échap</kbd> fermer</div>
+      <p>La ville de Port-Lanterne est protégée par la Flamme Bénite : aucun mort ne peut y entrer et vous y guérissez vite. La nuit, les morts sont plus forts et la Marée Morte attaque la plage. Mourir vous ramène en ville et coûte 10 % de vos doublons. Une flèche dorée indique toujours votre prochain objectif.</p>
+      <p>Hors des villes (Port-Lanterne, Havre-des-Brumes) et des maisons, les pirates peuvent s'affronter : le vainqueur ramasse l'or perdu. Les noms en rouge sont ceux des pirates qui peuvent vous attaquer. Certaines grottes ne se voient que de très près.</p>
+    </div>
+  </div>
+
+  <div id="dialog" class="hidden">
+    <canvas id="dlg-portrait" width="20" height="22"></canvas>
+    <div class="dlg-body">
+      <div class="dlg-name"><span id="dlg-name"></span><small id="dlg-title"></small></div>
+      <div id="dlg-text"></div>
+      <div id="dlg-choices"></div>
+    </div>
+  </div>
+
+  <div id="tooltip" class="hidden"></div>
+
+  <div id="death" class="hidden">
+    <h1>Vous avez sombré…</h1>
+    <p id="death-txt"></p>
+    <button id="respawn-btn" class="btn big">Revenir à Port-Lanterne</button>
+  </div>
+
+  <!-- écran d'accueil -->
+  <div id="fade"></div>
+  <div id="login">
+    <div class="login-box panel">
+      <h1 class="logo">Marée Morte</h1>
+      <div class="tagline">Pirates contre les damnés · MMORPG</div>
+      <div class="login-grid">
+        <div class="login-form">
+          <label>Nom de pirate<input id="lg-name" maxlength="16" autocomplete="username" placeholder="ex. Jeanne Sabre-Noir"></label>
+          <label id="lg-pass-wrap">Mot de passe<input id="lg-pass" type="password" maxlength="64" autocomplete="current-password" placeholder="4 caractères minimum"></label>
+          <div class="note" id="lg-note">Un nom inconnu crée un nouveau pirate. Un nom existant vous reconnecte.</div>
+          <div class="note warn hidden" id="desktop-only">Marée Morte se joue sur ordinateur, avec un clavier et une souris.</div>
+          <button id="lg-go" class="btn big">⚓ Lever l'ancre !</button>
+          <button id="lg-solo" class="btn hidden">Jouer en solo (hors-ligne)</button>
+          <div id="lg-err"></div>
+        </div>
+        <div class="creator">
+          <canvas id="lg-preview" width="20" height="28"></canvas>
+          <div class="opt"><span>Peau</span><div id="opt-skin" class="swatches"></div></div>
+          <div class="opt"><span>Cheveux</span><div id="opt-hair" class="swatches"></div></div>
+          <div class="opt"><span>Coupe</span><div id="opt-style" class="chips"></div></div>
+          <div class="opt"><span>Chemise</span><div id="opt-top" class="swatches"></div></div>
+          <div class="opt"><span>Barbe</span><div id="opt-beard" class="chips"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="login-foot">ZQSD/WASD pour bouger · clic pour frapper · E pour parler</div>
+  </div>
+</div>
+<script type="module" src="/client/main.js"></script>
+</body>
+</html>
