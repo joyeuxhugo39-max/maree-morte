@@ -5,7 +5,7 @@ import { MOBS } from '../shared/data/mobs.js';
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { mulberry32 } from '../shared/rng.js';
 import { CLOTH_KEYS } from './render/sprites-chars.js';
-import { HARVEST, STRUCTS, CLAIM_R, PLANTER_GROW } from '../shared/data/craft.js';
+import { HARVEST, STRUCTS, CLAIM_R, PLANTER_GROW, HOME_OK, HOME_PRICE } from '../shared/data/craft.js';
 import { ITEMS } from '../shared/data/items.js';
 import { NPCS } from '../shared/data/npcs.js';
 import { SKILLS } from '../shared/data/skills.js';
@@ -17,7 +17,8 @@ import { Input } from './input.js';
 import { Sfx } from './audio.js';
 import { WSNet, LocalNet } from './net.js';
 import { RoomNet } from './roomnet.js';
-import { iconURL } from './render/sprites-items.js';
+import { iconURL, iconCanvas } from './render/sprites-items.js';
+import { updateCine, cineLocked, endCine, bossIntro, bossDown, krakenIntro, krakenDown } from './cine.js';
 
 const $ = (id) => document.getElementById(id);
 // page publique (github.io) : multijoueur direct entre navigateurs
@@ -60,8 +61,9 @@ const G = {
   },
   npcReady(id) { return QUEST_ORDER.some((qid) => QUESTS[qid].turnin === id && G.ui.questStateOf(qid) === 'ready'); },
   useSkill: (id, fromUI) => useSkill(id, fromUI),
+  inHome: () => !!myHomeRoom(),
 };
-window.G = G;
+window.G = G; window.MM_ICON = (i, t) => iconCanvas(i, t, 2);
 
 // ------------------------------------------------------------ démarrage
 async function boot(hotData = {}) {
@@ -156,7 +158,7 @@ function onMsg(m) {
     case 'me': {
       const prev = G.me;
       G.me = m; G.meAt = now;
-      if (G.player) G.player.lvl = m.lvl;
+      if (G.player) { G.player.lvl = m.lvl; G.player.pet = m.pet || ''; G.player.thief = !!m.vo; }
       if (G.player && m.boat !== undefined && now - (G.posAt || 0) > 0.4) G.player.boat = m.boat || null;
       if (m.room !== undefined && m.room !== G.room && now - (G.posAt || 0) > 0.4) G.room = m.room;
       if (prev && m.lvl !== prev.lvl) ui.renderTracker();
@@ -239,6 +241,11 @@ function onMsg(m) {
     case 'dead': ui.showDeath(m.lost, m.by); G.sfx.play('die'); break;
     case 'kick': ui.toast(m.msg, 'warn'); break;
     case 'pong': G.ping = Math.round(performance.now() - m.c); break;
+    case 'homes': G.homes = new Map(m.list.map(([k, name, lock]) => [k, { name, lock: lock || 0 }])); break;
+    case 'seal': G.sealUntil = now + m.open; if (G.player && Math.hypot(G.player.x - G.world.doors[G.world.twin.door].ox, G.player.y - G.world.doors[G.world.twin.door].oy) < 400) { G.sfx.play('seal'); G.renderer.shake(3, 0.8); } break;
+    case 'lock': ui.toast(m.msg, m.ok ? 'quest' : 'warn'); G.sfx.play(m.ok ? 'unlock' : 'crack'); if (m.ok) G.burgleUntil = now + 40; break;
+    case 'cine': if (m.id === 'kraken' && G.player) krakenIntro(G, m, now); break;
+    case 'kr': G.kraken = !!m.on; break;
   }
 }
 function start(m, now) {
@@ -251,7 +258,10 @@ function start(m, now) {
   G.myKey = String(m.name).toLowerCase(); G.room = m.room == null ? -1 : m.room; G.lastRoom = -99; G.found = new Set(m.found || []);
   if (m.build) applyBuild({ a: m.build.s, af: m.build.f, b: m.build.b }, now);
   G.depleted.clear(); for (const [id, sec] of m.dep || []) G.depleted.set(id, now + sec);
-  G.player = { title: m.me.title && ACHIEVEMENTS[m.me.title] ? ACHIEVEMENTS[m.me.title].title : '', id: m.id, k: 'p', name: m.name, x: m.x, y: m.y, dir: 0, moving: false, look: m.look, lookKey: JSON.stringify(m.look), lvl: m.me.lvl, weapon: m.eq.weapon, gun: m.eq.gun, hp: 100, flags: 0, walk: 0, buf: [], boat: m.boat || null, bvx: 0, bvy: 0 };
+  G.homes = new Map((m.homes || []).map(([k, name, lock]) => [k, { name, lock: lock || 0 }]));
+  G.sealUntil = now + ((m.seals && m.seals.jumeaux) || 0); G.kraken = !!m.kr; G.burgleUntil = 0; G.inkUntil = 0; G.pull = null; G.grabUntil = 0; G.seaFight = 0;
+  if (G.cine) endCine(G);
+  G.player = { title: m.me.title && ACHIEVEMENTS[m.me.title] ? ACHIEVEMENTS[m.me.title].title : '', id: m.id, k: 'p', name: m.name, x: m.x, y: m.y, dir: 0, moving: false, look: m.look, lookKey: JSON.stringify(m.look), lvl: m.me.lvl, weapon: m.eq.weapon, gun: m.eq.gun, hp: 100, flags: 0, walk: 0, buf: [], boat: m.boat || null, bvx: 0, bvy: 0, pet: m.pet || '' };
   for (const st of G.structs.values()) st.mine = st.owner === m.name;
   for (const b of G.bases) b.mine = b.mine || b.name === m.name;
   G.worldTime = m.wt;
@@ -295,7 +305,8 @@ function upsert(meta, t) {
     G.ents.set(meta.id, e);
     if (meta.k === 'm' && (meta.hp < meta.mhp)) e.hp = Math.round(meta.hp / meta.mhp * 100);
   }
-  if (meta.k === 'p') { e.name = meta.name; e.look = meta.look; e.lookKey = JSON.stringify(meta.look); e.lvl = meta.lvl; e.weapon = meta.w; e.gun = meta.g; e.title = meta.ti || ''; e.bt = meta.bt || ''; }
+  if (meta.k === 'p') { e.name = meta.name; e.look = meta.look; e.lookKey = JSON.stringify(meta.look); e.lvl = meta.lvl; e.weapon = meta.w; e.gun = meta.g; e.title = meta.ti || ''; e.bt = meta.bt || ''; e.pet = meta.pt || ''; e.thief = !!meta.vo; }
+  else if (meta.k === 'a') { e.name = meta.name; e.cap = meta.cap; if (meta.sink && !e.sinkT) e.sinkT = t - 3; }
   else e.type = meta.type;
 }
 const entOf = (id) => (id === G.myId ? G.player : G.ents.get(id));
@@ -321,6 +332,8 @@ function onEvent(ev, t) {
       if (!e) break;
       const [, id, v, crit, by, dot] = ev;
       const mine = id === me;
+      if ((mine || by === me) && G.player && G.player.boat) G.seaFight = now + 9;
+      if (dot === 'g') { R.text(e.x, e.y - 6, v, '#c86aff'); if (mine) { G.ui.hurtFlash(); G.sfx.play('hurt'); } break; }
       if (dot) { R.text(e.x, e.y - 6, v, dot === 'f' ? '#ffa040' : '#d83a3a'); R.burst(e.x, e.y - 6, 3, { z: 10, col: dot === 'f' ? ['#ffd24a', '#ff8a2a'] : ['#a01818', '#d83a3a'], speed: 20, up: dot === 'f' ? 30 : 10, life: 0.4, g: dot === 'f' ? -20 : 120 }); break; }
       e.hitT = now;
       R.text(e.x, e.y - (e.type === 'boss' ? 24 : 0), v, mine ? '#ff6a5a' : crit ? '#ffd23a' : '#ffffff', !!crit);
@@ -334,6 +347,7 @@ function onEvent(ev, t) {
     case 'die': {
       if (!e) break;
       if (e === G.player) { R.burst(e.x, e.y, 20, { col: HIT_COL.p, speed: 60, up: 50 }); break; }
+      if (MOBS[e.type] && MOBS[e.type].sea) { e.dyingT = now; e.downT = now; e.removeAt = now + (e.type === 'kraken' ? 4.2 : 0.9); R.burst(e.x, e.y, 24, { z: 2, col: ['#ffffff', '#d8f6ff', '#b85476'], up: 90, speed: 40, life: 0.8, g: 200 }); G.sfx.play('splash', vol(e.x, e.y)); break; }
       e.dyingT = now; e.removeAt = now + 0.85;
       R.decals.push({ x: e.x, y: e.y, kind: e.type === 'crab' || e.type === 'crabroi' ? 'shell' : e.type === 'boss' ? 'skull' : 'bones', v: 0, t0: now });
       R.burst(e.x, e.y, 16, { z: 8, col: HIT_COL[e.type] || HIT_COL.p, speed: 60, up: 60, life: 0.7 });
@@ -361,7 +375,50 @@ function onEvent(ev, t) {
       G.sfx.play('boom', vol(x, y));
       break;
     }
-    case 'tele': R.teles.push({ x: ev[1], y: ev[2], r: ev[3], dur: ev[4], t0: now }); break;
+    case 'tele': R.teles.push({ x: ev[1], y: ev[2], r: ev[3], dur: ev[4], t0: now, style: ev[5] || 0 }); break;
+    case 'teleL': R.lteles.push({ x0: ev[1], y0: ev[2], x1: ev[3], y1: ev[4], w: ev[5], dur: ev[6], t0: now, style: ev[7] || 0 }); break;
+    case 'boomL': {
+      const [, x0, y0, x1, y1, w] = ev, L = Math.hypot(x1 - x0, y1 - y0), sea = !G.renderer.room && tileAt(G.world, (x0 + x1) / 2, (y0 + y1) / 2) === T.DEEP;
+      for (let d = 6; d < L; d += 12) { const x = x0 + (x1 - x0) * d / L, y = y0 + (y1 - y0) * d / L; R.burst(x, y, sea ? 8 : 5, { z: 2, col: sea ? ['#ffffff', '#d8f6ff', '#9fd8ff'] : ['#d8c8a8', '#a89878', '#ffffff'], up: sea ? 80 : 40, speed: w, life: 0.6, g: 160 }); }
+      if (nearMe((x0 + x1) / 2, (y0 + y1) / 2, 240)) R.shake(4, 0.3);
+      G.sfx.play(sea ? 'splash' : 'boom', vol((x0 + x1) / 2, (y0 + y1) / 2) * (sea ? 1 : 0.5));
+      break;
+    }
+    case 'cine': {
+      if (!G.player) break;
+      if (ev[1] === 'boss' && e) bossIntro(G, e, ev[3], now);
+      else if (ev[1] === 'bossdown') bossDown(G, ev[3], ev[4], ev[5], now);
+      else if (ev[1] === 'krakenrise' && e) { e.upT = now; e.firstRise = 1; R.shake(7, 1.6); G.sfx.play('roar', 1.2); G.sfx.play('splash'); R.burst(e.x, e.y, 80, { z: 2, col: ['#ffffff', '#d8f6ff', '#9fd8ff'], up: 150, speed: 90, life: 1.1, g: 200 }); }
+      else if (ev[1] === 'krakendown') krakenDown(G, ev[3], ev[4], now);
+      break;
+    }
+    case 'phase': if (e) {
+      e.phaseT = now; R.shake(5, 0.6); G.sfx.play('roar', vol(e.x, e.y));
+      R.addFx({ kind: 'ring', x: e.x, y: e.y - 10, r: 90, dur: 0.8, col: 'rgba(255,70,40,A)', w: 3 });
+      R.addFx({ kind: 'flash', x: e.x, y: e.y - 14, r: 70, dur: 0.5 });
+      const def = MOBS[e.type]; if (def && nearMe(e.x, e.y, 420)) G.ui.banner(def.name, ev[2] >= 2 ? 'Phase finale — il est déchaîné !' : 'Phase ' + (ev[2] + 1) + ' — il enrage !');
+    } break;
+    case 'dash': if (e) { e.dashT = now + ev[3]; e.dashA = ev[2]; e.windT = now; e.windDur = ev[3]; } break;
+    case 'leap': if (e) { e.leap = { t0: now, dur: ev[4] }; R.smoke(e.x, e.y, 6, 'rgba(200,180,150,0.5)', { size: 2 }); G.sfx.play('roll', vol(e.x, e.y)); } break;
+    case 'howl': if (e) { for (let k = 0; k < 3; k++) R.addFx({ kind: 'ring', x: e.x, y: e.y - 12, r: 40 + k * 30, dur: 0.5 + k * 0.2, col: 'rgba(210,150,255,A)', w: 2 }); G.sfx.play('roar', vol(e.x, e.y) * 0.8); } break;
+    case 'shield': if (e) { e.shieldUntil = now + ev[2]; G.sfx.play('forge', vol(e.x, e.y) * 0.6); } break;
+    case 'roar': if (e) { R.shake(5, 0.7); G.sfx.play('roar', Math.max(0.3, vol(e.x, e.y))); R.addFx({ kind: 'ring', x: e.x, y: e.y - 20, r: 120, dur: 0.9, col: 'rgba(255,255,255,A)', w: 2 }); } break;
+    case 'ink': {
+      const [, x, y, r, dur] = ev;
+      R.inks.push({ x, y, r, dur, t0: now });
+      R.burst(x, y, 40, { z: 4, col: ['#0a0812', '#1a1a2a', '#3a2a5a'], up: 60, speed: r * 0.6, life: 0.9, size: 2 });
+      G.sfx.play('splash', vol(x, y));
+      if (nearMe(x, y, r)) { G.inkUntil = now + dur; G.ui.toast('L’encre du Kraken vous aveugle et vous ralentit !', 'warn'); }
+      break;
+    }
+    case 'pull': { const [, x, y, r, v, dur] = ev; G.pull = { x, y, r, v, until: now + dur, t0: now }; G.sfx.play('rumble'); if (nearMe(x, y, r)) G.ui.toast('Un tourbillon ! Éloignez-vous de la gueule !', 'warn'); break; }
+    case 'grab': if (e) { e.grabId = ev[2]; if (ev[2] === me) { G.grabUntil = now + 4; G.grabBy = ev[1]; G.ui.toast('Une tentacule vous tient ! Tirez-lui dessus !', 'warn'); G.sfx.play('crack'); R.shake(4, 0.4); } } break;
+    case 'ungrab': if (e) e.grabId = null; if (ev[2] === me) G.grabUntil = 0; break;
+    case 'slam': if (e) { e.slam = { a: ev[2], t0: now, dur: ev[3] }; } break;
+    case 'rise': if (e) { e.riseT = now; R.burst(e.x, e.y, 18, { z: 2, col: ['#ffffff', '#d8f6ff', '#9fd8ff'], up: 90, speed: 30, life: 0.7, g: 200 }); G.sfx.play('splash', vol(e.x, e.y) * 0.7); } break;
+    case 'sink': if (e) { e.sinkT = now; G.sfx.play('crack'); R.burst(e.x, e.y, 40, { z: 2, col: ['#ffffff', '#d8f6ff', '#6d4626'], up: 90, speed: 50, life: 0.9, g: 200 }); } break;
+    case 'dive': if (e) { e.downT = now; R.burst(e.x, e.y, 50, { z: 2, col: ['#ffffff', '#d8f6ff', '#9fd8ff'], up: 110, speed: 70, life: 0.9, g: 200 }); G.sfx.play('splash', vol(e.x, e.y)); } break;
+    case 'emerge': if (e) { e.upT = now; e.firstRise = 0; e.x = ev[2]; e.y = ev[3]; e.buf = [[now, ev[2], ev[3], 0, 0]]; R.shake(6, 0.6); G.sfx.play('roar', vol(ev[2], ev[3])); G.sfx.play('splash', vol(ev[2], ev[3])); R.burst(ev[2], ev[3], 70, { z: 2, col: ['#ffffff', '#d8f6ff', '#9fd8ff'], up: 140, speed: 90, life: 1, g: 200 }); } break;
     case 'whirl': if (e) { e.atkT = now; e.atkKind = 3; R.addFx({ kind: 'whirl', follow: () => e, dur: 0.35 }); G.sfx.play('slash', vol(e.x, e.y)); setTimeout(() => G.sfx.play('slash', vol(e.x, e.y) * 0.8), 120); } break;
     case 'roll': if (e && ev[1] !== me) { e.rollT = now; e.rollA = ev[2]; R.smoke(e.x, e.y, 4, 'rgba(220,200,160,0.5)', { size: 2, life: 0.5 }); } break;
     case 'cry':
@@ -387,6 +444,8 @@ function onEvent(ev, t) {
       else if (k === 'craft') { R.burst(x, y - 8, 8, { col: ['#ffd23a', '#ffffff'], up: 30, speed: 15, life: 0.5 }); }
       else if (k === 'build') { R.smoke(x, y, 6, 'rgba(200,180,140,0.55)', { size: 2, life: 0.7 }); G.sfx.play('dig', vol(x, y) * 0.5); }
       else if (k === 'forge') { R.burst(x, y, 24, { z: 8, col: ['#ffd23a', '#ff8a2a', '#ffffff'], up: 60, speed: 50, life: 0.6 }); G.sfx.play('forge', vol(x, y)); }
+      else if (k === 'seal') { R.burst(x, y, 50, { col: ['#bfe8ff', '#ffffff', '#5a8ae0'], up: 90, speed: 50, life: 1.2 }); for (let q = 0; q < 3; q++) R.addFx({ kind: 'ring', x, y, r: 40 + q * 30, dur: 0.7 + q * 0.3, col: 'rgba(160,220,255,A)', w: 2 }); }
+      else if (k === 'bones') { R.burst(x, y - 10, 16, { col: ['#e4dcc0', '#c4bb9c', '#ffffff'], up: 70, speed: 40, life: 0.6 }); }
       else if (k === 'quest') { R.burst(x, y, 30, { col: ['#ffd23a', '#ffffff', '#9fd8ff'], up: 80, speed: 40, life: 1.0 }); R.addFx({ kind: 'ring', x, y, r: 40, dur: 0.6, col: 'rgba(255,220,100,A)', w: 2 }); }
       break;
     }
@@ -482,6 +541,11 @@ function interact() {
   else if (t.kind === 'struct') G.send({ t: 'sint', tx: t.tx, ty: t.ty });
   else if (t.kind === 'dig') { G.send({ t: 'dig' }); G.renderer.smoke(G.player.x, G.player.y, 6, 'rgba(160,120,80,0.6)', { size: 2 }); }
   else if (t.kind === 'door') useDoor(t.d, false, performance.now() / 1000);
+  else if (t.kind === 'homebuy') G.ui.confirm(`Acheter la <b>${t.d.name}</b> pour <b>${HOME_PRICE} doublons</b> ?<br><small>Votre nom sera sur la porte. Meublez-la (touche B), rangez-y votre butin… et méfiez-vous des crocheteurs.</small>`, () => G.send({ t: 'home', a: 'buy', k: t.d.plot }));
+  else if (t.kind === 'lockpick') {
+    if (!(G.inv || []).some((s) => s && s.id === 'crochets')) { G.ui.toast(`Maison de ${t.h0.name} : fermée à clé. Il faudrait des crochets de serrurier…`, 'info'); return; }
+    G.ui.lockpick(t.h0.name, t.h0.lock, (ok) => { if (ok !== null) G.send({ t: 'lock', k: t.d.plot, ok: ok ? 1 : 0 }); });
+  }
   else if (t.kind === 'exit') useDoor(t.d, true, performance.now() / 1000);
   else if (t.kind === 'board') G.send({ t: 'board', a: +G.aim.toFixed(3) });
   else if (t.kind === 'land') G.send({ t: 'land', a: +G.aim.toFixed(3) });
@@ -515,7 +579,16 @@ function findInteract() {
     if (G.room < 0) {
       if (d.secret && !G.found.has(d.id)) continue;
       const dd = Math.hypot(d.ox - p.x, d.oy - p.y);
-      if (dd < 22 && dd < bd) { bd = dd; best = { kind: 'door', d, x: d.ox, y: d.oy - 6, h: 22, verb: d.name }; }
+      if (dd < 22 && dd < bd) {
+        bd = dd; best = { kind: 'door', d, x: d.ox, y: d.oy - 6, h: 22, verb: d.name };
+        if (d.plot != null) {
+          const h = G.homes.get(d.plot);
+          if (!h) best = { kind: 'homebuy', d, x: d.ox, y: d.oy - 6, h: 22, verb: `Acheter (${HOME_PRICE} doublons)` };
+          else if (h.name === p.name) best.verb = 'Entrer chez vous';
+          else if (performance.now() / 1000 < G.burgleUntil) best.verb = 'Entrer (cambriolage)';
+          else best = { kind: 'lockpick', d, h0: h, x: d.ox, y: d.oy - 6, h: 22, verb: (G.inv || []).some((s) => s && s.id === 'crochets') ? `Crocheter la porte de ${h.name}` : `Maison de ${h.name}` };
+        } else if (d.seal && !(G.sealUntil > performance.now() / 1000)) best.verb = 'Porte scellée';
+      }
     } else if (d.room === G.room) {
       const dd = Math.hypot(d.ex - p.x, d.ey - p.y);
       if (dd < 26 && dd < bd) { bd = dd; best = { kind: 'exit', d, x: d.ex, y: d.ey - 4, h: 18, verb: 'Sortir' }; }
@@ -527,6 +600,8 @@ function findInteract() {
     const x = st.tx * TILE + 8, y = st.ty * TILE + 14, d = Math.hypot(x - p.x, y - p.y);
     if (d > 30 || d >= bd) continue;
     if (st.type === 'feu_camp' || st.type === 'etabli' || st.type === 'forge_base') { bd = d; best = { kind: 'station', x, y, h: 20, verb: 'Artisanat' }; }
+    else if (STRUCTS[st.type].pet) { if (st.mine) { bd = d; best = { kind: 'struct', tx: st.tx, ty: st.ty, x, y, h: 14, verb: p.pet === STRUCTS[st.type].pet ? 'Laisser à la maison' : 'Emmener avec vous' }; } }
+    else if (!st.mine && st.type === 'coffre' && G.room >= 0 && nowT < G.burgleUntil) { bd = d; best = { kind: 'struct', tx: st.tx, ty: st.ty, x, y, h: 20, verb: 'Fouiller le coffre' }; }
     else if (st.mine && (st.type === 'coffre' || st.type === 'lit' || st.type === 'jardiniere')) { bd = d; best = { kind: 'struct', tx: st.tx, ty: st.ty, x, y, h: 20, verb: st.type === 'coffre' ? 'Ouvrir' : st.type === 'lit' ? 'Dormir' : ((st.age0 || 0) + nowT - st.seen >= PLANTER_GROW ? 'Récolter' : 'Ça pousse') }; }
   }
   if (best) return best;
@@ -579,12 +654,27 @@ function updateBuild() {
   const b = G.build, p = G.player, W = G.world;
   if (!b.item) { b.valid = false; return; }
   const [tx, ty] = hoveredTile(), i = ty * W.W + tx, t = W.tiles[i];
-  let ok = Math.hypot(tx * TILE + 8 - p.x, ty * TILE + 10 - p.y) < 96 && !W.solid[i] && ![T.DEEP, T.WATER, T.SWAMP, T.ROCK, T.PLANK, T.COBBLE].includes(t);
   const def = STRUCTS[b.item.place], mine = G.bases.find((x) => x.mine);
+  const home = myHomeRoom();
+  if (home) { // chez soi : sur le plancher, sans boucher l'entrée
+    const r = home, exx = r.x0 + (r.w >> 1);
+    b.valid = (def.home || HOME_OK.has(b.item.place)) && tx >= r.x0 && ty >= r.y0 && tx < r.x0 + r.w && ty < r.y0 + r.h && t === T.FLOOR && !(ty === r.y0 + r.h - 1 && Math.abs(tx - exx) <= 1)
+      && (def.floor ? !G.floors.has(i) : !G.structs.has(i)) && Math.hypot(tx * TILE + 8 - p.x, ty * TILE + 10 - p.y) < 140;
+    return;
+  }
+  let ok = Math.hypot(tx * TILE + 8 - p.x, ty * TILE + 10 - p.y) < 96 && !W.solid[i] && ![T.DEEP, T.WATER, T.SWAMP, T.ROCK, T.PLANK, T.COBBLE].includes(t) && !(def.home && !HOME_OK.has(b.item.place));
   if (def.floor) ok = ok && !G.floors.has(i); else ok = ok && !G.structs.has(i);
   if (b.item.place === 'pavillon') ok = ok && !mine && !SAFE.has(W.zones[i]) && W.zones[i] !== Z.WRECK && W.zones[i] !== Z.CAVE && !G.bases.some((x) => Math.hypot(x.tx - tx, x.ty - ty) < CLAIM_R * 2 + 2);
   else ok = ok && !!mine && Math.hypot(tx - mine.tx, ty - mine.ty) <= CLAIM_R + 0.5;
   b.valid = ok;
+}
+// la pièce de ma maison, si j'y suis
+function myHomeRoom() {
+  if (G.room < 0 || !G.player) return null;
+  const pl = G.world.plots.find((q) => q.room === G.room);
+  if (!pl) return null;
+  const h = G.homes.get(pl.k);
+  return h && h.name === G.player.name ? G.world.rooms[G.room] : null;
 }
 function placeHovered() {
   const b = G.build;
@@ -643,8 +733,11 @@ function ambience(now) {
   let theme = G.night ? 'night' : 'day';
   if (G.zone === Z.SWAMP || G.zone === Z.WRECK || G.zone === Z.CAVE) theme = 'swamp';
   if (G.zone === Z.INTERIOR) theme = 'day';
-  for (const e of G.ents.values()) if (e.k === 'm' && !e.dyingT && (e.type === 'boss' || (MOBS[e.type] && MOBS[e.type].elite)) && Math.hypot(e.x - p.x, e.y - p.y) < 260) theme = 'boss';
+  if (p.boat) theme = now < G.seaFight ? 'naval' : 'sea';
   if (G.evt && G.evt.state === 'on' && Math.hypot(G.evt.x - p.x, G.evt.y - p.y) < 420) theme = 'boss';
+  for (const e of G.ents.values()) if (e.k === 'm' && !e.dyingT && MOBS[e.type] && MOBS[e.type].ai && !MOBS[e.type].sea && Math.hypot(e.x - p.x, e.y - p.y) < 280) theme = 'epic';
+  if (G.kraken && Math.hypot(G.world.kraken.x - p.x, G.world.kraken.y - p.y) < 560) theme = 'naval';
+  if (G.cine && G.cine.theme) theme = G.cine.theme;
   G.sfx.setTheme(theme);
   const w = weatherAt(G.worldTime);
   G.sfx.rain(G.room >= 0 ? 0 : w.rain);
@@ -705,8 +798,11 @@ function frame(now, dt) {
   const mw = R.toWorld(G.input.mouse.x, G.input.mouse.y);
   G.mouseWorld = mw;
   G.aim = Math.atan2(mw.y - (p.y - 9), mw.x - p.x);
+  G.locked = cineLocked(G, now) || !!G.ui.lp || !!G.ui.cf;
   handleKeys(now);
-  if (G.build) { updateBuild(); if (G.input.mouse.left && !G.buildClickHeld) { G.buildClickHeld = true; placeHovered(); } if (!G.input.mouse.left) G.buildClickHeld = false; }
+  G.ui.lockpickTick(dt);
+  if (G.locked) { /* on regarde */ }
+  else if (G.build) { updateBuild(); if (G.input.mouse.left && !G.buildClickHeld) { G.buildClickHeld = true; placeHovered(); } if (!G.input.mouse.left) G.buildClickHeld = false; }
   else if (G.input.mouse.left && !(G.me && G.me.dead)) tryAttack(G.aim, now);
   updatePlayer(now, dt);
   interpolate(now, dt);
@@ -738,7 +834,10 @@ function frame(now, dt) {
   G.renderer.drunk = G.me && G.me.drunk > 0 ? Math.max(0, 1 - (now - G.meAt) / G.me.drunk) * 1 : 0;
   updateFolk(dt);
   if (now - (G.ambAt || 0) > 0.4) { G.ambAt = now; ambience(now); G.objective = computeObjective(); }
-  G.camTarget = { x: p.x, y: p.y - 12 };
+  updatePets(now, dt);
+  R.petOut = p.pet || '';
+  G.ui.ink(now < G.inkUntil);
+  G.camTarget = updateCine(G, now) || { x: p.x, y: p.y - 12 };
   R.render(G, now, dt);
   G.ui.update(now);
 }
@@ -746,9 +845,11 @@ function handleKeys(now) {
   const ui = G.ui;
   for (const k of G.input.takePressed()) {
     if (ui.typing()) continue;
+    if (ui.cf) { if (k.key === 'e' || k.code === 'Enter') ui.confirmEnd(true); else if (k.code === 'Escape') ui.confirmEnd(false); continue; }
+    if (ui.lp) { if (k.key === 'e' || k.code === 'Space' || k.code === 'MouseLeft') ui.lockpickPress(); else if (k.code === 'Escape') ui.lockpickEnd(null); continue; }
+    if (cineLocked(G, now)) { if (k.code === 'Escape' && G.cine.skippable) endCine(G); continue; }
     if (!$('dialog').classList.contains('hidden') && /^Digit[1-9]$/.test(k.code)) { ui.pickChoice(+k.code.slice(5) - 1); continue; }
-    if (k.code === 'Escape') { ui.close(); continue; }
-    if (k.code === 'Escape' && G.build) { stopBuild(); continue; }
+    if (k.code === 'Escape') { if (G.build && !ui.open) stopBuild(); else ui.close(); continue; }
     if (k.key === 'i' || k.code === 'Tab') { ui.toggle('inventory'); continue; }
     if (k.key === 'c') { ui.toggle('craft'); continue; }
     if (k.key === 'b') { if (G.build) stopBuild(); else startBuild(null); continue; }
@@ -774,14 +875,21 @@ function handleKeys(now) {
 function updatePlayer(now, dt) {
   const p = G.player, me = G.me;
   if (!me || me.dead) { p.moving = false; return; }
-  const ax = G.ui.typing() ? { x: 0, y: 0 } : G.input.axis();
+  const held = now < G.grabUntil;
+  const ax = G.ui.typing() || G.locked || held ? { x: 0, y: 0 } : G.input.axis();
   const rolling = now - (p.rollT || -9) < ROLL_TIME;
   let vx, vy, nx, ny;
   const B = p.boat && ITEMS[p.boat] && ITEMS[p.boat].boat;
   if (B) { // navigation : un peu d'inertie
     const k = Math.min(1, dt * 3.2);
-    p.bvx += (ax.x * B.speed - p.bvx) * k; p.bvy += (ax.y * B.speed - p.bvy) * k;
+    const bs = B.speed * (now < G.inkUntil ? 0.6 : 1);
+    p.bvx += (ax.x * bs - p.bvx) * k; p.bvy += (ax.y * bs - p.bvy) * k;
+    if (held) { p.bvx = 0; p.bvy = 0; }
     vx = p.bvx; vy = p.bvy;
+    if (G.pull && now < G.pull.until && !held) { // le tourbillon du Kraken
+      const dx = G.pull.x - p.x, dy = G.pull.y - p.y, d = Math.hypot(dx, dy);
+      if (d < G.pull.r && d > 10) { vx += dx / d * G.pull.v; vy += dy / d * G.pull.v; }
+    }
     [nx, ny] = moveBoat(G.world, p.x, p.y, vx * dt, vy * dt);
     if (Math.abs(nx - p.x) < 0.01 && Math.abs(ny - p.y) < 0.01) { p.bvx *= 0.4; p.bvy *= 0.4; }
   } else {
@@ -802,12 +910,29 @@ function updatePlayer(now, dt) {
   if (p.moving) p.walk += dt;
   // portes : on entre en poussant contre la porte, on sort par le seuil
   if (!B && !rolling && now > G.doorCd) {
-    if (G.room < 0) { if (ax.y < -0.3) for (const d of G.world.doors) if (Math.abs(p.x - d.ox) < 9 && p.y < d.oy + 3 && p.y > d.oy - 24) { useDoor(d, false, now); break; } }
+    if (G.room < 0) { if (ax.y < -0.3) for (const d of G.world.doors) if (Math.abs(p.x - d.ox) < 9 && p.y < d.oy + 3 && p.y > d.oy - 24) { if (d.plot != null && !((G.homes.get(d.plot) || {}).name === p.name || now < G.burgleUntil)) break; if (d.seal && !(G.sealUntil > now)) break; useDoor(d, false, now); break; } }
     else if (ax.y > 0.3 && tileAt(G.world, p.x, p.y) === T.EXIT) { const d = G.world.doors.find((q) => q.room === G.room); if (d) useDoor(d, true, now); }
   }
   if (now - G.lastSend > 0.05 && (moved || p.moving !== G.lastMoving)) {
     G.send({ t: 'mv', x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, d: p.dir, m: p.moving ? 1 : 0 });
     G.lastSend = now; G.lastMoving = p.moving;
+  }
+}
+// les animaux de compagnie trottent derrière leur maître
+function updatePets(now, dt) {
+  const owners = [G.player];
+  for (const e of G.ents.values()) if (e.k === 'p' && e.pet) owners.push(e);
+  for (const o of owners) {
+    if (!o.pet || o.dyingT) { o.petObj = null; continue; }
+    let q = o.petObj;
+    if (!q || q.kind !== o.pet) q = o.petObj = { kind: o.pet, x: o.x - 10, y: o.y + 2, dir: 2, moving: false, walk: 0, seed: Math.random() * 9 };
+    const boat = o === G.player ? !!o.boat : !!(o.flags & 16);
+    q.hidden = boat && q.kind !== 'perroquet';
+    const tx = o.x + (o.dir === 2 ? -13 : o.dir === 1 ? 13 : (q.seed > 4.5 ? 10 : -10)), ty = o.y + (o.dir === 3 ? 9 : o.dir === 0 ? -7 : 3);
+    const dx = tx - q.x, dy = ty - q.y, d = Math.hypot(dx, dy);
+    if (d > 160) { q.x = tx; q.y = ty; q.moving = false; }
+    else if (d > (q.moving ? 2.5 : 14)) { const sp = Math.min(d * 5, 130) * dt; q.x += dx / d * Math.min(d, sp); q.y += dy / d * Math.min(d, sp); q.moving = true; if (Math.abs(dx) > 1) q.dir = dx < 0 ? 1 : 2; q.walk += dt; }
+    else q.moving = false;
   }
 }
 function interpolate(now, dt) {

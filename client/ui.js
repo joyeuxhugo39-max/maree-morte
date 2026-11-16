@@ -7,7 +7,7 @@ import { ZONES, Z, SAFE } from '../shared/world.js';
 import { SLOTS, SLOT_NAMES, RARITY, INV_SIZE, MAP_W, OVER_H, TILE, clockString, dayFrac, darkness, weatherAt } from '../shared/constants.js';
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { UPG_SLOTS, UPG_MAX, upgradeCost, UPG_TEXT } from '../shared/formulas.js';
-import { RECIPES, STATIONS, CATEGORIES } from '../shared/data/craft.js';
+import { RECIPES, STATIONS, CATEGORIES, STRUCTS, HOME_OK } from '../shared/data/craft.js';
 import { iconURL } from './render/sprites-items.js';
 import { slotFrameURL, plankURL, mouseURL, lockURL } from './render/ui-art.js';
 import { humanSheet, SKINS, HAIRS, CLOTH, CLOTH_KEYS, FW, FH } from './render/sprites-chars.js';
@@ -208,6 +208,47 @@ export class UI {
     while (box.children.length > 5) box.firstChild.remove();
     setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 450); }, kind === 'quest' || kind === 'level' ? 4200 : 2600);
   }
+  // ------------------------------------------------------------ cinématiques, encre, confirmation, crochetage
+  cine(on) { document.body.classList.toggle('cine', !!on); if (!on) { this.cineTitle(null); this.cineSub(''); } }
+  cineTitle(name, tag, cls = '') {
+    const el = $('cine-title');
+    if (!name) { el.classList.add('hidden'); return; }
+    $('cine-name').textContent = name; $('cine-tag').textContent = tag || '';
+    el.className = 'hidden'; void el.offsetWidth; el.className = cls;
+  }
+  cineSub(text) { const el = $('cine-sub'); if (!text) { el.classList.remove('on'); return; } el.textContent = text; el.classList.add('on'); }
+  ink(on) { if (on !== this.inkOn) { this.inkOn = on; $('ink').classList.toggle('on', !!on); } }
+  confirm(html, yes) {
+    this.close();
+    $('cf-text').innerHTML = html; $('confirm').classList.remove('hidden'); this.cf = yes || (() => {});
+    $('cf-yes').onclick = () => this.confirmEnd(true); $('cf-no').onclick = () => this.confirmEnd(false);
+  }
+  confirmEnd(ok) { const f = this.cf; this.cf = null; $('confirm').classList.add('hidden'); if (ok && f) f(); }
+  // trois goupilles : arrêter l'aiguille dans le vert, trois fois de suite
+  lockpick(name, lock, done) {
+    this.close();
+    $('lockpick').classList.remove('hidden');
+    $('lp-sub').textContent = `Maison de ${name}` + (lock ? ` · serrure renforcée (${lock}/2)` : '');
+    $('lp-pins').innerHTML = '<div class="lp-pin"></div><div class="lp-pin"></div><div class="lp-pin"></div>';
+    const st = this.lp = { n: 0, pos: 0, dir: 1, speed: 0.85 + lock * 0.3, zone: [0, 0], done };
+    st.newZone = () => { const w = Math.max(0.08, 0.25 - lock * 0.05 - st.n * 0.035), a = 0.08 + Math.random() * (0.84 - w); st.zone = [a, a + w]; $('lp-zone').style.left = (a * 100) + '%'; $('lp-zone').style.width = (w * 100) + '%'; };
+    st.newZone();
+    $('lockpick').onmousedown = (e) => { e.preventDefault(); this.lockpickPress(); };
+  }
+  lockpickTick(dt) {
+    const st = this.lp; if (!st) return;
+    st.pos += st.dir * st.speed * (1 + st.n * 0.3) * dt;
+    if (st.pos > 1) { st.pos = 1; st.dir = -1; } if (st.pos < 0) { st.pos = 0; st.dir = 1; }
+    $('lp-needle').style.left = (st.pos * 100) + '%';
+  }
+  lockpickPress() {
+    const st = this.lp; if (!st) return;
+    if (st.pos >= st.zone[0] && st.pos <= st.zone[1]) {
+      $('lp-pins').children[st.n].classList.add('ok'); st.n++; this.G.sfx.play('pin');
+      if (st.n >= 3) setTimeout(() => this.lockpickEnd(true), 220); else st.newZone();
+    } else this.lockpickEnd(false);
+  }
+  lockpickEnd(ok) { const st = this.lp; if (!st) return; this.lp = null; $('lockpick').classList.add('hidden'); st.done(ok); }
   hurtFlash() { const v = $('vignette'); v.classList.add('hurt'); clearTimeout(this.hurtT); this.hurtT = setTimeout(() => v.classList.remove('hurt'), 120); }
   showDeath(lost, by) {
     $('death-txt').textContent = `${by ? `Terrassé par : ${by}. ` : ''}Vous perdez ${lost} doublon${lost > 1 ? 's' : ''}.`;
@@ -265,7 +306,7 @@ export class UI {
       const el = this.hk[id], s = SKILLS[id];
       if (!el) continue;
       const needLvl = me.lvl < s.lvl;
-      const locked = needLvl || (s.needGun && !eq.gun && !(boat && boat.cannon));
+      const locked = !!(needLvl || (s.needGun && !eq.gun && !(boat && boat.cannon)));
       el.classList.toggle('locked', locked);
       el.querySelector('.lv b').textContent = needLvl ? s.lvl : '';
       el.querySelector('.lv').style.display = needLvl ? '' : 'none';
@@ -657,11 +698,12 @@ export class UI {
     if (!G.build) { bar.classList.add('hidden'); return; }
     bar.classList.remove('hidden');
     const counts = {};
-    for (const s of G.inv) if (s && ITEMS[s.id].place) counts[s.id] = (counts[s.id] || 0) + s.n;
+    const home = G.inHome && G.inHome();
+    for (const s of G.inv) if (s && ITEMS[s.id].place && (home ? (STRUCTS[ITEMS[s.id].place].home || HOME_OK.has(ITEMS[s.id].place)) : !(STRUCTS[ITEMS[s.id].place].home && !HOME_OK.has(ITEMS[s.id].place)))) counts[s.id] = (counts[s.id] || 0) + s.n;
     if (G.build.id && !counts[G.build.id]) { G.build.id = null; G.build.item = null; }
     const ids = Object.keys(counts);
-    bar.innerHTML = '<span class="bt">Construction</span>' + ids.map((id) => `<div class="hk${G.build.id === id ? ' flash' : ''}" data-id="${id}"><img src="${iconURL(ITEMS[id].icon, ITEMS[id].tint)}"><span class="cnt">${counts[id]}</span></div>`).join('')
-      + (ids.length ? '' : '<span class="bh">Rien à poser : fabriquez des constructions (C).</span>')
+    bar.innerHTML = `<span class="bt">${home ? 'Ameublement' : 'Construction'}</span>` + ids.map((id) => `<div class="hk${G.build.id === id ? ' flash' : ''}" data-id="${id}"><img src="${iconURL(ITEMS[id].icon, ITEMS[id].tint)}"><span class="cnt">${counts[id]}</span></div>`).join('')
+      + (ids.length ? '' : `<span class="bh">${home ? 'Rien à poser : achetez des meubles chez Anselme ou fabriquez-en (C).' : 'Rien à poser : fabriquez des constructions (C).'}</span>`)
       + '<span class="bh">Clic : poser · Clic droit : démonter · Échap : quitter</span>';
     bar.querySelectorAll('.hk').forEach((el) => {
       const id = el.dataset.id;

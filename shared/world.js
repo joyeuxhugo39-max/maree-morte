@@ -798,6 +798,7 @@ export function generateWorld(seed = 7) {
     const t = tiles[i];
     if (t === T.DEEP || t === T.ROCK || t === T.PLANK || t === T.COBBLE && z !== Z.RUINS) continue;
     if (Math.hypot(x - TC.x, (y - TC.y) * 1.2) < 24 || Math.hypot(x - HC.x, (y - HC.y) * 1.2) < 18) continue;
+    if (x > 123 && x < 179 && y > 61 && y < 91) continue; // pas de morts aux portes du Quartier des Corsaires
     (candidates[z] = candidates[z] || []).push([x, y]);
   }
   for (const z in candidates) shuffle(candidates[z], rng);

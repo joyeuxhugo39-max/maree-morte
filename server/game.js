@@ -281,7 +281,7 @@ export class Game {
       lvl: p.level, xp: p.xp, xpNext: xpToNext(p.level), gold: p.gold,
       st: { atk: p.stats.atk, gun: p.stats.gun, def: p.stats.def, crit: Math.round(p.stats.crit * 100), speed: p.stats.speed, regen: +p.stats.regen.toFixed(1) },
       cry: Math.max(0, +(p.cry - this.time).toFixed(1)), drunk: Math.max(0, +(p.drunkUntil - this.time).toFixed(1)),
-      dead: p.dead, kills: p.kills, upg: p.upg, title: p.title, boat: p.boat, room: p.room, pk: p.pk,
+      dead: p.dead, kills: p.kills, upg: p.upg, title: p.title, boat: p.boat, room: p.room, pk: p.pk, pet: p.pet || '', vo: this.time < p.thiefUntil ? 1 : 0,
     };
   }
   toast(p, msg, kind = 'info') { this.send(p, { t: 'toast', msg, kind }); }
@@ -1358,7 +1358,7 @@ export class Game {
     if (it.tool === 'fish') return this.toast(p, 'Face à l’eau, appuyez sur R pour pêcher.', 'info');
     if (it.boat) return p.boat ? this.land(p, NaN) : this.board(p, NaN, i);
     if (it.pet) { // animal de compagnie : il vous suit, ou il se repose dans le sac
-      p.pet = p.pet === it.pet ? null : it.pet; p.lookVer++;
+      p.pet = p.pet === it.pet ? null : it.pet; p.lookVer++; p.dirtyMe = true;
       return this.toast(p, p.pet ? `${it.name} vous suit.` : `${it.name} se repose.`, 'info');
     }
     if (!it.use) return this.toast(p, `${it.name} ne s'utilise pas.`, 'warn');
@@ -1380,7 +1380,7 @@ export class Game {
       const h = this.homeOf(p.key);
       if (!h || p.room !== this.world.plots[h.k].room) return this.toast(p, 'Utilisez-la chez vous, dans votre maison.', 'warn');
       if (h.lock >= 2) return this.toast(p, 'Votre porte a déjà la meilleure serrure.', 'warn');
-      h.lock++; s.n--; if (s.n <= 0) p.inv[i] = null; p.dirtyInv = true; this.worldDirty = true;
+      h.lock++; s.n--; if (s.n <= 0) p.inv[i] = null; p.dirtyInv = true; this.worldDirty = true; this.broadcastHomes();
       return this.toast(p, `Serrure renforcée posée (niveau ${h.lock}/2).`, 'quest');
     }
     if (it.use.conch) return this.blowConch(p, i);
@@ -1481,12 +1481,13 @@ export class Game {
     if (!pr || p.dead || Math.hypot(pr.x - p.x, pr.y - p.y) > INTERACT_RANGE + 10) return;
     if (pr.type === 'chest') {
       const now = Date.now();
-      if (pr.cache && !p.caches[id]) { // une cachette : l'arme est à vous, une fois
-        p.caches[id] = 1;
+      const ck = 'i:' + pr.cache; // clé stable d'une version du monde à l'autre
+      if (pr.cache && !p.caches[ck]) { // une cachette : l'arme est à vous, une fois
+        p.caches[ck] = 1;
         this.giveOrDrop(p, pr.cache, 1);
         this.send(p, { t: 'loot', id: pr.cache, n: 1 });
         this.toast(p, `Cachette découverte : ${ITEMS[pr.cache].name} !`, 'quest');
-        if (Object.keys(p.caches).length >= 3) this.unlock(p, 'fouineur');
+        if (Object.keys(p.caches).filter((k) => k.startsWith('i:')).length >= 3) this.unlock(p, 'fouineur');
       }
       if ((p.chests[id] || 0) > now) return this.toast(p, `Ce coffre est vide. Il se remplira dans ${Math.ceil((p.chests[id] - now) / 60000)} min.`, 'warn');
       const L = CHEST_LOOT[pr.chest || 0];
@@ -1879,7 +1880,7 @@ export class Game {
   }
   // ------------------------------------------------------------ maisons
   homeOf(key) { for (const h of this.homes.values()) if (h.key === key) return h; return null; }
-  homesList() { return [...this.homes.values()].map((h) => [h.k, h.name]); }
+  homesList() { return [...this.homes.values()].map((h) => [h.k, h.name, h.lock]); }
   broadcastHomes() { this.broadcastAll({ t: 'homes', list: this.homesList() }); }
   homeAction(p, a, k) {
     const pl = this.world.plots[k];
@@ -1966,7 +1967,7 @@ export class Game {
     }
     if (Math.random() < 0.5) this.removeItem(p, 'crochets', 1);
     p.burgle = { k, until: this.time + 40, looted: false };
-    p.thiefUntil = this.time + 300; p.lookVer++;
+    p.thiefUntil = this.time + 300; p.lookVer++; p.dirtyMe = true;
     this.send(p, { t: 'lock', ok: 1, msg: 'Clic ! La porte cède. 40 secondes pour fouiller un coffre.' });
     if (owner) this.toast(owner, `⚠ ${p.name} a crocheté la porte de votre maison !`, 'warn');
     p.cds.door = 0;
@@ -2051,7 +2052,7 @@ export class Game {
     if (st.home != null && !mine && st.type === 'coffre') return this.burgleChest(p, st);
     if (STRUCTS[st.type].pet) {
       if (!mine) return this.toast(p, 'Il vous regarde de travers.', 'info');
-      p.pet = p.pet === STRUCTS[st.type].pet ? null : STRUCTS[st.type].pet; p.lookVer++;
+      p.pet = p.pet === STRUCTS[st.type].pet ? null : STRUCTS[st.type].pet; p.lookVer++; p.dirtyMe = true;
       return this.toast(p, p.pet ? 'Votre compagnon vous suit.' : 'Votre compagnon reste à la maison.', 'info');
     }
     if (st.type === 'lit') {

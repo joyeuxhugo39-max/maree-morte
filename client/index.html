@@ -153,7 +153,8 @@
       <div><kbd>E</kbd> — parler, ouvrir un coffre, ramasser, entrer dans un bâtiment</div>
       <div><kbd>E</kbd> face à l'eau — mettre votre barque ou votre sloop à l'eau · <kbd>E</kbd> près du rivage — accoster</div>
       <div><kbd>F</kbd> — manger / boire le meilleur soin du sac</div>
-      <div><kbd>C</kbd> — artisanat · <kbd>B</kbd> — construire votre base (plantez d'abord un pavillon pirate)</div>
+      <div><kbd>C</kbd> — artisanat · <kbd>B</kbd> — construire votre base (plantez d'abord un pavillon pirate) ou meubler votre maison</div>
+      <div><kbd>E</kbd> devant une maison à vendre (Quartier des Corsaires) — l'acheter · devant celle d'un autre, avec des crochets — la crocheter</div>
       <div><kbd>R</kbd> — pêcher face à l'eau (canne à pêche requise), puis <kbd>R</kbd> quand ça mord</div>
       <div><kbd>K</kbd> — hauts faits et titres · <kbd>/danse</kbd> <kbd>/salut</kbd> <kbd>/rire</kbd> <kbd>/assis</kbd> dans le chat</div>
       <div><kbd>I</kbd> inventaire · <kbd>J</kbd> quêtes · <kbd>M</kbd> carte · <kbd>Entrée</kbd> chat · <kbd>Échap</kbd> fermer</div>
@@ -170,6 +171,22 @@
       <div id="dlg-choices"></div>
     </div>
   </div>
+
+  <!-- cinématiques, encre du Kraken, crochetage, confirmation -->
+  <div id="cine-top" class="cinebar"></div>
+  <div id="cine-bot" class="cinebar"><span id="cine-sub"></span></div>
+  <div id="cine-title" class="hidden"><div id="cine-name"></div><div id="cine-tag"></div></div>
+  <div id="ink"></div>
+  <div id="lockpick" class="hidden">
+    <div class="lp-box">
+      <div class="lp-title">Crochetage</div>
+      <div class="lp-sub" id="lp-sub"></div>
+      <div class="lp-pins" id="lp-pins"></div>
+      <div class="lp-bar"><div class="lp-zone" id="lp-zone"></div><div class="lp-needle" id="lp-needle"></div></div>
+      <div class="lp-hint"><kbd>E</kbd>, <kbd>Espace</kbd> ou clic quand l'aiguille passe dans le vert · <kbd>Échap</kbd> pour renoncer</div>
+    </div>
+  </div>
+  <div id="confirm" class="hidden"><div class="cf-box"><div id="cf-text"></div><div class="cf-row"><button id="cf-yes" class="btn">Oui (E)</button><button id="cf-no" class="btn">Non (Échap)</button></div></div></div>
 
   <div id="tooltip" class="hidden"></div>
 

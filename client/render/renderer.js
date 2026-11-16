@@ -5,6 +5,7 @@ import { PROPS, Z, SAFE, tileAt, zoneAt } from '../../shared/world.js';
 import { boatSprites } from './sprites-boats.js';
 import { ITEMS } from '../../shared/data/items.js';
 import { MOBS } from '../../shared/data/mobs.js';
+import { NPCS } from '../../shared/data/npcs.js';
 import { Terrain, makeWaterLayers, CHUNK_PX } from './terrain.js';
 import { buildEnvSprites, buildStructSprites } from './sprites-env.js';
 import { STRUCTS, CLAIM_R, PLANTER_GROW } from '../../shared/data/craft.js';
@@ -14,9 +15,13 @@ import { heldWeapon } from './weapons.js';
 import { textCanvas, textWidth } from './font.js';
 import { PB } from './pixel.js';
 import { hash2 } from '../../shared/rng.js';
+import { extend06, petSheets, drawTentacle } from './sprites-06.js';
 
 const TAU = Math.PI * 2;
 const TREES = new Set(['tree', 'jtree', 'palm', 'deadtree']);
+// couleur des zones d'alerte selon l'attaque : canon, cendre, os, onde, bond, geyser, Kraken, vague, tentacule
+const TELE_COL = { 0: [230, 40, 30], 1: [255, 150, 40], 2: [230, 40, 30], 3: [255, 130, 50], 4: [225, 225, 195], 5: [255, 215, 70], 6: [200, 110, 255], 7: [90, 180, 255], 8: [200, 40, 110], 9: [120, 220, 255], 10: [210, 60, 130] };
+const isSea = (e) => e.k === 'a' || (e.k === 'm' && MOBS[e.type] && MOBS[e.type].sea);
 const rnd = Math.random;
 
 function makeCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
@@ -84,6 +89,7 @@ export class Renderer {
     this.water = makeWaterLayers();
     this.env = buildEnvSprites();
     this.structSpr = buildStructSprites(this.env);
+    extend06(this.env, this.structSpr); this.pets = petSheets(); this.tentacle = drawTentacle;
     this.boats = boatSprites();
     this.room = null;
     this.parrot = parrotSheet();
@@ -105,7 +111,7 @@ export class Renderer {
     this.camX = 0; this.camY = 0;
     this.shakeT = 0; this.shakeA = 0;
     this.parts = []; this.texts = []; this.fx = []; this.projs = new Map(); this.bombs = []; this.teles = []; this.critters = []; this.glints = []; this.bubbles = [];
-    this.fogA = 0; this.drunk = 0;
+    this.fogA = 0; this.drunk = 0; this.lteles = []; this.inks = []; this.abyss = null; this.redSails = new Map();
     this.rain = []; this.splashes = []; this.decals = []; this.flash = 0; this.nextBolt = 0; this.bolt = null; this.onThunder = null;
     this.cats = { orange: catSheet('orange'), black: catSheet('black'), white: catSheet('white') };
     this.shakeOn = true;
@@ -224,17 +230,29 @@ export class Renderer {
     const depl = (p) => G.depleted && (G.depleted.get(p.id) || 0) > now;
     for (const p of props) if (p.ground && !depl(p)) ctx.drawImage(p.spr.cv, Math.round(p.x - p.spr.ax - camX), Math.round(p.y - p.spr.ay - camY));
     this.drawGroundMarks(ctx, G, camX, camY, now);
+    this.drawSeaFx(ctx, G, camX, camY, now);
     // objets tombés au sol
     for (const e of G.ents.values()) if (e.k === 'd') this.drawDrop(ctx, e, camX, camY, now, G);
     // télégraphes
     for (let i = this.teles.length - 1; i >= 0; i--) {
       const t = this.teles[i], k = (now - t.t0) / t.dur;
       if (k >= 1) { this.teles.splice(i, 1); continue; }
-      const x = t.x - camX, y = t.y - camY;
-      ctx.fillStyle = `rgba(220,40,30,${0.15 + 0.25 * k})`;
+      const x = t.x - camX, y = t.y - camY, C = TELE_COL[t.style] || TELE_COL[0];
+      ctx.fillStyle = `rgba(${C[0]},${C[1]},${C[2]},${0.15 + 0.25 * k})`;
       ctx.beginPath(); ctx.ellipse(x, y, t.r * k, t.r * k * 0.7, 0, 0, TAU); ctx.fill();
-      ctx.strokeStyle = `rgba(255,80,60,${0.6 + 0.4 * Math.sin(now * 20)})`; ctx.lineWidth = 1;
+      ctx.strokeStyle = `rgba(${Math.min(255, C[0] + 30)},${Math.min(255, C[1] + 40)},${Math.min(255, C[2] + 30)},${0.6 + 0.4 * Math.sin(now * 20)})`; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.ellipse(x, y, t.r, t.r * 0.7, 0, 0, TAU); ctx.stroke();
+    }
+    for (let i = this.lteles.length - 1; i >= 0; i--) {
+      const t = this.lteles[i], k = (now - t.t0) / t.dur;
+      if (k >= 1) { this.lteles.splice(i, 1); continue; }
+      const C = TELE_COL[t.style] || TELE_COL[0], L = Math.hypot(t.x1 - t.x0, t.y1 - t.y0);
+      ctx.save(); ctx.translate(t.x0 - camX, t.y0 - camY); ctx.rotate(Math.atan2(t.y1 - t.y0, t.x1 - t.x0));
+      ctx.fillStyle = `rgba(${C[0]},${C[1]},${C[2]},${0.12 + 0.14 * k})`; ctx.fillRect(0, -t.w / 2, L, t.w);
+      ctx.fillStyle = `rgba(${C[0]},${C[1]},${C[2]},${0.2 + 0.3 * k})`; ctx.fillRect(0, -t.w / 2, L * k, t.w);
+      ctx.strokeStyle = `rgba(${Math.min(255, C[0] + 30)},${Math.min(255, C[1] + 40)},${Math.min(255, C[2] + 30)},${0.6 + 0.4 * Math.sin(now * 20)})`; ctx.lineWidth = 1;
+      ctx.strokeRect(0.5, -t.w / 2 + 0.5, L - 1, t.w - 1);
+      ctx.restore();
     }
 
     // tri en profondeur
@@ -244,6 +262,8 @@ export class Renderer {
     for (const e of G.ents.values()) if (e.k !== 'd' && e.x > camX - 60 && e.x < camX + W + 60 && e.y > camY - 30 && e.y < camY + H + 60) draw.push({ y: e.y, e });
     for (const n of G.npcs) if (n.x > camX - 40 && n.x < camX + W + 40 && n.y > camY - 30 && n.y < camY + H + 40) draw.push({ y: n.y, n });
     if (G.player) draw.push({ y: G.player.y, e: G.player });
+    if (G.player && G.player.petObj && !G.player.petObj.hidden) draw.push({ y: G.player.petObj.y, pet: G.player.petObj });
+    for (const e of G.ents.values()) if (e.k === 'p' && e.petObj && !e.petObj.hidden) draw.push({ y: e.petObj.y, pet: e.petObj });
     for (const f of G.folk || []) if (f.x > camX - 30 && f.x < camX + W + 30 && f.y > camY - 30 && f.y < camY + H + 40) draw.push({ y: f.y, e: f });
     for (const c of G.cats || []) if (c.x > camX - 20 && c.x < camX + W + 20 && c.y > camY - 20 && c.y < camY + H + 20) draw.push({ y: c.y, c });
     draw.sort((a, b) => a.y - b.y);
@@ -256,11 +276,12 @@ export class Renderer {
         if (d.p.type === 'ship' || d.p.type === 'wreck' || d.p.type === 'lighthouse' || d.p.type === 'boat') continue;
         const w = Math.min(28, s.w * 0.34);
         ctx.beginPath(); ctx.ellipse(d.p.x - camX + (TREES.has(d.p.type) ? 3 : 0), d.p.y - camY - 1, w, Math.max(2, Math.min(7, w * 0.3)), 0, 0, TAU); ctx.fill();
-      } else if (d.c) {
-        ctx.beginPath(); ctx.ellipse(d.c.x - camX, d.c.y - camY - 1, 4, 1.5, 0, 0, TAU); ctx.fill();
+      } else if (d.c || d.pet) {
+        const c = d.c || d.pet;
+        if (c.kind !== 'perroquet') { ctx.beginPath(); ctx.ellipse(c.x - camX, c.y - camY - 1, 4, 1.5, 0, 0, TAU); ctx.fill(); }
       } else {
         const o = d.e || d.n;
-        if (o.k === 'd' || (o.dyingT && now - o.dyingT > 0.4)) continue;
+        if (o.k === 'd' || (o.dyingT && now - o.dyingT > 0.4) || isSea(o)) continue;
         if (o === G.player ? G.player.boat : (o.flags & 16)) continue;
         if (this.inWater(o.x, o.y)) continue;
         const big = o.sheet && o.sheet.fw > FW ? 2 : 1;
@@ -272,6 +293,7 @@ export class Renderer {
       if (d.p) this.drawProp(ctx, d.p, camX, camY, now, me, G);
       else if (d.st) this.drawStruct(ctx, d.st, camX, camY, now);
       else if (d.c) this.drawCat(ctx, d.c, camX, camY, now);
+      else if (d.pet) this.drawPet(ctx, d.pet, camX, camY, now);
       else if (d.n) this.drawNpc(ctx, d.n, camX, camY, now, G);
       else this.drawEntity(ctx, d.e, camX, camY, now, G);
     }
@@ -349,6 +371,7 @@ export class Renderer {
     }
     if (p.type === 'chest' && G.chests && G.chests[p.id] > Date.now()) s = this.env.chestOpen[p.chest || 0];
     if (p.type === 'grotte' && p.door != null && !(G.found && G.found.has(p.door))) s = this.env.grotte[(p.v % 3) + 3];
+    if (p.type === 'sceau' && G.sealUntil > now) s = this.env.sceau[1];
     const indoor = p.ty >= OVER_H;
     let x = Math.round(p.x - s.ax - camX), y = Math.round(p.y - s.ay - camY);
     if (p.type === 'ship') y += Math.round(Math.sin(now * 1.1) * 1.2);
@@ -365,6 +388,18 @@ export class Renderer {
       ctx.drawImage(s.cv, 0, 0, s.w, cut, x + Math.round(sway), y, s.w, cut);
     } else ctx.drawImage(s.cv, x, y);
     if (alpha < 1) ctx.globalAlpha = 1;
+    if (p.type === 'home' && G.homes) { // la pancarte au-dessus de la porte : le nom du propriétaire
+      const h = G.homes.get(p.plot);
+      const t = textCanvas(h ? h.name : 'À VENDRE', h ? '#2b1606' : '#7a1410', null);
+      const w = t.width + 7, sx = Math.round(p.x - camX - w / 2), sy = Math.round(p.y - camY - 37 + Math.sin(now * 1.4 + p.x) * 0.6);
+      ctx.fillStyle = '#120a06'; ctx.fillRect(sx - 1, sy - 1, w + 2, 11);
+      ctx.fillStyle = h ? '#b88a52' : '#e8dcc0'; ctx.fillRect(sx, sy, w, 9);
+      ctx.fillStyle = h ? '#d8ac6e' : '#fff8e8'; ctx.fillRect(sx, sy, w, 1);
+      ctx.fillStyle = h ? '#7a5228' : '#b8a888'; ctx.fillRect(sx, sy + 8, w, 1);
+      ctx.fillStyle = '#3a3a46'; ctx.fillRect(sx + 2, sy - 4, 1, 3); ctx.fillRect(sx + w - 3, sy - 4, 1, 3);
+      ctx.drawImage(t, sx + 4, sy + 1);
+      if (h && h.lock) { ctx.fillStyle = '#f2c14a'; ctx.fillRect(sx + w + 1, sy + 3, 4, 4); ctx.fillStyle = '#8a8a9c'; ctx.fillRect(sx + w + 2, sy + 1, 2, 2); }
+    }
     if ((p.type === 'ship' || p.type === 'wreck' || p.type === 'boat') && !indoor) {
       // écume autour de la coque
       const wl = p.y - camY - (p.type === 'boat' ? 4 : 4);
@@ -392,6 +427,7 @@ export class Renderer {
     ctx.drawImage(sh.cv, f * FW, n.dir * FH, FW, FH - (bob ? 0 : 0), Math.round(n.x - sh.ax - camX), Math.round(n.y - sh.ay - camY) + (bob ? 0 : 0), FW, FH);
   }
   sheetOf(e) {
+    if (isSea(e)) return null;
     if (e.k === 'p' || e.k === 'f') { if (!e.sheet || e.sheetKey !== e.lookKey) { e.sheet = humanSheet(e.look); e.sheetKey = e.lookKey; } return e.sheet; }
     if (!e.sheet) e.sheet = mobSheet(e.type);
     return e.sheet;
@@ -414,7 +450,145 @@ export class Renderer {
     ctx.beginPath(); ctx.ellipse(Math.round(e.x - camX), Math.round(e.y - camY), fr.cv.width * 0.46 + Math.sin(now * 3) * 0.8, fr.cv.height * 0.3, 0, 0, TAU); ctx.stroke();
     if (e.moving && rnd() < 0.7) this.burst(e.x + bx * len, e.y - 2 + by * len, 1, { z: 1, col: ['#ffffff', '#d8f6ff'], up: 8, speed: 10, life: 0.6, g: 30 });
   }
+  // ------------------------------------------------------------ 0.6 : navires alliés, Kraken, tentacules, animaux
+  redSail(cv) {
+    let c = this.redSails.get(cv);
+    if (!c) { c = makeCanvas(cv.width, cv.height); const x = c.getContext('2d'); x.drawImage(cv, 0, 0); x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(190,28,36,0.62)'; x.fillRect(0, 0, c.width, c.height); this.redSails.set(cv, c); }
+    return c;
+  }
+  drawAlly(ctx, e, camX, camY, now, G) {
+    const dir = e.dir & 3, fr = this.boats.sloop[dir][0];
+    const sink = e.sinkT ? Math.min(1, (now - e.sinkT) / 2.0) : 0;
+    const X = Math.round(e.x - camX), Y = Math.round(e.y - camY), bob = Math.round(Math.sin(now * 2.2 + e.id) * 0.8);
+    const red = (e.name || '').includes('Mouette');
+    if (!e.capSheet) e.capSheet = humanSheet((red ? NPCS.morgane : NPCS.elouan).look);
+    ctx.save();
+    if (sink > 0) { // le navire se cabre et s'enfonce ; rien ne dépasse sous la ligne d'eau
+      ctx.beginPath(); ctx.rect(X - 70, Y - 100, 140, 104); ctx.clip();
+      ctx.translate(X, Y); ctx.rotate(sink * 0.55 * (dir === 1 ? -1 : 1)); ctx.translate(-X, -Y + sink * sink * 40);
+    } else { ctx.fillStyle = 'rgba(8,24,44,0.28)'; ctx.beginPath(); ctx.ellipse(X, Y + 1, fr.cv.width * 0.42, fr.cv.height * 0.32, 0, 0, TAU); ctx.fill(); }
+    const x0 = X - fr.ax, y0 = Y - fr.ay + bob;
+    ctx.drawImage(fr.cv, x0, y0);
+    if (fr.sail) ctx.drawImage(red ? this.redSail(fr.sail.cv) : fr.sail.cv, x0 + fr.sail.x, y0 + fr.sail.y);
+    const sh = e.capSheet;
+    if (sink < 0.5) ctx.drawImage(sh.cv, 0, dir * sh.fh, sh.fw, 21, x0 + fr.seat[0] - sh.ax, y0 + fr.seat[1] - 19, sh.fw, 21);
+    ctx.restore();
+    if (sink > 0) {
+      const grow = Math.min(1, sink * 3.5);
+      this.tentacle(ctx, X - 24, Y + 3, { t: now, seed: 1.3, len: 50 * grow, curl: 1.3, lean: 0.9, leanA: 0, thick: 6 });
+      this.tentacle(ctx, X + 22, Y + 5, { t: now + 1, seed: 4.1, len: 46 * grow, curl: 1.2, lean: 0.9, leanA: Math.PI, thick: 6 });
+      this.tentacle(ctx, X + 2, Y + 9, { t: now + 2, seed: 6.7, len: 40 * grow, curl: 1.5, lean: 0.4, leanA: -1.2, thick: 5 });
+      if (rnd() < 0.9) this.burst(e.x + (rnd() - 0.5) * 56, e.y + (rnd() - 0.5) * 14, 2, { z: 2, col: ['#ffffff', '#d8f6ff', '#9fd8ff'], up: 46, speed: 24, life: 0.7, g: 80 });
+    } else {
+      ctx.strokeStyle = 'rgba(230,250,250,0.45)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(X, Y, fr.cv.width * 0.46 + Math.sin(now * 3) * 0.8, fr.cv.height * 0.3, 0, 0, TAU); ctx.stroke();
+      if (e.moving && rnd() < 0.7) { const len = (dir === 1 || dir === 2 ? fr.cv.width : fr.cv.height) * 0.42; this.burst(e.x + [0, 1, -1, 0][dir] * len, e.y - 2 + [-1, 0, 0, 1][dir] * len, 1, { z: 1, col: ['#ffffff', '#d8f6ff'], up: 8, speed: 10, life: 0.6, g: 30 }); }
+    }
+  }
+  drawKraken(ctx, e, camX, camY, now, G) {
+    const rage = ((e.flags >> 5) & 3) >= 2, s = this.env.kraken[rage ? 1 : 0];
+    let k = 1; // part du corps hors de l'eau
+    if (e.downT && (!e.upT || e.downT > e.upT)) k = Math.max(0, 1 - (now - e.downT) / (e.dyingT ? 3.4 : 0.7));
+    else if (e.upT) k = Math.min(1, (now - e.upT) / (e.firstRise ? 1.5 : 0.6));
+    else if (e.flags & 8) k = 0;
+    const X = Math.round(e.x - camX), Y = Math.round(e.y - camY);
+    const ek = 1 - (1 - k) * (1 - k), hgt = Math.round(s.ay * ek);
+    const shakeX = e.dyingT ? Math.round(Math.sin(now * 46) * 2 * k) : (now - (e.phaseT || -9) < 1.4 ? Math.round(Math.sin(now * 50) * 1.5) : 0);
+    const bob = Math.round(Math.sin(now * 1.3) * 1.5);
+    // l'eau sombre sous la bête
+    ctx.fillStyle = 'rgba(6,10,30,0.42)'; ctx.beginPath(); ctx.ellipse(X, Y + 4, 54, 20, 0, 0, TAU); ctx.fill();
+    if (hgt > 2) {
+      ctx.drawImage(s.cv, 0, 0, s.w, hgt, X - s.ax + shakeX, Y - hgt + bob, s.w, hgt);
+      if (now - (e.hitT || -9) < 0.09 || (e.dyingT && Math.floor(now * 10) % 3 === 0)) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.45; ctx.drawImage(s.cv, 0, 0, s.w, hgt, X - s.ax + shakeX, Y - hgt + bob, s.w, hgt); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
+      // paupières : il cligne
+      if (ek > 0.9 && Math.floor(now * 0.9 + 0.3) % 5 === 0 && (now * 0.9 + 0.3) % 1 < 0.14) { ctx.fillStyle = rage ? '#5a0e18' : '#341030'; ctx.fillRect(X - 30 + shakeX, Y - 22 + bob, 20, 14); ctx.fillRect(X + 10 + shakeX, Y - 22 + bob, 20, 14); }
+    }
+    // écume au ras de l'eau, bouillons quand il bouge
+    ctx.strokeStyle = 'rgba(235,250,255,0.7)'; ctx.lineWidth = 1;
+    for (let q = 0; q < 2; q++) { ctx.beginPath(); ctx.ellipse(X, Y + 1 + q * 2, (40 + q * 9) * Math.max(0.3, ek) + Math.sin(now * 3 + q) * 1.5, (9 + q * 3) * Math.max(0.3, ek), 0, 0, TAU); ctx.stroke(); }
+    if ((k > 0 && k < 1) || rnd() < 0.2) this.burst(e.x + (rnd() - 0.5) * 80, e.y + (rnd() - 0.5) * 16, k < 1 ? 4 : 1, { z: 2, col: ['#ffffff', '#d8f6ff', '#9fd8ff'], up: k < 1 ? 70 : 24, speed: 26, life: 0.6, g: 160 });
+  }
+  drawTentacleMob(ctx, e, camX, camY, now, G) {
+    const X = Math.round(e.x - camX), Y = Math.round(e.y - camY);
+    let rise = e.riseT ? Math.min(1, (now - e.riseT) / 0.9) : 1;
+    if (e.dyingT) rise = Math.max(0, 1 - (now - e.dyingT) / 0.8);
+    let kr = null; for (const q of G.ents.values()) if (q.type === 'kraken') kr = q;
+    const rage = kr && ((kr.flags >> 5) & 3) >= 2;
+    if (kr && (kr.flags & 8) && !e.dyingT) rise *= 0.35; // la bête a plongé : les tentacules se tapissent
+    let lean = 0, leanA = 0, flat = 0, curl = 0.35;
+    if (e.slam) {
+      const t = now - e.slam.t0, d = e.slam.dur; leanA = e.slam.a;
+      if (t < d) lean = -0.55 * (t / d);
+      else if (t < d + 0.1) flat = (t - d) / 0.1;
+      else if (t < d + 0.5) flat = 1;
+      else if (t < d + 0.95) flat = 1 - (t - d - 0.5) / 0.45;
+      else e.slam = null;
+    }
+    if (e.grabId != null) { const q = e.grabId === G.myId ? G.player : G.ents.get(e.grabId); if (q) { leanA = Math.atan2(q.y - e.y, q.x - e.x); flat = 0.82; curl = 1.5; } }
+    ctx.strokeStyle = 'rgba(235,250,255,0.65)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.ellipse(X, Y + 1, 9 + Math.sin(now * 4 + e.id) * 1, 3.5, 0, 0, TAU); ctx.stroke();
+    if (rise <= 0.02) return;
+    this.tentacle(ctx, X, Y, { t: now, seed: e.id * 1.7, len: 50 * rise, lean, leanA, flat, rage, curl, thick: 6.5 });
+    if (now - (e.hitT || -9) < 0.09) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5; this.tentacle(ctx, X, Y, { t: now, seed: e.id * 1.7, len: 50 * rise, lean, leanA, flat, rage: 1, curl, thick: 6.5 }); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
+  }
+  drawPet(ctx, q, camX, camY, now) {
+    const set = this.pets[q.kind];
+    if (!set) return;
+    const fly = q.kind === 'perroquet';
+    const fr = set[fly ? Math.floor(now * 9) % 2 : q.moving ? Math.floor(now * 9) % 2 : 2 + (Math.floor(now * 0.7 + q.seed) % 7 === 0 ? 1 : 0)];
+    const x = Math.round(q.x - camX), y = Math.round(q.y - camY) - (fly ? 20 + Math.round(Math.sin(now * 3 + q.seed) * 2) : q.kind === 'kraken' && q.moving ? Math.round(Math.abs(Math.sin(now * 9)) * 3) : 0);
+    ctx.save();
+    if (q.dir === 1) { ctx.translate(x, 0); ctx.scale(-1, 1); ctx.drawImage(fr, -(fr.width >> 1), y - fr.height + 1); }
+    else ctx.drawImage(fr, x - (fr.width >> 1), y - fr.height + 1);
+    ctx.restore();
+  }
+  // encre, tourbillon, abysses : ce qui se passe à la surface de l'eau
+  drawSeaFx(ctx, G, camX, camY, now) {
+    const tw = this.world.twin;
+    if (tw && !this.room) for (const pl of tw.plates) { // dalles des Jumeaux : elles s'éveillent sous les pas
+      let on = G.sealUntil > now;
+      if (!on && G.player && Math.hypot(G.player.x - pl.x, G.player.y - pl.y) < 11) on = true;
+      if (!on) for (const e of G.ents.values()) if (e.k === 'p' && Math.hypot(e.x - pl.x, e.y - pl.y) < 11) { on = true; break; }
+      if (!on) continue;
+      const x = Math.round(pl.x - camX), y = Math.round(pl.y - camY);
+      ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.55 + 0.25 * Math.sin(now * 5);
+      ctx.drawImage(this.glows.cold, x - 16, y - 14, 32, 28);
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+      if (rnd() < 0.25) this.burst(pl.x + (rnd() - 0.5) * 12, pl.y + 2, 1, { z: 2, col: ['#bfe8ff', '#ffffff'], up: 30, speed: 4, life: 0.9, g: -14 });
+    }
+    for (let i = this.inks.length - 1; i >= 0; i--) {
+      const t = this.inks[i], k = (now - t.t0) / t.dur;
+      if (k >= 1) { this.inks.splice(i, 1); continue; }
+      const a = Math.min(1, k * 8) * Math.min(1, (1 - k) * 3), r = t.r * (0.5 + 0.5 * Math.min(1, k * 5));
+      ctx.fillStyle = `rgba(6,4,14,${0.62 * a})`;
+      for (let q = 0; q < 5; q++) { const an = q * 1.26 + t.x, rr = r * (q ? 0.55 : 1); ctx.beginPath(); ctx.ellipse(t.x - camX + (q ? Math.cos(an) * r * 0.5 : 0), t.y - camY + (q ? Math.sin(an) * r * 0.35 : 0), rr + Math.sin(now * 2 + q) * 2, rr * 0.7, 0, 0, TAU); ctx.fill(); }
+    }
+    const P = G.pull;
+    if (P && now < P.until) { // le tourbillon : des spirales d'écume qui tournent vers la gueule
+      const a = Math.min(1, (now - P.t0) * 2) * Math.min(1, (P.until - now) * 2);
+      ctx.lineWidth = 1;
+      for (let q = 0; q < 7; q++) {
+        const rr = P.r * (1 - ((now * 0.22 + q / 7) % 1)), a0 = now * 2.4 + q * 0.9 + rr * 0.03;
+        ctx.strokeStyle = `rgba(225,248,255,${0.55 * a * (rr / P.r + 0.2)})`;
+        ctx.beginPath(); ctx.ellipse(P.x - camX, P.y - camY, rr, rr * 0.8, 0, a0, a0 + 2.2); ctx.stroke();
+      }
+      ctx.fillStyle = `rgba(4,8,26,${0.5 * a})`; ctx.beginPath(); ctx.ellipse(P.x - camX, P.y - camY, 62, 48, 0, 0, TAU); ctx.fill();
+    }
+    const A = this.abyss;
+    if (A) { // quelque chose monte du fond
+      const k = (now - A.t0) / A.dur;
+      if (k >= 1) this.abyss = null;
+      else {
+        const a = Math.min(1, k * 3) * Math.min(1, (1 - k) * 3), r = (A.big ? 80 : 54) * (0.4 + 0.6 * Math.min(1, k * 1.5));
+        ctx.fillStyle = `rgba(4,6,22,${0.6 * a})`; ctx.beginPath(); ctx.ellipse(A.x - camX, A.y - camY, r, r * 0.6, 0, 0, TAU); ctx.fill();
+        if (rnd() < 0.7) this.burst(A.x + (rnd() - 0.5) * r * 1.6, A.y + (rnd() - 0.5) * r * 0.9, 1, { z: 1, col: ['#ffffff', '#d8f6ff'], up: 20, speed: 6, life: 0.6, g: -10 });
+      }
+    }
+  }
   drawEntity(ctx, e, camX, camY, now, G) {
+    if (e.k === 'a') return this.drawAlly(ctx, e, camX, camY, now, G);
+    if (e.type === 'kraken') return this.drawKraken(ctx, e, camX, camY, now, G);
+    if (e.type === 'tentacule') return this.drawTentacleMob(ctx, e, camX, camY, now, G);
     const sh = this.sheetOf(e);
     if (!sh) return;
     const boat = e === G.player ? (G.player.boat && ITEMS[G.player.boat] && ITEMS[G.player.boat].boat ? ITEMS[G.player.boat].boat.kind : null) : ((e.flags & 16) && e.bt ? e.bt : null);
@@ -432,6 +606,17 @@ export class Renderer {
     let x = Math.round(e.x - sh.ax - camX), y = Math.round(e.y - sh.ay - camY) + sit;
     const dying = e.dyingT ? now - e.dyingT : -1;
     if (dying > 0.75) return;
+    if (e.k === 'm') {
+      const ph = (e.flags >> 5) & 3;
+      if (ph && dying < 0) { // un boss enragé : le sol rougeoie sous lui
+        ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.35 + 0.2 * Math.sin(now * 7);
+        ctx.drawImage(ph >= 2 ? this.glows.red : this.glows.warm, Math.round(e.x - camX) - 22, Math.round(e.y - camY) - 12, 44, 22);
+        ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+        if (rnd() < 0.12 * ph) this.burst(e.x + (rnd() - 0.5) * 16, e.y - 2, 1, { z: 4, col: ph >= 2 ? ['#ff5a2a', '#ffb03a'] : ['#ffb03a', '#ffe58a'], up: 36, speed: 6, life: 0.7, g: -14 });
+      }
+      if (e.leap) { const lk = (now - e.leap.t0) / e.leap.dur; if (lk < 1) y -= Math.round(Math.sin(lk * Math.PI) * 30); else { e.leap = null; this.shake(3, 0.2); this.smoke(e.x, e.y, 8, 'rgba(200,180,150,0.55)', { size: 3 }); } }
+      if (e.dashT && now > e.dashT && now < e.dashT + 0.7 && e.moving && rnd() < 0.8) this.smoke(e.x, e.y, 1, 'rgba(220,200,160,0.5)', { size: 2, life: 0.4 });
+    }
     const water = this.inWater(e.x, e.y);
     const cut = Math.max(sit, water ? (sh.fw > FW ? 8 : 5) : 0);
     ctx.save();
@@ -461,6 +646,12 @@ export class Renderer {
     }
     if (!wpBehind) this.drawWeapon(ctx, e, sh, meta, x, y, now, dir);
     ctx.restore();
+    if (e.k === 'm' && (e.flags & 16)) { // carapace : presque rien ne passe
+      const cx = Math.round(e.x - camX), cy = Math.round(e.y - camY) - Math.round(sh.fh * 0.3);
+      ctx.strokeStyle = `rgba(255,225,120,${0.7 + 0.3 * Math.sin(now * 12)})`; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(cx, cy, sh.fw * 0.48, sh.fh * 0.42, 0, 0, TAU); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,225,120,0.14)'; ctx.beginPath(); ctx.ellipse(cx, cy, sh.fw * 0.48, sh.fh * 0.42, 0, 0, TAU); ctx.fill();
+    }
     if (water) {
       ctx.strokeStyle = 'rgba(220,250,255,0.6)';
       ctx.lineWidth = 1;
@@ -629,6 +820,12 @@ export class Renderer {
         ctx.fillStyle = '#ff6a1e'; ctx.fillRect(Math.round(x - dx * 3), Math.round(y - dy * 3), 2, 2);
         ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.6; ctx.drawImage(this.glows.warm, x - 8, y - 8, 16, 16); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
         if (rnd() < 0.5) this.burst(p.x, p.y + 9, 1, { z: 9, col: ['#ffd24a', '#ff8a2a', '#ff5a1a'], up: 10, speed: 8, life: 0.35, g: -20 });
+        continue;
+      }
+      if (p.kind === 'bone') {
+        const a = p.t * 14, c = Math.cos(a) * 3, s = Math.sin(a) * 3;
+        ctx.strokeStyle = '#1c1426'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - c, y - s); ctx.lineTo(x + c, y + s); ctx.stroke();
+        ctx.strokeStyle = '#f4ecd8'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - c, y - s); ctx.lineTo(x + c, y + s); ctx.stroke();
         continue;
       }
       if (p.kind === 'bolt' || p.kind === 'slug') {
@@ -939,6 +1136,14 @@ export class Renderer {
       }
       const e = o;
       if (e.dyingT) continue;
+      if (e.k === 'a') { // navire allié : son nom et celui de son capitaine
+        if (e.sinkT) continue;
+        const n1 = textCanvas(e.name || '', '#ffd23a'), n2 = textCanvas(e.cap || '', '#e8dcc0');
+        ctx.drawImage(n1, x - (n1.width >> 1), Math.round(e.y - camY) - 70); ctx.drawImage(n2, x - (n2.width >> 1), Math.round(e.y - camY) - 62);
+        continue;
+      }
+      if (e.type === 'kraken') continue;
+      if (e.type === 'tentacule') { if (e.hp < 100) this.hpBar(ctx, x, Math.round(e.y - camY) - 58, 18, e.hp / 100, '#e04a3a'); continue; }
       const sh = e.sheet;
       const top = Math.round(e.y - camY - (sh ? sh.ay : 26) + (e.type === 'boss' ? 4 : 2) + (e.k === 'p' && (e === G.player ? G.player.boat : (e.flags & 16)) ? 5 : 0));
       if (e.k === 'p') {
@@ -950,6 +1155,7 @@ export class Renderer {
         if (e.title && (!me || G.showMyName)) { const tt = textCanvas(e.title, '#f2c14a'); ctx.globalAlpha = 0.9; ctx.drawImage(tt, x - (tt.width >> 1), top - 16); ctx.globalAlpha = 1; }
         if (!me && (e.hp < 100 || pvp)) this.hpBar(ctx, x, top - 2, 16, e.hp / 100, pvp ? '#e0a040' : '#5cd65c');
         if (e.flags & 8) { ctx.fillStyle = '#ffd23a'; ctx.fillRect(x - 1, top - 14, 2, 2); }
+        if (e.thief) { const tv = textCanvas('VOLEUR', '#ff5a4a'); ctx.drawImage(tv, x - (tv.width >> 1), top - (e.title && (!me || G.showMyName) ? 23 : 16)); }
       } else if (e.k === 'm') {
         const def = MOBS[e.type];
         const hover = G.mouseWorld && Math.abs(G.mouseWorld.x - e.x) < 12 && Math.abs(G.mouseWorld.y - (e.y - 10)) < 14;
@@ -988,6 +1194,11 @@ export class Renderer {
       ctx.fillStyle = 'rgba(20,12,34,0.25)'; ctx.beginPath(); ctx.ellipse(bx - camX, by - camY - 1, Math.min(9, spr.w * 0.4), 2.5, 0, 0, TAU); ctx.fill();
     }
     ctx.drawImage(spr.cv, x, y);
+    const pk = STRUCTS[st.type].pet;
+    if (pk && this.pets[pk] && !(st.mine && this.petOut === pk)) { // l'animal dort dans son panier, sauf s'il suit son maître
+      const set = this.pets[pk], fr = set[pk === 'perroquet' ? 3 : 2 + (Math.floor(now * 0.6 + st.tx) % 6 === 0 ? 1 : 0)];
+      ctx.drawImage(fr, Math.round(bx - camX) - (fr.width >> 1), Math.round(by - camY) - fr.height - 1);
+    }
     if (spr.flame) { const fr = this.flames[Math.floor(now * 10 + st.tx) % 4]; ctx.drawImage(fr, Math.round(bx - spr.ax + spr.flame[0] - fr.width / 2 - camX), Math.round(by - spr.ay + spr.flame[1] - fr.height + 3 - camY)); }
     if (st.type === 'forge_base' && Math.random() < 0.08) this.burst(bx, by, 1, { z: 8, col: ['#ffd24a', '#ff8a2a'], up: 20, speed: 8, life: 0.6, g: -10 });
     if (st.type === 'feu_camp' && Math.random() < 0.1) this.burst(bx, by - 2, 1, { z: 8, col: ['#ffd24a', '#ff8a2a'], up: 24, speed: 6, life: 0.7, g: -12 });
@@ -1149,16 +1360,21 @@ export class Renderer {
   }
   drawBossBar(ctx, G) {
     let boss = null;
-    for (const e of G.ents.values()) if (e.k === 'm' && e.type === 'boss' && !e.dyingT) boss = e;
+    for (const e of G.ents.values()) if (e.k === 'm' && e.type === 'kraken' && !e.dyingT) boss = e;
+    if (!boss) for (const e of G.ents.values()) if (e.k === 'm' && e.type === 'boss' && !e.dyingT) boss = e;
     if (!boss) for (const e of G.ents.values()) if (e.k === 'm' && !e.dyingT && MOBS[e.type] && MOBS[e.type].elite && (!boss || e.hp < boss.hp)) boss = e;
-    if (!boss || !G.player || Math.hypot(boss.x - G.player.x, boss.y - G.player.y) > 320) return;
-    const W = this.W, w = Math.min(220, W - 120), x = Math.round((W - w) / 2), y = 26;
-    const name = textCanvas(MOBS[boss.type].name.toUpperCase(), '#ffd0a0', '#1c1426', 1);
-    ctx.drawImage(name, Math.round(W / 2 - name.width / 2), y - 10);
+    if (!boss || !G.player || document.body.classList.contains('cine') || Math.hypot(boss.x - G.player.x, boss.y - G.player.y) > (boss.type === 'kraken' ? 560 : 320)) return;
+    const def = MOBS[boss.type], W = this.W, w = Math.min(boss.type === 'kraken' ? 280 : 220, W - 120), x = Math.round((W - w) / 2), y = 28;
+    const name = textCanvas(def.name.toUpperCase(), '#ffd0a0', '#1c1426', 1);
+    ctx.drawImage(name, Math.round(W / 2 - name.width / 2), y - 11);
     ctx.fillStyle = '#1c1426'; ctx.fillRect(x - 2, y - 2, w + 4, 8);
     ctx.fillStyle = '#3a0c0c'; ctx.fillRect(x, y, w, 4);
-    ctx.fillStyle = '#d83a2a'; ctx.fillRect(x, y, Math.round(w * boss.hp / 100), 4);
-    ctx.fillStyle = '#ff8a6a'; ctx.fillRect(x, y, Math.round(w * boss.hp / 100), 1);
+    const ph = (boss.flags >> 5) & 3;
+    ctx.fillStyle = ph >= 2 ? '#ff5a1e' : ph === 1 ? '#e8662a' : '#d83a2a'; ctx.fillRect(x, y, Math.round(w * boss.hp / 100), 4);
+    ctx.fillStyle = '#ffb08a'; ctx.fillRect(x, y, Math.round(w * boss.hp / 100), 1);
+    // encoches : les seuils où le boss change de phase
+    for (const f of def.phases || []) { ctx.fillStyle = '#1c1426'; ctx.fillRect(x + Math.round(w * f) - 1, y - 2, 2, 8); ctx.fillStyle = '#ffd23a'; ctx.fillRect(x + Math.round(w * f) - 1, y - 3, 2, 1); }
+    if (def.title) { const tt = textCanvas(def.title, '#c8b8a0', '#1c1426', 1); ctx.globalAlpha = 0.9; ctx.drawImage(tt, Math.round(W / 2 - tt.width / 2), y + 8); ctx.globalAlpha = 1; }
   }
 }
 const MOB_EYE = { roi_squelette: '#b8ff6a', zsailor: '#ffe14a', buccaneer: '#ff5a3a', ghoul: '#d28aff', drowned: '#c8fff4', skelgun: '#ff4a3a', boss: '#9dff6a', crab: '#ffe14a', crabroi: '#ffe14a', goule_alpha: '#ff3a3a', capitaine_noye: '#c8fff4' };

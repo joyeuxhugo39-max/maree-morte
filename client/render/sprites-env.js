@@ -1220,3 +1220,4 @@ export function buildEnvSprites() {
   S.grotte = [grotteCliff(false), grotteSkull(false), grotteCrystal(false), grotteCliff(true), grotteSkull(true), grotteCrystal(true)];
   return S;
 }
+export { building, cheminee, table, chaise, etagere, plante, DW };

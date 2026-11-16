@@ -96,8 +96,26 @@ const P = {
     pb.rect(6, 7, 5, 7, IRON[2]); pb.rect(7, 8, 3, 5, 0xffd36b); pb.set(7, 8, 0xfff4c0); pb.hl(6, 7, 5, GOLD[3]); pb.hl(6, 14, 5, GOLD[2]);
   },
   banana(pb) {
-    for (let i = 0; i < 11; i++) { const x = 3 + i, y = 11 - Math.round(Math.sin(i / 10 * Math.PI) * 6); pb.set(x, y, 0xffe14a); pb.set(x, y + 1, 0xf0b828); pb.set(x, y + 2, 0xc88a1a); }
-    pb.set(2, 9, 0x5a3a1a); pb.set(14, 9, 0x5a3a1a);
+    // deux bananes en croissant, la queue en haut à droite
+    const one = (p0, p1, p2, fat, R) => {
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+        let best = 99, bt = 0, side = 0;
+        for (let k = 0; k <= 40; k++) {
+          const t = k / 40, u = 1 - t;
+          const cx = u * u * p0[0] + 2 * u * t * p1[0] + t * t * p2[0], cy = u * u * p0[1] + 2 * u * t * p1[1] + t * t * p2[1];
+          const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+          if (d < best) { best = d; bt = t; const tx = 2 * u * (p1[0] - p0[0]) + 2 * t * (p2[0] - p1[0]), ty = 2 * u * (p1[1] - p0[1]) + 2 * t * (p2[1] - p1[1]); side = ((x + 0.5 - cx) * ty - (y + 0.5 - cy) * tx) / (Math.hypot(tx, ty) || 1); }
+        }
+        const w = 0.75 + fat * Math.pow(Math.sin(Math.PI * Math.min(1, bt * 1.04)), 0.7);
+        if (best > w) continue;
+        const s = side / w; // -1 : bord creux (clair), +1 : ventre (ombre)
+        pb.set(x, y, bt < 0.07 ? 0x6a4a1c : bt > 0.95 ? 0x4a3014 : s < -0.45 ? R[3] : s < 0.2 ? R[2] : s < 0.7 ? R[1] : R[0]);
+      }
+    };
+    one([12.5, 1.5], [14.5, 11], [4, 13.2], 1.5, [0xb87a14, 0xe0a422, 0xf7c93a, 0xffe46a]);
+    one([11, 1.8], [9.5, 9.5], [1.8, 9.2], 1.7, [0xc88a1a, 0xf0b828, 0xffd83e, 0xfff08a]);
+    pb.set(11, 1, 0x7a5a22); pb.set(12, 1, 0x5a3e16); pb.set(11, 2, 0x8a9a2e); pb.set(12, 2, 0x6a7a22);
+    pb.set(5, 7, 0xfffbd0); pb.set(6, 6, 0xfffbd0);
   },
   coconut(pb) { pb.blob(8, 8.5, 6, 5.5, [0x3a2414, 0x5a3820, 0x7a4f2c, 0x9c683a, 0xb88a52], { noise: 0.3 }); pb.set(6, 6, 0x1a100a); pb.set(9, 6, 0x1a100a); pb.set(7.5, 8, 0x1a100a); },
   fish(pb) {
@@ -254,6 +272,34 @@ const P = {
     pb.set(8, 15, R[2]);
   },
   // compétences
+  // ---- 0.6 : meubles, animaux, butin de cambriolage, Kraken
+  f_table(pb) { pb.ellipse(8, 6, 7, 3, WOOD[3]); pb.ellipse(8, 5.4, 6, 2.2, WOOD[5]); pb.rect(3, 8, 2, 6, WOOD[1]); pb.rect(11, 8, 2, 6, WOOD[1]); pb.rect(7, 2, 2, 3, 0xeee6d0); pb.set(7, 1, 0xffd24a); },
+  f_chair(pb) { pb.rect(4, 2, 2, 8, WOOD[3]); pb.hl(4, 3, 2, WOOD[5]); pb.rect(4, 8, 8, 2, WOOD[4]); pb.hl(4, 8, 8, WOOD[5]); pb.vl(5, 10, 4, WOOD[2]); pb.vl(11, 10, 4, WOOD[2]); pb.rect(4, 5, 2, 1, WOOD[1]); },
+  f_shelf(pb) { pb.rect(2, 1, 12, 14, WOOD[1]); pb.rect(3, 2, 10, 12, 0x1c110a); for (const y of [5, 9, 13]) pb.hl(2, y, 12, WOOD[4]); for (const [x, y, c] of [[4, 3, 0x2a6a3a], [7, 3, 0x7a2a2a], [10, 2, 0x2e4a8a], [4, 6, 0x8a6a2a], [8, 7, 0x5a2a6a], [11, 6, 0x3a7a7a], [5, 10, 0x7a2a2a], [9, 11, 0x2a6a3a]]) pb.rect(x, y, 2, y % 4 === 3 ? 2 : 3, c); },
+  f_wardrobe(pb) { pb.rect(2, 2, 12, 12, WOOD[2]); pb.rect(1, 1, 14, 2, WOOD[4]); pb.hl(1, 1, 14, WOOD[5]); pb.rect(3, 4, 4, 9, WOOD[3]); pb.rect(9, 4, 4, 9, WOOD[3]); pb.vl(3, 4, 9, WOOD[5]); pb.vl(9, 4, 9, WOOD[5]); pb.set(7, 8, GOLD[3]); pb.set(8, 8, GOLD[3]); pb.rect(2, 14, 2, 1, WOOD[0]); pb.rect(12, 14, 2, 1, WOOD[0]); },
+  f_fireplace(pb) { for (let y = 3; y < 15; y++) for (let x = 2; x < 14; x++) pb.set(x, y, (y % 3 === 0 || (x + (y > 8 ? 2 : 0)) % 5 === 0) ? STONE5[1] : STONE5[3]); pb.rect(1, 2, 14, 2, WOOD[4]); pb.hl(1, 2, 14, WOOD[5]); pb.rect(5, 8, 6, 7, 0x140a08); pb.rect(6, 11, 4, 3, 0xff8a2a); pb.rect(7, 10, 2, 2, 0xffd24a); pb.set(7, 9, 0xfff2b0); },
+  f_plant(pb) { for (const [x1, y1] of [[2, 4], [5, 1], [8, 0], [11, 1], [14, 4]]) pb.line(8, 9, x1, y1, 0x357a39, 1.6); for (const [x1, y1] of [[3, 3], [8, 1], [13, 3]]) pb.line(8, 8, x1, y1, 0x7cc25a); pb.rect(5, 10, 6, 5, 0xa0502a); pb.hl(4, 10, 8, 0xc8703a); pb.hl(5, 14, 6, 0x6a3018); },
+  f_painting(pb, t) { const F = t === 'gold' ? GOLD : [WOOD[1], WOOD[2], WOOD[3], WOOD[4], WOOD[5]]; pb.rect(1, 2, 14, 11, F[2]); pb.hl(1, 2, 14, F[4]); pb.hl(1, 12, 14, F[0]); pb.vl(1, 2, 11, F[3]); for (let y = 4; y < 11; y++) for (let x = 3; x < 13; x++) pb.set(x, y, t === 'gold' ? (y < 7 ? mix(0xffb84a, 0xf06a3a, (y - 4) / 3) : mix(0x2a5a9a, 0x14305e, (y - 7) / 4)) : (y < 7 ? 0x8aa0c0 : ((x + y) % 3 ? 0x2a6a9a : 0x4a8ab0))); if (t === 'gold') pb.disc(8, 6.5, 1.6, 0xfff8d0); else { pb.rect(6, 7, 4, 1, 0x4a2c14); pb.vl(8, 4, 3, 0x2a1a0e); pb.rect(6, 4, 2, 3, 0xf4ecd8); } },
+  f_masterpiece(pb) { P.f_painting(pb, 'gold'); pb.set(1, 2, 0xfff6c8); pb.set(14, 2, 0xfff6c8); pb.set(1, 12, 0xfff6c8); pb.set(14, 12, 0xfff6c8); },
+  f_rug(pb) { for (let y = 3; y < 13; y++) for (let x = 1; x < 15; x++) { const b = Math.min(x - 1, 14 - x, y - 3, 12 - y); const d = Math.abs(x - 7.5) / 5 + Math.abs(y - 7.5) / 3.4; pb.set(x, y, b === 0 ? 0x5a1418 : b === 1 ? 0xd8a43a : d < 0.5 ? 0xf2c14a : d < 0.8 ? 0x2a3a6a : 0x8a2228); } for (let y = 4; y < 12; y += 2) { pb.set(0, y, 0xe8dcc0); pb.set(15, y, 0xe8dcc0); } },
+  f_books(pb) { pb.rect(1, 1, 14, 14, WOOD[1]); pb.rect(2, 2, 12, 12, 0x1c110a); for (const y of [5, 9, 13]) pb.hl(1, y, 14, WOOD[4]); let k = 0; for (const y of [2, 6, 10]) for (let x = 2; x < 14; x += 2) { const c = [0x7a2a2a, 0x2a4a7a, 0x3a6a3a, 0x8a6a2a, 0x5a3a6a, 0x9a8a6a][(k++ * 5 + y) % 6]; pb.rect(x, y, 2, 3, c); pb.set(x, y, shade(c, 1.5)); } },
+  f_trophy(pb) { pb.rect(4, 12, 8, 3, WOOD[2]); pb.hl(3, 11, 10, WOOD[4]); for (let y = 2; y < 11; y++) for (let x = 4; x < 12; x++) pb.set(x, y, x === 4 ? 0xa8e8d8 : x === 11 ? 0x2a6a5a : mix(0x3a8a78, 0x1a4a40, (y - 2) / 9)); pb.rect(5, 1, 6, 1, IRON[4]); pb.disc(8, 6.5, 3, 0xf0e8c8); pb.disc(8, 6.5, 1.8, 0xffc02a); pb.vl(8, 5, 3, 0x100610); pb.set(6, 5, 0xffffff); },
+  f_lock(pb) { for (let a = Math.PI; a < Math.PI * 2; a += 0.08) { pb.set(8 + Math.cos(a) * 3.6, 6.5 + Math.sin(a) * 4, IRON[5]); pb.set(8 + Math.cos(a) * 2.6, 6.5 + Math.sin(a) * 3, IRON[3]); } pb.vl(4, 6, 2, IRON[5]); pb.vl(11, 6, 2, IRON[4]); pb.rect(3, 8, 10, 7, GOLD[2]); pb.hl(3, 8, 10, GOLD[4]); pb.vl(3, 8, 7, GOLD[3]); pb.hl(3, 14, 10, GOLD[0]); pb.disc(8, 11, 1.2, 0x2a1a0a); pb.vl(8, 11, 3, 0x2a1a0a); for (const [x, y] of [[4, 9], [11, 9], [4, 13], [11, 13]]) pb.set(x, y, IRON[5]); },
+  p_cat(pb) { const C = [0x8a8478, 0xc4bdae, 0xe8e2d6, 0xfaf6ee]; pb.blob(8, 10, 4.5, 4, [C[0], C[1], C[2], C[3], C[3]], {}); pb.disc(8, 5.5, 3.4, C[2]); pb.rect(4, 1, 2, 3, C[2]); pb.rect(10, 1, 2, 3, C[2]); pb.set(5, 2, 0xffb0b0); pb.set(10, 2, 0xffb0b0); pb.set(6, 5, 0x2a6a3a); pb.set(10, 5, 0x2a6a3a); pb.set(8, 7, 0xff9a9a); pb.line(12, 12, 14, 8, C[1]); },
+  p_dog(pb) { const B = [0x4a2c14, 0x7a4a22, 0xa86a32, 0xc88a4a]; pb.blob(8, 10.5, 4.5, 3.6, [B[0], B[1], B[2], B[3], B[3]], {}); pb.disc(8, 5.5, 3.6, B[2]); pb.rect(3, 3, 2, 5, B[0]); pb.rect(11, 3, 2, 5, B[0]); pb.ellipse(8, 7, 2, 1.5, 0xf0e0c0); pb.set(8, 6, 0x1a1014); pb.set(6, 4, 0x1a1014); pb.set(10, 4, 0x1a1014); pb.hl(5, 9, 6, 0xc82a2a); pb.set(8, 10, GOLD[3]); },
+  p_parrot(pb) { const G = [0x1a4a22, 0x2a7a32, 0x4aaa3e, 0x8ad85a]; pb.blob(7, 9, 3.6, 4.6, [G[0], G[1], G[2], G[3], G[3]], {}); pb.disc(8, 4, 2.8, G[2]); pb.set(8, 3, 0x141014); pb.rect(10, 4, 2, 2, 0xf2c14a); pb.set(11, 6, 0xd49a2a); pb.line(5, 12, 3, 15, 0xd83a32); pb.line(6, 12, 5, 15, 0x2a5aa8); pb.vl(4, 7, 5, G[1]); },
+  p_monkey(pb) { const B = [0x3a2414, 0x5a3820, 0x7a4f2c, 0x9c683a], S = 0xe8c49a; pb.blob(8, 11, 3.6, 3.6, [B[0], B[1], B[2], B[3], B[3]], {}); pb.disc(8, 6, 3.6, B[2]); pb.ellipse(8, 7, 2.6, 2.2, S); pb.rect(3, 5, 2, 2, B[1]); pb.rect(11, 5, 2, 2, B[1]); pb.set(7, 6, 0x1a1014); pb.set(9, 6, 0x1a1014); pb.set(8, 8, 0x8a5a3a); pb.rect(6, 1, 4, 2, 0xb03232); pb.set(10, 1, GOLD[3]); pb.line(12, 12, 14, 9, B[1]); pb.set(14, 8, B[1]); },
+  p_kraken(pb) { const R = [0x6c204a, 0x93345e, 0xc85a82, 0xf08aa8, 0xffc0d0]; pb.blob(8, 6.5, 5.2, 5, R, {}); for (const [x, d] of [[3, 0], [5, 1], [8, 0], [10, 1], [12, 0]]) { pb.vl(x, 11, 2 + d, R[1]); pb.set(x + (x < 8 ? -1 : 1), 13 + d, R[2]); } for (const ex of [6, 10]) { pb.rect(ex - 1, 6, 2, 2, 0xffe14a); pb.set(ex, 7, 0x100610); } pb.set(5, 3, R[4]); },
+  lockpick(pb) { pb.line(2, 13, 12, 3, IRON[5]); pb.line(3, 14, 13, 4, IRON[3]); pb.set(13, 2, IRON[5]); pb.set(14, 3, IRON[5]); pb.set(14, 2, IRON[4]); pb.line(4, 9, 11, 2, IRON[4]); pb.set(11, 1, IRON[5]); pb.disc(2.5, 13.5, 1.8, GOLD[2]); pb.set(2, 13, GOLD[4]); },
+  r_watch(pb) { pb.disc(8, 9, 5.4, GOLD[2]); pb.disc(8, 9, 4.2, 0xf8f4e6); pb.rect(7, 2, 2, 2, GOLD[3]); pb.disc(8, 2, 1.4, GOLD[1]); pb.vl(8, 6, 3, 0x1a1014); pb.hl(8, 9, 3, 0x1a1014); pb.set(4, 6, GOLD[4]); pb.set(5, 5, GOLD[4]); for (const [x, y] of [[8, 5], [12, 9], [8, 13], [4, 9]]) pb.set(x, y, 0x8a6a2a); },
+  r_ring(pb) { for (let a = 0; a < 6.3; a += 0.06) { pb.set(8 + Math.cos(a) * 5, 9.5 + Math.sin(a) * 4.5, GOLD[3]); pb.set(8 + Math.cos(a) * 4, 9.5 + Math.sin(a) * 3.5, GOLD[1]); } pb.rect(6, 2, 5, 4, GOLD[2]); pb.hl(6, 2, 5, GOLD[4]); pb.rect(7, 3, 3, 2, 0x1c284e); pb.set(8, 3, 0x9fd8ff); },
+  r_pearls(pb) { for (let k = 0; k < 11; k++) { const a = Math.PI * (0.05 + k * 0.09), x = 8 + Math.cos(a) * 6, y = 3 + Math.sin(a) * 9; pb.disc(x, y, 1.5, 0x2a2434); pb.set(x - 0.5, y - 0.5, 0xa8a0c8); } pb.disc(8, 13, 2, 0x1a1620); pb.set(7, 12, 0xd8d0f0); },
+  r_casket(pb) { pb.rect(2, 7, 12, 7, 0x6a2030); pb.hl(2, 7, 12, 0x9a3448); pb.rect(2, 4, 12, 3, 0x7a2838); pb.hl(2, 4, 12, 0xb84a5e); pb.rect(2, 9, 12, 1, GOLD[2]); pb.rect(7, 8, 2, 3, GOLD[3]); for (const [x, y, c] of [[4, 3, 0x9fd8ff], [7, 2, 0xff6a84], [10, 3, 0x7aff8a], [12, 2, GOLD[4]], [5, 2, GOLD[3]]]) pb.set(x, y, c); pb.hl(2, 13, 12, 0x3a0c18); },
+  r_moons(pb) { pb.line(3, 1, 8, 5, IRON[4]); pb.line(13, 1, 8, 5, IRON[4]); pb.disc(8, 10, 5.2, IRON[2]); pb.disc(8, 10, 4.2, 0x16204e); for (const [cx, l] of [[6.2, 1], [9.8, 0]]) for (let y = 6; y < 14; y++) for (let x = 3; x < 13; x++) { const d1 = Math.hypot(x + 0.5 - cx, y + 0.5 - 10), d2 = Math.hypot(x + 0.5 - (cx + (l ? 1.5 : -1.5)), y + 0.5 - 10); if (d1 <= 2.7 && d2 > 2.3) pb.set(x, y, l ? 0xeef0f8 : 0x9fd8ff); } },
+  ink(pb) { pb.rect(5, 5, 6, 9, 0x1a1a2a); pb.vl(5, 6, 7, 0x4a4a6a); pb.rect(6, 3, 4, 2, 0x3a3a52); pb.rect(6, 1, 4, 2, 0xa0703f); pb.hl(6, 1, 4, 0xc8945a); pb.rect(6, 9, 4, 4, 0x0a0812); pb.set(7, 10, 0x5a3a8a); pb.set(12, 12, 0x0a0812); pb.set(13, 14, 0x0a0812); },
+  conch(pb) { const S = [0x8a4a5a, 0xc87a8a, 0xf0b0b0, 0xffe0d8, 0xfff6f0]; pb.blob(8.5, 9, 6, 4.6, S, {}); pb.blob(4.5, 6, 3.2, 3, S, {}); pb.set(2, 4, S[3]); pb.set(1, 3, S[4]); for (let k = 0; k < 4; k++) pb.line(5 + k * 2.4, 6 + k * 0.4, 6 + k * 2.4, 12, S[1]); pb.ellipse(11.5, 10.5, 2.6, 1.8, 0x5a2434); pb.ellipse(11.5, 10, 1.6, 1, 0xff9ab0); },
+  kraken_eye(pb) { pb.disc(8, 8, 6.4, 0xd8c8a0); pb.blob(8, 8, 6, 6, [0xb8a078, 0xd8c8a0, 0xf0e8c8, 0xfffbe6, 0xffffff], {}); pb.disc(8, 8, 3.8, 0xffc02a); pb.disc(8, 8, 2.8, 0xffe070); pb.rect(7, 4, 2, 8, 0x100610); pb.set(5, 5, 0xffffff); pb.set(6, 5, 0xffffff); for (const [x, y] of [[3, 10], [12, 11], [10, 3]]) pb.set(x, y, 0xc84a5a); },
+  tentacle_food(pb) { const R = [0x6a2a1e, 0x9a4a2a, 0xc87a3a, 0xe8a858, 0xf8d090]; for (let k = 0; k <= 20; k++) { const u = k / 20, x = 2.5 + u * 10 + Math.sin(u * 5) * 1.6, y = 12.5 - u * 9 - Math.sin(u * 3) * 1.2; pb.disc(x, y, 2.6 - u * 1.6, k % 4 === 0 ? R[1] : R[2]); } for (let k = 2; k <= 18; k += 4) { const u = k / 20, x = 2.5 + u * 10 + Math.sin(u * 5) * 1.6, y = 12.5 - u * 9 - Math.sin(u * 3) * 1.2; pb.set(x - 1, y + 1, R[4]); } pb.set(12, 1, 0xd8d8d8); pb.set(13, 0, 0xb8b8b8); pb.set(10, 0, 0xd8d8d8); },
   sk_slash(pb) {
     for (let a = -1.9; a < 0.4; a += 0.04) { const r = 6.5; pb.set(8 + Math.cos(a) * r, 9 + Math.sin(a) * r, 0xffffff); pb.set(8 + Math.cos(a) * (r - 1), 9 + Math.sin(a) * (r - 1), 0xbfe8ff); }
     P.saber(pb, 'steel');
@@ -279,9 +325,28 @@ const P = {
     for (const r of [3, 5, 7]) for (let a = -0.8; a <= 0.8; a += 0.12) pb.set(8 + Math.cos(a) * r, 9 + Math.sin(a) * r, r === 5 ? 0xffe14a : 0xffffff);
   },
   sk_roll(pb) {
-    for (let a = 3.6; a < 6.6; a += 0.06) pb.set(8 + Math.cos(a) * 5.5, 8 + Math.sin(a) * 5.5, 0xffffff);
-    pb.set(13, 9, 0xffffff); pb.set(14, 8, 0xffffff); pb.set(12, 8, 0xffffff); pb.set(13, 7, 0xffffff);
-    for (const [x, y] of [[2, 13], [4, 14], [1, 11]]) { pb.disc(x, y, 1.4, 0xd8c8a8); }
+    // la botte du pirate qui file, trois traits de vitesse derrière elle
+    const rows = [
+      '................',
+      '.......ccccc....',
+      '.......cLLLc....',
+      '.......dBBBd....',
+      '.......dBHBd....',
+      '.......dBBBd....',
+      '.......dGGGd....',
+      '.......dBHBd....',
+      '.......dBBBBd...',
+      '.......dBBHBBdd.',
+      '.......dBBBBBBBd',
+      '.......dBBBBBBBd',
+      '.......sssssssss',
+      '.......ss...ssss',
+    ];
+    const pal = { c: 0xb88a52, L: 0xe0b878, d: 0x4a2c14, B: 0x7a4a26, H: 0x9c6838, G: 0xf2c14a, s: 0x1c120a };
+    rows.forEach((r, y) => [...r].forEach((ch, x) => { if (pal[ch] !== undefined) pb.set(x, y + 1, pal[ch]); }));
+    pb.set(9, 7, 0xffe58a);
+    pb.hl(2, 4, 4, 0xffffff); pb.hl(0, 7, 6, 0xffffff); pb.hl(2, 10, 4, 0xffffff); pb.hl(1, 13, 5, 0xbfe8ff);
+    pb.set(1, 4, 0x9fd8ff); pb.set(1, 10, 0x9fd8ff);
   },
   sk_fists(pb) { pb.blob(8, 8, 5, 4.5, [0xa8664e, 0xd38f72, 0xf0bd9a, 0xffdcc2, 0xffeedd], {}); for (const x of [5, 7, 9, 11]) pb.vl(x, 5, 3, 0xa8664e); },
 };
