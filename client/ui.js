@@ -195,6 +195,9 @@ export class UI {
       if (ZONES[G.zone] && ZONES[G.zone].hard) buffs.push('☠ Zone extrême');
       const dt = now - G.meAt, jb = []; // 1.0 : la justice
       const ev = G.wevt; // 1.0 : une invasion annoncée
+      const ar = G.arena; // 1.0 : la Fosse
+      if (ar && ar.run && G.room >= 0 && G.world.rooms[G.room].kind === 'fosse') jb.push(['wanted', `⚔ Fosse : vague ${ar.run.wave} — ${ar.run.left} adversaire${ar.run.left > 1 ? 's' : ''}`]);
+      if (ar && ar.duel && G.room >= 0 && G.world.rooms[G.room].kind === 'fosse') jb.push(['wanted', `🤺 ${ar.duel.a} contre ${ar.duel.b}${ar.duel.fight ? '' : ` — paris ${ar.duel.pot[0]} / ${ar.duel.pot[1]}, ${Math.max(0, Math.ceil(ar.duel.at - (now - ar.t0)))} s`}`]);
       if (ev) jb.push(['wanted', ev.wave ? `☠ ${ev.name} : vague ${ev.wave}/3 — ${ev.left} morts` : `☠ Flotte maudite → ${ev.name} : ${this.mmss(Math.max(0, ev.in - (now - ev.at0)))}`]);
       if (me.jail > 0) jb.push(['jail', `⛓ Geôle ${this.mmss(Math.max(0, me.jail - dt))} · caution ${me.bail}`]);
       else if (me.wd) jb.push(['wanted', `☠ RECHERCHÉ${me.arrest ? ` — la garde ! ${Math.max(0, 10 - me.arrest)} s` : ''}`]);
@@ -726,6 +729,11 @@ export class UI {
     }
     if (N.shop) ch.push({ label: '🛒 Voir la marchandise', go: () => this.openShop(npcId) });
     if (N.dice) ch.push({ label: '🎲 Jouer aux dés', cls: 'q', go: () => this.diceMenu(npcId) });
+    if (N.arena) { // 1.0 : la Fosse
+      ch.push({ label: '⚔ Descendre dans la Fosse (vagues, seul ou avec votre groupe)', cls: 'q', go: () => { this.G.send({ t: 'arena', a: 'waves' }); this.close(); } });
+      ch.push({ label: '🏆 Le classement de la semaine', go: () => { this.arenaBoardAsk = npcId; this.G.send({ t: 'arena', a: 'board' }); } });
+      ch.push({ label: '🤺 Comment défier un pirate ?', go: () => this.say("Approchez-vous de lui ici même, dans la Fosse, et appuyez sur E : vous pourrez le défier en duel, avec ou sans mise. Les gradins parient sur le vainqueur — la maison garde cinq pour cent. On ne meurt pas dans ma Fosse : on finit dans les gradins.", [{ label: 'Autre chose…', go: () => this.dialogMain(npcId) }, { label: 'Au revoir.', go: () => this.close() }]) });
+    }
     if (N.bail && this.G.me && this.G.me.jail > 0) ch.push({ label: `🔑 Payer la caution (${this.G.me.bail} doublons)`, cls: 'q', go: () => { this.G.send({ t: 'bail' }); this.close(); } });
     if (npcId === 'isa') ch.push({ label: '⚒ Renforcer mon équipement', go: () => { this.close(); this.show('forge'); } });
     for (const t of N.topics || []) ch.push({ label: t.q, go: () => this.say(t.a, [{ label: 'Autre chose…', go: () => this.dialogMain(npcId) }, { label: 'Au revoir.', go: () => this.close() }]) });
@@ -813,7 +821,7 @@ export class UI {
     };
     const CATS = [
       ['Premiers pas', ['premier_sang', 'niveau10', 'riche', 'forge', 'proprietaire', 'peche']],
-      ['Combat', ['crabes', 'faucheur', 'elite', 'boss', 'invasion', 'defenseur', 'horde', 'duel', 'chasseur', 'roi_os', 'kraken', 'freres', 'damnes', 'eruption']],
+      ['Combat', ['crabes', 'faucheur', 'elite', 'boss', 'invasion', 'defenseur', 'horde', 'duel', 'chasseur', 'gladiateur', 'duelliste', 'champion_fosse', 'roi_os', 'kraken', 'freres', 'damnes', 'eruption']],
       ['Mer et voyages', ['navigateur', 'naufrageur', 'rade', 'explorateur', 'espadon', 'citoyen']],
       ['Trésors et secrets', ['tresor', 'speleo', 'fouineur', 'cambrioleur', 'jumeaux', 'flambeur']],
       ['Légendes', ['gardien', 'complice', 'elegance', 'libertalia', 'gloire', 'gloire_max', 'potence', 'melomane']],

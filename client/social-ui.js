@@ -13,7 +13,7 @@ const CH_TAG = { global: 'Global', groupe: 'Groupe', equipage: 'Équipage', mp: 
 const RANKS = { capitaine: 'Capitaine', officier: 'Officier', matelot: 'Matelot' };
 const RANK_ORDER = { capitaine: 0, officier: 1, matelot: 2 };
 export const FLAG_SYMS = [['crane', 'Crâne et tibias'], ['sabres', 'Sabres croisés'], ['ancre', 'Ancre'], ['coeur', 'Cœur percé'], ['etoile', 'Étoile du nord'], ['sablier', 'Sablier']];
-const ASK_TIME = { groupe: 60, equipage: 120, echange: 45 };
+const ASK_TIME = { groupe: 60, equipage: 120, echange: 45, duel: 30, pari: 12 };
 const STEPS = ['Proposer', 'Accepter', 'Garnir', 'Valider', 'Confirmer', 'Conclu'];
 
 // ------------------------------------------------------------ le pavillon, en pixels
@@ -165,7 +165,9 @@ export const social = {
     for (const el of box.children) if (el.dataset.k === key) el.remove();
     while (box.children.length >= 3) box.firstChild.remove();
     const el = document.createElement('div'); el.className = 'ask'; el.dataset.k = key;
-    const txt = m.kind === 'groupe' ? `<b>${esc(m.from)}</b> vous invite dans son groupe.<small>Expérience partagée et +10 % par compagnon proche.</small>`
+    if (m.kind === 'pari') return this.askBet(m);
+    const txt = m.kind === 'duel' ? `<b>${esc(m.from)}</b> vous défie en duel dans la Fosse${m.bet ? ` — mise : <b>${m.bet} doublons</b> chacun` : ''}.<small>On ne meurt pas dans la Fosse ; le vainqueur emporte les mises (moins 5 %).</small>`
+      : m.kind === 'groupe' ? `<b>${esc(m.from)}</b> vous invite dans son groupe.<small>Expérience partagée et +10 % par compagnon proche.</small>`
       : m.kind === 'equipage' ? `<b>${esc(m.from)}</b> vous invite à rejoindre l’équipage <b>« ${esc(m.crew)} »</b> [${esc(m.tag)}].`
         : `<b>${esc(m.from)}</b> vous propose un échange.<small>Rien ne change de mains avant votre double confirmation.</small>`;
     const dur = ASK_TIME[m.kind] || 45;
@@ -174,6 +176,7 @@ export const social = {
       el.remove(); clearTimeout(el.tm);
       if (m.kind === 'groupe') G.send({ t: 'soc', a: yes ? 'accept' : 'decline', name: m.from });
       else if (m.kind === 'equipage') { if (yes) G.send({ t: 'crew', a: 'accept' }); }
+      else if (m.kind === 'duel') G.send({ t: 'arena', a: yes ? 'accept' : 'decline' });
       else G.send({ t: 'trade', a: yes ? 'accept' : 'decline' });
     };
     el.querySelector('.ok').onclick = () => done(true);
@@ -183,6 +186,18 @@ export const social = {
     G.sfx.play('quest', 0.6);
   },
 
+  // 1.0 : les gradins parient sur le vainqueur d'un duel
+  askBet(m) {
+    const box = $('asks'), el = document.createElement('div'); el.className = 'ask'; el.dataset.k = 'pari';
+    for (const o of box.querySelectorAll('[data-k="pari"]')) o.remove();
+    el.innerHTML = `<div class="ask-t">🤺 <b>${esc(m.from)}</b> contre <b>${esc(m.vs)}</b> : les paris sont ouverts !<small>Pari mutuel : les gagnants se partagent la cagnotte (moins 5 %).</small></div>
+      <div class="ask-b"><select class="bet-n"><option>50</option><option selected>100</option><option>250</option><option>500</option></select><button class="btn ok" data-on="0">${esc(m.from)}</button><button class="btn ok" data-on="1">${esc(m.vs)}</button><button class="btn no">Non merci</button></div><div class="ask-time"><i style="animation-duration:12s"></i></div>`;
+    const done = () => { el.remove(); clearTimeout(el.tm); };
+    el.querySelectorAll('[data-on]').forEach((b) => { b.onclick = () => { this.G.send({ t: 'arena', a: 'bet', on: +b.dataset.on, n: +el.querySelector('.bet-n').value }); done(); }; });
+    el.querySelector('.no').onclick = done;
+    el.tm = setTimeout(done, 12000);
+    box.appendChild(el); this.G.sfx.play('coin', 0.6);
+  },
   // ------------------------------------------------------------ état social, cadres du groupe
   setSoc(s) {
     this.soc = s;
@@ -224,6 +239,7 @@ export const social = {
       member ? ['join', 'Rejoindre (téléportation depuis une ville)'] : (!g || lead) ? ['invite', 'Inviter dans le groupe'] : null,
       member && lead ? ['gkick', 'Retirer du groupe'] : null,
       ['trade', 'Proposer un échange'],
+      G.room >= 0 && G.world.rooms[G.room].kind === 'fosse' ? ['duel', '🤺 Défier en duel (Fosse)'] : null,
       friend ? ['unfriend', 'Retirer de vos amis'] : ['friend', 'Ajouter en ami'],
       s.crew && crewRank !== 'matelot' && !(s.crew.members || []).some(([n]) => n.toLowerCase() === key) ? ['crew', `Inviter dans l’équipage [${s.crew.tag}]`] : null,
       blocked ? ['unblock', 'Ne plus ignorer'] : ['block', 'Ignorer (bloquer)'],
@@ -244,11 +260,21 @@ export const social = {
       if (a === 'mp') return this.focusChat(`/mp ${name} `);
       if (a === 'report') return this.focusChat(`/signaler ${name} `);
       if (a === 'trade') return G.send({ t: 'trade', a: 'ask', name });
+      if (a === 'duel') return this.duelMenu(name, e);
       if (a === 'crew') return G.send({ t: 'crew', a: 'invite', name });
       if (a === 'gkick') return G.send({ t: 'soc', a: 'kick', name });
       G.send({ t: 'soc', a, name });
     };
     G.sfx.play('click');
+  },
+  duelMenu(name, ev) {
+    const menu = $('pmenu');
+    menu.innerHTML = `<div class="pm-h">Défier ${esc(name)}</div>` + [0, 100, 500, 1000, 2500].map((b) => `<button data-b="${b}">${b ? `Mise : ${b} doublons` : 'Pour l’honneur (sans mise)'}</button>`).join('');
+    menu.classList.remove('hidden');
+    const shut = () => { menu.classList.add('hidden'); removeEventListener('mousedown', out, true); };
+    const out = (e) => { if (!menu.contains(e.target)) shut(); };
+    setTimeout(() => addEventListener('mousedown', out, true), 0);
+    menu.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; shut(); this.G.send({ t: 'arena', a: 'duel', name, bet: +b.dataset.b }); };
   },
   closeMenus() { const m = $('pmenu'); if (m) m.classList.add('hidden'); },
 

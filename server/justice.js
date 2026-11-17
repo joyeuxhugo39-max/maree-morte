@@ -56,6 +56,8 @@ export const justice = {
   },
   // peut-on se battre ? (en plus des zones : canPvp dans game.js)
   pvpAllowed(a, b) {
+    if (a.duel || b.duel) return !!(a.duel && b.duel && this.duel && this.time >= this.duel.startAt); // un duel de la Fosse : eux deux seulement
+    if (a.arena || b.arena) return false;
     if (a.jail > 0 || b.jail > 0) return false;
     if (a.group && a.group === b.group) return false; // pas de tirs amis
     if (a.crew && a.crew === b.crew) return false;

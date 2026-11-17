@@ -230,6 +230,18 @@ function onMsg(m) {
     case 'seen': ui.addSeen(m.c); break;
     case 'codex': G.codex = m; if (ui.open === 'codex') ui.renderCodex(); break;
     case 'soc': ui.setSoc(m); break; // 1.0 : amis, groupe, équipage
+    case 'arena': { // 1.0 : la Fosse
+      if (m.board) {
+        const top = m.board.length ? m.board.map(([n, w], i) => `${i + 1}. ${n} — vague ${w}`).join('\n') : 'Personne n’a encore combattu cette semaine.';
+        const last = m.last && m.last.length ? `\n\nLa semaine passée : ${m.last.map(([, n, w], i) => `${['🥇', '🥈', '🥉'][i]} ${n} (${w})`).join(', ')}` : '';
+        ui.say(`Classement de la Fosse — semaine ${m.week}\n\n${top}${last}`, [{ label: 'Autre chose…', go: () => ui.dialogMain(ui.arenaBoardAsk || 'maitre_fosse') }, { label: 'Au revoir.', go: () => ui.close() }]);
+        break;
+      }
+      const was = G.arena && G.arena.duel;
+      G.arena = { run: m.run, duel: m.duel, t0: now };
+      if (m.duel && m.duel.fight && !(was && was.fight)) ui.banner('En garde !', `${m.duel.a} contre ${m.duel.b}`);
+      break;
+    }
     case 'wevt': { // 1.0 : une invasion annoncée
       const was = G.wevt;
       G.wevt = m.end ? null : { ...m, at0: now };

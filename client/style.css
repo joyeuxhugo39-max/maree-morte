@@ -237,7 +237,7 @@ body.spy { background: #050308; }
 .dlg-body { flex: 1; }
 .dlg-name { font-family: var(--title); font-size: 26px; color: #4a2410; line-height: 1; margin-bottom: 4px; }
 .dlg-name small { font-family: var(--ui); font-size: 12px; color: var(--ink2); margin-left: 8px; }
-#dlg-text { font-size: 16px; line-height: 1.45; min-height: 46px; }
+#dlg-text { font-size: 16px; line-height: 1.45; min-height: 46px; white-space: pre-line; max-height: 46vh; overflow-y: auto; }
 #dlg-choices { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
 #dlg-choices button { text-align: left; font-family: var(--ui); font-size: 15px; background: rgba(255, 255, 255, 0.35); border: 2px solid transparent; border-radius: 3px; padding: 5px 9px; cursor: pointer; color: var(--ink); }
 #dlg-choices button:hover { border-color: var(--wood3); background: rgba(255, 255, 255, 0.65); }
@@ -642,3 +642,4 @@ table.ladder td { padding: 4px; border-bottom: 1px dashed rgba(96, 54, 22, 0.25)
 .rep-row .rb { height: 8px; background: rgba(60, 30, 10, 0.2); border-radius: 4px; overflow: hidden; } .rep-row .rb i { display: block; height: 100%; background: linear-gradient(#e2bc54, #a8761c); }
 .rep-row .rl { font-size: 12px; font-weight: 700; color: #6a4a30; } .rep-row .rl.lv3, .rep-row .rl.lv4 { color: #2a6a3a; } .rep-row .rl.lv5 { color: #a8761c; }
 @media (max-width: 640px) { .rep-row { grid-template-columns: 1fr 70px; } .rep-row .rb, .rep-row .rx { display: none; } }
+.ask .bet-n { font-family: var(--ui); font-size: 14px; padding: 3px 4px; border: 2px solid #6b4426; border-radius: 3px; background: #fff8e4; }

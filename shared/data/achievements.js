@@ -9,6 +9,9 @@ export const ACHIEVEMENTS = {
   gloire: { name: 'Légende vivante', desc: 'Passé le niveau 30, atteindre la Gloire 10.', title: 'Légende vivante' }, // 1.0
   gloire_max: { name: 'Immortel', desc: 'Atteindre la Gloire 50, la plus haute.', title: 'Immortel des Sept Mers' },
   chasseur: { name: 'Chasseur de primes', desc: 'Abattre un forban recherché par la Capitainerie.', title: 'Chasseur de primes' },
+  gladiateur: { name: 'Gladiateur', desc: 'Tenir dix vagues dans la Fosse de Libertalia.', title: 'Gladiateur de la Fosse' },
+  duelliste: { name: 'Fine lame', desc: 'Remporter un duel dans la Fosse.', title: 'Fine lame' },
+  champion_fosse: { name: 'Champion de la Fosse', desc: 'Finir premier du classement de la semaine dans la Fosse.', title: 'Champion de la Fosse' },
   defenseur: { name: 'Rempart des vivants', desc: 'Repousser une flotte maudite venue envahir une ville.', title: 'Rempart des vivants' },
   melomane: { name: 'Mélomane', desc: 'Noter dans son carnet les huit airs de l’archipel (la boîte à musique les joue).', title: 'Mélomane des tavernes' },
   potence: { name: 'Gibier de potence', desc: 'Purger une peine à la Geôle de Port-Lanterne.', title: 'Gibier de potence' },

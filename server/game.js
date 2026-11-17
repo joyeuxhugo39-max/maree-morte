@@ -27,6 +27,7 @@ import { STRUCTS, PLANTER_GROW, HOME_OK, HOME_MAX, HOME_PRICE, QUEST_PICK, PROPE
 import { social } from './social.js';
 import { justice, SHIELD_AFTER_DEATH } from './justice.js';
 import { events } from './events.js';
+import { arena } from './arena.js';
 import { repLevel, buyPrice, sellPrice } from '../shared/data/places.js';
 import { LEGACY_VALUE, LEGACY_STRUCT, QUEST_ITEM_OLD_VALUE } from '../shared/data/legacy.js';
 import { generateWorld, canStand, moveWithCollision, moveBoat, zoneAt, tileAt, blocksShot, canSail, roomIdAt, Z, ZONES, SAFE } from '../shared/world.js';
@@ -109,6 +110,7 @@ export class Game {
     this.socialInit();
     this.justiceInit();
     this.eventsInit();
+    this.arenaInit();
     this.seenW = Math.ceil(this.world.W / SEEN_CELL); this.seenH = Math.ceil(this.world.OVER_H / SEEN_CELL); this.seenBytes = Math.ceil(this.seenW * this.seenH / 8);
     this.usedTokens = new Set(); this.fails = new Map(); this.bans = {}; this.reports = []; this.maintenance = null; // 1.0
     if (storage && storage.loadMeta) { Promise.resolve(storage.loadMeta('bans')).then((b) => { if (b) this.bans = b; }).catch(() => {}); Promise.resolve(storage.loadMeta('reports')).then((r) => { if (Array.isArray(r)) this.reports = r; }).catch(() => {}); }
@@ -215,6 +217,7 @@ export class Game {
       case 'crew': return this.crewAction(p, String(m.a), m);
       case 'trade': return this.tradeAction(p, String(m.a), m);
       case 'bail': return this.bail(p);
+      case 'arena': return this.arenaAction(p, String(m.a), m);
       case 'song': { const k = String(m.k), s = HOUSE_MUSIC.find(([x]) => x && x === k); if (!s || p.songs.has(k)) return; p.songs.add(k); p.dirtyMe = true; const n = HOUSE_MUSIC.length - 1; if (p.songs.size >= n) this.unlock(p, 'melomane'); return this.toast(p, `♪ Nouvel air noté dans votre carnet : « ${s[1]} » (${p.songs.size}/${n}). La boîte à musique de votre maison saura le jouer.`, 'quest'); }
       case 'ladder': return this.send(p, { t: 'ladder', top: this.ladderTop(), hist: p.pvpHist, me: [p.honor | 0, Math.floor(p.infamy || 0)] });
       case 'respawn': return this.respawn(p);
@@ -303,6 +306,7 @@ export class Game {
     this.socialLogin(p);
     this.justiceLogin(p);
     if (this.wevt) this.pushEvent(p);
+    if (this.board && this.board.champ === p.key) this.unlock(p, 'champion_fosse');
     if (!res.data) this.toast(p, 'Bienvenue ! Parlez à la Capitaine Morgane, près des quais (touche E).', 'quest');
     this.log(`[jeu] ${p.name} connecté (${this.players.size} en ligne)`);
   }
@@ -1569,6 +1573,7 @@ export class Game {
     if (p.hp <= 0) this.killPlayer(p, src);
   }
   killPlayer(p, src) {
+    if ((p.arena || p.duel) && this.inFosse(p)) return this.arenaKnockout(p); // 1.0 : dans la Fosse, on est mis à terre
     if (p.st) p.st.deaths++;
     if (p.riding) this.dismount(p);
     p.recallAt = 0;
@@ -3041,6 +3046,7 @@ export class Game {
     if (this.tickCount % 5 === 0) for (const p of this.players.values()) this.updateBuffs(p);
     if (this.tickCount % 5 === 0) this.updateVolcano();
     if (this.tickCount % 20 === 0) { this.justiceGlobalTick(); this.eventTick(); }
+    if (this.tickCount % 5 === 0) this.arenaTick();
     if (this.tickCount % 40 === 0 && this.players.size > 1) { // les autres pirates sur la carte
       const pl = [...this.players.values()].map((q) => [q.id, q.name, Math.round(q.x), Math.round(q.y), q.room, q.dead ? 1 : 0, this.isWanted(q) ? 1 : 0]);
       for (const p of this.players.values()) this.send(p, { t: 'map', pl });
@@ -3111,3 +3117,4 @@ export class Game {
 Object.assign(Game.prototype, social);
 Object.assign(Game.prototype, justice); // 1.0 : protection, infamie, primes, honneur, Geôle
 Object.assign(Game.prototype, events); // 1.0 : les invasions rares et annoncées
+Object.assign(Game.prototype, arena); // 1.0 : l'Arène de la Fosse
