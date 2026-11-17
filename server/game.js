@@ -156,6 +156,9 @@ export class Game {
       case 'talk': return this.onTalk(p, String(m.npc));
       case 'qa': return this.acceptQuest(p, String(m.q));
       case 'qt': return this.turnIn(p, String(m.q));
+      case 'track': return this.trackQuest(p, String(m.q), !!m.on);
+      case 'qab': return this.abandonQuest(p, String(m.q));
+      case 'sort': return this.sortInv(p);
       case 'buy': return this.buy(p, String(m.npc), String(m.item));
       case 'sell': return this.sell(p, m.slot | 0);
       case 'use': return this.useSlot(p, m.slot | 0);
@@ -163,7 +166,7 @@ export class Game {
       case 'equip': return this.equip(p, m.slot | 0);
       case 'unequip': return this.unequip(p, String(m.s));
       case 'swap': return this.swap(p, m.a | 0, m.b | 0);
-      case 'drop': return this.dropSlot(p, m.slot | 0);
+      case 'drop': return this.dropSlot(p, m.slot | 0, m.n == null ? 0 : m.n | 0);
       case 'pick': return this.pick(p, m.id | 0);
       case 'open': return this.openProp(p, m.id | 0);
       case 'chat': return this.chat(p, String(m.m || ''));
@@ -175,6 +178,12 @@ export class Game {
       case 'title': return this.setTitle(p, m.id == null ? null : String(m.id));
       case 'harvest': return this.questPick(p, m.id | 0);
       case 'ride': return this.toggleRide(p);
+      case 'emote': { // 0.8 : émotes de la barre (2 à 5)
+        const k = String(m.k);
+        if (!['danse', 'salut', 'doigt', 'salto'].includes(k) || p.dead || (p.cds.emote || 0) > this.time) return;
+        p.cds.emote = this.time + 1.2;
+        return this.ev(p.x, p.y, ['emote', p.id, k]);
+      }
       case 'place': return this.place(p, m.slot | 0, m.tx | 0, m.ty | 0);
       case 'unplace': return this.unplace(p, m.tx | 0, m.ty | 0);
       case 'sint': return this.structInteract(p, m.tx | 0, m.ty | 0);
@@ -218,7 +227,7 @@ export class Game {
     this.convertLegacy(p);
     this.send(p, {
       t: 'welcome', id: p.id, seed: this.world.seed, wt: this.worldTime, solo: this.solo,
-      me: this.meState(p), inv: p.inv, eq: p.eq, q: p.quests, chests: p.chests, look: p.look, base: p.base,
+      me: this.meState(p), inv: p.inv, eq: p.eq, q: p.quests, tr: p.track || [], chests: p.chests, look: p.look, base: p.base,
       name: p.name, x: p.x, y: p.y, isNew: !res.data, ach: p.ach, treasure: p.treasure, evt: this.invasionState(),
       history: (this.chatLog || []).slice(-12),
       build: this.buildSnapshot(p.key), dep: [...this.depleted].filter(([, t]) => t > this.time).map(([id, t]) => [id, Math.round(t - this.time)]),
@@ -257,6 +266,7 @@ export class Game {
       if (d.eq) for (const s of SLOTS) p.eq[s] = d.eq[s] && ITEMS[d.eq[s]] && ITEMS[d.eq[s]].slot === s ? d.eq[s] : null;
       if (d.quests && typeof d.quests === 'object') for (const q in d.quests) if (QUESTS[q]) p.quests[q] = { s: d.quests[q].s === 'done' ? 'done' : 'active', p: Array.isArray(d.quests[q].p) ? d.quests[q].p.map((v) => v | 0) : [], t: +d.quests[q].t || 0 };
       if (d.chests) p.chests = d.chests;
+      if (Array.isArray(d.track)) p.track = d.track.filter((q) => QUESTS[q] && p.quests[q] && p.quests[q].s === 'active').slice(0, 4);
       p.kills = d.kills | 0;
       if (d.upg) for (const k of UPG_SLOTS) p.upg[k] = Math.max(0, Math.min(UPG_MAX, d.upg[k] | 0));
       if (d.treasure && typeof d.treasure.x === 'number') p.treasure = { x: d.treasure.x, y: d.treasure.y };
@@ -302,7 +312,7 @@ export class Game {
     this.applyRefund(p);
   }
   serialize(p) {
-    return { name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: p.quests, chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: p.ach, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
+    return { name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: p.quests, track: p.track || [], chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: p.ach, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
   }
   save(p) {
     p.lastSave = this.time;
@@ -363,7 +373,7 @@ export class Game {
       st: { atk: p.stats.atk, gun: p.stats.gun, def: p.stats.def, crit: Math.round(p.stats.crit * 100), speed: p.stats.speed, regen: +p.stats.regen.toFixed(1) },
       cry: Math.max(0, +(p.cry - this.time).toFixed(1)), drunk: Math.max(0, +(p.drunkUntil - this.time).toFixed(1)),
       dead: p.dead, kills: p.kills, upg: p.upg, title: p.title, boat: p.boat, room: p.room, pk: p.pk, pet: p.pet || '', vo: this.time < p.thiefUntil ? 1 : 0,
-      ride: p.riding && p.eq.mount ? ITEMS[p.eq.mount].mount.kind : '', bf: p.buffs ? Object.entries(p.buffs).filter(([, v]) => v.until > this.time).map(([k, v]) => [k, Math.ceil(v.until - this.time)]) : [], rc: p.recallAt ? +(p.recallAt - this.time).toFixed(1) : 0,
+      ride: p.riding && p.eq.mount ? ITEMS[p.eq.mount].mount.kind : '', cnt: p.cnt, zsn: p.zs.size, zst: FAR_ZONES.length, cch: Object.keys(p.caches).length, bf: p.buffs ? Object.entries(p.buffs).filter(([, v]) => v.until > this.time).map(([k, v]) => [k, Math.ceil(v.until - this.time)]) : [], rc: p.recallAt ? +(p.recallAt - this.time).toFixed(1) : 0,
     };
   }
   toast(p, msg, kind = 'info') { this.send(p, { t: 'toast', msg, kind }); }
@@ -1962,13 +1972,45 @@ export class Game {
     } else { p.inv[a] = B; p.inv[b] = A; }
     p.dirtyInv = true;
   }
-  dropSlot(p, i) {
+  dropSlot(p, i, n = 0) { // n : combien en lâcher (0 = toute la pile)
     const s = p.inv[i];
     if (!s || p.dead) return;
     if (ITEMS[s.id].quest) return this.toast(p, "Vous ne pouvez pas jeter un objet de quête.", 'warn');
     if (this.boatInUse(p, s.id)) return this.toast(p, 'Vous êtes à bord !', 'warn');
-    p.inv[i] = null; p.dirtyInv = true; p.dirtyQ = true;
-    this.spawnDrop(p.x, p.y + 4, s.id, s.n, 0);
+    const k = n > 0 ? Math.min(n, s.n) : s.n;
+    s.n -= k; if (s.n <= 0) p.inv[i] = null;
+    p.dirtyInv = true; p.dirtyQ = true;
+    this.spawnDrop(p.x, p.y + 4, s.id, k, 0);
+    this.send(p, { t: 'dropped', id: s.id, n: k });
+  }
+  // ranger le sac : équipement, montures, consommables, objets de quête, le reste ; les plus rares d'abord
+  sortInv(p) {
+    if (p.dead || (p.cds.sort || 0) > this.time) return;
+    p.cds.sort = this.time + 0.5;
+    const order = (id) => { const it = ITEMS[id]; return it.slot === 'weapon' ? 0 : it.slot === 'gun' ? 1 : it.slot === 'outfit' ? 2 : it.slot ? 3 : it.mount ? 4 : it.boat ? 5 : it.use ? 6 : it.quest ? 8 : 7; };
+    const items = p.inv.filter(Boolean);
+    // regroupe les piles d'un même objet
+    const merged = [];
+    for (const s of items) { const m = isStackable(s.id) && merged.find((o) => o.id === s.id && o.n < STACK_MAX); if (m) { const k = Math.min(s.n, STACK_MAX - m.n); m.n += k; if (s.n - k > 0) merged.push({ id: s.id, n: s.n - k }); } else merged.push({ id: s.id, n: s.n }); }
+    merged.sort((a, b) => order(a.id) - order(b.id) || (ITEMS[b.id].rarity || 0) - (ITEMS[a.id].rarity || 0) || ITEMS[a.id].name.localeCompare(ITEMS[b.id].name, 'fr'));
+    for (let k = 0; k < p.inv.length; k++) p.inv[k] = merged[k] || null;
+    p.dirtyInv = true;
+  }
+  // quêtes suivies à l'écran (quatre au plus), et abandon d'une quête en cours
+  trackQuest(p, qid, on) {
+    if (!QUESTS[qid]) return;
+    p.track = (p.track || []).filter((q) => q !== qid && p.quests[q] && p.quests[q].s === 'active');
+    if (on && p.quests[qid] && p.quests[qid].s === 'active') { p.track.unshift(qid); p.track = p.track.slice(0, 4); }
+    p.dirtyQ = true;
+  }
+  abandonQuest(p, qid) {
+    const q = QUESTS[qid], st = p.quests[qid];
+    if (!q || !st || st.s !== 'active' || q.noAbandon) return;
+    delete p.quests[qid];
+    for (const g of q.goals) if (g.type === 'collect' && ITEMS[g.item] && ITEMS[g.item].quest && g.item !== 'conque_abysses') this.removeItem(p, g.item, this.countItem(p, g.item));
+    p.track = (p.track || []).filter((x) => x !== qid);
+    p.dirtyQ = true; p.dirtyInv = true;
+    this.toast(p, `Quête abandonnée : ${q.name}. Vous pourrez la reprendre auprès de ${NPCS[q.giver].name}.`, 'info');
   }
   nearNpc(p, id, range = INTERACT_RANGE + 16) {
     const n = this.npcPos.get(id);
@@ -2045,6 +2087,8 @@ export class Game {
     if (!q || questState(qid, p.quests, p.level) !== 'available' || !this.nearNpc(p, q.giver)) return;
     p.quests[qid] = { s: 'active', p: q.goals.map(() => 0) };
     q.goals.forEach((g, i) => { if (g.type === 'explore' && p.zone === g.zone) p.quests[qid].p[i] = 1; });
+    p.track = (p.track || []).filter((x) => p.quests[x] && p.quests[x].s === 'active' && x !== qid);
+    if (p.track.length < 4) p.track.unshift(qid); // une nouvelle quête est suivie d'office (s'il reste de la place)
     p.dirtyQ = true;
     this.toast(p, `Nouvelle quête : ${q.name}`, 'quest');
   }
@@ -2054,6 +2098,7 @@ export class Game {
     if (!goalsMet(qid, st, (id) => this.countItem(p, id))) return this.toast(p, 'Les objectifs ne sont pas remplis.', 'warn');
     for (const g of q.goals) if (g.type === 'collect') this.removeItem(p, g.item, g.n);
     p.quests[qid] = q.repeat ? { s: 'done', p: [], t: Date.now() } : { s: 'done', p: [] };
+    p.track = (p.track || []).filter((x) => x !== qid);
     p.gold += q.rewards.gold || 0;
     for (const [id, n] of q.rewards.items || []) this.giveOrDrop(p, id, n);
     this.giveXp(p, q.rewards.xp || 0);
@@ -2091,10 +2136,10 @@ export class Game {
     if (msg[0] === '/') {
       const [cmd] = msg.slice(1).split(' ');
       if (cmd === 'who' || cmd === 'qui') return this.send(p, { t: 'chat', from: null, kind: 'sys', m: `En ligne (${this.players.size}) : ${[...this.players.values()].map((q) => `${q.name} (niv. ${q.level})`).join(', ')}` });
-      if (cmd === 'aide' || cmd === 'help') return this.send(p, { t: 'chat', from: null, kind: 'sys', m: 'Commandes : /qui, /pos, /suicide (retour en ville). Émotes : /danse /salut /rire /joie /colere /assis.' });
+      if (cmd === 'aide' || cmd === 'help') return this.send(p, { t: 'chat', from: null, kind: 'sys', m: 'Commandes : /qui, /pos, /suicide (retour en ville). Émotes : /danse /salut /rire /joie /colere /assis /doigt /salto (ou les touches 2 à 5).' });
       if (cmd === 'pos') return this.send(p, { t: 'chat', from: null, kind: 'sys', m: `Position : ${Math.floor(p.x / TILE)}, ${Math.floor(p.y / TILE)} — ${p.room >= 0 ? this.world.rooms[p.room].name : ZONES[p.zone].name}${SAFE.has(p.zone) ? ' (zone sûre)' : ''}` });
       if (cmd === 'suicide' || cmd === 'unstuck') { if (!p.dead) this.killPlayer(p, null); return; }
-      const EMOTES = { danse: 'danse', salut: 'salut', rire: 'rire', colere: 'colere', 'colère': 'colere', joie: 'joie', assis: 'assis' };
+      const EMOTES = { danse: 'danse', salut: 'salut', rire: 'rire', colere: 'colere', 'colère': 'colere', joie: 'joie', assis: 'assis', doigt: 'doigt', salto: 'salto' };
       if (EMOTES[cmd]) { this.ev(p.x, p.y, ['emote', p.id, EMOTES[cmd]]); return; }
       return this.send(p, { t: 'chat', from: null, kind: 'sys', m: 'Commande inconnue. Tapez /aide.' });
     }
@@ -2689,7 +2734,7 @@ export class Game {
   flush(p) {
     if (p.dirtyMe) { p.dirtyMe = false; this.send(p, Object.assign({ t: 'me' }, this.meState(p))); }
     if (p.dirtyInv) { p.dirtyInv = false; this.send(p, { t: 'inv', inv: p.inv, eq: p.eq }); }
-    if (p.dirtyQ) { p.dirtyQ = false; this.send(p, { t: 'q', q: p.quests }); }
+    if (p.dirtyQ) { p.dirtyQ = false; this.send(p, { t: 'q', q: p.quests, tr: p.track || [] }); }
   }
   entMeta(e, kind) {
     if (kind === 'p') return { id: e.id, k: 'p', name: e.name, look: e.look, lvl: e.level, x: Math.round(e.x), y: Math.round(e.y), w: e.eq.weapon, g: e.eq.gun, dead: e.dead, ti: e.title ? ACHIEVEMENTS[e.title].title : '', bt: e.boat ? ITEMS[e.boat].boat.kind : '', pt: e.pet || '', vo: this.time < e.thiefUntil ? 1 : 0, rd: e.riding && e.eq.mount ? ITEMS[e.eq.mount].mount.kind : '' };

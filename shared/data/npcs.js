@@ -17,7 +17,7 @@ export const NPCS = {
       'bandana', 'chapeau_feuilles', 'chapeau_paille', 'bandana_noir', 'tricorne', 'casque_os', 'mariniere', 'gilet_cuir', 'armure_coquillages', 'carapace_crabe', 'manteau_corsaire', 'bottes_usees', 'bottes_pont',
       'collier_coquillages', 'talisman_os', 'collier_requin'],
     topics: [
-      { q: 'Comment devenir plus fort ?', a: "Abats des morts, gagne de l'expérience et équipe-toi mieux. Le Tourbillon d'acier s'apprend au niveau 2, la Rasade de rhum au 3, les Bombes au 4 et le Cri d'abordage au 6." },
+      { q: 'Comment devenir plus fort ?', a: "Abats des morts, gagne de l'expérience et équipe-toi mieux : tout s'achète, chez moi ou ailleurs. Et apprends à rouler sous les coups (Espace)." },
     ],
   },
   bartholome: {

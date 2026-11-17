@@ -85,14 +85,17 @@
         <div id="stats"></div>
       </div>
       <div class="bag">
+        <div id="bag-tools"><div id="bag-tabs"></div><button id="bag-sort" class="chip" title="Ranger le sac par type et rareté">⇅ Trier</button></div>
         <div id="bag"></div>
-        <div class="hint">Clic droit : utiliser / équiper · Glisser : ranger · <span id="sell-hint">Maj + clic : jeter</span></div>
+        <div id="bag-trash" title="Glissez un objet ici (ou hors du sac) pour le lâcher au sol">🗑 Glissez ici pour lâcher un objet</div>
+        <div class="hint">Clic droit : utiliser / équiper · Glisser : ranger · <span id="sell-hint">Maj + clic : lâcher</span></div>
       </div>
     </div>
   </div>
 
   <div id="panel-quests" class="panel hidden">
     <div class="panel-head"><h2>Journal de bord</h2><button class="x" data-close>✕</button></div>
+    <div id="qtabs"></div>
     <div class="quests-wrap"><div id="qlist"></div><div id="qdetail"></div></div>
   </div>
 
@@ -120,8 +123,10 @@
     <div class="hint">Un renforcement reste sur l'emplacement : il profite à toute pièce que vous y équipez ensuite.</div>
   </div>
 
+  <div id="qty" class="hidden"><div class="frame"><div id="qty-text"></div><input id="qty-n" type="number" min="1" value="1"><div class="qty-b"><button id="qty-all" class="chip">Tout</button><button id="qty-ok" class="btn">Lâcher</button><button id="qty-no" class="chip">Annuler</button></div></div></div>
   <div id="panel-ach" class="panel hidden">
     <div class="panel-head"><h2>Hauts faits</h2><button class="x" data-close>✕</button></div>
+    <div id="ach-sum"></div>
     <div id="ach-list"></div>
   </div>
 

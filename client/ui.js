@@ -2,8 +2,8 @@
 import { ITEMS } from '../shared/data/items.js';
 import { QUESTS, QUEST_ORDER, questState } from '../shared/data/quests.js';
 import { NPCS } from '../shared/data/npcs.js';
-import { SKILLS, HOTBAR } from '../shared/data/skills.js';
-import { ZONES, Z, SAFE } from '../shared/world.js';
+import { SKILLS, HOTBAR, EMOTES } from '../shared/data/skills.js';
+import { ZONES, Z, SAFE, roomIdAt, zoneAt } from '../shared/world.js';
 import { SLOTS, SLOT_NAMES, RARITY, INV_SIZE, MAP_W, OVER_H, TILE, clockString, dayFrac, darkness, weatherAt, isFullMoon } from '../shared/constants.js';
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { UPG_SLOTS, UPG_MAX, upgradeCost, UPG_TEXT } from '../shared/formulas.js';
@@ -293,7 +293,7 @@ export class UI {
     slot(g1, 'shot', iconURL('sk_shot'), `<img src="${mouseURL('R')}">`, eqTip('gun', 'Clic droit ou 1 : tirer'), () => this.G.useSkill('shot', true), 'hbeq');
     sep();
     const g2 = group();
-    for (const [id, k] of [['whirl', '2'], ['rum', '3'], ['bomb', '4'], ['cry', '5']]) slot(g2, id, iconURL(SKILLS[id].icon), k, skTip(id), () => this.G.useSkill(id, true));
+    for (const em of EMOTES) slot(g2, 'em_' + em.id, iconURL(em.icon), em.key, () => `<div class="tn">${esc(em.name)}</div><div class="tt">Touche ${em.key} · émote</div><div class="td">${esc(em.desc)}</div>`, () => this.G.emote(em.id), 'hbem');
     sep();
     const g3 = group();
     slot(g3, 'roll', iconURL(SKILLS.roll.icon), '␣', skTip('roll'), () => this.G.useSkill('roll', true));
@@ -326,6 +326,12 @@ export class UI {
       el.querySelector('.cd').style.setProperty('--cd', (left / total * 100).toFixed(1) + '%');
       const t = left > 0.95 ? String(Math.ceil(left)) : '';
       const cdt = el.querySelector('.cdt'); if (cdt.textContent !== t) cdt.textContent = t;
+    }
+    for (const em of EMOTES) { // les émotes : une courte recharge, sans niveau ni énergie
+      const el = this.hk['em_' + em.id]; if (!el) continue;
+      el.querySelector('.lv').style.display = 'none';
+      const left = Math.max(0, (G.cd['em_' + em.id] || 0) - now);
+      el.querySelector('.cd').style.setProperty('--cd', (left / 1.2 * 100).toFixed(1) + '%');
     }
     let food = 0;
     for (const s of G.inv || []) if (s && ITEMS[s.id].use && ITEMS[s.id].use.heal) food += s.n;
@@ -371,6 +377,29 @@ export class UI {
     }
     if (it.use && (it.use.heal || it.use.en)) { const u = it.use; lines.push(`<div class="ts">${u.heal ? '+' + u.heal + ' PV ' : ''}${u.en ? '+' + u.en + ' énergie ' : ''}${u.drunk ? '(ivresse)' : ''}</div>`); }
     if (it.use && it.use.combine) lines.push(`<div class="ts">Fragments : ${this.G.countItem(id)} / ${it.use.combine}</div>`);
+    // 0.8 : effets des armes, montures, voyages et potions
+    const fx = it.shot || it, pc = (v) => Math.round(v * 100) + ' %', sec = (v) => String(v).replace('.', ',') + ' s';
+    if (fx.slow) lines.push(`<div class="ts">Ralentit la cible de ${pc(fx.slow[0])} (${sec(fx.slow[1])})</div>`);
+    if (fx.frost) lines.push(`<div class="ts">Gel : −${pc(fx.frost[0])} de vitesse, attaques freinées (${sec(fx.frost[1])})</div>`);
+    if (fx.poison) lines.push(`<div class="ts">Poison : ${pc(fx.poison)} des dégâts en 4 s, cumulable trois fois</div>`);
+    if (fx.stun) lines.push(`<div class="ts">${pc(fx.stun[0])} de chances d'étourdir (${sec(fx.stun[1])})</div>`);
+    if (fx.chain) lines.push(`<div class="ts">Foudre : saute sur ${fx.chain[0]} ennemi${fx.chain[0] > 1 ? 's' : ''} voisin${fx.chain[0] > 1 ? 's' : ''} (${pc(fx.chain[1])} des dégâts)</div>`);
+    if (fx.pull) lines.push(`<div class="ts">Ramène la cible jusqu'à vous</div>`);
+    if (fx.fear) lines.push(`<div class="ts">${pc(fx.fear[0])} de chances de faire fuir (${sec(fx.fear[1])})</div>`);
+    if (fx.curse) lines.push(`<div class="ts">Malédiction : +${pc(fx.curse[1])} de dégâts subis (${sec(fx.curse[0])})</div>`);
+    if (fx.execute) lines.push(`<div class="ts">+${pc(fx.execute[1])} de dégâts sur une cible sous ${pc(fx.execute[0])} de vie</div>`);
+    if (fx.midas) lines.push(`<div class="ts">${pc(fx.midas)} de chances de faire tomber de l'or ; +50 % de doublons sur vos victimes</div>`);
+    if (fx.charge) lines.push(`<div class="ts">Élan : vous bondissez en frappant ; en selle, ×1,5 sans descendre</div>`);
+    if (fx.ricochet) lines.push(`<div class="ts">Ricoche sur ${fx.ricochet} ennemis de plus</div>`);
+    if (fx.boomer) lines.push(`<div class="ts">Revient au lanceur, et frappe au retour</div>`);
+    if (fx.homing) lines.push(`<div class="ts">Les balles cherchent leur cible</div>`);
+    if (it.leech && it.slot !== 'weapon') lines.push(`<div class="ts">Vol de vie : ${pc(it.leech)}</div>`);
+    if (it.goldFind) lines.push(`<div class="ts">+${pc(it.goldFind)} de doublons sur les morts</div>`);
+    if (it.curseOnHit) lines.push(`<div class="ts">${pc(it.curseOnHit)} de chances de maudire la cible</div>`);
+    if (it.mount) lines.push(`<div class="ts">En selle : vitesse +${pc(it.mount.speed - 1)}${it.mount.def ? ', défense +' + it.mount.def : ''}${it.mount.regen ? ', régénération +' + it.mount.regen : ''}</div><div class="tt">Touche C : monter ou descendre</div>`);
+    if (it.boat) lines.push(`<div class="ts">Vitesse ${it.boat.speed}${it.boat.cannon ? ' · ' + it.boat.cannon + ' canon' + (it.boat.cannon > 1 ? 's' : '') + ' par bordée' : ''}</div>`);
+    if (it.use && it.use.buff) lines.push(`<div class="ts">${{ spd: 'Vitesse', atk: 'Attaque et tir', def: 'Défense' }[it.use.buff]} +${pc(it.use.v)} pendant ${it.use.dur} s</div>`);
+    if (it.use && it.use.cleanse) lines.push(`<div class="ts">Guérit poison, saignements et brûlures</div>`);
     const up = ctx === 'eq' && it.slot && this.G.me && this.G.me.upg ? this.G.me.upg[it.slot] || 0 : 0;
     if (up) lines.push(`<div class="ts">Renforcement +${up} (${UPG_TEXT[it.slot]} ×${up})</div>`);
     let cmp = '';
@@ -380,7 +409,7 @@ export class UI {
       const a = it[k] || 0, b = cur ? cur[k] || 0 : 0;
       if (a !== b) cmp = `<div class="${a > b ? 'better' : 'worse'}">${a > b ? '▲' : '▼'} ${Math.abs(a - b)} par rapport à l'équipement actuel</div>`;
     }
-    const type = it.slot ? SLOT_NAMES[it.slot] : it.tool ? 'Outil' : it.use ? 'Consommable' : it.quest ? 'Objet de quête' : 'Matériau';
+    const type = it.slot ? SLOT_NAMES[it.slot] : it.boat ? 'Bateau' : it.tool ? 'Outil' : it.use ? 'Consommable' : it.quest ? 'Objet de quête' : it.place ? 'Mobilier' : 'Objet de valeur';
     const sell = it.quest ? 'Ne se vend pas' : `Revente : ${Math.max(1, Math.floor(it.value * 0.35))} doublons`;
     return `<div class="tn" style="color:${r.color}">${esc(it.name)}${up ? ' +' + up : ''}${n > 1 ? ' ×' + n : ''}</div><div class="tt">${type} · ${r.name}</div>${lines.join('')}${cmp}<div class="td">${esc(it.desc || '')}</div><div class="tv">${ctx === 'shop' ? 'Prix : ' + it.value + ' doublons' : sell}</div>`;
   }
@@ -388,6 +417,14 @@ export class UI {
   // ------------------------------------------------------------ inventaire
   bindInventory() {
     const bag = $('bag');
+    this.invFilter = 'all';
+    const tabs = [['all', 'Tout'], ['equip', 'Équipement'], ['use', 'Consommables'], ['quest', 'Quête'], ['misc', 'Divers']];
+    for (const [k, label] of tabs) { const b = document.createElement('button'); b.textContent = label; b.dataset.k = k; b.onclick = () => { this.invFilter = k; this.renderInventory(); }; $('bag-tabs').appendChild(b); }
+    $('bag-sort').onclick = () => { this.G.send({ t: 'sort' }); this.G.sfx.play('click'); };
+    const trash = $('bag-trash');
+    trash.ondragover = (e) => { e.preventDefault(); trash.classList.add('over'); };
+    trash.ondragleave = () => trash.classList.remove('over');
+    trash.ondrop = (e) => { e.preventDefault(); trash.classList.remove('over'); this.dropItem(+e.dataTransfer.getData('text/plain')); };
     for (let i = 0; i < INV_SIZE; i++) {
       const s = document.createElement('div'); s.className = 'slot'; s.dataset.i = i;
       s.onclick = (e) => this.bagClick(i, e);
@@ -395,7 +432,12 @@ export class UI {
       s.onmouseenter = (e) => { const it = this.G.inv && this.G.inv[i]; if (it) this.tip(e, this.itemTip(it.id, it.n)); };
       s.onmouseleave = () => this.untip();
       s.draggable = true;
-      s.ondragstart = (e) => { e.dataTransfer.setData('text/plain', String(i)); };
+      s.ondragstart = (e) => { e.dataTransfer.setData('text/plain', String(i)); e.dataTransfer.effectAllowed = 'move'; };
+      s.ondragend = (e) => { // lâché hors de toute fenêtre : l'objet tombe au sol
+        if (e.dataTransfer.dropEffect !== 'none' || this.shopNpc || this.storageOpen) return;
+        const inside = [...document.querySelectorAll('.panel:not(.hidden)')].some((p) => { const r = p.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; });
+        if (!inside && e.clientX > 0 && e.clientY > 0) this.dropItem(i);
+      };
       s.ondragover = (e) => e.preventDefault();
       s.ondrop = (e) => { e.preventDefault(); const from = +e.dataTransfer.getData('text/plain'); if (from !== i) this.G.send({ t: 'swap', a: from, b: i }); };
       bag.appendChild(s);
@@ -410,9 +452,27 @@ export class UI {
       el.ondrop = (e) => { e.preventDefault(); const from = +e.dataTransfer.getData('text/plain'); const it = this.G.inv[from]; if (it && ITEMS[it.id].slot === el.dataset.slot) this.G.send({ t: 'equip', slot: from }); };
     });
   }
+  // lâcher un objet : une quantité pour les piles, une confirmation pour les objets rares
+  dropItem(i) {
+    const G = this.G, it = G.inv && G.inv[i];
+    if (!it) return;
+    const def = ITEMS[it.id];
+    if (def.quest) { this.toast('Un objet de quête ne se jette pas.', 'warn'); return; }
+    const go = (n) => { G.send({ t: 'drop', slot: i, n }); this.untip(); };
+    if (it.n > 1) {
+      $('qty-text').innerHTML = `Lâcher combien de <b>${esc(def.name)}</b> ? (vous en avez ${it.n})`;
+      const inp = $('qty-n'); inp.max = it.n; inp.value = it.n; $('qty').classList.remove('hidden'); setTimeout(() => inp.select(), 30);
+      const end = (n) => { $('qty').classList.add('hidden'); if (n > 0) go(Math.min(it.n, n)); };
+      $('qty-all').onclick = () => end(it.n); $('qty-ok').onclick = () => end(Math.max(1, +inp.value | 0)); $('qty-no').onclick = () => end(0);
+      inp.onkeydown = (e) => { if (e.key === 'Enter') end(Math.max(1, +inp.value | 0)); if (e.key === 'Escape') end(0); e.stopPropagation(); };
+      return;
+    }
+    if ((def.rarity || 0) >= 2) { const open = this.open; this.confirm(`Lâcher <b style="color:${RARITY[def.rarity].color}">${esc(def.name)}</b> au sol ? N'importe qui pourra le ramasser.`, () => { go(1); if (open) this.show(open); }); return; }
+    go(1);
+  }
   bagClick(i, e) {
     const G = this.G;
-    if (e.shiftKey && G.inv[i]) { if (this.shopNpc) G.send({ t: 'sell', slot: i }); else G.send({ t: 'drop', slot: i }); this.untip(); return; }
+    if (e.shiftKey && G.inv[i]) { if (this.shopNpc) G.send({ t: 'sell', slot: i }); else this.dropItem(i); this.untip(); return; }
     if (this.sel >= 0 && this.sel !== i) { G.send({ t: 'swap', a: this.sel, b: i }); this.sel = -1; this.renderInventory(); return; }
     if (this.sel === i) { this.sel = -1; this.renderInventory(); return; }
     if (G.inv[i]) { this.sel = i; this.renderInventory(); }
@@ -429,9 +489,12 @@ export class UI {
   renderInventory() {
     const G = this.G;
     const slots = $('bag').children;
+    const cat = (id) => { const d = ITEMS[id]; return d.quest ? 'quest' : d.slot || d.boat ? 'equip' : d.use ? 'use' : 'misc'; };
+    const f = this.invFilter || 'all';
+    document.querySelectorAll('#bag-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.k === f));
     for (let i = 0; i < INV_SIZE; i++) {
       const el = slots[i], it = G.inv && G.inv[i];
-      el.className = 'slot' + (i === this.sel ? ' sel' : '') + (it && ITEMS[it.id].rarity ? ' r' + ITEMS[it.id].rarity : '');
+      el.className = 'slot' + (i === this.sel ? ' sel' : '') + (it && ITEMS[it.id].rarity ? ' r' + ITEMS[it.id].rarity : '') + (f !== 'all' && (!it || cat(it.id) !== f) ? ' dim' : '');
       el.innerHTML = it ? `<img src="${iconURL(ITEMS[it.id].icon, ITEMS[it.id].tint)}">${it.n > 1 ? `<span class="n">${it.n}</span>` : ''}` : '';
     }
     document.querySelectorAll('.eslot').forEach((el) => {
@@ -469,17 +532,20 @@ export class UI {
     const G = this.G, html = [];
     if (G.evt && G.evt.state === 'on') html.push(`<div class="track evt"><b>🌊 La Marée Morte attaque !</b><div>Vague ${Math.max(1, G.evt.wave)}/${G.evt.total} · ${G.evt.left} mort${G.evt.left > 1 ? 's' : ''} restant${G.evt.left > 1 ? 's' : ''}</div><div>Défendez la plage au sud-ouest du port.</div></div>`);
     if (G.treasure) html.push('<div class="track"><b>✗ Carte au trésor</b><div>Suivez la flèche et creusez sur la croix (E).</div></div>');
-    for (const qid of QUEST_ORDER) {
+    const tracked = (G.track || []).filter((q) => G.quests && G.quests[q] && G.quests[q].s === 'active');
+    const order = tracked.length ? tracked : QUEST_ORDER; // les quêtes suivies, sinon les premières en cours
+    for (const qid of order) {
       const st = G.quests && G.quests[qid];
       if (!st || st.s !== 'active') continue;
       const q = QUESTS[qid], prog = this.goalProgress(qid), ready = prog.every(([a, b]) => a >= b);
-      html.push(`<div class="track"><b>${esc(q.name)}</b>${ready ? `<div class="ready">✔ Retournez voir ${esc(NPCS[q.turnin].name)}</div>` : q.goals.map((g, i) => `<div class="${prog[i][0] >= prog[i][1] ? 'ok' : ''}">${prog[i][0] >= prog[i][1] ? '✔' : '•'} ${esc(g.text)}${prog[i][1] > 1 ? ` ${prog[i][0]}/${prog[i][1]}` : ''}</div>`).join('')}</div>`);
+      html.push(`<div class="track" data-q="${qid}"><b>${tracked.includes(qid) ? '<span class="star">★</span> ' : ''}${esc(q.name)}</b>${ready ? `<div class="ready">✔ Retournez voir ${esc(NPCS[q.turnin].name)}</div>` : q.goals.map((g, i) => `<div class="${prog[i][0] >= prog[i][1] ? 'ok' : ''}">${prog[i][0] >= prog[i][1] ? '✔' : '•'} ${esc(g.text)}${prog[i][1] > 1 ? ` ${prog[i][0]}/${prog[i][1]}` : ''}</div>`).join('')}</div>`);
     }
     if (!html.length) {
       const next = QUEST_ORDER.find((q) => this.questStateOf(q) === 'available');
       if (next) html.push(`<div class="track"><b>Nouvelle quête disponible</b><div>${esc(NPCS[QUESTS[next].giver].name)} a du travail pour vous (!)</div></div>`);
     }
-    $('tracker').innerHTML = html.slice(0, this.G.aide === 'complet' ? 3 : 1).join('');
+    $('tracker').innerHTML = html.slice(0, tracked.length ? Math.max(tracked.length, 1) + (G.evt && G.evt.state === 'on' ? 1 : 0) + (G.treasure ? 1 : 0) : this.G.aide === 'complet' ? 3 : 1).join('');
+    $('tracker').querySelectorAll('.track[data-q]').forEach((el) => (el.onclick = () => { this.show('quests'); this.renderQuests(el.dataset.q); }));
     if (this.open === 'quests') this.renderQuests();
   }
   renderQuests(sel) {
@@ -492,19 +558,38 @@ export class UI {
       else if (s === 'available') groups.available.push([qid, s]);
       else if (s === 'done') groups.done.push([qid, s]);
     }
-    if (!this.qsel || !QUESTS[this.qsel]) this.qsel = (groups.active[0] || groups.available[0] || groups.done[0] || [])[0];
-    const sec = (title, arr) => arr.length ? `<h4>${title}</h4>` + arr.map(([q, s]) => `<div class="qi ${q === this.qsel ? 'sel' : ''}" data-q="${q}">${s === 'ready' ? '✔ ' : s === 'available' ? '! ' : ''}${esc(QUESTS[q].name)}<small>${esc(NPCS[QUESTS[q].giver].name)} · niv. ${QUESTS[q].level}</small></div>`).join('') : '';
-    $('qlist').innerHTML = sec('En cours', groups.active) + sec('Disponibles', groups.available) + sec('Terminées', groups.done) || '<p>Aucune quête pour le moment.</p>';
+    const track = G.track || [];
+    groups.active.sort((a, b) => (track.includes(b[0]) ? 1 : 0) - (track.includes(a[0]) ? 1 : 0) || (b[1] === 'ready' ? 1 : 0) - (a[1] === 'ready' ? 1 : 0));
+    if (sel) this.qtab = groups.active.some(([q]) => q === sel) ? 'active' : groups.available.some(([q]) => q === sel) ? 'available' : 'done';
+    if (!this.qtab || !groups[this.qtab].length) this.qtab = ['active', 'available', 'done'].find((k) => groups[k].length) || 'active';
+    const tabs = $('qtabs');
+    tabs.innerHTML = '';
+    for (const [k, label] of [['active', 'En cours'], ['available', 'Disponibles'], ['done', 'Terminées']]) {
+      const b = document.createElement('button'); b.textContent = `${label} (${groups[k].length})`; b.className = this.qtab === k ? 'on' : '';
+      b.onclick = () => { this.qtab = k; this.qsel = (groups[k][0] || [])[0]; this.renderQuests(); };
+      tabs.appendChild(b);
+    }
+    const list = groups[this.qtab];
+    if (!this.qsel || !list.some(([q]) => q === this.qsel)) this.qsel = (list[0] || [])[0];
+    $('qlist').innerHTML = list.length ? list.map(([q, s]) => `<div class="qi ${q === this.qsel ? 'sel' : ''}" data-q="${q}">${track.includes(q) ? '<span class="star">★</span>' : ''}<span class="qlv">niv. ${QUESTS[q].level || 1}</span>${s === 'ready' ? '✔ ' : s === 'available' ? '! ' : ''}${esc(QUESTS[q].name)}<small>${esc(NPCS[QUESTS[q].giver].name)}</small></div>`).join('')
+      : `<p>${this.qtab === 'active' ? 'Aucune quête en cours.' : this.qtab === 'available' ? 'Aucune quête disponible pour le moment : gagnez des niveaux, ou explorez !' : 'Aucune quête terminée.'}</p>`;
     $('qlist').querySelectorAll('.qi').forEach((el) => (el.onclick = () => this.renderQuests(el.dataset.q)));
     const qid = this.qsel;
-    if (!qid) { $('qdetail').innerHTML = '<p>Parlez aux habitants de Port-Lanterne marqués d’un <b>!</b> pour obtenir des quêtes.</p>'; return; }
+    if (!qid) { $('qdetail').innerHTML = '<p>Parlez aux habitants marqués d’un <b>!</b> pour obtenir des quêtes. Les quêtes suivies (★) s’affichent à l’écran, et la flèche vous guide vers la première.</p>'; return; }
     const q = QUESTS[qid], s = this.questStateOf(qid), prog = this.goalProgress(qid);
+    const npcZone = (id) => { const n = (G.allNpcs || []).find((o) => o.id === id) || (G.npcs || []).find((o) => o.id === id); if (!n) return ''; const rid = roomIdAt(G.world, n.x, n.y); return rid >= 0 ? G.world.rooms[rid].name : ZONES[zoneAt(G.world, n.x, n.y)].name; };
     const rew = [`<span>✦ ${q.rewards.xp} XP</span>`, `<span><i class="coin"></i>${q.rewards.gold}</span>`, ...(q.rewards.items || []).map(([id, n]) => `<img title="${esc(ITEMS[id].name)}" src="${iconURL(ITEMS[id].icon, ITEMS[id].tint)}"><span>${esc(ITEMS[id].name)}${n > 1 ? ' ×' + n : ''}</span>`)];
+    const goals = s === 'done' ? '<p><b>Quête terminée.</b></p>' : q.goals.map((g, i) => { const [a, b2] = prog[i]; return `<div class="goal ${a >= b2 ? 'ok' : ''}">${a >= b2 ? '✔' : '☐'} ${esc(g.text)} ${b2 > 1 ? `(${a}/${b2})` : ''}${b2 > 1 ? `<div class="bar"><i style="width:${Math.round(a / b2 * 100)}%"></i></div>` : ''}</div>`; }).join('');
+    const tracked = track.includes(qid);
     $('qdetail').innerHTML = `<h3>${esc(q.name)}</h3>
+      <div class="meta">Niveau ${q.level || 1} · donnée par ${esc(NPCS[q.giver].name)}${npcZone(q.giver) ? ' (' + esc(npcZone(q.giver)) + ')' : ''}</div>
       <p><i>« ${esc(s === 'done' ? q.done : q.offer)} »</i></p>
-      ${s === 'done' ? '<p><b>Quête terminée.</b></p>' : q.goals.map((g, i) => `<div class="goal ${prog[i][0] >= prog[i][1] ? 'ok' : ''}">${prog[i][0] >= prog[i][1] ? '✔' : '☐'} ${esc(g.text)} ${prog[i][1] > 1 ? `(${prog[i][0]}/${prog[i][1]})` : ''}</div>`).join('')}
-      ${s === 'available' ? `<p>À accepter auprès de <b>${esc(NPCS[q.giver].name)}</b>.</p>` : s !== 'done' ? `<p>À rendre à <b>${esc(NPCS[q.turnin].name)}</b>. ${esc(q.progress)}</p>` : ''}
-      <div class="rew"><b>Récompenses :</b> ${rew.join(' ')}</div>`;
+      ${goals}
+      ${s === 'available' ? `<p>À accepter auprès de <b>${esc(NPCS[q.giver].name)}</b>${npcZone(q.giver) ? ', ' + esc(npcZone(q.giver)) : ''}.</p>` : s !== 'done' ? `<p>À rendre à <b>${esc(NPCS[q.turnin].name)}</b>${npcZone(q.turnin) ? ' (' + esc(npcZone(q.turnin)) + ')' : ''}. ${esc(q.progress)}</p>` : ''}
+      <div class="rew"><b>Récompenses :</b> ${rew.join(' ')}</div>
+      ${s === 'active' || s === 'ready' ? `<div class="qact"><button id="q-track" class="btn">${tracked ? '☆ Ne plus suivre' : '★ Suivre cette quête'}</button>${q.noAbandon ? '' : '<button id="q-ab" class="chip">Abandonner</button>'}</div>` : ''}`;
+    const bt = $('q-track'); if (bt) bt.onclick = () => { G.send({ t: 'track', q: qid, on: !tracked }); G.sfx.play('click'); };
+    const ba = $('q-ab'); if (ba) ba.onclick = () => this.confirm(`Abandonner <b>${esc(q.name)}</b> ? Vous perdrez votre progression${q.goals.some((g) => g.type === 'collect') ? ' et les objets de quête ramassés' : ''}.`, () => { G.send({ t: 'qab', q: qid }); this.show('quests'); });
   }
 
   // ------------------------------------------------------------ dialogues
@@ -621,19 +706,40 @@ export class UI {
   }
   // ------------------------------------------------------------ hauts faits
   renderAch() {
-    const G = this.G, list = $('ach-list'), ach = G.ach || {};
+    const G = this.G, list = $('ach-list'), ach = G.ach || {}, me = G.me || {};
+    const cur = me.title;
+    const total = Object.keys(ACHIEVEMENTS).length, got = Object.keys(ach).filter((k) => ACHIEVEMENTS[k]).length;
+    $('ach-sum').innerHTML = `<b>${got} / ${total}</b> hauts faits · titre porté : <b>${cur && ACHIEVEMENTS[cur] ? esc(ACHIEVEMENTS[cur].title) : 'aucun'}</b><div class="bar"><i style="width:${Math.round(got / total * 100)}%"></i></div>`;
+    if (cur) { const b = document.createElement('button'); b.className = 'chip'; b.textContent = 'Retirer le titre'; b.onclick = () => G.send({ t: 'title', id: null }); $('ach-sum').appendChild(b); }
+    const cnt = me.cnt || {}, secrets = G.world.doors.filter((d) => d.secret).length;
+    const PROG = {
+      crabes: [cnt.crab || 0, 50], faucheur: [me.kills || 0, 250], riche: [me.gold || 0, 1000], niveau10: [me.lvl || 1, 10],
+      forge: [Math.max(0, ...Object.values(me.upg || {})), 3], naufrageur: [cnt.ships || 0, 10], horde: [cnt.horde || 0, 30],
+      speleo: [G.found ? [...G.found].filter((id) => G.world.doors[id] && G.world.doors[id].secret).length : 0, secrets], fouineur: [me.cch || 0, 3], explorateur: [me.zsn || 0, me.zst || 11],
+    };
+    const CATS = [
+      ['Premiers pas', ['premier_sang', 'niveau10', 'riche', 'forge', 'proprietaire', 'peche']],
+      ['Combat', ['crabes', 'faucheur', 'elite', 'boss', 'invasion', 'horde', 'duel', 'roi_os', 'kraken', 'freres', 'damnes', 'eruption']],
+      ['Mer et voyages', ['navigateur', 'naufrageur', 'rade', 'explorateur', 'espadon']],
+      ['Trésors et secrets', ['tresor', 'speleo', 'fouineur', 'cambrioleur', 'jumeaux']],
+      ['Légendes', ['gardien', 'complice', 'elegance']],
+    ];
+    const seen = new Set(CATS.flatMap(([, ids]) => ids));
+    const rest = Object.keys(ACHIEVEMENTS).filter((k) => !seen.has(k));
+    if (rest.length) CATS.push(['Autres', rest]);
     list.innerHTML = '';
-    const cur = G.me && G.me.title;
-    const head = document.createElement('div'); head.className = 'ach-head';
-    head.innerHTML = `Titre affiché : <b>${cur && ACHIEVEMENTS[cur] ? esc(ACHIEVEMENTS[cur].title) : 'aucun'}</b> · ${Object.keys(ach).length}/${Object.keys(ACHIEVEMENTS).length} débloqués`;
-    if (cur) { const b = document.createElement('button'); b.className = 'chip'; b.textContent = 'Retirer'; b.onclick = () => G.send({ t: 'title', id: null }); head.appendChild(b); }
-    list.appendChild(head);
-    for (const id in ACHIEVEMENTS) {
-      const a = ACHIEVEMENTS[id], got = !!ach[id];
-      const row = document.createElement('div'); row.className = 'ach' + (got ? ' got' : '');
-      row.innerHTML = `<img src="${iconURL('trophy')}"><div><b>${esc(a.name)}</b><small>${esc(a.desc)}</small><small class="tt">Titre : « ${esc(a.title)} »</small></div>`;
-      if (got && cur !== id) { const b = document.createElement('button'); b.className = 'chip'; b.textContent = 'Porter'; b.onclick = () => G.send({ t: 'title', id }); row.appendChild(b); }
-      list.appendChild(row);
+    for (const [name, ids] of CATS) {
+      const ok = ids.filter((id) => ACHIEVEMENTS[id]);
+      if (!ok.length) continue;
+      const h = document.createElement('h4'); h.textContent = `${name} — ${ok.filter((id) => ach[id]).length}/${ok.length}`; list.appendChild(h);
+      for (const id of ok) {
+        const a = ACHIEVEMENTS[id], has = !!ach[id], pr = PROG[id];
+        const row = document.createElement('div'); row.className = 'ach' + (has ? ' got' : '');
+        const date = has && typeof ach[id] === 'number' && ach[id] > 1e12 ? new Date(ach[id]).toLocaleDateString('fr-FR') : '';
+        row.innerHTML = `<img src="${iconURL('trophy')}"><div><b>${esc(a.name)}</b><small>${esc(a.desc)}</small><small class="tt">Titre : « ${esc(a.title)} »</small>${has ? (date ? `<small class="date">Obtenu le ${date}</small>` : '') : pr ? `<small>${Math.min(pr[0], pr[1])} / ${pr[1]}</small><div class="bar"><i style="width:${Math.min(100, Math.round(pr[0] / Math.max(1, pr[1]) * 100))}%"></i></div>` : ''}</div>`;
+        if (has && cur !== id) { const b = document.createElement('button'); b.className = 'chip'; b.textContent = 'Porter'; b.onclick = () => G.send({ t: 'title', id }); row.appendChild(b); }
+        list.appendChild(row);
+      }
     }
   }
 

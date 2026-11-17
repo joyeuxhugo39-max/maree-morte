@@ -757,6 +757,14 @@ export class Renderer {
     const roll = e.rollT ? now - e.rollT : 9;
     const meta = sh.meta[dir][frame];
     const wpBehind = dir === 3;
+    const flip = e.flipT ? now - e.flipT : 9;
+    if (flip < 0.65) { // salto arrière : un bond, un tour complet
+      const k = flip / 0.65, lift = Math.round(Math.sin(k * Math.PI) * 16), a = -k * TAU * (dir === 1 ? -1 : 1);
+      ctx.translate(x + sh.fw / 2, y + sh.fh * 0.55 - lift); ctx.rotate(a); ctx.translate(-(x + sh.fw / 2), -(y + sh.fh * 0.55));
+      ctx.drawImage(sh.cv, 0, dir * sh.fh, sh.fw, sh.fh, x, y, sh.fw, sh.fh);
+      ctx.restore();
+      return;
+    }
     if (roll < 0.24) {
       const a = (roll / 0.24) * TAU * (Math.cos(e.rollA || 0) < 0 ? -1 : 1);
       ctx.translate(x + sh.fw / 2, y + sh.fh * 0.62); ctx.rotate(a); ctx.translate(-(x + sh.fw / 2), -(y + sh.fh * 0.62));
@@ -776,6 +784,7 @@ export class Renderer {
       ctx.globalAlpha = dying >= 0 ? Math.max(0, 1 - dying / 0.75) : 1;
     }
     if (!wpBehind) this.drawWeapon(ctx, e, sh, meta, x, y, now, dir);
+    if ((e.waveUntil || 0) > now || (e.fingerUntil || 0) > now) this.drawHandEmote(ctx, e, x, y, now);
     if (e.burnT && dying >= 0) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.max(0, 0.8 - dying); ctx.drawImage(this.glows.warm, Math.round(e.x - camX) - 16, Math.round(e.y - camY) - 30, 32, 34); ctx.globalCompositeOperation = 'source-over'; if (rnd() < 0.8) this.burst(e.x + (rnd() - 0.5) * 10, e.y - 4, 1, { z: 10, col: ['#ffd24a', '#ff8a2a', '#e04a1a'], up: 40, speed: 6, life: 0.5, g: -30 }); }
     ctx.restore();
     if (e.k === 'm' && (e.flags & 16)) { // carapace : presque rien ne passe
@@ -794,6 +803,22 @@ export class Renderer {
     } else if (e.moving && rnd() < 0.06) {
       const t = tileAt(this.world, e.x, e.y);
       if (t === T.SAND || t === T.DIRT || t === T.MUD) this.burst(e.x, e.y, 1, { z: 1, col: t === T.SAND ? ['#f2dca6', '#d8b77b'] : ['#9c744a', '#b48b5c'], up: 12, speed: 10, life: 0.4, g: 60 });
+    }
+  }
+  // émotes de la main, au-dessus de l'épaule : un salut qui s'agite, ou le doigt d'honneur
+  drawHandEmote(ctx, e, x, y, now) {
+    const skin = [0xf2c8a0, 0xd8a070, 0xa8704a, 0x6e4a32][(e.look && e.look.skin) | 0] || 0xf2c8a0;
+    const S = '#' + skin.toString(16).padStart(6, '0'), D = '#1c1214';
+    const px = (a, b, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x + a, y + b, w, h); };
+    if ((e.fingerUntil || 0) > now) {
+      const hx = 15, hy = 2 + Math.round(Math.sin(now * 10) * 0.6);
+      px(hx - 1, hy + 2, 6, 6, D); px(hx, hy + 3, 4, 4, S); // le poing
+      px(hx + 1, hy - 2, 3, 5, D); px(hx + 2, hy - 1, 1, 4, S); // le doigt levé
+      px(hx - 1, hy + 8, 3, 3, D); px(hx, hy + 8, 1, 2, S); // le poignet
+    } else {
+      const wv = Math.round(Math.sin(now * 14) * 2), hx = 15 + wv, hy = 1;
+      px(hx - 1, hy - 1, 6, 7, D); px(hx, hy, 4, 5, S); px(hx, hy - 2, 1, 2, S); px(hx + 2, hy - 2, 1, 2, S); // la main ouverte
+      px(15, hy + 6, 3, 5, D); px(16, hy + 6, 1, 4, S); // l'avant-bras
     }
   }
   drawCC(ctx, e, sh, camX, camY, now) {

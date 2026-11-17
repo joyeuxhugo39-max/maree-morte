@@ -191,7 +191,7 @@ function onMsg(m) {
       ui.renderTracker();
       break;
     }
-    case 'q': G.quests = m.q; G.refreshNpcs(); ui.renderTracker(); break;
+    case 'q': G.quests = m.q; if (m.tr) G.track = m.tr; G.refreshNpcs(); ui.renderTracker(); break;
     case 'map': G.mapPlayers = m.pl; break;
     case 'spy': G.spyUntil = now + m.dur; G.renderer.spy = true; G.renderer.resize(G.renderer.lastW, G.renderer.lastH); document.body.classList.add('spy'); G.sfx.play('pickup'); break;
     case 'erupt': { // le volcan se réveille
@@ -229,6 +229,7 @@ function onMsg(m) {
       break;
     }
     case 'found': G.found = new Set(m.found || []); G.sfx.play('quest'); break;
+    case 'dropped': ui.feed(`Lâché : ${ITEMS[m.id].name}${m.n > 1 ? ' ×' + m.n : ''}`, iconURL(ITEMS[m.id].icon, ITEMS[m.id].tint)); G.sfx.play('dig', 0.4); break;
     case 'pos': {
       if (m.travel) { ui.fade(); G.sfx.play('splash', 0.6); G.snapCam = true; }
       const p = G.player; if (!p) break;
@@ -271,7 +272,7 @@ function start(m, now) {
   G.refreshNpcs && (G.me = m.me, G.refreshNpcs());
   G.ach = m.ach || {}; G.treasure = m.treasure || null; G.evt = m.evt || null;
   G.structs.clear(); G.floors.clear(); G.bases = []; G.world.block.fill(0); G.world.doorOwner.clear();
-  G.myKey = String(m.name).toLowerCase(); G.room = m.room == null ? -1 : m.room; G.lastRoom = -99; G.found = new Set(m.found || []);
+  G.myKey = String(m.name).toLowerCase(); G.room = m.room == null ? -1 : m.room; G.lastRoom = -99; G.found = new Set(m.found || []); G.track = m.tr || [];
   if (m.build) applyBuild({ a: m.build.s, af: m.build.f, b: m.build.b }, now);
   G.depleted.clear(); for (const [id, sec] of m.dep || []) G.depleted.set(id, now + sec);
   G.homes = new Map((m.homes || []).map(([k, name, lock]) => [k, { name, lock: lock || 0 }]));
@@ -507,8 +508,11 @@ function onEvent(ev, t) {
     case 'emote': {
       if (!e) break;
       const k = ev[2];
-      const say = { salut: 'Ohé !', rire: 'Ha ha ha !', colere: 'Grrr !', joie: 'Yo-ho-ho !' }[k];
-      if (k === 'danse') e.danceUntil = now + 4;
+      const say = { salut: 'Ohé !', rire: 'Ha ha ha !', colere: 'Grrr !', joie: 'Yo-ho-ho !', doigt: ['Tiens, prends ça !', 'Va donc, eh !', 'Et ça, tu le vois ?'][Math.floor(Math.random() * 3)] }[k];
+      if (k === 'danse') { e.danceUntil = now + 4; G.sfx.play('level', vol(e.x, e.y) * 0.25); }
+      if (k === 'salut') e.waveUntil = now + 1.8;
+      if (k === 'doigt') e.fingerUntil = now + 2;
+      if (k === 'salto') { e.flipT = now; G.sfx.play('roll', vol(e.x, e.y)); setTimeout(() => R.smoke(e.x, e.y, 6, 'rgba(220,200,160,0.5)', { size: 2, life: 0.5 }), 600); }
       if (k === 'assis') e.sitUntil = now + 60;
       if (say) R.addFx({ kind: 'bubble', text: say, follow: () => e, dur: 2.2, h: 40 });
       if (k === 'joie') R.burst(e.x, e.y, 14, { z: 20, col: ['#ffd23a', '#ff93b8', '#ffffff'], up: 50, speed: 30, life: 0.8 });
@@ -678,6 +682,15 @@ function questNeeds(item) {
   let have = 0; for (const s of G.inv || []) if (s && s.id === item) have += s.n;
   return Math.max(0, need - have);
 }
+// les émotes de la barre (2 à 5)
+function emote(k) {
+  const now = nowS();
+  if (!G.player || G.player.dead || now < (G.emoteAt || 0)) return;
+  G.emoteAt = now + 1.2; G.cd['em_' + k] = now + 1.2; G.cdTotal['em_' + k] = 1.2;
+  G.send({ t: 'emote', k });
+  G.ui.flashSkill('em_' + k);
+}
+G.emote = emote;
 // ------------------------------------------------------------ boucle
 let lastT = performance.now();
 function loop(ts) {
@@ -753,7 +766,7 @@ function outside(o) {
   if (!d || (d.secret && !G.found.has(d.id))) return null;
   return Object.assign({}, o, { x: d.ox, y: d.oy, npc: 0, h: 22 });
 }
-const DROPPED_BY = { os_maudit: 'zsailor', dent_zombie: 'buccaneer', algue_noire: 'drowned', poudre_noire: 'skelgun', pince_crabe: 'crab', encre_noire: 'drowned', ecaille_sirene: 'sirene', soie_pendu: 'pendu', plume_corbeau: 'medecin_peste', os_legionnaire: 'legionnaire', coeur_golem: 'golem_lave', braise: 'calcine', herbes: 'medecin_peste', cuir_molosse: 'chien_mort' };
+const DROPPED_BY = { lame_rouillee: 'buccaneer', voile_dechiree: 'zsailor', os_maudit: 'zsailor', dent_zombie: 'buccaneer', algue_noire: 'drowned', poudre_noire: 'skelgun', pince_crabe: 'crab', encre_noire: 'drowned', ecaille_sirene: 'sirene', soie_pendu: 'pendu', plume_corbeau: 'medecin_peste', os_legionnaire: 'legionnaire', coeur_golem: 'golem_lave', braise: 'calcine', herbes: 'medecin_peste', cuir_molosse: 'chien_mort' };
 function computeObjective() { return outside(computeObjective0()); }
 function computeObjective0() {
   const p = G.player;
@@ -761,8 +774,9 @@ function computeObjective0() {
   if (G.evt && G.evt.state === 'on') return { x: G.evt.x, y: G.evt.y, label: 'Invasion', col: '#ff6a5a' };
   if (G.treasure) return { x: G.treasure.x, y: G.treasure.y, label: 'Trésor', col: '#ff6a5a' };
   const npcAt = (id) => G.npcs.find((n) => n.id === id) || G.allNpcs.find((n) => n.id === id);
+  const tracked = (G.track || []).filter((q) => G.quests && G.quests[q] && G.quests[q].s === 'active');
   const near = (mob) => { let best = null, bd = 1e9; for (const sp of G.world.spawns) if (sp.mob === mob) { const d = Math.hypot(sp.x - p.x, sp.y - p.y); if (d < bd) { bd = d; best = sp; } } if (!best) for (const r of G.world.seaRoutes || []) if (r.ship === mob) for (const [x, y] of r.pts) { const d = Math.hypot(x - p.x, y - p.y); if (d < bd) { bd = d; best = { x, y }; } } return best; };
-  for (const qid of QUEST_ORDER) {
+  for (const qid of [...tracked, ...QUEST_ORDER.filter((q) => !tracked.includes(q))]) { // la flèche suit d'abord les quêtes suivies
     const st = G.quests && G.quests[qid];
     if (!st || st.s !== 'active') continue;
     const q = QUESTS[qid];
@@ -777,6 +791,12 @@ function computeObjective0() {
       if (g.type === 'collect') {
         if (g.item === 'tonnelet') { const pr = G.world.props.find((o) => o.type === 'tonnelet'); return { x: pr.x, y: pr.y, label: 'Tonnelet', h: 16 }; }
         if (g.item === 'eclat_cristal') { if (G.room < 0) continue; let best = null, bd = 1e9; for (const pr of G.world.props) if (pr.type === 'cristal' && roomIdAt(G.world, pr.x, pr.y) === G.room) { const d = Math.hypot(pr.x - p.x, pr.y - p.y); if (d < bd) { bd = d; best = pr; } } if (best) return { x: best.x, y: best.y, label: 'Cristal', h: 22 }; continue; }
+        const pick = Object.entries(QUEST_PICK).filter(([, v]) => v.item === g.item).map(([k]) => k);
+        if (pick.length && G.room < 0) { // un décor à fouiller : le plus proche (pas encore vidé)
+          let best = null, bd = 1e9; const tnow = performance.now() / 1000;
+          for (const pr of G.harvestable) if (pick.includes(pr.type) && !((G.depleted.get(pr.id) || 0) > tnow)) { const d = Math.hypot(pr.x - p.x, pr.y - p.y); if (d < bd) { bd = d; best = pr; } }
+          if (best) return { x: best.x, y: best.y, label: ITEMS[g.item].name, h: 16 };
+        }
         const sp = near(DROPPED_BY[g.item] || 'zsailor'); if (sp) return { x: sp.x, y: sp.y, label: ITEMS[g.item].name, h: 24 };
       }
     }
@@ -930,10 +950,10 @@ function handleKeys(now) {
     if (k.key === 'f') { G.send({ t: 'eat' }); continue; }
     switch (k.code) {
       case 'Digit1': case 'MouseRight': useSkill('shot'); break;
-      case 'Digit2': useSkill('whirl'); break;
-      case 'Digit3': useSkill('rum'); break;
-      case 'Digit4': useSkill('bomb'); break;
-      case 'Digit5': useSkill('cry'); break;
+      case 'Digit2': emote('danse'); break;
+      case 'Digit3': emote('salut'); break;
+      case 'Digit4': emote('doigt'); break;
+      case 'Digit5': emote('salto'); break;
       case 'Space': case 'ShiftLeft': useSkill('roll'); break;
     }
   }

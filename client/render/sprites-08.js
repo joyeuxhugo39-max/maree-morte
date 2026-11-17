@@ -45,6 +45,31 @@ registerIcons({
     for (const [x, y] of [[5, 5], [10, 5], [5, 10], [10, 10]]) { pb.disc(x, y, 2.6, G[2]); pb.set(x - 1, y - 1, G[4]); }
     pb.disc(7.5, 7.5, 1.6, G[3]); pb.line(9, 10, 13, 15, G[1]);
   },
+  // émotes (touches 2 à 5)
+  em_danse(pb) { // deux notes de musique
+    const G = [0xa86e1c, 0xd49a2a, 0xf2c14a, 0xffe58a];
+    for (const [x, y] of [[3, 10], [9, 8]]) { pb.ellipse(x + 1, y + 2, 2, 1.6, G[2]); pb.set(x, y + 1, G[3]); pb.vl(x + 3, y - 6, 8, G[1]); }
+    pb.line(6, 4, 12, 2, G[2], 2); pb.set(13, 13, 0xff93b8); pb.set(1, 4, 0x9fd8ff); pb.set(14, 6, 0xffffff);
+  },
+  em_salut(pb) { // une main ouverte qui salue
+    const S = [0xa8704a, 0xd8a070, 0xf2c8a0, 0xffe4c8];
+    pb.rect(5, 6, 6, 6, S[2]); pb.vl(10, 6, 6, S[1]); pb.hl(5, 11, 6, S[1]);
+    for (const [x, h] of [[5, 4], [7, 5], [9, 4]]) { pb.vl(x, 6 - h, h, S[2]); pb.vl(x + 1, 6 - h, h, S[1]); pb.set(x, 6 - h, S[3]); }
+    pb.line(11, 8, 13, 5, S[2], 2); pb.rect(6, 12, 4, 3, S[1]);
+    for (const [x, y] of [[2, 3], [1, 6], [14, 2]]) pb.set(x, y, 0xffffff);
+  },
+  em_doigt(pb) { // le poing, et le doigt du milieu levé
+    const S = [0xa8704a, 0xd8a070, 0xf2c8a0, 0xffe4c8];
+    pb.rect(4, 7, 8, 6, S[2]); pb.hl(4, 7, 8, S[3]); pb.vl(11, 7, 6, S[1]); pb.hl(4, 12, 8, S[1]);
+    for (const x of [5, 9]) pb.hl(x, 8, 2, S[1]);
+    pb.rect(7, 1, 2, 7, S[2]); pb.vl(8, 1, 7, S[1]); pb.set(7, 1, S[3]);
+    pb.rect(5, 13, 5, 3, S[1]);
+  },
+  em_salto(pb) { // un bonhomme qui tourne, et sa trajectoire
+    for (let a = 0; a <= 20; a++) { const t = a / 20 * Math.PI * 1.6 + 0.6; pb.set(Math.round(8 + Math.cos(t) * 6), Math.round(8 + Math.sin(t) * 6), 0x9fd8ff); }
+    pb.set(13, 3, 0xffffff); pb.set(14, 4, 0x9fd8ff); pb.set(12, 4, 0x9fd8ff);
+    pb.disc(8, 5, 1.6, 0xf2c8a0); pb.line(8, 7, 8, 10, 0xb03232, 2); pb.line(8, 10, 6, 13, 0x2a3c70); pb.line(8, 10, 10, 13, 0x2a3c70); pb.line(8, 8, 5, 6, 0xf2c8a0); pb.line(8, 8, 11, 6, 0xf2c8a0);
+  },
   conch_pink(pb) {
     const S = [0x8a3a6a, 0xc86aa0, 0xf0a8d0, 0xffd8ec, 0xfff4fa];
     pb.blob(8.5, 9, 6, 4.6, S, {}); pb.blob(4.5, 6, 3.2, 3, S, {}); pb.set(2, 4, S[3]); pb.set(1, 3, S[4]);
