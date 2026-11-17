@@ -368,7 +368,7 @@ function upsert(meta, t) {
     G.ents.set(meta.id, e);
     if (meta.k === 'm' && (meta.hp < meta.mhp)) e.hp = Math.round(meta.hp / meta.mhp * 100);
   }
-  if (meta.k === 'p') { e.name = meta.name; e.look = meta.look; e.lookKey = JSON.stringify(meta.look); e.lvl = meta.lvl; e.weapon = meta.w; e.gun = meta.g; e.title = meta.ti || ''; e.bt = meta.bt || ''; e.pet = meta.pt || ''; e.thief = !!meta.vo; e.cw = meta.cw || ''; e.wd = !!meta.wd; e.pr = !!meta.pr; e.gl = meta.gl || 0; }
+  if (meta.k === 'p') { e.name = meta.name; e.look = meta.look; e.lookKey = JSON.stringify(meta.look); e.lvl = meta.lvl; e.weapon = meta.w; e.gun = meta.g; e.title = meta.ti || ''; e.bt = meta.bt || ''; e.pet = meta.pt || ''; e.thief = !!meta.vo; e.cw = meta.cw || ''; e.wd = !!meta.wd; e.pr = !!meta.pr; e.gl = meta.gl || 0; e.ab = meta.ab || 0; }
   else if (meta.k === 'm') { e.type = meta.type; e.sun = !!meta.sun; e.horde = !!meta.hd; }
   else if (meta.k === 'a') { e.name = meta.name; e.cap = meta.cap; if (meta.sink && !e.sinkT) e.sinkT = t - 3; }
   else e.type = meta.type;
@@ -589,7 +589,7 @@ function onEvent(ev, t) {
 // ------------------------------------------------------------ actions du joueur
 function tryAttack(aim, now) {
   const p = G.player;
-  if (!p || !G.me || G.me.dead || p.boat) return;
+  if (!p || !G.me || G.me.dead || p.boat || G.me.ab) return;
   if ((G.cd.slash || 0) > now) return;
   const spd = (G.eq.weapon && ITEMS[G.eq.weapon].speed) || 0.55;
   G.cd.slash = now + spd; G.cdTotal.slash = spd;
@@ -609,9 +609,10 @@ function useSkill(id) {
   if (!me || !p || me.dead) return;
   if (id === 'slash') return tryAttack(G.aim, now);
   if (me.lvl < s.lvl) { G.ui.toast(`${s.name} : niveau ${s.lvl} requis.`, 'warn'); G.sfx.play('deny'); return; }
-  const boat = p.boat && ITEMS[p.boat] && ITEMS[p.boat].boat;
-  if (boat && (id === 'whirl' || id === 'roll')) { G.ui.toast('Impossible à bord.', 'warn'); G.sfx.play('deny'); return; }
-  const cannon = id === 'shot' && boat && boat.cannon;
+  const capE = me.ab ? G.ents.get(me.ab) : null; // 1.0 : canonnier à bord d'un compagnon
+  const boat = (p.boat && ITEMS[p.boat] && ITEMS[p.boat].boat) || (capE && capE.bt ? { cannon: 1 } : null);
+  if ((boat || me.ab) && (id === 'whirl' || id === 'roll')) { G.ui.toast('Impossible à bord.', 'warn'); G.sfx.play('deny'); return; }
+  const cannon = id === 'shot' && (me.ab ? 1 : boat && boat.cannon);
   if (s.needGun && !G.eq.gun && !cannon) { G.ui.toast(boat ? 'À bord, il vous faut un pistolet (ou un sloop et son canon).' : 'Il vous faut une arme à feu (emplacement Pistolet).', 'warn'); G.sfx.play('deny'); return; }
   if ((G.cd[id] || 0) > now) return;
   if (me.en < s.cost) { G.ui.toast("Pas assez d'énergie.", 'warn'); G.sfx.play('deny'); return; }
@@ -653,6 +654,8 @@ function interact() {
   }
   else if (t.kind === 'exit') useDoor(t.d, true, performance.now() / 1000);
   else if (t.kind === 'player') G.ui.playerMenu(t.name, null); // 1.0 : inviter, échanger, ajouter en ami…
+  else if (t.kind === 'embark') G.send({ t: 'embark', name: t.name }); // 1.0 : navires partagés
+  else if (t.kind === 'disembark') G.send({ t: 'disembark' });
   else if (t.kind === 'board') G.send({ t: 'board', a: +G.aim.toFixed(3) });
   else if (t.kind === 'land') G.send({ t: 'land', a: +G.aim.toFixed(3) });
 }
@@ -720,6 +723,13 @@ function findInteract() {
     if (questNeeds(Q.item) <= 0) continue; // on ne ramasse que ce qu'une quête réclame
     bd = d;
     best = { kind: 'harvest', id: pr.id, x: pr.x, y: pr.y, h: pr.spr ? Math.min(40, pr.spr.h * 0.6) : 14, verb: Q.verb };
+  }
+  if (G.me && G.me.ab) return { kind: 'disembark', x: p.x, y: p.y, h: 34, verb: 'Débarquer' }; // 1.0 : à bord d'un compagnon
+  if (!best && !p.boat && G.room < 0) for (const e of G.ents.values()) { // 1.0 : monter à bord du navire d'un compagnon
+    if (e.k !== 'p' || !(e.flags & 16) || e.dead) continue;
+    const mate = G.ui.inGroup(e.id) || (e.cw && e.cw === G.ui.myCrewTag);
+    const d = Math.hypot(e.x - p.x, e.y - p.y);
+    if (mate && d < 56 && d < bd) { bd = d; best = { kind: 'embark', name: e.name, x: e.x, y: e.y, h: 40, verb: `Monter à bord (canonnier de ${e.name})` }; }
   }
   if (!best && !p.boat) for (const e of G.ents.values()) { // 1.0 : un autre pirate, tout près
     if (e.k !== 'p' || e === p || e.dead || (e.flags & 2)) continue;
@@ -1051,10 +1061,17 @@ function updatePlayer(now, dt) {
   const ax = G.ui.typing() || G.locked || held ? { x: 0, y: 0 } : G.input.axis();
   const rolling = now - (p.rollT || -9) < ROLL_TIME;
   let vx, vy, nx, ny;
+  if (me.ab) { // 1.0 : à bord du navire d'un compagnon, on suit le capitaine
+    const cap = G.ents.get(me.ab);
+    if (cap) { p.x = cap.x + (p.abSide || 8); p.y = cap.y - 2; p.dir = cap.dir; }
+    p.moving = false;
+    if (now - G.lastSend > 0.5) { G.send({ t: 'mv', x: Math.round(p.x), y: Math.round(p.y), d: p.dir, m: 0 }); G.lastSend = now; }
+    return;
+  }
   const B = p.boat && ITEMS[p.boat] && ITEMS[p.boat].boat;
   if (B) { // navigation : un peu d'inertie
     const k = Math.min(1, dt * 3.2);
-    const bs = B.speed * (now < G.inkUntil ? 0.6 : 1);
+    const bs = B.speed * (now < G.inkUntil ? 0.6 : 1) * (1 + 0.06 * (me.crewN || 0)); // chaque canonnier rame
     p.bvx += (ax.x * bs - p.bvx) * k; p.bvy += (ax.y * bs - p.bvy) * k;
     if (held) { p.bvx = 0; p.bvy = 0; }
     vx = p.bvx; vy = p.bvy;

@@ -801,7 +801,9 @@ export class Renderer {
       if (e.leap) { const lk = (now - e.leap.t0) / e.leap.dur; if (lk < 1) y -= Math.round(Math.sin(lk * Math.PI) * 30); else { e.leap = null; this.shake(3, 0.2); this.smoke(e.x, e.y, 8, 'rgba(200,180,150,0.55)', { size: 3 }); } }
       if (e.dashT && now > e.dashT && now < e.dashT + 0.7 && e.moving && rnd() < 0.8) this.smoke(e.x, e.y, 1, 'rgba(220,200,160,0.5)', { size: 2, life: 0.4 });
     }
-    const water = this.inWater(e.x, e.y);
+    const onDeck = e.k === 'p' && (e === G.player ? G.me && G.me.ab : e.ab); // 1.0 : un canonnier sur le pont d'un compagnon
+    if (onDeck) y -= 7;
+    const water = !onDeck && this.inWater(e.x, e.y);
     const cut = Math.max(sit, water ? (sh.fw > FW ? 8 : 5) : 0);
     ctx.save();
     if (dying >= 0) { ctx.globalAlpha = Math.max(0, 1 - dying / 0.75); y += Math.round(dying * (e.burnT ? 4 : 10)); }

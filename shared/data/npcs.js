@@ -94,7 +94,7 @@ Object.assign(NPCS, {
     ],
   },
   ysaline: {
-    name: 'Ysaline', title: 'Charpentière de marine',
+    name: 'Ysaline', title: 'Charpentière de marine', repair: 1,
     look: { skin: 1, hair: 0, hairStyle: 'queue', top: 'gilet', topCol: 'brown', pants: 'navy', boots: 'brown', hat: 'bandana', hatCol: 'teal' },
     greet: ["Une coque, c'est comme un cœur : il faut l'écouter.", 'Attention aux copeaux !', 'Le sloop là-bas ? Le plus rapide de l’archipel. Et il a du répondant.'],
     shop: ['barque', 'sloop', 'fusil_harpon', 'pistolet_double', 'harpon', 'cimeterre', 'rapiere', 'dague_cristal', 'flamberge', 'poivriere', 'pistolet_duel', 'pistolet_cristal', 'amulette_lanterne', 'pendentif_cristal'],

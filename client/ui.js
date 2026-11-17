@@ -186,7 +186,8 @@ export class UI {
       if (me.cry > 0) buffs.push(`⚔ Abordage ${Math.ceil(me.cry - (now - G.meAt))}s`);
       if (me.drunk > 0) buffs.push(`🍾 Ivre ${Math.max(0, Math.ceil(me.drunk - (now - G.meAt)))}s`);
       if (G.zone === Z.TOWN) buffs.push('🔥 Flamme Bénite');
-      if (G.player && G.player.boat) buffs.push('⛵ ' + ((ITEMS[G.player.boat] && ITEMS[G.player.boat].name) || 'Barque'));
+      if (G.player && G.player.boat) buffs.push(`⛵ ${(ITEMS[G.player.boat] && ITEMS[G.player.boat].name) || 'Barque'}${me.hullMax ? ` — coque ${me.hull}/${me.hullMax}` : ''}${me.crewN ? ` — ${me.crewN} canonnier${me.crewN > 1 ? 's' : ''}` : ''}`);
+      else if (me.ab) buffs.push(`⚓ Canonnier à bord${me.hullMax ? ` — coque ${me.hull}/${me.hullMax}` : ''} (clic droit : bordée)`);
       if (me.ride) buffs.push('🐎 En selle (C pour descendre)');
       const BN = { spd: '💨 Célérité', atk: '💪 Force du taureau', def: '🛡 Tonique de fer', chant: '🎶 Entrain' };
       for (const [k, s] of me.bf || []) { const left = Math.max(0, Math.ceil(s - (now - G.meAt))); if (left > 0) buffs.push(`${BN[k] || k} ${left}s`); }
@@ -752,6 +753,7 @@ export class UI {
       ch.push({ label: '🏆 Le classement de la semaine', go: () => { this.arenaBoardAsk = npcId; this.G.send({ t: 'arena', a: 'board' }); } });
       ch.push({ label: '🤺 Comment défier un pirate ?', go: () => this.say("Approchez-vous de lui ici même, dans la Fosse, et appuyez sur E : vous pourrez le défier en duel, avec ou sans mise. Les gradins parient sur le vainqueur — la maison garde cinq pour cent. On ne meurt pas dans ma Fosse : on finit dans les gradins.", [{ label: 'Autre chose…', go: () => this.dialogMain(npcId) }, { label: 'Au revoir.', go: () => this.close() }]) });
     }
+    if (this.G.me && this.G.me.repairCost > 0 && (N.repair || (N.shop || []).some((i) => ITEMS[i] && ITEMS[i].boat))) ch.push({ label: `⚓ Réparer les coques (${this.G.me.repairCost} doublons)`, cls: 'q', go: () => { this.G.send({ t: 'repair' }); this.close(); } }); // 1.0
     if (N.bail && this.G.me && this.G.me.jail > 0) ch.push({ label: `🔑 Payer la caution (${this.G.me.bail} doublons)`, cls: 'q', go: () => { this.G.send({ t: 'bail' }); this.close(); } });
     if (npcId === 'isa') ch.push({ label: '⚒ Renforcer mon équipement', go: () => { this.close(); this.show('forge'); } });
     for (const t of N.topics || []) ch.push({ label: t.q, go: () => this.say(t.a, [{ label: 'Autre chose…', go: () => this.dialogMain(npcId) }, { label: 'Au revoir.', go: () => this.close() }]) });
