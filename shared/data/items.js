@@ -309,3 +309,66 @@ O('tenue_vaudou', { name: 'Tenue du houngan', regen: 2.5, hp: 40, def: 8, value:
 O('habit_gouverneur', { name: 'Habit de gouverneur', def: 14, hp: 70, goldFind: 0.15, value: 9500, rarity: 3, outfit: { top: 'capitaine', topCol: 'red', pants: 'white', boots: 'black', hat: 'plume', hatCol: 'red', cape: 'red' }, desc: 'Velours, dentelle et boutons d’or. Le dernier gouverneur ne le portera plus. Doublons +15 %.' });
 // les trophées de boss : objets de collection irremplaçables (jamais volés), à exposer chez soi
 for (const [boss, [id, name, desc]] of Object.entries(TROPHIES)) ITEMS[id] = { home: 1, name, place: 't_' + id, value: 1500, rarity: 3, unique: 1, trophy: boss, icon: 'f_trophy', desc: desc + ' Trophée de boss : à exposer chez vous.' };
+
+// ------------------------------------------------------------ 1.0 : niveaux requis, rôles et équilibrage des armes
+// niveau requis pour s'équiper — explicite (it.lvl) ou déduit de la valeur ; les montures sont plus accessibles
+const REQ_STEPS = [[20, 1], [60, 2], [120, 4], [250, 6], [500, 8], [900, 11], [1600, 14], [2600, 17], [4200, 20], [7000, 23], [10000, 26]];
+export function reqLevel(it) {
+  if (!it || !it.slot) return 1;
+  if (it.lvl) return it.lvl;
+  const v = it.value || 0;
+  let L = 28;
+  for (const [max, lv] of REQ_STEPS) if (v <= max) { L = lv; break; }
+  if (it.slot === 'mount') L = Math.max(1, Math.round(L * 0.6));
+  return L;
+}
+// chaque arme a un rôle lisible ; ses dégâts sont ramenés dans une fourchette juste pour son niveau et son rôle
+// (une arme lente qui balaie large ou une arme à effets frappe moins fort, une arme vive un peu plus)
+export const ROLES = {
+  rapide: ['Rapide', 'Coups vifs et fréquents : idéale en duel et pour achever.'],
+  equilibree: ['Équilibrée', 'Ni trop lente ni trop courte : bonne partout.'],
+  lourde: ['Lourde', 'Coups lents et dévastateurs, large balayage, gros recul.'],
+  allonge: ['Allonge', 'Frappe de loin, en ligne : tenez les morts à distance.'],
+  balayage: ['Balayage', 'Large arc de cercle : plusieurs ennemis à la fois.'],
+  polyvalente: ['Polyvalente', 'Un tir sûr, à toutes les distances.'],
+  precision: ['Précision', 'Longue portée, gros coup unique.'],
+  dispersion: ['Dispersion', 'Une gerbe de plombs : redoutable à bout portant.'],
+  percante: ['Perçante', 'Traverse les rangs ennemis : plusieurs cibles d’un coup.'],
+  zone: ['Explosive', 'Dégâts de zone : pour les groupes.'],
+  controle: ['Contrôle', 'Ralentit, gèle, empoisonne ou attire : l’effet avant les dégâts.'],
+};
+const MELEE_FX = ['leech', 'bleed', 'poison', 'frost', 'stun', 'burn', 'chain', 'curse', 'fear', 'execute', 'midas', 'charge', 'slow'];
+const SHOT_FX = ['frost', 'poison', 'stun', 'burn', 'curse', 'bleed', 'pull', 'chain', 'homing'];
+function roleOf(it) {
+  if (it.slot === 'weapon') {
+    const sp = it.speed || 0.5, reach = it.reach || 27, arc = it.arc || 1.15;
+    if (reach >= 38 && arc <= 0.7) return 'allonge';
+    if (sp >= 0.7) return 'lourde';
+    if (arc >= 1.6) return 'balayage';
+    if (sp <= 0.34) return 'rapide';
+    return 'equilibree';
+  }
+  const s = it.shot || {};
+  if (s.explode) return 'zone';
+  if ((s.n || 1) > 2) return 'dispersion';
+  if ((s.pierce || 0) >= 3 || s.boomer || s.ricochet) return 'percante';
+  if (s.frost || s.poison || s.stun || s.pull || s.curse || s.chain || s.homing) return 'controle';
+  if ((s.range || 0) >= 240) return 'precision';
+  return 'polyvalente';
+}
+const MELEE_MUL = { rapide: 1.05, equilibree: 1, lourde: 0.82, allonge: 0.88, balayage: 0.85 };
+const GUN_MUL = { polyvalente: 1, precision: 0.9, percante: 0.75, controle: 0.8, zone: 0.72 };
+for (const it of Object.values(ITEMS)) {
+  if (it.slot !== 'weapon' && it.slot !== 'gun') continue;
+  it.role = roleOf(it);
+  const L = reqLevel(it);
+  if (it.slot === 'weapon') {
+    const fx = Math.min(2, MELEE_FX.filter((k) => it[k]).length);
+    const t = (12 + 3 * L) * MELEE_MUL[it.role] * Math.pow(0.92, fx) * (it.speed || 0.5);
+    it.atk = Math.round(Math.max(t * 0.85, Math.min(t * 1.35, it.atk || 0)));
+  } else if (GUN_MUL[it.role] && (it.shot.n || 1) === 1 && !it.shot.burst) { // les armes à plombs gardent leurs réglages
+    const fx = Math.min(2, SHOT_FX.filter((k) => it.shot[k]).length);
+    const t = (8 + 1.6 * L) * GUN_MUL[it.role] * (it.cdMul || 1) * Math.pow(0.92, fx);
+    it.gun = Math.round(Math.max(t * 0.85, Math.min(t * 1.35, it.gun || 0)));
+  }
+}

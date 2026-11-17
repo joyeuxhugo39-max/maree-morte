@@ -615,3 +615,21 @@ body.cine #grp-frames, body.cine #asks { opacity: 0 !important; }
 #trade-qty { min-height: 0; font-size: 13px; margin-top: 6px; } #trade-qty input { width: 70px; font-family: var(--ui); padding: 2px 4px; }
 #trade-btns { display: flex; justify-content: space-between; margin-top: 10px; } #trade-btns #trade-cancel { background: linear-gradient(#d8c8b0, #a89070); }
 #trade-act.gold { background: linear-gradient(#ffe58a, #e8a832); box-shadow: inset 0 -3px 0 rgba(120, 60, 0, 0.45), inset 0 2px 0 rgba(255, 255, 255, 0.5), 0 3px 0 #1a0e06, 0 0 12px rgba(255, 210, 74, 0.8); }
+
+/* 1.0 : rôles des armes, Gloire, justice et honneur */
+#tooltip .trole { color: #ffd88a; font-size: 12px; margin: 2px 0; } #tooltip .trole b { color: #ffe7a0; }
+#xpbar.glory .fill { background: linear-gradient(#fff2a8, #f2c14a 45%, #a86e1c) !important; }
+#xpbar.glory span { color: #fff6d0; }
+#buffs .buff.jail { background: #2a2a3a; border-color: #9aa0b4; color: #e0e4f0; }
+#buffs .buff.wanted { background: #6a0e0a; border-color: #ff5a4a; color: #fff; animation: mpblink 0.8s ease-in-out infinite alternate; }
+#buffs .buff.infamy { border-color: #c86a3a; color: #ffb08a; }
+#buffs .buff.prot { background: rgba(240, 236, 220, 0.18); border-color: #f3f0e2; color: #fff; }
+.hon-head { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 6px; }
+.hon-head > div { background: rgba(96, 54, 22, 0.12); border: 2px solid rgba(96, 54, 22, 0.3); border-radius: 4px; padding: 6px; text-align: center; }
+.hon-head span { display: block; font-size: 11px; color: #6a4a30; text-transform: uppercase; letter-spacing: 0.5px; } .hon-head b { font-size: 18px; color: #5a1408; }
+.hs-j { color: #3a3a4a !important; } .hs-w { color: #b8140a !important; } .hs-p { color: #2a6a3a !important; font-size: 13px !important; } .hs-f { color: #2a5a32 !important; }
+.soc-h { font-family: var(--title); font-weight: 400; font-size: 20px; color: #5a1408; margin: 10px 0 4px; }
+.soc-log.win { border-left: 4px solid #3a8a46; padding-left: 8px; } .soc-log.loss { border-left: 4px solid #a8322a; padding-left: 8px; }
+.how-meurtre { color: #a8322a; font-size: 12px; } .how-prime { color: #a8761c; font-size: 12px; } .how-defense { color: #2a6a3a; font-size: 12px; }
+table.ladder { width: 100%; border-collapse: collapse; font-size: 13px; } table.ladder th { text-align: left; color: #6a4a30; font-size: 11px; text-transform: uppercase; border-bottom: 2px solid rgba(96, 54, 22, 0.4); padding: 3px 4px; }
+table.ladder td { padding: 4px; border-bottom: 1px dashed rgba(96, 54, 22, 0.25); } table.ladder tr.me td { background: rgba(242, 193, 74, 0.3); font-weight: 700; }

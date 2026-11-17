@@ -1447,10 +1447,11 @@ export class Renderer {
       const top = Math.round(e.y - camY - (sh ? sh.ay : 26) + (e.type === 'boss' ? 4 : 2) + (e.k === 'p' && (e === G.player ? G.player.boat : (e.flags & 16)) ? 5 : 0) - (riding ? 12 : 0));
       if (e.k === 'p') {
         const me = e === G.player;
-        const pvp = !me && G.player && G.zone >= 0 && !SAFE.has(G.zone) && !SAFE.has(zoneAt(this.world, e.x, e.y));
         const mate = !me && G.ui.inGroup(e.id); // 1.0 : les compagnons de groupe en vert, le sigle d'équipage à droite du nom
+        const pvp = !me && G.player && G.zone >= 0 && !SAFE.has(G.zone) && !SAFE.has(zoneAt(this.world, e.x, e.y)) && !e.pr && !(G.me && G.me.prot) && !mate && !(e.cw && e.cw === G.ui.myCrewTag) && (e.wd || Math.abs((e.lvl || 1) - ((G.me && G.me.lvl) || 1)) <= 10);
         const name = textCanvas(e.name || '?', me ? '#ffe7a0' : mate ? '#a8ffb0' : pvp ? '#ff9a8a' : '#ffffff');
-        const lv = textCanvas(String(e.lvl || 1), '#c8b8ff');
+        const gl = me ? (G.me && G.me.glory) || 0 : e.gl || 0;
+        const lv = gl ? textCanvas(`${e.lvl || 1}+${gl}`, '#ffd24a') : textCanvas(String(e.lvl || 1), '#c8b8ff');
         if (!me || G.showMyName) {
           ctx.drawImage(name, x - (name.width >> 1) + 3, top - 9); ctx.drawImage(lv, x - (name.width >> 1) - lv.width + 2, top - 9);
           const cw = me ? G.ui.myCrewTag : e.cw;
@@ -1459,7 +1460,9 @@ export class Renderer {
         if (e.title && (!me || G.showMyName)) { const tt = textCanvas(e.title, '#f2c14a'); ctx.globalAlpha = 0.9; ctx.drawImage(tt, x - (tt.width >> 1), top - 16); ctx.globalAlpha = 1; }
         if (!me && (e.hp < 100 || pvp)) this.hpBar(ctx, x, top - 2, 16, e.hp / 100, pvp ? '#e0a040' : '#5cd65c');
         if (e.flags & 8) { ctx.fillStyle = '#ffd23a'; ctx.fillRect(x - 1, top - 14, 2, 2); }
-        if (e.thief) { const tv = textCanvas('VOLEUR', '#ff5a4a'); ctx.drawImage(tv, x - (tv.width >> 1), top - (e.title && (!me || G.showMyName) ? 23 : 16)); }
+        const wd = me ? G.me && G.me.wd : e.wd;
+        if (e.thief || wd) { const tv = textCanvas(wd ? 'RECHERCHÉ' : 'VOLEUR', '#ff5a4a'); ctx.drawImage(tv, x - (tv.width >> 1), top - (e.title && (!me || G.showMyName) ? 23 : 16)); }
+        else if (!me && e.pr && G.zone >= 0 && !SAFE.has(G.zone)) { ctx.fillStyle = '#f3f0e2'; ctx.fillRect(x - 1, top - 17, 1, 6); ctx.fillRect(x, top - 17, 4, 3); } // le pavillon blanc
       } else if (e.k === 'm') {
         const def = MOBS[e.type];
         const hover = G.mouseWorld && Math.abs(G.mouseWorld.x - e.x) < 12 && Math.abs(G.mouseWorld.y - (e.y - 10)) < 14;

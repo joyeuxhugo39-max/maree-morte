@@ -274,7 +274,9 @@ function onMsg(m) {
     case 'chest': if (m.id > 0) G.chests[m.id] = m.until; ui.toast(`Trésor ! +${m.gold} doublons${m.got.length ? ' · ' + m.got.join(', ') : ''}`, 'quest'); G.sfx.play('chest'); break;
     case 'qdone': { const q = QUESTS[m.q]; ui.toast(`Quête terminée : ${q.name}`, 'quest'); G.sfx.play('quest'); break; }
     case 'dice': ui.diceResult(m); break;
-    case 'dead': ui.showDeath(m.lost, m.by); G.sfx.play('die'); break;
+    case 'dead': ui.showDeath(m.lost, m.by, m.jail, m.pk); G.sfx.play('die'); break;
+    case 'ladder': ui.ladder = m; if (ui.open === 'crew' && ui.crewTab === 'honneur') ui.renderCrew(); break; // 1.0 : honneur et classement
+    case 'hon': ui.honHist = m.hist; if (ui.open === 'crew' && ui.crewTab === 'honneur') ui.G.send({ t: 'ladder' }); break;
     case 'kick': G.kicked = true; ui.toast(m.msg, 'warn'); try { sessionStorage.removeItem('mm_resume'); } catch (e) { /* */ } break;
     case 'pong': G.ping = Math.round(performance.now() - m.c); break;
     case 'homes': G.homes = new Map(m.list.map(([k, name, lock, music]) => [k, { name, lock: lock || 0, music: music || '' }])); break;
@@ -344,7 +346,7 @@ function upsert(meta, t) {
     G.ents.set(meta.id, e);
     if (meta.k === 'm' && (meta.hp < meta.mhp)) e.hp = Math.round(meta.hp / meta.mhp * 100);
   }
-  if (meta.k === 'p') { e.name = meta.name; e.look = meta.look; e.lookKey = JSON.stringify(meta.look); e.lvl = meta.lvl; e.weapon = meta.w; e.gun = meta.g; e.title = meta.ti || ''; e.bt = meta.bt || ''; e.pet = meta.pt || ''; e.thief = !!meta.vo; e.cw = meta.cw || ''; }
+  if (meta.k === 'p') { e.name = meta.name; e.look = meta.look; e.lookKey = JSON.stringify(meta.look); e.lvl = meta.lvl; e.weapon = meta.w; e.gun = meta.g; e.title = meta.ti || ''; e.bt = meta.bt || ''; e.pet = meta.pt || ''; e.thief = !!meta.vo; e.cw = meta.cw || ''; e.wd = !!meta.wd; e.pr = !!meta.pr; e.gl = meta.gl || 0; }
   else if (meta.k === 'm') { e.type = meta.type; e.sun = !!meta.sun; e.horde = !!meta.hd; }
   else if (meta.k === 'a') { e.name = meta.name; e.cap = meta.cap; if (meta.sink && !e.sinkT) e.sinkT = t - 3; }
   else e.type = meta.type;
@@ -992,7 +994,7 @@ function frame(now, dt) {
     const first = G.lastRoom === -99;
     G.lastRoom = G.room; G.snapCam = true;
     const r = G.room >= 0 ? G.world.rooms[G.room] : null;
-    if (r) G.ui.banner(r.name, r.kind === 'cave' ? 'Grotte — danger' : r.kind === 'arene' ? 'Arène — danger' : 'Zone sûre');
+    if (r) G.ui.banner(r.name, r.kind === 'cave' ? 'Grotte — danger' : r.kind === 'arene' ? 'Arène — danger' : r.kind === 'prison' ? 'Purgez votre peine, ou payez la caution au gardien' : 'Zone sûre');
     else if (first) G.ui.banner(ZONES[z].name, ZONES[z].lvl);
     G.zone = z; G.zoneAt = now; G.ui.setZone(z, r);
     G.sfx.ambience(r ? (r.kind === 'cave' ? 0.15 : 0.05) : z === Z.BEACH || z === Z.TOWN || z === Z.WRECK ? 1 : 0.4);
@@ -1000,7 +1002,7 @@ function frame(now, dt) {
     if (G.zone === -1 || now - (G.zoneAt || 0) > 1.2) { G.ui.banner(ZONES[z].name, ZONES[z].lvl); }
     if (G.zone >= 0 && SAFE.has(G.zone) !== SAFE.has(z) && G.room < 0 && now - (G.pvpWarnAt || -99) > 20) {
       G.pvpWarnAt = now;
-      G.ui.toast(SAFE.has(z) ? 'Zone sûre : personne ne peut vous attaquer ici.' : 'Hors de la zone sûre : les autres pirates peuvent vous attaquer.', SAFE.has(z) ? 'info' : 'warn');
+      G.ui.toast(SAFE.has(z) ? 'Zone sûre : personne ne peut vous attaquer ici.' : G.me && G.me.prot ? 'Hors de la zone sûre — mais votre pavillon blanc vous protège encore.' : 'Hors de la zone sûre : les autres pirates peuvent vous attaquer.', SAFE.has(z) ? 'info' : 'warn');
     }
     G.zone = z; G.zoneAt = now; G.ui.setZone(z, null);
     G.sfx.ambience(z === Z.BEACH || z === Z.TOWN || z === Z.WRECK || z === Z.SEA ? 1 : 0.4);

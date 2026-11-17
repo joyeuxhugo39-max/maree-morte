@@ -21,10 +21,11 @@ export function migrateSave(d) {
   return d;
 }
 // les champs qu'écrit serialize() : tout autre champ d'une sauvegarde est conservé à part
-const SAVE_KEYS = new Set(['friends', 'blocked', 'tradeLog', 'seen', 'st', 'kc', 'met', 'col', 'tut', 'name', 'look', 'level', 'xp', 'gold', 'hp', 'inv', 'eq', 'quests', 'track', 'chests', 'x', 'y', 'kills', 'upg', 'treasure', 'ach', 'title', 'cnt', 'respawnAt', 'found', 'boat', 'pk', 'caches', 'zs', 'pet', 'home', 'base', 'saved', 'sv', 'held']);
+const SAVE_KEYS = new Set(['inf', 'jail', 'hon', 'pvph', 'glory', 'gxp', 'friends', 'blocked', 'tradeLog', 'seen', 'st', 'kc', 'met', 'col', 'tut', 'name', 'look', 'level', 'xp', 'gold', 'hp', 'inv', 'eq', 'quests', 'track', 'chests', 'x', 'y', 'kills', 'upg', 'treasure', 'ach', 'title', 'cnt', 'respawnAt', 'found', 'boat', 'pk', 'caches', 'zs', 'pet', 'home', 'base', 'saved', 'sv', 'held']);
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { STRUCTS, PLANTER_GROW, HOME_OK, HOME_MAX, HOME_PRICE, QUEST_PICK, PROPERTY, HOME_LIMIT, RESALE, plotCategory } from '../shared/data/craft.js';
 import { social } from './social.js';
+import { justice, SHIELD_AFTER_DEATH } from './justice.js';
 import { LEGACY_VALUE, LEGACY_STRUCT, QUEST_ITEM_OLD_VALUE } from '../shared/data/legacy.js';
 import { generateWorld, canStand, moveWithCollision, moveBoat, zoneAt, tileAt, blocksShot, canSail, roomIdAt, Z, ZONES, SAFE } from '../shared/world.js';
 import { ITEMS, STACK_MAX, isStackable } from '../shared/data/items.js';
@@ -32,7 +33,7 @@ import { MOBS } from '../shared/data/mobs.js';
 import { QUESTS, questState, goalsMet, npcVisible } from '../shared/data/quests.js';
 import { NPCS } from '../shared/data/npcs.js';
 import { SKILLS } from '../shared/data/skills.js';
-import { computeStats, xpToNext, mitigate, displayLook, sanitizeLook, MAX_LEVEL, UPG_SLOTS, UPG_MAX, upgradeCost, reqLevel } from '../shared/formulas.js';
+import { computeStats, xpToNext, mitigate, displayLook, sanitizeLook, MAX_LEVEL, GLORY_XP, GLORY_MAX, UPG_SLOTS, UPG_MAX, upgradeCost, reqLevel } from '../shared/formulas.js';
 
 const DT = 1 / TICK_RATE;
 const PVP_MUL = 0.6; // les dégâts entre joueurs sont réduits
@@ -103,6 +104,7 @@ export class Game {
     this.sessions = new Map(); // conn -> session { player, bucket, lastMsg }
     this.version = GAME_VERSION;
     this.socialInit();
+    this.justiceInit();
     this.seenW = Math.ceil(this.world.W / SEEN_CELL); this.seenH = Math.ceil(this.world.OVER_H / SEEN_CELL); this.seenBytes = Math.ceil(this.seenW * this.seenH / 8);
     this.usedTokens = new Set(); this.fails = new Map(); this.bans = {}; this.reports = []; this.maintenance = null; // 1.0
     if (storage && storage.loadMeta) { Promise.resolve(storage.loadMeta('bans')).then((b) => { if (b) this.bans = b; }).catch(() => {}); Promise.resolve(storage.loadMeta('reports')).then((r) => { if (Array.isArray(r)) this.reports = r; }).catch(() => {}); }
@@ -208,6 +210,8 @@ export class Game {
       case 'soc': return this.socAction(p, String(m.a), String(m.name || ''));
       case 'crew': return this.crewAction(p, String(m.a), m);
       case 'trade': return this.tradeAction(p, String(m.a), m);
+      case 'bail': return this.bail(p);
+      case 'ladder': return this.send(p, { t: 'ladder', top: this.ladderTop(), hist: p.pvpHist, me: [p.honor | 0, Math.floor(p.infamy || 0)] });
       case 'respawn': return this.respawn(p);
       case 'ping': return this.send(p, { t: 'pong', c: m.c });
       case 'fish': return this.onFish(p, +m.a);
@@ -292,6 +296,7 @@ export class Game {
     });
     this.broadcastChat(null, `${p.name} accoste à Port-Lanterne.`, 'sys');
     this.socialLogin(p);
+    this.justiceLogin(p);
     if (!res.data) this.toast(p, 'Bienvenue ! Parlez à la Capitaine Morgane, près des quais (touche E).', 'quest');
     this.log(`[jeu] ${p.name} connecté (${this.players.size} en ligne)`);
   }
@@ -406,6 +411,7 @@ export class Game {
     p.col = new Set(d && Array.isArray(d.col) ? d.col.filter((x) => typeof x === 'string') : []);
     p.tut = d ? (d.tut == null ? 99 : d.tut | 0) : 0; // tutoriel : les anciens pirates le connaissent déjà
     this.socialLoad(p, d);
+    this.justiceLoad(p, d);
     if (d) {
       for (const k in d) if (!SAVE_KEYS.has(k)) p.heldF[k] = d[k];
       if (Array.isArray(d.held)) for (const it of d.held) if (it && typeof it.id === 'string') p.held.push({ id: it.id, n: Math.max(1, it.n | 0) });
@@ -474,7 +480,7 @@ export class Game {
     this.applyRefund(p);
   }
   serialize(p) {
-    return { ...(p.heldF || {}), ...this.socialSave(p), sv: SAVE_VERSION, held: p.held || [], seen: p.seen ? b64(p.seen) : undefined, st: p.st, kc: p.kc, met: p.met ? [...p.met] : [], col: p.col ? [...p.col] : [], tut: p.tut, name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: { ...(p.heldQ || {}), ...p.quests }, track: p.track || [], chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: { ...(p.heldA || {}), ...p.ach }, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
+    return { ...(p.heldF || {}), ...this.socialSave(p), ...this.justiceSave(p), sv: SAVE_VERSION, held: p.held || [], seen: p.seen ? b64(p.seen) : undefined, st: p.st, kc: p.kc, met: p.met ? [...p.met] : [], col: p.col ? [...p.col] : [], tut: p.tut, name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: { ...(p.heldQ || {}), ...p.quests }, track: p.track || [], chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: { ...(p.heldA || {}), ...p.ach }, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
   }
   save(p) {
     p.lastSave = this.time;
@@ -489,7 +495,7 @@ export class Game {
   }
 
   recalc(p) {
-    p.stats = computeStats(p.level, p.eq, p.upg, !!p.riding, this.activeBuffs(p));
+    p.stats = computeStats(p.level, p.eq, p.upg, !!p.riding, this.activeBuffs(p), p.glory);
     const L = displayLook(p.base, p.eq);
     if (JSON.stringify(L) !== JSON.stringify(p.look)) { p.look = L; p.lookVer++; }
     if (p.hp > p.stats.maxHp) p.hp = p.stats.maxHp;
@@ -539,6 +545,7 @@ export class Game {
       st: { atk: p.stats.atk, gun: p.stats.gun, def: p.stats.def, crit: Math.round(p.stats.crit * 100), speed: p.stats.speed, regen: +p.stats.regen.toFixed(1) },
       cry: Math.max(0, +(p.cry - this.time).toFixed(1)), drunk: Math.max(0, +(p.drunkUntil - this.time).toFixed(1)),
       dead: p.dead, kills: p.kills, upg: p.upg, title: p.title, boat: p.boat, room: p.room, pk: p.pk, pet: p.pet || '', vo: this.time < p.thiefUntil ? 1 : 0,
+      ...this.justiceMe(p), gxpNext: GLORY_XP,
       ride: p.riding && p.eq.mount ? ITEMS[p.eq.mount].mount.kind : '', cnt: p.cnt, zsn: p.zs.size, zst: FAR_ZONES.length, cch: Object.keys(p.caches).length, bf: p.buffs ? Object.entries(p.buffs).filter(([, v]) => v.until > this.time).map(([k, v]) => [k, Math.ceil(v.until - this.time)]) : [], rc: p.recallAt ? +(p.recallAt - this.time).toFixed(1) : 0,
     };
   }
@@ -683,6 +690,7 @@ export class Game {
     }
   }
   respawnMob(m, rising = false) {
+    if (m.scale) { m.maxHp = m.baseHp; m.scale = 0; }
     m.x = m.sx; m.y = m.sy; m.hp = m.maxHp; m.state = 'idle'; m.target = 0; m.tags.clear(); m.windup = 0;
     m.phase = 0; m.cd = {}; m.frenzy = 0; m.shieldUntil = 0; m.dash = null; m.leap = null; m.pauseUntil = 0;
     m.id = this.nextId++; // nouvel identifiant : les clients le voient « apparaître »
@@ -752,7 +760,7 @@ export class Game {
       } else if (m.state === 'return') {
         const d = this.stepMob(m, m.sx, m.sy, speed * 1.3);
         m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.05);
-        if (d < 6) { m.state = 'idle'; m.hp = m.maxHp; m.tags.clear(); m.phase = 0; m.frenzy = 0; m.shieldUntil = 0; }
+        if (d < 6) { if (m.scale) { m.maxHp = m.baseHp; m.scale = 0; } m.state = 'idle'; m.hp = m.maxHp; m.tags.clear(); m.phase = 0; m.frenzy = 0; m.shieldUntil = 0; }
       } else if (m.state === 'chase') {
         const t = this.players.get(m.target);
         const leashed = Math.hypot(m.x - m.sx, m.y - m.sy) > def.leash;
@@ -1337,6 +1345,14 @@ export class Game {
 
   // ------------------------------------------------------------ combat
   dmgMul(p) { return this.time < p.cry ? 1.3 : 1; }
+  // 1.0 : les boss et les grandes élites se renforcent selon le nombre de pirates engagés (+60 % de PV par pirate, jusqu'à six)
+  bossLike(m) { const d = m.def; return (m.boss || (d.ai && !d.sea) || (d.elite && d.big)) && !m.bossEvent && !m.summoned && d.ai !== 'tentacle' && d.ai !== 'kraken'; }
+  bossScale(m, n) {
+    const f = 1 + 0.6 * (Math.min(6, n) - 1);
+    if (f <= (m.scale || 1)) return;
+    if (!m.scale) m.baseHp = m.maxHp;
+    m.hp = Math.round(m.hp * f / (m.scale || 1)); m.maxHp = Math.round(m.baseHp * f); m.scale = f;
+  }
   rollDamage(p, base) {
     const crit = Math.random() < p.stats.crit;
     const v = Math.max(1, Math.round(base * this.dmgMul(p) * rand(0.9, 1.1) * (crit ? 1.8 : 1)));
@@ -1352,6 +1368,7 @@ export class Game {
     if (m.shieldUntil > this.time) amount = Math.max(1, Math.round(amount * 0.3));
     if (m.curseUntil > this.time) amount = Math.round(amount * m.curseMul);
     if (m.grab) m.grab.dmg += amount;
+    if (!m.tags.has(p.id) && this.bossLike(m)) this.bossScale(m, m.tags.size + 1); // 1.0 : plus on est nombreux, plus il tient
     m.hp -= amount;
     m.tags.set(p.id, (m.tags.get(p.id) || 0) + amount);
     this.ev(m.x, m.y, dot ? ['dmg', m.id, amount, 0, p.id, dot] : ['dmg', m.id, amount, crit ? 1 : 0, p.id]);
@@ -1420,20 +1437,25 @@ export class Game {
       if (m.boss) this.unlock(p, 'boss');
     }
     if (m.event || m.horde) { if (Math.random() < 0.5) this.spawnDrop(m.x, m.y, 'or', Math.round(rand(def.gold[0], def.gold[1]) / 2), top.id); if (!def.elite) return; }
-    // butin
+    // butin — 1.0 : contre un boss ou une élite, chaque pirate qui a vraiment pris part au combat a son propre butin
     const [g0, g1] = def.gold;
-    const midas = top && top.eq && ITEMS[top.eq.weapon] && ITEMS[top.eq.weapon].midas ? 0.5 : 0;
-    const gold = Math.round(rand(g0, g1) * (1 + (top && top.stats ? top.stats.goldFind || 0 : 0) + midas));
-    if (gold > 0) this.spawnDrop(m.x, m.y, 'or', gold, top.id);
+    const personal = this.bossLike(m) || !!def.elite;
+    const winners = personal ? [...tags.keys()].map((id) => this.players.get(id)).filter((q) => q && !q.dead && dist(q, m) <= 700 && ((m.tags.get(q.id) || 0) >= m.maxHp * 0.03 || (m.gbonus && m.gbonus.has(q.id)))) : [];
+    if (!winners.length && top) winners.push(top);
+    const share = winners.length > 1 ? 0.7 : 1;
+    for (const w of winners) {
+      const midas = w.eq && ITEMS[w.eq.weapon] && ITEMS[w.eq.weapon].midas ? 0.5 : 0;
+      const gold = Math.round(rand(g0, g1) * share * (1 + (w.stats ? w.stats.goldFind || 0 : 0) + midas));
+      if (gold > 0) this.spawnDrop(m.x + (winners.length > 1 ? rand(-8, 8) : 0), m.y, 'or', gold, w.id);
+      for (const [item, ch, a, b] of def.loot) if (ITEMS[item] && !ITEMS[item].quest && Math.random() < ch) this.spawnDrop(m.x + (winners.length > 1 ? rand(-10, 10) : 0), m.y, item, Math.round(rand(a, b)), w.id);
+    }
     for (const [item, ch, a, b] of def.loot) {
       if (!ITEMS[item]) continue;
       if (ITEMS[item].quest) { // objet de quête : seulement pour un pirate qui en réclame encore (en comptant ce qui l'attend au sol)
         const owed = (q) => { let n = this.questNeeds(q, item); for (const d of this.drops.values()) if (d.item === item && d.owner === q.id) n -= d.n; return n; };
         const who = [top, ...[...m.tags.keys()].map((id) => this.players.get(id))].find((q) => q && !q.dead && owed(q) > 0);
         if (who && Math.random() < Math.min(1, ch * 1.4)) this.spawnDrop(m.x, m.y, item, Math.min(owed(who), Math.max(1, Math.round(rand(a, b)))), who.id);
-        continue;
       }
-      if (Math.random() < ch) this.spawnDrop(m.x, m.y, item, Math.round(rand(a, b)), top.id);
     }
   }
   // combien d'exemplaires de cet objet les quêtes en cours réclament-elles encore ?
@@ -1500,7 +1522,7 @@ export class Game {
         d.left -= v;
         const src = this.players.get(d.src);
         if (isMob) { if (src && t.state !== 'dead') this.damageMob(t, Math.max(1, Math.round(v)), src, false, 0, 0, d.kind); }
-        else if (!t.dead && !SAFE.has(t.zone)) this.damagePlayer(t, v, src || null, false, d.kind);
+        else if (!t.dead && !SAFE.has(t.zone) && !(src && src !== t && !this.canPvp(src, t))) this.damagePlayer(t, v, src || null, false, d.kind);
       }
       t.dots = t.dots.filter((d) => d.left >= 0.5);
     };
@@ -1527,14 +1549,14 @@ export class Game {
     }
   }
   // JcJ : partout, sauf dans les zones sûres (villes, intérieurs)
-  canPvp(a, b) { return !!a && !!b && a !== b && !a.dead && !b.dead && !SAFE.has(a.zone) && !SAFE.has(b.zone) && a.room === b.room; }
+  canPvp(a, b) { return !!a && !!b && a !== b && !a.dead && !b.dead && !SAFE.has(a.zone) && !SAFE.has(b.zone) && a.room === b.room && this.pvpAllowed(a, b); }
   damagePlayer(p, raw, src, crit = false, dot = 0) {
     if (p.dead) return;
     if (this.time < p.invulnUntil && !dot) { this.ev(p.x, p.y, ['dodge', p.id]); return; }
     const dmg = dot ? Math.max(1, Math.round(raw)) : mitigate(raw, p.stats.def);
     p.hp -= dmg; p.lastHurt = this.time; p.dirtyMe = true;
     if (p.recallAt && !dot) { p.recallAt = 0; this.toast(p, 'Rappel interrompu !', 'warn'); }
-    if (src && src.key) { p.lastPvp = this.time; src.lastPvp = this.time; }
+    if (src && src.key && src !== p) { p.lastPvp = this.time; src.lastPvp = this.time; this.onPvpHit(p, src); }
     this.ev(p.x, p.y, dot ? ['dmg', p.id, dmg, 0, src ? src.id : 0, dot] : ['dmg', p.id, dmg, crit ? 1 : 0, src ? src.id : 0]);
     if (p.hp <= 0) this.killPlayer(p, src);
   }
@@ -1545,11 +1567,13 @@ export class Game {
     p.hp = 0; p.dead = true; p.deathAt = this.time; p.moving = false;
     if (p.boat) { p.boat = null; p.lookVer++; }
     p.fishing = null;
-    const lost = Math.floor(p.gold * 0.1);
+    const pk = src && src.key && src !== p && this.players.has(src.id) ? src : null;
+    const lost = pk ? this.pvpLoss(p, pk) : Math.floor(p.gold * 0.1); // 1.0 : en duel, pertes limitées
     p.gold -= lost;
     this.ev(p.x, p.y, ['die', p.id]);
-    const pk = src && src.key && src !== p && this.players.has(src.id) ? src : null;
-    this.send(p, { t: 'dead', lost, by: src ? (src.def ? src.def.name : src.name || '') : '', pk: pk ? 1 : 0 });
+    if (pk) this.onPvpKill(p, pk, lost);
+    this.onDeathJustice(p); // forban recherché ou cambrioleur : direction la Geôle
+    this.send(p, { t: 'dead', lost, by: src ? (src.def ? src.def.name : src.name || '') : '', pk: pk ? 1 : 0, jail: p.jail | 0 });
     p.dirtyMe = true;
     for (const m of this.mobs) if (m.target === p.id) { m.target = 0; }
     if (pk) {
@@ -1568,6 +1592,8 @@ export class Game {
     if (!p.dead || this.time - p.deathAt < 1.5) return;
     p.dead = false; p.hp = p.stats.maxHp; p.en = p.stats.maxEn;
     if (p.boat) { p.boat = null; p.lookVer++; }
+    if (p.shieldNext) { p.shieldNext = false; p.shieldUntil = this.time + SHIELD_AFTER_DEATH; p.lookVer++; this.toast(p, `Pavillon blanc : personne ne peut vous attaquer pendant ${SHIELD_AFTER_DEATH / 60} minutes (et vous n’attaquez personne).`, 'info'); }
+    if (p.jail > 0) { p.invulnUntil = this.time + 3; this.imprison(p, 0); this.ev(p.x, p.y, ['fx', 'respawn', p.x, p.y]); return; }
     const sp = this.world.spawnPoint;
     p.x = sp.x + rand(-12, 12); p.y = sp.y + rand(-4, 4);
     const bed = p.respawnAt && this.structs.get(p.respawnAt.ty * this.world.W + p.respawnAt.tx);
@@ -1581,7 +1607,7 @@ export class Game {
     p.dirtyMe = true;
   }
   giveXp(p, xp) {
-    if (p.level >= MAX_LEVEL) return;
+    if (p.level >= MAX_LEVEL) return this.giveGlory(p, xp);
     p.xp += xp; p.dirtyMe = true;
     this.ev(p.x, p.y, ['xp', p.id, xp]);
     while (p.level < MAX_LEVEL && p.xp >= xpToNext(p.level)) {
@@ -1594,6 +1620,22 @@ export class Game {
       if (p.level % 5 === 0) this.broadcastChat(null, `${p.name} atteint le niveau ${p.level} !`, 'sys');
       p.lookVer++;
       if (p.level >= 10) this.unlock(p, 'niveau10');
+    }
+  }
+  // 1.0 : au-delà du niveau 30, l'expérience devient de la Gloire
+  giveGlory(p, xp) {
+    if ((p.glory | 0) >= GLORY_MAX) return;
+    p.gxp = (p.gxp | 0) + xp; p.dirtyMe = true;
+    this.ev(p.x, p.y, ['xp', p.id, xp]);
+    while (p.glory < GLORY_MAX && p.gxp >= GLORY_XP) {
+      p.gxp -= GLORY_XP; p.glory++;
+      this.recalc(p); p.hp = p.stats.maxHp;
+      this.ev(p.x, p.y, ['lvl', p.id, p.level]);
+      this.toast(p, `Gloire ${p.glory} ! +1 % de PV et +0,5 % de dégâts (total : +${p.glory} % PV, +${(p.glory * 0.5).toFixed(1).replace('.', ',')} % dégâts).`, 'level');
+      if (p.glory % 10 === 0) this.broadcastChat(null, `★ ${p.name} atteint la Gloire ${p.glory} !`, 'sys');
+      if (p.glory >= 10) this.unlock(p, 'gloire');
+      if (p.glory >= GLORY_MAX) { this.unlock(p, 'gloire_max'); p.gxp = 0; }
+      p.lookVer++;
     }
   }
   spawnProj(x, y, a, speed, range, dmg, team, owner, kind, pierce = 0, crit = false, pvp = false, fx = null) {
@@ -1932,10 +1974,12 @@ export class Game {
     if (!d || p.dead || p.boat || (p.cds.door || 0) > this.time) return;
     if (out) {
       if (p.room !== d.room || Math.abs(p.x - d.ex) > 18 || Math.abs(p.y - d.ey) > 24) return;
+      if (d.jail && this.jailBlocks(p)) { p.cds.door = this.time + 1.5; return; }
       p.cds.door = this.time + 0.6;
       this.teleport(p, d.rx, d.ry + 2, { door: d.id, out: 1 });
     } else {
       if (p.room !== -1 || Math.abs(p.x - d.ox) > 18 || Math.abs(p.y - d.oy) > 28) return;
+      if (d.jail) return; // on n'entre à la Geôle que conduit par la garde
       if (d.seal && (this.seals[d.seal] || 0) < this.time) { p.cds.door = this.time + 1.5; return this.toast(p, 'La porte est scellée. Deux dalles, deux pirates…', 'warn'); }
       if (d.plot != null) {
         const h = this.homes.get(d.plot);
@@ -2071,7 +2115,7 @@ export class Game {
     if (it.use.conch) return this.blowConch(p, i);
     if (it.use.travel) {
       const dest = this.world.docks && this.world.docks[it.use.travel];
-      if (!dest) return;
+      if (!dest || this.jailBlocks(p)) return;
       if (!SAFE.has(p.zone) || p.boat) return this.toast(p, 'Le passeur n’embarque que depuis une ville, à pied.', 'warn');
       if (this.time - p.lastHurt < 8) return this.toast(p, 'Pas en plein combat !', 'warn');
       let tx = dest.x, ty = dest.y;
@@ -2089,6 +2133,7 @@ export class Game {
     }
     if (it.use.recall) {
       if (p.boat) return this.toast(p, 'Accostez d’abord.', 'warn');
+      if (this.jailBlocks(p)) return;
       if (p.recallAt) return;
       p.recallAt = this.time + 3; p.recallSlot = s.id; p.dirtyMe = true;
       this.ev(p.x, p.y, ['fx', 'recall', p.x, p.y, p.id]);
@@ -2737,6 +2782,7 @@ export class Game {
     if (Math.random() < 0.5) this.removeItem(p, 'crochets', 1);
     p.burgle = { k, until: this.time + 40, looted: false };
     p.thiefUntil = this.time + 300; p.lookVer++; p.dirtyMe = true;
+    p.infamy = Math.min(20, (p.infamy || 0) + 1); // 1.0 : la Capitainerie note le crochetage
     this.send(p, { t: 'lock', ok: 1, msg: 'Clic ! La porte cède. 40 secondes pour fouiller un coffre.' });
     if (owner) this.toast(owner, `⚠ ${p.name} a crocheté la porte de votre maison !`, 'warn');
     p.cds.door = 0;
@@ -2971,6 +3017,7 @@ export class Game {
         if (p.goldLast != null) { const dg = p.gold - p.goldLast; if (dg > 0) p.st.gin += dg; else p.st.gout -= dg; }
         p.goldLast = p.gold;
         if (p.dirtyCodex) { p.dirtyCodex = false; this.send(p, { t: 'codex', kc: p.kc, met: [...p.met], col: [...p.col], st: p.st }); }
+        this.justiceTick(p);
       }
       if (p.fishing) this.updateFishing(p);
       if (p.gold >= 1000 && !p.ach.riche) this.unlock(p, 'riche');
@@ -2980,8 +3027,9 @@ export class Game {
     if (this.tickCount % 10 === 0) this.updateKraken();
     if (this.tickCount % 5 === 0) for (const p of this.players.values()) this.updateBuffs(p);
     if (this.tickCount % 5 === 0) this.updateVolcano();
+    if (this.tickCount % 20 === 0) this.justiceGlobalTick();
     if (this.tickCount % 40 === 0 && this.players.size > 1) { // les autres pirates sur la carte
-      const pl = [...this.players.values()].map((q) => [q.id, q.name, Math.round(q.x), Math.round(q.y), q.room, q.dead ? 1 : 0]);
+      const pl = [...this.players.values()].map((q) => [q.id, q.name, Math.round(q.x), Math.round(q.y), q.room, q.dead ? 1 : 0, this.isWanted(q) ? 1 : 0]);
       for (const p of this.players.values()) this.send(p, { t: 'map', pl });
     }
     this.updateAllies();
@@ -2998,7 +3046,7 @@ export class Game {
     if (p.dirtyQ) { p.dirtyQ = false; this.send(p, { t: 'q', q: p.quests, tr: p.track || [] }); }
   }
   entMeta(e, kind) {
-    if (kind === 'p') return { cw: e.crew && this.crews.get(e.crew) ? this.crews.get(e.crew).tag : '', id: e.id, k: 'p', name: e.name, look: e.look, lvl: e.level, x: Math.round(e.x), y: Math.round(e.y), w: e.eq.weapon, g: e.eq.gun, dead: e.dead, ti: e.title ? ACHIEVEMENTS[e.title].title : '', bt: e.boat ? ITEMS[e.boat].boat.kind : '', pt: e.pet || '', vo: this.time < e.thiefUntil ? 1 : 0, rd: e.riding && e.eq.mount ? ITEMS[e.eq.mount].mount.kind : '' };
+    if (kind === 'p') return { cw: e.crew && this.crews.get(e.crew) ? this.crews.get(e.crew).tag : '', id: e.id, k: 'p', name: e.name, look: e.look, lvl: e.level, x: Math.round(e.x), y: Math.round(e.y), w: e.eq.weapon, g: e.eq.gun, dead: e.dead, ti: e.title ? ACHIEVEMENTS[e.title].title : '', bt: e.boat ? ITEMS[e.boat].boat.kind : '', pt: e.pet || '', vo: this.time < e.thiefUntil ? 1 : 0, rd: e.riding && e.eq.mount ? ITEMS[e.eq.mount].mount.kind : '', wd: this.isWanted(e) ? 1 : 0, pr: this.isProtected(e) ? 1 : 0, gl: e.glory | 0 };
     if (kind === 'm') return { id: e.id, k: 'm', type: e.type, x: Math.round(e.x), y: Math.round(e.y), hp: Math.ceil(e.hp), mhp: e.maxHp, sun: e.def.night && e.sunproof && !e.horde ? 1 : 0, hd: e.horde ? 1 : 0 };
     return { id: e.id, k: 'd', item: e.item, n: e.n, x: Math.round(e.x), y: Math.round(e.y), own: e.owner, ou: Math.max(0, +(e.ownUntil - this.time).toFixed(1)) };
   }
@@ -3048,3 +3096,4 @@ export class Game {
 }
 // 1.0 : discussions, groupes, équipages et échanges (server/social.js)
 Object.assign(Game.prototype, social);
+Object.assign(Game.prototype, justice); // 1.0 : protection, infamie, primes, honneur, Geôle

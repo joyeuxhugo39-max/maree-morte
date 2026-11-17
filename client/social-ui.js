@@ -257,9 +257,9 @@ export const social = {
     tab = this.crewTab || (this.soc && this.soc.group ? 'groupe' : 'amis');
     this.crewTab = tab;
     const G = this.G, s = this.soc || { friends: [], blocked: [], log: [] };
-    const tabs = [['groupe', 'Groupe'], ['amis', `Amis (${s.friends.filter((f) => f[1]).length}/${s.friends.length})`], ['equipage', 'Équipage'], ['ignores', 'Ignorés'], ['echanges', 'Échanges']];
+    const tabs = [['groupe', 'Groupe'], ['amis', `Amis (${s.friends.filter((f) => f[1]).length}/${s.friends.length})`], ['equipage', 'Équipage'], ['honneur', 'Honneur'], ['ignores', 'Ignorés'], ['echanges', 'Échanges']];
     $('crew-tabs').innerHTML = tabs.map(([k, l]) => `<button data-k="${k}" class="${k === tab ? 'on' : ''}">${l}</button>`).join('');
-    $('crew-tabs').onclick = (e) => { const b = e.target.closest('button'); if (b) this.renderCrew(b.dataset.k); };
+    $('crew-tabs').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.k === 'honneur') G.send({ t: 'ladder' }); this.renderCrew(b.dataset.k); };
     const body = $('crew-body');
     const row = (name, sub, btns, on = true) => `<div class="soc-row${on ? '' : ' off'}"><i class="dot${on ? ' on' : ''}"></i><span class="sn" data-name="${esc(name)}">${esc(name)}</span><span class="ss">${sub}</span><span class="sb">${btns}</span></div>`;
     const btn = (a, label, name, cls = '') => `<button class="btn mini ${cls}" data-a="${a}" data-n="${esc(name || '')}">${label}</button>`;
@@ -286,6 +286,7 @@ export const social = {
       h += addBox('friend', 'Nom du pirate', 'Ajouter');
       h += `<p class="soc-help">Vous êtes prévenu quand un ami prend la mer ou rentre au port.</p>`;
     } else if (tab === 'equipage') h += this.crewHTML(s, row, btn, addBox);
+    else if (tab === 'honneur') h += this.honorHTML();
     else if (tab === 'ignores') {
       h += `<p class="soc-help">Vous n’entendez plus les pirates ignorés : ni leurs messages, ni leurs invitations, ni leurs propositions d’échange.</p>`;
       h += s.blocked.length ? s.blocked.map((n) => row(n, 'ignoré', btn('unblock', 'Ne plus ignorer', n), false)).join('') : '<p class="soc-empty">Personne n’est ignoré.</p>';
@@ -327,6 +328,20 @@ export const social = {
     if (c.rank !== 'matelot') h += addBox('crew', 'Nom du pirate', 'Recruter');
     h += `<div class="soc-foot">${btn('cleave', 'Quitter l’équipage', '', 'warn')}</div>`;
     h += `<p class="soc-help">Canal d’équipage : <kbd>/e message</kbd> ou Tab dans le chat. Le capitaine nomme les officiers, qui peuvent recruter.</p>`;
+    return h;
+  },
+  // 1.0 : honneur, infamie, historique des combats et classement
+  honorHTML() {
+    const me = this.G.me || {}, L = this.ladder || { top: [], hist: [] };
+    const status = me.jail > 0 ? '<b class="hs-j">En Geôle</b>' : me.wd ? '<b class="hs-w">Recherché</b>' : me.prot ? '<b class="hs-p">Protégé (pavillon blanc)</b>' : '<b class="hs-f">Libre</b>';
+    const HOW = { prime: 'prime touchée', defense: 'légitime défense', meurtre: 'sans provocation' };
+    let h = `<div class="hon-head"><div><span>Honneur</span><b>${me.hon || 0}</b></div><div><span>Infamie</span><b>${Math.floor(me.inf || 0)} / 3</b></div><div><span>Statut</span>${status}</div><div><span>Duels gagnés</span><b>${me.pk || 0}</b></div></div>`;
+    h += `<p class="soc-help">Hors des villes, on peut se battre entre pirates — sauf les moins de niveau 10, ceux qui reviennent d’une défaite (pavillon blanc, deux minutes), les membres d’un même groupe ou équipage, et ceux qui ont plus de dix niveaux d’écart. Abattre un pirate qui ne vous avait pas frappé vaut un point d’infamie (deux s’il est bien plus faible) ; à trois, vous êtes <b>recherché</b> : la garde vous arrête en ville et toute mort vous mène à la Geôle. L’infamie s’efface d’un point par quart d’heure. Abattre un forban recherché rapporte sa prime et de l’honneur. On ne perd jamais plus de 10 % de son or en duel, et rien si le même pirate s’acharne.</p>`;
+    h += '<h4 class="soc-h">Vos derniers combats</h4>';
+    const hist = this.honHist || L.hist || [];
+    h += hist.length ? [...hist].reverse().map((x) => `<div class="soc-log ${x.k === 'tue' ? 'win' : 'loss'}"><div>${x.k === 'tue' ? '⚔ Vous avez abattu' : '☠ Abattu par'} <b>${esc(x.who)}</b> (niv. ${x.lvl}) <span>${esc(x.where || '')} · ${new Date(x.at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></div><div class="how-${x.how}">${HOW[x.how] || ''}${x.lost ? ` · ${x.lost} doublons perdus` : ''}</div></div>`).join('') : '<p class="soc-empty">Aucun duel pour l’instant.</p>';
+    h += '<h4 class="soc-h">Classement de l’honneur</h4>';
+    h += L.top && L.top.length ? `<table class="ladder"><tr><th>#</th><th>Pirate</th><th>Honneur</th><th>Victoires</th><th>Défaites</th></tr>${L.top.map(([n, hon, k, d], i) => `<tr class="${this.G.player && n === this.G.player.name ? 'me' : ''}"><td>${i + 1}</td><td>${esc(n)}</td><td>${hon}</td><td>${k}</td><td>${d}</td></tr>`).join('')}</table>` : '<p class="soc-empty">Le classement est vide : aucun duel n’a encore eu lieu.</p>';
     return h;
   },
   bindCrewForm() {

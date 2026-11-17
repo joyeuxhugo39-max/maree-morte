@@ -6,6 +6,10 @@ export const ACHIEVEMENTS = {
   riche: { name: 'Fortune de pirate', desc: 'Posséder 1 000 doublons.', title: 'Pirate fortuné' },
   eruption: { name: 'Sous la cendre', desc: 'Rester debout sur l’île pendant toute une éruption du Volcan de Cendrelune.', title: 'Cracheur de feu' },
   niveau10: { name: 'Vieux loup', desc: 'Atteindre le niveau 10.', title: 'Vieux loup de mer' },
+  gloire: { name: 'Légende vivante', desc: 'Passé le niveau 30, atteindre la Gloire 10.', title: 'Légende vivante' }, // 1.0
+  gloire_max: { name: 'Immortel', desc: 'Atteindre la Gloire 50, la plus haute.', title: 'Immortel des Sept Mers' },
+  chasseur: { name: 'Chasseur de primes', desc: 'Abattre un forban recherché par la Capitainerie.', title: 'Chasseur de primes' },
+  potence: { name: 'Gibier de potence', desc: 'Purger une peine à la Geôle de Port-Lanterne.', title: 'Gibier de potence' },
   elite: { name: 'Tueur de géants', desc: 'Vaincre une créature d’élite.', title: 'Tueur de géants' },
   boss: { name: 'Briseur de malédiction', desc: 'Vaincre le Capitaine Barbe-Cendre.', title: 'Briseur de malédiction' },
   invasion: { name: 'Défenseur du port', desc: 'Repousser la Marée Morte (ancienne invasion, retirée en 0.9).', title: 'Défenseur de Port-Lanterne', legacy: 1 },

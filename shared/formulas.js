@@ -2,21 +2,14 @@ import { ITEMS } from './data/items.js';
 import { PLAYER_SPEED, SLOTS } from './constants.js';
 
 export const MAX_LEVEL = 30;
-// 1.0 : niveau requis pour s'équiper — explicite (it.lvl) ou déduit de la valeur ; les montures sont plus accessibles
-const REQ_STEPS = [[20, 1], [60, 2], [120, 4], [250, 6], [500, 8], [900, 11], [1600, 14], [2600, 17], [4200, 20], [7000, 23], [10000, 26]];
-export function reqLevel(it) {
-  if (!it || !it.slot) return 1;
-  if (it.lvl) return it.lvl;
-  const v = it.value || 0;
-  let L = 28;
-  for (const [max, lv] of REQ_STEPS) if (v <= max) { L = lv; break; }
-  if (it.slot === 'mount') L = Math.max(1, Math.round(L * 0.6));
-  return L;
-}
+// 1.0 : passé le niveau 30, l'expérience nourrit la Gloire — cinquante crans, chacun +1 % de PV et +0,5 % de dégâts
+export const GLORY_XP = 12000, GLORY_MAX = 50;
+// 1.0 : niveau requis pour s'équiper — défini dans items.js (l'équilibrage des armes s'en sert)
+export { reqLevel, ROLES } from './data/items.js';
 export function xpToNext(level) { return Math.round(50 * Math.pow(level, 1.6) + 30); }
 
 // riding : la monture équipée n'apporte ses bonus qu'en selle ; buffs : potions en cours { spd, atk, def }
-export function computeStats(level, eq, upg = {}, riding = false, buffs = null) {
+export function computeStats(level, eq, upg = {}, riding = false, buffs = null, glory = 0) {
   let maxHp = 90 + (level - 1) * 18, maxEn = 60 + (level - 1) * 4;
   let atk = 0, gun = 0, def = 0, spd = 0, crit = 0.05, regen = 0.4 + level * 0.05, leech = 0, goldFind = 0, curseOnHit = 0;
   let atkSpeed = 0.55, gunCd = 1, mountSpeed = 1;
@@ -33,11 +26,12 @@ export function computeStats(level, eq, upg = {}, riding = false, buffs = null) 
   const mul = 1 + 0.07 * (level - 1);
   const uw = upg.weapon || 0, ug = upg.gun || 0, ub = upg.body || 0;
   maxHp += ub * 5;
-  const B = buffs || {};
+  const B = buffs || {}, gl = Math.max(0, Math.min(GLORY_MAX, glory | 0));
+  maxHp = Math.round(maxHp * (1 + 0.01 * gl));
   return {
     maxHp, maxEn,
-    atk: Math.round((atk || 3) * mul * (1 + 0.1 * uw) * (1 + (B.atk || 0))),
-    gun: Math.round(gun * mul * (1 + 0.1 * ug) * (1 + (B.atk || 0))),
+    atk: Math.round((atk || 3) * mul * (1 + 0.1 * uw) * (1 + (B.atk || 0)) * (1 + 0.005 * gl)),
+    gun: Math.round(gun * mul * (1 + 0.1 * ug) * (1 + (B.atk || 0)) * (1 + 0.005 * gl)),
     def: Math.round((Math.round(def * (1 + 0.12 * ub)) + ub) * (1 + (B.def || 0))), crit: Math.min(0.6, crit), regen,
     speed: Math.round(PLAYER_SPEED * (1 + spd + (B.spd || 0)) * mountSpeed),
     atkSpeed, gunCd, leech, goldFind, curseOnHit, mountSpeed,

@@ -7,7 +7,7 @@ import { ZONES, Z, SAFE, roomIdAt, zoneAt } from '../shared/world.js';
 import { T, SEEN_CELL } from '../shared/constants.js';
 import { SLOTS, SLOT_NAMES, RARITY, INV_SIZE, MAP_W, OVER_H, TILE, clockString, dayFrac, darkness, weatherAt, isFullMoon } from '../shared/constants.js';
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
-import { UPG_SLOTS, UPG_MAX, upgradeCost, UPG_TEXT, reqLevel } from '../shared/formulas.js';
+import { UPG_SLOTS, UPG_MAX, upgradeCost, UPG_TEXT, reqLevel, ROLES, MAX_LEVEL } from '../shared/formulas.js';
 import { STRUCTS, HOME_OK } from '../shared/data/craft.js';
 import { iconURL } from './render/sprites-items.js';
 import { MOBS } from '../shared/data/mobs.js';
@@ -163,9 +163,16 @@ export class UI {
       $('hp-txt').textContent = `${me.hp} / ${me.maxHp}`;
       $('en-fill').style.width = (me.en / me.maxEn * 100).toFixed(1) + '%';
       $('en-txt').textContent = `${me.en} / ${me.maxEn}`;
-      $('xp-fill').style.width = (me.xp / me.xpNext * 100).toFixed(1) + '%';
-      $('xp-txt').textContent = `${me.xp} / ${me.xpNext} XP`;
-      $('hud-lvl').textContent = me.lvl;
+      if (me.lvl >= MAX_LEVEL && me.gxpNext) { // 1.0 : la Gloire
+        $('xp-fill').style.width = (me.glory >= 50 ? 100 : me.gxp / me.gxpNext * 100).toFixed(1) + '%';
+        $('xp-txt').textContent = me.glory >= 50 ? `★ Gloire ${me.glory} — la plus haute` : `★ Gloire ${me.glory || 0} — ${me.gxp} / ${me.gxpNext}`;
+        $('xpbar').classList.add('glory');
+      } else {
+        $('xp-fill').style.width = (me.xp / me.xpNext * 100).toFixed(1) + '%';
+        $('xp-txt').textContent = `${me.xp} / ${me.xpNext} XP`;
+        $('xpbar').classList.remove('glory');
+      }
+      $('hud-lvl').textContent = me.glory ? `${me.lvl} ★${me.glory}` : me.lvl;
       $('gold-n').textContent = me.gold; $('gold-mini').textContent = me.gold;
       const f = dayFrac(G.worldTime), d = darkness(f);
       const w = weatherAt(G.worldTime);
@@ -185,7 +192,14 @@ export class UI {
       if (G.night) buffs.push(isFullMoon(G.worldTime) ? '🌕 Pleine lune : la Horde rôde' : '☾ Nuit');
       else if (isFullMoon(G.worldTime + 120)) buffs.push('🌕 Pleine lune ce soir');
       if (ZONES[G.zone] && ZONES[G.zone].hard) buffs.push('☠ Zone extrême');
-      const bh = buffs.map((b) => `<span class="buff">${esc(b)}</span>`).join('');
+      const dt = now - G.meAt, jb = []; // 1.0 : la justice
+      if (me.jail > 0) jb.push(['jail', `⛓ Geôle ${this.mmss(Math.max(0, me.jail - dt))} · caution ${me.bail}`]);
+      else if (me.wd) jb.push(['wanted', `☠ RECHERCHÉ${me.arrest ? ` — la garde ! ${Math.max(0, 10 - me.arrest)} s` : ''}`]);
+      else if (me.inf >= 1) jb.push(['infamy', `Infamie ${Math.floor(me.inf)}/3`]);
+      if (me.prot === -1 && !SAFE.has(G.zone)) jb.push(['prot', '🏳 Protégé (niv. < 10)']);
+      else if (me.prot > 0) jb.push(['prot', `🏳 Pavillon blanc ${this.mmss(Math.max(0, me.prot - dt))}`]);
+      if (this.lastProt !== !!me.prot) { this.lastProt = !!me.prot; this.setZone(G.zone, G.room >= 0 ? G.world.rooms[G.room] : null); }
+      const bh = jb.map(([c, b]) => `<span class="buff ${c}">${esc(b)}</span>`).join('') + buffs.map((b) => `<span class="buff">${esc(b)}</span>`).join('');
       if (bh !== this.lastBuffs) { $('buffs').innerHTML = bh; this.lastBuffs = bh; }
       this.updateHotbar(now);
     }
@@ -197,8 +211,10 @@ export class UI {
     $('zone-name').textContent = room ? room.name : ZONES[z].name;
     $('zone-lvl').textContent = room ? (room.kind === 'cave' ? 'Grotte' : 'Intérieur') : ZONES[z].lvl;
     const pv = $('zone-pvp');
-    pv.textContent = safe ? 'Zone sûre' : '⚔ JcJ';
-    pv.className = safe ? 'safe' : 'pvp';
+    const me = this.G.me || {};
+    const jail = room && room.kind === 'prison';
+    pv.textContent = jail ? '⛓ Geôle' : safe ? 'Zone sûre' : me.prot ? '⚔ JcJ — vous êtes protégé' : '⚔ JcJ';
+    pv.className = jail ? 'pvp' : safe || me.prot ? 'safe' : 'pvp';
   }
   fade() { const f = $('fade'); f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); }
   banner(title, sub) {
@@ -282,8 +298,9 @@ export class UI {
   }
   lockpickEnd(ok) { const st = this.lp; if (!st) return; this.lp = null; $('lockpick').classList.add('hidden'); st.done(ok); }
   hurtFlash() { const v = $('vignette'); v.classList.add('hurt'); clearTimeout(this.hurtT); this.hurtT = setTimeout(() => v.classList.remove('hurt'), 120); }
-  showDeath(lost, by) {
-    $('death-txt').textContent = `${by ? `Terrassé par : ${by}. ` : ''}Vous perdez ${lost} doublon${lost > 1 ? 's' : ''}.`;
+  mmss(s) { s = Math.ceil(s); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+  showDeath(lost, by, jail, pk) {
+    $('death-txt').textContent = `${by ? `Terrassé par : ${by}. ` : ''}${lost ? `Vous perdez ${lost} doublon${lost > 1 ? 's' : ''}.` : pk ? 'Pas d’acharnement : vous ne perdez rien.' : 'Vous ne perdez rien.'}${jail ? ` Direction la Geôle de Port-Lanterne (${jail} s).` : pk ? ' Pavillon blanc pendant deux minutes à votre retour.' : ''}`;
     $('death').classList.remove('hidden');
   }
   hideDeath() { $('death').classList.add('hidden'); }
@@ -382,6 +399,9 @@ export class UI {
     if (it.slot) { const need = reqLevel(it), my = this.G.me ? this.G.me.lvl : 1; lines.push(`<div class="${my >= need ? 'tt' : 'tw'}">Niveau requis : ${need}${my < need ? ' (vous êtes niveau ' + my + ')' : ''}</div>`); }
     const stat = (k, label, pct) => { if (it[k]) lines.push(`<div class="ts">+${pct ? Math.round(it[k] * 100) + ' %' : it[k]} ${label}</div>`); };
     stat('atk', 'attaque'); stat('gun', 'puissance de tir'); stat('def', 'défense'); stat('hp', 'PV max'); stat('crit', 'coup critique', true); stat('spd', 'vitesse', true); stat('regen', 'régénération PV/s');
+    if (it.role && ROLES[it.role]) lines.push(`<div class="trole"><b>${ROLES[it.role][0]}</b> — ${ROLES[it.role][1]}</div>`); // 1.0 : le rôle de l'arme
+    if (it.slot === 'weapon') lines.push(`<div class="tt">≈ ${Math.round(it.atk / (it.speed || 0.5))} dégâts de base par seconde</div>`);
+    else if (it.slot === 'gun' && it.shot) lines.push(`<div class="tt">≈ ${Math.round(it.gun * (it.shot.n || 1) * (it.shot.burst || 1) / (it.cdMul || 1))} dégâts de base par seconde${(it.shot.n || 1) > 2 ? ' (si tout touche)' : ''}</div>`);
     if (it.slot === 'weapon') {
       const reach = it.reach || 27, arc = it.arc || 1.15;
       lines.push(`<div class="tt">Cadence ${String(it.speed || 0.5).replace('.', ',')} s · portée ${reach < 25 ? 'courte' : reach <= 30 ? 'moyenne' : 'longue'} · ${arc < 0.8 ? 'estocade' : arc > 1.6 ? 'balayage très large' : arc > 1.25 ? 'balayage large' : 'taille'}</div>`);
@@ -702,6 +722,7 @@ export class UI {
     }
     if (N.shop) ch.push({ label: '🛒 Voir la marchandise', go: () => this.openShop(npcId) });
     if (N.dice) ch.push({ label: '🎲 Jouer aux dés', cls: 'q', go: () => this.diceMenu(npcId) });
+    if (N.bail && this.G.me && this.G.me.jail > 0) ch.push({ label: `🔑 Payer la caution (${this.G.me.bail} doublons)`, cls: 'q', go: () => { this.G.send({ t: 'bail' }); this.close(); } });
     if (npcId === 'isa') ch.push({ label: '⚒ Renforcer mon équipement', go: () => { this.close(); this.show('forge'); } });
     for (const t of N.topics || []) ch.push({ label: t.q, go: () => this.say(t.a, [{ label: 'Autre chose…', go: () => this.dialogMain(npcId) }, { label: 'Au revoir.', go: () => this.close() }]) });
     ch.push({ label: 'Au revoir.', go: () => this.close() });
@@ -785,10 +806,10 @@ export class UI {
     };
     const CATS = [
       ['Premiers pas', ['premier_sang', 'niveau10', 'riche', 'forge', 'proprietaire', 'peche']],
-      ['Combat', ['crabes', 'faucheur', 'elite', 'boss', 'invasion', 'horde', 'duel', 'roi_os', 'kraken', 'freres', 'damnes', 'eruption']],
+      ['Combat', ['crabes', 'faucheur', 'elite', 'boss', 'invasion', 'horde', 'duel', 'chasseur', 'roi_os', 'kraken', 'freres', 'damnes', 'eruption']],
       ['Mer et voyages', ['navigateur', 'naufrageur', 'rade', 'explorateur', 'espadon', 'citoyen']],
       ['Trésors et secrets', ['tresor', 'speleo', 'fouineur', 'cambrioleur', 'jumeaux', 'flambeur']],
-      ['Légendes', ['gardien', 'complice', 'elegance', 'libertalia']],
+      ['Légendes', ['gardien', 'complice', 'elegance', 'libertalia', 'gloire', 'gloire_max', 'potence']],
     ];
     const seen = new Set(CATS.flatMap(([, ids]) => ids));
     const rest = Object.keys(ACHIEVEMENTS).filter((k) => !seen.has(k));
@@ -1060,13 +1081,13 @@ export class UI {
       if (e.k === 'm' && !e.dyingT) { const d = MOBS[e.type] || {}; dot(e.x, e.y, d.ship ? '#1c1426' : e.type === 'boss' || d.elite ? '#ff2a2a' : '#e05040', d.ship ? 5 : e.type === 'boss' || d.elite ? 4 : 2); if (d.ship) dot(e.x, e.y, '#ff8a6a', 3); }
       else if (e.k === 'a') dot(e.x, e.y, '#ffd23a', 4);
     }
-    for (const [id, , px0, py0, room, dead] of G.mapPlayers || []) { // les autres pirates, même hors de vue
+    for (const [id, , px0, py0, room, dead, wd] of G.mapPlayers || []) { // les autres pirates, même hors de vue
       if (id === G.myId) continue;
       let px = px0, py = py0;
       if (room >= 0) { const d = G.world.doors.find((q) => q.room === room); if (d) { px = d.ox; py = d.oy; } }
       const e = G.ents.get(id);
       if (e && !inside && room < 0) { px = e.x; py = e.y; }
-      dot(px, py, '#1c1426', 5); dot(px, py, dead ? '#8a8a9a' : this.inGroup(id) ? '#7aff8a' : '#7ae0ff', 3);
+      dot(px, py, '#1c1426', 5); dot(px, py, dead ? '#8a8a9a' : this.inGroup(id) ? '#7aff8a' : wd ? '#ff4a3a' : '#7ae0ff', 3);
     }
     for (const d of G.world.doors) if (d.secret && G.found.has(d.id)) { dot(d.ox, d.oy, '#1c1426', 5); dot(d.ox, d.oy, '#b8a0ff', 3); }
     for (const n of G.npcs) { if (n.y >= OVER_H * TILE) continue; const mk = G.npcMarker(n.id); dot(n.x, n.y, mk ? '#ffd23a' : '#e8d8b0', mk ? 3 : 2); }
@@ -1129,14 +1150,15 @@ export class UI {
     for (const d of G.world.doors) if (d.secret && G.found.has(d.id)) { const dx = d.ox / TILE * S, dy = d.oy / TILE * S; x.fillStyle = '#1c1426'; x.beginPath(); x.arc(dx, dy, 6, 0, 6.3); x.fill(); x.fillStyle = '#b8a0ff'; x.beginPath(); x.arc(dx, dy, 4, 0, 6.3); x.fill(); x.font = '600 13px "Pixelify Sans", sans-serif'; x.fillStyle = 'rgba(0,0,0,0.6)'; x.fillText(d.name, dx + 1, dy - 9); x.fillStyle = '#e0d4ff'; x.fillText(d.name, dx, dy - 10); }
     for (const n of G.npcs) { const mk = G.npcMarker(n.id); if (!mk) continue; let nx = n.x, ny = n.y; if (ny >= OVER_H * TILE) { const rid = G.world.roomGrid[Math.floor(ny / TILE) * MAP_W + Math.floor(nx / TILE)], d = G.world.doors.find((q) => q.room === rid); if (!d) continue; nx = d.ox; ny = d.oy; } x.fillStyle = '#ffd23a'; x.font = '700 16px "Pixelify Sans", sans-serif'; x.fillText(mk, nx / TILE * S, ny / TILE * S - 6); }
     x.font = '600 12px "Pixelify Sans", sans-serif';
-    for (const [id, name, px0, py0, room, dead] of G.mapPlayers || []) { // les autres pirates, partout sur la carte
+    for (const [id, name0, px0, py0, room, dead, wd] of G.mapPlayers || []) { // les autres pirates, partout sur la carte
+      const name = wd ? `☠ ${name0} (recherché)` : name0;
       if (id === G.myId) continue;
       let px = px0, py = py0;
       if (room >= 0) { const d = G.world.doors.find((q) => q.room === room); if (d) { px = d.ox; py = d.oy; } }
       const sx = px / TILE * S, sy = py / TILE * S;
       const gm = this.inGroup(id);
-      x.fillStyle = '#1c1426'; x.fillRect(sx - 4, sy - 4, 8, 8); x.fillStyle = dead ? '#8a8a9a' : gm ? '#7aff8a' : '#7ae0ff'; x.fillRect(sx - 3, sy - 3, 6, 6);
-      x.fillStyle = 'rgba(0,0,0,0.65)'; x.fillText(name, sx + 1, sy - 6); x.fillStyle = gm ? '#c8ffd0' : '#c8f4ff'; x.fillText(name, sx, sy - 7);
+      x.fillStyle = '#1c1426'; x.fillRect(sx - 4, sy - 4, 8, 8); x.fillStyle = dead ? '#8a8a9a' : gm ? '#7aff8a' : wd ? '#ff4a3a' : '#7ae0ff'; x.fillRect(sx - 3, sy - 3, 6, 6);
+      x.fillStyle = 'rgba(0,0,0,0.65)'; x.fillText(name, sx + 1, sy - 6); x.fillStyle = gm ? '#c8ffd0' : wd ? '#ffb0a0' : '#c8f4ff'; x.fillText(name, sx, sy - 7);
     }
     if (G.treasure) { const tx = G.treasure.x / TILE * S, ty = G.treasure.y / TILE * S; x.strokeStyle = '#d82a2a'; x.lineWidth = 3; x.beginPath(); x.moveTo(tx - 6, ty - 6); x.lineTo(tx + 6, ty + 6); x.moveTo(tx + 6, ty - 6); x.lineTo(tx - 6, ty + 6); x.stroke(); }
     if (G.objective) { x.fillStyle = '#ffd23a'; x.beginPath(); x.arc(G.objective.x / TILE * S, G.objective.y / TILE * S, 5, 0, 6.3); x.fill(); x.strokeStyle = '#1c1426'; x.lineWidth = 2; x.stroke(); }

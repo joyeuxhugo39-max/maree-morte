@@ -1129,6 +1129,15 @@ export function generateWorld(seed = 7) {
       for (const [tx, ty] of [[x0 + 9, y0 + 2], [x0 + 12, y0 + 4], [x0 + 8, y0 + 6], [x0 + 3, y0 + 6]]) if (tx < x0 + w - 1 && ty < y0 + h - 1) { put('table', tx, ty); put('chaise', tx - 1, ty, 0); put('chaise', tx + 1, ty, 1); }
       put('tonneau_d', x0, y0 + h - 1); put('tonneau_d', x0 + w - 1, y0 + h - 1);
       innerNpcs.push({ id: r.npc || (kind === 'tavern' ? 'rosalie' : 'ysolde'), x: (x0 + 3) * TILE + 8, y: (y0 + 1) * TILE + 12, dir: 0 });
+    } else if (kind === 'prison') { // 1.0 : la geôle des forbans recherchés — trois cellules ouvertes, la paille, le gardien à la porte
+      for (let c = 0; c < 3; c++) {
+        const cx = x0 + 1 + c * 5;
+        for (let y = y0; y < y0 + 3; y++) put('barreaux', cx + 4, y, 0);
+        for (let x = cx; x < cx + 4; x++) if (x !== cx + 2) put('barreaux', x, y0 + 3, 1);
+        put(c === 1 ? 'tonneau_d' : 'crate', cx, y0);
+      }
+      put('brazier', x0, y0 + h - 2); put('table', x0 + w - 4, y0 + h - 3); put('chaise', x0 + w - 5, y0 + h - 3, 0); put('ratelier', x0 + w - 1, y0 + 4, 1);
+      innerNpcs.push({ id: 'gardien_geole', x: (x0 + w - 3) * TILE + 8, y: (y0 + h - 2) * TILE + 12, dir: 0 });
     } else if (kind === 'geole') { // trois cellules ; le capitaine dans celle du milieu
       for (let c = 0; c < 3; c++) { const cx = x0 + 1 + c * 4; for (let y = y0; y < y0 + 3; y++) { put('barreaux', cx + 3, y, 0); } put('barreaux', cx, y0 + 3, 1); put('barreaux', cx + 1, y0 + 3, 1); put('barreaux', cx + 2, y0 + 3, 1); }
       put('table', x0 + 5, y0 + h - 2); put('chaise', x0 + 4, y0 + h - 2, 0); put('ratelier', x0 + w - 1, y0 + h - 2, 1);
@@ -1366,6 +1375,11 @@ export function generateWorld(seed = 7) {
     b.room = r.id; b.doorId = doors.length - 1; doors[b.doorId].plot = b.plot;
     plots.push(b);
   }
+  // 1.0 : la Geôle de Port-Lanterne, la dernière pièce (les anciennes gardent leurs numéros) ; on n'y entre que conduit
+  // par la garde, et sa porte ne s'ouvre de l'intérieur qu'une fois la peine purgée
+  const jailRoom = room('Geôle de Port-Lanterne', 'prison', 16, 9, T.STONEF, { x: TC.x, y: TC.y + 2 });
+  doors[doors.length - 1].jail = 1; doors[doors.length - 1].secret = true;
+  furnish(jailRoom);
   if (ay + rowH + 2 > H) throw new Error('bande des intérieurs trop petite (est)');
 
   // ---------- 11c. Cachettes : des coffres oubliés, chacun garde une arme ----------
@@ -1633,7 +1647,7 @@ export function generateWorld(seed = 7) {
       { id: 'freres', plates: fortPlates, door: doors.findIndex((d) => d.seal === 'freres'), room: arena.id, open: 120 },
     ],
     docks, lavaLights, seaRoutes, volcano, rade: RD, anse: AT, ermite: EM, volcan: VC, quarantaine: QC, ossements: AO, damnes: DM, lagon: LG, pendus: FP, fort: FT, brumes: BR,
-    libertalia: LB, libFort: LFT,
+    libertalia: LB, libFort: LFT, jail: jailRoom.id,
     seed, W, H, tiles, zones, solid, plankDir, waterDist, props, buildings, npcs, spawns, chests,
     spawnPoint, town: TC, lighthouse: LH, ruins: RC, cemetery: CEM, wreck: WR, coastY, dockEnd,
   };

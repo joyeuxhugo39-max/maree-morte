@@ -173,6 +173,16 @@ Object.assign(NPCS, {
     greet: ['Hic. On ne touche pas aux barreaux.', 'Le prisonnier ? Il parle, il parle... Hic.', 'Personne ne sort d’ici. Sauf avec la clé. Que j’ai. Quelque part.'],
     topics: [{ q: 'Une bouteille ?', a: "Une bouteille ? Hic. Six, oui. Six, ça c'est une conversation." }],
   },
+  gardien_geole: { // 1.0 : on lui paie la caution, ou l'on attend
+    name: 'Maître Verrou', title: 'Gardien de la Geôle', bail: 1,
+    look: { skin: 1, hair: 0, hairStyle: 'court', beard: 1, top: 'capitaine', topCol: 'navy', pants: 'black', boots: 'black', hat: 'tricorne', hatCol: 'black' },
+    greet: ['Encore un forban. La paille est fraîche, le temps passe plus vite assis.', 'On sort d’ici de deux façons : en purgeant sa peine, ou en payant la caution.', 'La Capitainerie tient ses comptes. Et moi, je tiens les clés.'],
+    topics: [
+      { q: 'Pourquoi suis-je ici ?', a: "Vous étiez recherché. Trop de pirates envoyés par le fond sans qu'ils aient levé la main sur vous, ou une maison crochetée. La garde vous a pris en ville, ou l'on vous a ramené mort. Ici, on purge, puis l'ardoise est effacée." },
+      { q: 'Comment ne plus revenir ?', a: "Ne frappez que ceux qui vous cherchent. Celui qui se défend n'a rien à craindre de la Capitainerie. Et l'infamie s'oublie : à force de bonne conduite, elle redescend toute seule." },
+      { q: 'Et les chasseurs de primes ?', a: "Une prime court sur chaque forban recherché : celui qui l'abat touche une part de son or, et l'honneur qui va avec. Le classement de l'honneur est affiché à la Capitainerie… enfin, dans votre livre de compagnons (P)." },
+    ],
+  },
   madame_soie: {
     name: 'Madame Soie', title: 'Couturière des forbans',
     look: { skin: 2, hair: 0, hairStyle: 'queue', top: 'capitaine', topCol: 'teal', pants: 'black', boots: 'black', hat: 'plume', hatCol: 'teal' },
