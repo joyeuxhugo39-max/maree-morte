@@ -360,8 +360,18 @@ function fortLib() { // le Fort des Hauts : une herse, des pavillons noirs (le f
   return mk(pb, 36, 62);
 }
 
+// 1.0 : un levier de fer sur son socle de pierre (le Bastion Englouti)
+function levier() {
+  const pb = new PB(14, 22);
+  pb.rect(1, 14, 12, 7, STONE[2]); pb.hl(1, 14, 12, STONE[4]); pb.rect(1, 20, 12, 1, STONE[0]);
+  pb.rect(4, 12, 6, 3, IRON[1]); pb.hl(4, 12, 6, IRON[3]);
+  pb.line(7, 12, 11, 2, IRON[2], 2); pb.line(7, 12, 11, 2, IRON[4]); pb.disc(11, 2, 1.8, 0xc8342e); pb.set(10, 1, 0xff8a7a);
+  pb.outline('auto');
+  return mk(pb, 7, 20);
+}
 export function extend08(env) {
   const many = (fn, n) => Array.from({ length: n }, (_, v) => fn(v));
+  env.levier = [levier()];
   env.rempart = many(rempart, 16); env.tour = many(tour, 2); env.porte_cite = [porteCite()];
   env.fontaine = [fontaine()]; env.statue = [statue()]; env.linge = many(linge, 3); env.drapeau = many(drapeau, 2);
   env.canne = many(canne, 4); env.paletuvier = many(paletuvier, 3);

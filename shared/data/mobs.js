@@ -182,3 +182,6 @@ for (const [boss, [id]] of Object.entries(TROPHIES)) if (MOBS[boss]) (MOBS[boss]
 mob('ame_anselme', { name: 'L’Âme du Père Anselme', level: 28, hp: 9000, dmg: 44, speed: 36, aggro: 260, leash: 380, range: 30, atkCd: 1.4, windup: 0.55, xp: 4800, gold: [500, 800], r: 14, respawn: 99999, elite: 1, big: 1,
   ai: 'flamme', phases: [0.66, 0.33], title: 'Premier gardien de la Flamme', weapon: ['bigsaber', 'gold'], loot: [['rhum_vieux', 1, 1, 2], ['lame_vespere', 0.08, 1, 1], ['habit_gouverneur', 0.05, 1, 1]] });
 for (const m of ['damne', 'arquebusier_damne']) MOBS[m].loot.push(['page_anselme', 0.3, 1, 1]);
+// 1.0 : le maître du Bastion Englouti, au fond de la troisième salle
+mob('amiral_englouti', { name: 'L’Amiral Englouti', level: 24, hp: 6500, dmg: 40, speed: 38, aggro: 200, leash: 300, range: 30, atkCd: 1.4, windup: 0.55, xp: 3600, gold: [420, 640], r: 14, respawn: 900, elite: 1, big: 1, swims: 1, groan: 1,
+  ai: 'amiral', phases: [0.5, 0.25], title: 'Seigneur du Bastion', weapon: ['bigsaber', 'steel'], loot: [['harpon_abysses', 0.18, 1, 1], ['sabre_jumeaux', 0.12, 1, 1], ['uniforme_marine', 0.15, 1, 1], ['rhum_vieux', 1, 1, 3]] });

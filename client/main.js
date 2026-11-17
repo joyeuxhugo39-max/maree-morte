@@ -231,6 +231,11 @@ function onMsg(m) {
     case 'codex': G.codex = m; if (ui.open === 'codex') ui.renderCodex(); break;
     case 'soc': ui.setSoc(m); break; // 1.0 : amis, groupe, équipage
     case 'tav': ui.tav(m); break; // 1.0 : les jeux de taverne
+    case 'dng': { // 1.0 : le Bastion Englouti — grilles, Écluse, leviers
+      const D = G.world.dungeon; G.dng = m; G.dngAt = now;
+      D.gates.forEach((g, k) => { for (const i of g) G.world.block[i] = m.open[k] ? 0 : 1; });
+      break;
+    }
     case 'arena': { // 1.0 : la Fosse
       if (m.board) {
         const top = m.board.length ? m.board.map(([n, w], i) => `${i + 1}. ${n} — vague ${w}`).join('\n') : 'Personne n’a encore combattu cette semaine.';
@@ -531,6 +536,7 @@ function onEvent(ev, t) {
       const [, k, x, y, id] = ev;
       if (k === 'spawn' || k === 'summon') { R.smoke(x, y, 8, k === 'summon' ? 'rgba(120,255,140,0.5)' : 'rgba(150,200,140,0.4)', { size: 3 }); if (k === 'summon') G.sfx.play('summon', vol(x, y)); }
       else if (k === 'respawn') R.burst(x, y, 20, { col: ['#ffffff', '#bfe8ff'], up: 60, speed: 30, life: 0.8 });
+      else if (k === 'lever') { R.burst(x, y - 18, 8, { col: ['#ffd24a', '#c8c7d4'], up: 30, speed: 25, life: 0.5 }); G.sfx.play('door', vol(x, y)); } // 1.0 : un levier du Bastion
       else if (k === 'recall') { R.addFx({ kind: 'ring', x, y, r: 40, dur: 3, col: 'rgba(255,170,220,A)', w: 2 }); G.sfx.play('conch', vol(x, y) * 0.7); }
       else if (k === 'smoke') { R.smoke(x, y, 30, 'rgba(40,34,44,0.7)', { size: 4, life: 1.6, spread: 30 }); G.sfx.play('boom', vol(x, y) * 0.3); }
       else if (k === 'buff') { const col = { spd: ['#f2d85a', '#fff2a0'], atk: ['#e85a4a', '#ffb0a0'], def: ['#9aa0b4', '#ffffff'] }[ev[5]] || ['#ffffff']; R.burst(x, y, 18, { z: 8, col, up: 50, speed: 20, life: 0.9, g: -20 }); G.sfx.play('level', vol(x, y) * 0.4); }
@@ -654,6 +660,7 @@ function interact() {
   }
   else if (t.kind === 'exit') useDoor(t.d, true, performance.now() / 1000);
   else if (t.kind === 'player') G.ui.playerMenu(t.name, null); // 1.0 : inviter, échanger, ajouter en ami…
+  else if (t.kind === 'lever') G.send({ t: 'lever', i: t.i }); // 1.0 : le Bastion
   else if (t.kind === 'embark') G.send({ t: 'embark', name: t.name }); // 1.0 : navires partagés
   else if (t.kind === 'disembark') G.send({ t: 'disembark' });
   else if (t.kind === 'board') G.send({ t: 'board', a: +G.aim.toFixed(3) });
@@ -724,6 +731,10 @@ function findInteract() {
     bd = d;
     best = { kind: 'harvest', id: pr.id, x: pr.x, y: pr.y, h: pr.spr ? Math.min(40, pr.spr.h * 0.6) : 14, verb: Q.verb };
   }
+  if (G.room >= 0 && G.world.dungeon && G.room === G.world.dungeon.room) G.world.dungeon.levers.forEach((L, i) => { // 1.0 : les leviers du Bastion
+    const d = Math.hypot(L.x - p.x, L.y - p.y);
+    if (d < 30 && d < bd) { bd = d; best = { kind: 'lever', i, x: L.x, y: L.y, h: 26, verb: 'Tirer le levier' }; }
+  });
   if (G.me && G.me.ab) return { kind: 'disembark', x: p.x, y: p.y, h: 34, verb: 'Débarquer' }; // 1.0 : à bord d'un compagnon
   if (!best && !p.boat && G.room < 0) for (const e of G.ents.values()) { // 1.0 : monter à bord du navire d'un compagnon
     if (e.k !== 'p' || !(e.flags & 16) || e.dead) continue;

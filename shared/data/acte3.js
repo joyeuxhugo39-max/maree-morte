@@ -164,3 +164,29 @@ export const ACTE3 = {
     ],
   },
 };
+
+// 1.0 : le Bastion Englouti, donjon pour plusieurs pirates (Île de la Quarantaine)
+export const DONJONS = {
+  bastion: {
+    name: 'Le Bastion Englouti', giver: 'kerbrat', turnin: 'kerbrat', level: 22, requires: ['freres_cote'], ach: 'bastion',
+    goals: [{ type: 'kill', mob: 'amiral_englouti', n: 1, text: 'L’Amiral Englouti, au fond du Bastion (Île de la Quarantaine)' }],
+    rewards: { xp: 16000, gold: 2500, items: [['tenue_corsaire', 1]] },
+    offer: "Sur l'Île de la Quarantaine, une bouche de pierre s'ouvre sur un fort que la mer a avalé : le Bastion Englouti. Trois salles, deux grilles, et derrière, l'Amiral. Chaque grille a deux leviers, loin l'un de l'autre : il faut les tirer ensemble. Seul, tu n'iras pas loin. C'est fait exprès.",
+    progress: 'L’entrée du Bastion est sur l’Île de la Quarantaine, au sud. Venez à plusieurs : deux leviers par grille.',
+    done: "L'Amiral est tombé ? Alors le Bastion est à nous. À nous tous. Comme il se doit chez les Frères.",
+    scene: [
+      ['npc', "Tu te souviens du Fort des Deux Clés ? Deux dalles, deux pirates. Le Bastion, c'est la même idée… en pire."],
+      ['me', "En pire comment ?"],
+      ['npc', "La deuxième salle s'appelle l'Écluse. Dès que tu y mets un pied, elle se remplit. Si vous n'ouvrez pas la grille suivante à temps, le courant vous recrache dehors, et tout est à refaire."],
+      { ask: [
+        { q: 'Et l’Amiral ?', a: [['npc', "Un amiral de la Couronne, noyé avec son fort. Il fait jaillir la mer sous tes pieds et rappelle son équipage. Garde tes distances et ne reste jamais immobile."]] },
+        { q: 'Combien faut-il être ?', a: [['npc', "Deux au moins, pour les leviers. Quatre ou cinq, si tu veux revenir avec toutes tes dents."]] },
+      ], go: 'On y va' },
+    ],
+    sceneDone: [
+      ['npc', "Alors ? L'Écluse ?"],
+      ['me', "On a eu de l'eau jusqu'au menton."],
+      ['npc', "Ha ! Le menton, c'est rien. Le dernier groupe en avait jusqu'au chapeau. Prends cette tenue de corsaire : tu l'as gagnée, toi et tes compagnons."],
+    ],
+  },
+};

@@ -14,6 +14,7 @@ export const ACHIEVEMENTS = {
   fin_apaiser: { name: 'La Flamme apaisée', desc: 'Acte III : rallumer la Flamme doucement, pour que les morts reposent là où ils tombent.', title: 'Apaiseur des Marées' },
   fin_gardien: { name: 'Le gardien de la Flamme', desc: 'Acte III : prendre la garde de la Flamme, et son fardeau.', title: 'Gardien de la Flamme' },
   fin_brasier: { name: 'La nuit où la mer brûla', desc: 'Acte III : retourner la Flamme contre la mer.', title: 'Brûleur de Marées' },
+  bastion: { name: 'Le Bastion tombé', desc: 'Vaincre l’Amiral Englouti au fond du Bastion, avec ses compagnons.', title: 'Briseur de grilles' },
   gladiateur: { name: 'Gladiateur', desc: 'Tenir dix vagues dans la Fosse de Libertalia.', title: 'Gladiateur de la Fosse' },
   duelliste: { name: 'Fine lame', desc: 'Remporter un duel dans la Fosse.', title: 'Fine lame' },
   champion_fosse: { name: 'Champion de la Fosse', desc: 'Finir premier du classement de la semaine dans la Fosse.', title: 'Champion de la Fosse' },

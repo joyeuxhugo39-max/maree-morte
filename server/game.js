@@ -30,6 +30,7 @@ import { events } from './events.js';
 import { arena } from './arena.js';
 import { tavern } from './tavern.js';
 import { naval } from './naval.js';
+import { dungeonLogic } from './dungeon.js';
 import { MEM_KEYS } from '../shared/data/scenes.js';
 import { repLevel, buyPrice, sellPrice } from '../shared/data/places.js';
 import { LEGACY_VALUE, LEGACY_STRUCT, QUEST_ITEM_OLD_VALUE } from '../shared/data/legacy.js';
@@ -115,6 +116,7 @@ export class Game {
     this.eventsInit();
     this.arenaInit();
     this.tavernInit();
+    this.dungeonInit();
     this.seenW = Math.ceil(this.world.W / SEEN_CELL); this.seenH = Math.ceil(this.world.OVER_H / SEEN_CELL); this.seenBytes = Math.ceil(this.seenW * this.seenH / 8);
     this.usedTokens = new Set(); this.fails = new Map(); this.bans = {}; this.reports = []; this.maintenance = null; // 1.0
     if (storage && storage.loadMeta) { Promise.resolve(storage.loadMeta('bans')).then((b) => { if (b) this.bans = b; }).catch(() => {}); Promise.resolve(storage.loadMeta('reports')).then((r) => { if (Array.isArray(r)) this.reports = r; }).catch(() => {}); }
@@ -224,6 +226,7 @@ export class Game {
       case 'embark': return this.embark(p, String(m.name || ''));
       case 'disembark': return this.disembark(p, null);
       case 'repair': return this.repair(p);
+      case 'lever': return this.pullLever(p, m.i | 0);
       case 'arena': return this.arenaAction(p, String(m.a), m);
       case 'tav': return this.tavernAction(p, String(m.a), m);
       case 'mem': { const k = String(m.k); if (MEM_KEYS.has(k) && p.mem.size < 200) p.mem.add(k); return; }
@@ -315,6 +318,7 @@ export class Game {
     this.socialLogin(p);
     this.justiceLogin(p);
     if (this.wevt) this.pushEvent(p);
+    if (this.inDungeon(p)) this.pushDng(p);
     if (this.fosseBoard && this.fosseBoard.champ === p.key) this.unlock(p, 'champion_fosse');
     if (!res.data) this.toast(p, 'Bienvenue ! Parlez à la Capitaine Morgane, près des quais (touche E).', 'quest');
     this.log(`[jeu] ${p.name} connecté (${this.players.size} en ligne)`);
@@ -1118,6 +1122,12 @@ export class Game {
           for (let k = 0; k < 16; k++) this.spawnProj(m.x, m.y - 12, k / 16 * Math.PI * 2, 140, 260, 60, 'm', m.id, 'curse', 0);
           this.ev(m.x, m.y, ['roar', m.id]);
         }
+        break;
+      }
+      case 'amiral': { // 1.0 : l'Amiral Englouti — geysers, ruées, son équipage, et la marée qui monte
+        if (ready('gey', P >= 2 ? 4 : 6)) { for (const p of this.bossTargets(m, 240)) { this.tele(p.x, p.y, 22, 1.1, 30, m, 7); this.tele(p.x + rand(-30, 30), p.y + rand(-24, 24), 20, 1.4, 26, m, 7); } }
+        else if (P >= 1 && ready('wave', 11)) { const a = Math.atan2(t.y - m.y, t.x - m.x); this.lineTele(m.x, m.y - 6, m.x + Math.cos(a) * 180, m.y - 6 + Math.sin(a) * 180, 26, 0.9, 36, m, 2); this.ev(m.x, m.y, ['shout', m.id, 'Par le fond !']); m.pauseUntil = now + 1.0; }
+        else if (P >= 1 && ready('sum', 16)) this.summonAdds(m, t, 'naufrageur', 2, 3, 'Équipage, à vos postes !');
         break;
       }
       case 'flamme': { // 1.0 : l'Âme du Père Anselme — le feu qui chasse les morts brûle aussi les vivants
@@ -2046,6 +2056,7 @@ export class Game {
       p.cds.door = this.time + 0.6;
       if (d.secret) this.discover(p, d);
       this.teleport(p, d.ix, d.iy, { door: d.id });
+      if (d.dungeon) { this.pushDng(p); this.toast(p, 'Le Bastion Englouti : deux leviers par grille, à tirer ensemble — à plusieurs. Et méfiez-vous de l’Écluse.', 'quest'); }
     }
   }
   // ------------------------------------------------------------ navigation
@@ -3094,7 +3105,7 @@ export class Game {
     if (this.tickCount % 5 === 0) for (const p of this.players.values()) this.updateBuffs(p);
     if (this.tickCount % 5 === 0) this.updateVolcano();
     if (this.tickCount % 20 === 0) { this.justiceGlobalTick(); this.eventTick(); }
-    if (this.tickCount % 5 === 0) this.arenaTick();
+    if (this.tickCount % 5 === 0) { this.arenaTick(); this.dungeonTick(); }
     this.navalTick();
     if (this.tickCount % 40 === 0 && this.players.size > 1) { // les autres pirates sur la carte
       const pl = [...this.players.values()].map((q) => [q.id, q.name, Math.round(q.x), Math.round(q.y), q.room, q.dead ? 1 : 0, this.isWanted(q) ? 1 : 0]);
@@ -3169,3 +3180,4 @@ Object.assign(Game.prototype, events); // 1.0 : les invasions rares et annoncée
 Object.assign(Game.prototype, arena); // 1.0 : l'Arène de la Fosse
 Object.assign(Game.prototype, tavern); // 1.0 : les jeux de taverne
 Object.assign(Game.prototype, naval); // 1.0 : navires partagés et coques
+Object.assign(Game.prototype, dungeonLogic); // 1.0 : le Bastion Englouti

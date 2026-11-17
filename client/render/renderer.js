@@ -340,6 +340,7 @@ export class Renderer {
       ctx.fillStyle = '#fff0a0'; ctx.fillRect(X - 1 + sp, Y - 2, 2, 1);
     }
     this.drawParticles(ctx, camX, camY, dt);
+    if (room && room.dungeon) this.drawDungeon(ctx, G, camX, camY, now); // 1.0 : grilles et Écluse du Bastion
     if (!room) this.drawGarlands(ctx, camX, camY, now, dark, false);
     if (!room) {
       this.updateCritters(G, camX, camY, now, dt, dark);
@@ -548,6 +549,32 @@ export class Renderer {
           ctx.globalAlpha = 1; ctx.fillStyle = g.cols[i]; ctx.fillRect(X - 1, Y, 2, 3); ctx.fillStyle = '#fff6d8'; ctx.fillRect(X - 1, Y, 1, 1);
         } else { ctx.fillStyle = '#3a2414'; ctx.fillRect(X - 1, Y - 1, 3, 1); ctx.fillStyle = g.cols[i]; ctx.globalAlpha = 0.75; ctx.fillRect(X - 1, Y, 2, 3); ctx.globalAlpha = 1; }
       }
+    }
+  }
+  // 1.0 : le Bastion Englouti — les grilles fermées, l'eau de l'Écluse, les leviers tirés
+  drawDungeon(ctx, G, camX, camY, now) {
+    const D = this.world.dungeon, st = G.dng || { open: [0, 0], water: 0, pulls: {} }, W = this.world.W;
+    D.gates.forEach((g, k) => {
+      if (st.open[k]) return;
+      let x0 = 1e9, y0 = 1e9, x1 = 0, y1 = 0;
+      for (const i of g) { const tx = i % W, ty = (i / W) | 0; x0 = Math.min(x0, tx); y0 = Math.min(y0, ty); x1 = Math.max(x1, tx); y1 = Math.max(y1, ty); }
+      const X = x0 * TILE - camX, Y = y0 * TILE - camY - 10, w = (x1 - x0 + 1) * TILE, h = (y1 - y0 + 1) * TILE + 10;
+      ctx.fillStyle = 'rgba(10,14,20,0.55)'; ctx.fillRect(X, Y, w, h);
+      for (let x = 2; x < w; x += 5) { ctx.fillStyle = '#5a5e6e'; ctx.fillRect(X + x, Y, 2, h); ctx.fillStyle = '#9aa0b4'; ctx.fillRect(X + x, Y, 1, h); }
+      ctx.fillStyle = '#3a3c48'; ctx.fillRect(X, Y, w, 3); ctx.fillRect(X, Y + h - 3, w, 3); ctx.fillStyle = '#b4b8c6'; ctx.fillRect(X, Y, w, 1);
+    });
+    if (st.water > 0) { // l'eau monte dans l'Écluse
+      const [cx0, cx1] = D.chambers[1], lvl = Math.min(1, st.water), top = D.y1 - (D.y1 - D.y0) * lvl;
+      const X = cx0 - camX, Y = top - camY, w = cx1 + 16 - cx0, h = D.y1 - top;
+      ctx.fillStyle = `rgba(30,90,140,${0.32 + 0.25 * lvl})`; ctx.fillRect(X, Y, w, h);
+      ctx.fillStyle = 'rgba(190,235,255,0.55)';
+      for (let x = 0; x < w; x += 4) ctx.fillRect(X + x, Y + Math.round(Math.sin(now * 3 + x * 0.15) * 1.5), 3, 1);
+      if (rnd() < 0.3 * lvl) this.burst(cx0 + rnd() * w, top + rnd() * h, 1, { z: 2, col: ['#d8f6ff', '#9fd8ff'], up: 20, speed: 6, life: 0.6, g: -20, size: 1 });
+    }
+    for (const [i, left] of Object.entries(st.pulls || {})) { // le levier tiré : il attend son jumeau
+      const L = D.levers[i]; if (!L) continue;
+      const k = Math.max(0, left - (now - (G.dngAt || now))) / 2.5;
+      ctx.strokeStyle = '#ffd24a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(L.x - camX, L.y - camY - 30, 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); ctx.stroke();
     }
   }
   // 1.0 : respiration au repos — la tête et les épaules descendent d'un pixel, à intervalles réguliers

@@ -60,7 +60,7 @@ export const PROPS = {
   comptoir: { solid: 1 }, etagere: { solid: 1 }, cheminee: { solid: 1 }, table: { solid: 1 }, chaise: {}, ratelier: { solid: 1 },
   plante: { solid: 1 }, lit_deco: { solid: 1 }, fourneau: { solid: 1 }, tapis_deco: { ground: 1 }, grotte: {}, crane_rock: { solid: 1 }, cristal: { solid: 1 }, tonneau_d: { solid: 1 },
   home: { solid: 1 }, dalle: { ground: 1 }, sceau: { solid: 1 },
-  volcan: { solid: 1 }, gibet: { solid: 1 }, corail: { solid: 1 }, obelisque: { solid: 1 }, fumerolle: { ground: 1 }, tente: { solid: 1 }, barreaux: { solid: 1 },
+  volcan: { solid: 1 }, gibet: { solid: 1 }, corail: { solid: 1 }, obelisque: { solid: 1 }, fumerolle: { ground: 1 }, tente: { solid: 1 }, barreaux: { solid: 1 }, levier: { solid: 1 },
   mannequin: { solid: 1 }, lavarock: { solid: 1 }, cage: { solid: 1 }, fort: { solid: 1 }, ruine: { solid: 1 }, totem: { solid: 1 },
   ship: { solid: 1 }, wreck: { solid: 1 }, boat: { solid: 1 },
   // 0.8 : Libertalia
@@ -1380,6 +1380,47 @@ export function generateWorld(seed = 7) {
   const jailRoom = room('Geôle de Port-Lanterne', 'prison', 16, 9, T.STONEF, { x: TC.x, y: TC.y + 2 });
   doors[doors.length - 1].jail = 1; doors[doors.length - 1].secret = true;
   furnish(jailRoom);
+  // 1.0 : le Bastion Englouti — un donjon de trois salles pour plusieurs pirates. Les pièces viennent après
+  // toutes les anciennes ; ses décors (entrée, leviers) sont posés à la toute fin, après tous les anciens décors.
+  const dungeon = (() => {
+    const DW = 72, DH = 18, [dx0, dy0] = alloc(DW, DH);
+    for (let y = dy0 - 2; y <= dy0 + DH; y++) for (let x = dx0 - 1; x <= dx0 + DW; x++) { const i = idx(x, y); tiles[i] = T.IWALL; zones[i] = Z.CAVE; solid[i] = 1; occ[i] = 0; }
+    for (let y = dy0; y < dy0 + DH; y++) for (let x = dx0; x < dx0 + DW; x++) { const i = idx(x, y); tiles[i] = T.STONEF; solid[i] = 0; occ[i] = 0; }
+    const gates = [];
+    for (const wx of [dx0 + 23, dx0 + 47]) { // deux murs, chacun percé d'une grille de trois cases
+      const g = [];
+      for (let y = dy0; y < dy0 + DH; y++) for (const x of [wx, wx + 1]) { const i = idx(x, y); if (y >= dy0 + 7 && y <= dy0 + 9) g.push(i); else { tiles[i] = T.IWALL; solid[i] = 1; } }
+      gates.push(g);
+    }
+    const exx = dx0 + 11, exy = dy0 + DH;
+    tiles[idx(exx, exy)] = T.EXIT; solid[idx(exx, exy)] = 0;
+    for (let x = exx - 1; x <= exx + 1; x++) occ[idx(x, exy - 1)] = 1;
+    const r = { id: rooms.length, name: 'Le Bastion Englouti', kind: 'cave', x0: dx0, y0: dy0, w: DW, h: DH, dungeon: 1 };
+    rooms.push(r);
+    // l'entrée : une bouche de pierre sur l'Île de la Quarantaine
+    let mouth = null;
+    for (let rr = 0; rr < 60 && !mouth; rr++) for (let a = 0; a < 40 && !mouth; a++) {
+      const x = Math.round(QC.x + 16 + Math.cos(a / 40 * 6.283) * rr), y = Math.round(QC.y + Math.sin(a / 40 * 6.283) * rr * 0.8);
+      if (!inMap(x, y + 3) || y >= OVER_H - 4) continue;
+      let ok = true;
+      for (let dy = -1; dy <= 2 && ok; dy++) for (let dx = -2; dx <= 2; dx++) { const i = idx(x + dx, y + dy), t = tiles[i]; if (!(t === T.SAND || t === T.GRASS || t === T.DIRT || t === T.DGRASS || t === T.MARSH) || occ[i] || path[i] || solid[i]) { ok = false; break; } }
+      if (ok) mouth = [x, y];
+    }
+    if (!mouth) throw new Error('pas de place pour le Bastion Englouti');
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -3; dx <= 3; dx++) if (inMap(mouth[0] + dx, mouth[1] + dy)) occ[idx(mouth[0] + dx, mouth[1] + dy)] = 1;
+    const door = { id: doors.length, room: r.id, name: r.name, kind: 'cave', secret: false, dungeon: 1,
+      ox: mouth[0] * TILE + 8, oy: (mouth[1] + 1) * TILE + 8, rx: mouth[0] * TILE + 8, ry: (mouth[1] + 1) * TILE + 12,
+      ix: exx * TILE + 8, iy: (exy - 1) * TILE + 10, ex: exx * TILE + 8, ey: exy * TILE + 8 };
+    doors.push(door);
+    const C = (k) => [(dx0 + k * 24) * TILE, (dx0 + k * 24 + 23) * TILE];
+    const lv = (tx, ty, gate, pair) => ({ tx, ty, x: tx * TILE + 8, y: ty * TILE + 10, gate, pair });
+    const levers = [lv(dx0 + 2, dy0 + 1, 0, 1), lv(dx0 + 20, dy0 + DH - 2, 0, 0), lv(dx0 + 27, dy0 + DH - 2, 1, 3), lv(dx0 + 44, dy0 + 1, 1, 2)];
+    const at = (fx, fy) => ({ x: (dx0 + fx) * TILE + 8, y: (dy0 + fy) * TILE + 10 });
+    for (const [m, fx, fy] of [['garde_maudit', 8, 5], ['garde_maudit', 15, 11], ['legionnaire', 6, 13], ['legionnaire', 17, 4], ['calcine', 11, 8],
+      ['naufrageur', 30, 4], ['naufrageur', 40, 13], ['goule_ecarlate', 35, 8], ['goule_ecarlate', 32, 14], ['garde_maudit', 42, 6],
+      ['amiral_englouti', 60, 4], ['garde_maudit', 54, 12], ['garde_maudit', 66, 12]]) caveSpawns.push({ mob: m, ...at(fx, fy) });
+    return { room: r.id, door: door.id, gates, levers, mouth, chambers: [C(0), C(1), C(2)], y0: dy0 * TILE, y1: (dy0 + DH) * TILE, decor: [[dx0 + 1, dy0 + DH - 2], [dx0 + 21, dy0 + 1], [dx0 + 25, dy0 + 1], [dx0 + 45, dy0 + DH - 2], [dx0 + 49, dy0 + 1], [dx0 + 70, dy0 + 1], [dx0 + 49, dy0 + DH - 2], [dx0 + 70, dy0 + DH - 2]] };
+  })();
   if (ay + rowH + 2 > H) throw new Error('bande des intérieurs trop petite (est)');
 
   // ---------- 11c. Cachettes : des coffres oubliés, chacun garde une arme ----------
@@ -1636,7 +1677,11 @@ export function generateWorld(seed = 7) {
     islands.push({ id, n, cx: Math.round(sx / n), cy: Math.round(sy / n), x0, y0, x1, y1, zone, zones: [...zc.keys()] });
   }
 
-  return {
+  // 1.0 : les décors du Bastion Englouti, posés après tous les autres (les anciens gardent leurs numéros)
+  addProp('grotte', dungeon.mouth[0], dungeon.mouth[1], 1);
+  for (const l of dungeon.levers) l.prop = addProp('levier', l.tx, l.ty, 0, 0, -2).id;
+  for (const [x, y] of dungeon.decor) addProp('brazier', x, y, 0, 0, -2);
+  const OUT = {
     block: new Uint8Array(N), // constructions des joueurs : 1 bloque tout, 2 bloque les morts
     islandOf, islands, // 1.0 : chaque case de terre connaît son île
     doorOwner: new Map(), rooms, doors, sail, roomGrid, havre: HC, havreDock, OVER_H,
@@ -1650,7 +1695,10 @@ export function generateWorld(seed = 7) {
     libertalia: LB, libFort: LFT, jail: jailRoom.id,
     seed, W, H, tiles, zones, solid, plankDir, waterDist, props, buildings, npcs, spawns, chests,
     spawnPoint, town: TC, lighthouse: LH, ruins: RC, cemetery: CEM, wreck: WR, coastY, dockEnd,
+    dungeon,
   };
+  for (const g of dungeon.gates) for (const i of g) OUT.block[i] = 1; // les grilles du Bastion sont fermées
+  return OUT;
 }
 
 // ---------- Requêtes de collision partagées ----------

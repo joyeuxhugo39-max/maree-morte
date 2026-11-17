@@ -2,7 +2,7 @@
 // requires : quêtes à terminer avant ; level : niveau minimum conseillé.
 import { Z } from '../world.js';
 import { OLD_SCENES } from './scenes.js';
-import { ACTE3 } from './acte3.js';
+import { ACTE3, DONJONS } from './acte3.js';
 
 export const QUESTS = {
   premier_pas: {
@@ -684,7 +684,7 @@ QUESTS.prime_lib_contrebande = primeLib('Prime : contrebandiers', 'contrebandier
 QUESTS.prime_lib_naufrageurs = primeLib('Prime : naufrageurs', 'naufrageur', 10, 19, 3800, 750, 'Naufrageurs abattus');
 QUESTS.prime_lib_gardes = primeLib('Prime : gardes maudits', 'garde_maudit', 10, 21, 4400, 850, 'Gardes maudits du fort abattus');
 QUESTS.prime_lib_goules = primeLib('Prime : goules écarlates', 'goule_ecarlate', 10, 23, 5000, 950, 'Goules écarlates abattues');
-Object.assign(QUESTS, ACTE3); // 1.0 : Acte III — La Flamme et la Marée
+Object.assign(QUESTS, ACTE3, DONJONS); // 1.0 : Acte III — La Flamme et la Marée ; le Bastion Englouti
 export const QUEST_ORDER = Object.keys(QUESTS);
 
 // état d'une quête pour un joueur : 'locked' | 'available' | 'active' | 'ready' | 'done'
