@@ -14,6 +14,7 @@ import { MOBS } from '../shared/data/mobs.js';
 import { slotFrameURL, plankURL, mouseURL, lockURL } from './render/ui-art.js';
 import { humanSheet, SKINS, HAIRS, CLOTH, CLOTH_KEYS, FW, FH, mobSheet, portraitOf } from './render/sprites-chars.js';
 import { MINI_COL } from './render/terrain.js';
+import { social } from './social-ui.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -43,7 +44,7 @@ export class UI {
     this.bindInventory();
     this.buildHotbar();
   }
-  typing() { const a = document.activeElement; return a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA'); }
+  typing() { const a = document.activeElement; return !!a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT'); }
 
   // ------------------------------------------------------------ accueil
   showLogin(opts) {
@@ -116,6 +117,7 @@ export class UI {
   }
   toggle(name) { if (this.open === name) this.close(); else this.show(name); }
   show(name) {
+    if (this.tradeSt && name !== 'trade') return this.toast('Terminez ou annulez d’abord l’échange en cours.', 'warn');
     this.close();
     this.open = name;
     $('panel-' + name).classList.remove('hidden');
@@ -125,10 +127,13 @@ export class UI {
     if (name === 'forge') this.renderForge();
     if (name === 'ach') this.renderAch();
     if (name === 'codex') this.renderCodex();
+    if (name === 'crew') this.renderCrew();
     if (name === 'settings') this.renderSettings();
     this.G.sfx.play('click');
   }
   close() {
+    if (this.open === 'trade' && this.tradeSt) { this.G.send({ t: 'trade', a: 'cancel' }); this.tradeSt = null; } // fermer = annuler l'échange
+    this.closeMenus();
     if (this.open) $('panel-' + this.open).classList.add('hidden');
     if (this.open === 'shop') this.shopNpc = null;
     if (this.open === 'storage') { $('panel-inventory').classList.add('hidden'); $('panel-inventory').style.transform = ''; $('panel-storage').style.transform = ''; this.storageOpen = false; }
@@ -880,7 +885,7 @@ export class UI {
     this.G.aide = mode;
   }
   // ------------------------------------------------------------ réglages
-  settings() { const d = { music: 0.6, sfx: 1, zoom: 0, shake: true, myname: false, aide: 'discret' }; try { return Object.assign(d, JSON.parse(localStorage.getItem('mm_settings') || '{}')); } catch (e) { return d; } }
+  settings() { const d = { music: 0.6, sfx: 1, zoom: 0, shake: true, myname: false, aide: 'discret', global: true, mpSound: true }; try { return Object.assign(d, JSON.parse(localStorage.getItem('mm_settings') || '{}')); } catch (e) { return d; } }
   applySettings(st) {
     const G = this.G;
     G.sfx.setVolumes(st.music, st.sfx);
@@ -888,43 +893,18 @@ export class UI {
     G.renderer.shakeOn = !!st.shake; G.showMyName = !!st.myname;
     this.setAide(st.aide || 'discret');
     try { localStorage.setItem('mm_settings', JSON.stringify(st)); } catch (e) { /* */ }
+    if (this.chatFilter) this.setChatFilter(this.chatFilter);
   }
   renderSettings() {
     const st = this.settings();
     $('set-music').value = st.music; $('set-sfx').value = st.sfx; $('set-zoom').value = String(st.zoom || 0);
     $('set-shake').checked = !!st.shake; $('set-myname').checked = !!st.myname; $('set-aide').value = st.aide || 'discret';
-    const upd = () => this.applySettings({ music: +$('set-music').value, sfx: +$('set-sfx').value, zoom: +$('set-zoom').value, shake: $('set-shake').checked, myname: $('set-myname').checked, aide: $('set-aide').value });
-    for (const id of ['set-music', 'set-sfx', 'set-zoom', 'set-shake', 'set-myname', 'set-aide']) $(id).oninput = $(id).onchange = upd;
+    $('set-global').checked = st.global !== false; $('set-mpsound').checked = st.mpSound !== false;
+    const upd = () => this.applySettings({ music: +$('set-music').value, sfx: +$('set-sfx').value, zoom: +$('set-zoom').value, shake: $('set-shake').checked, myname: $('set-myname').checked, aide: $('set-aide').value, global: $('set-global').checked, mpSound: $('set-mpsound').checked });
+    for (const id of ['set-music', 'set-sfx', 'set-zoom', 'set-shake', 'set-myname', 'set-aide', 'set-global', 'set-mpsound']) $(id).oninput = $(id).onchange = upd;
   }
 
-  // ------------------------------------------------------------ chat
-  bindChat() {
-    const inp = $('chat-input');
-    inp.onkeydown = (e) => {
-      e.stopPropagation();
-      if (e.key === 'Enter') { const m = inp.value.trim(); if (m) this.G.send({ t: 'chat', m }); inp.value = ''; inp.blur(); }
-      if (e.key === 'Escape') { inp.value = ''; inp.blur(); }
-    };
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !this.typing() && !$('hud').classList.contains('hidden')) { e.preventDefault(); this.focusChat(); }
-    });
-    inp.onfocus = () => $('chat').classList.remove('idle');
-    inp.onblur = () => { this.chatIdleT = performance.now() / 1000; };
-  }
-  focusChat() { $('chat').classList.remove('idle'); $('chat-input').focus(); }
-  chat(m) {
-    const log = $('chat-log');
-    const d = document.createElement('div');
-    if (m.from) {
-      const w = document.createElement('span'); w.className = 'who'; w.textContent = `${m.from}${m.lvl ? ' [' + m.lvl + ']' : ''} : `;
-      d.appendChild(w); d.appendChild(document.createTextNode(m.m));
-    } else { d.className = m.kind || 'sys'; d.textContent = m.m; }
-    log.appendChild(d);
-    while (log.children.length > 60) log.firstChild.remove();
-    log.scrollTop = log.scrollHeight;
-    $('chat').classList.remove('idle');
-    this.chatIdleT = performance.now() / 1000;
-  }
+  // ------------------------------------------------------------ chat : voir social-ui.js (canaux, historique, invitations, groupe, équipage, échange)
 
   // ------------------------------------------------------------ cartes
   // 0.8 : la carte façon carte au trésor — mer teintée selon la profondeur, écume, côtes à l'encre, relief ombré, papier
@@ -1086,7 +1066,7 @@ export class UI {
       if (room >= 0) { const d = G.world.doors.find((q) => q.room === room); if (d) { px = d.ox; py = d.oy; } }
       const e = G.ents.get(id);
       if (e && !inside && room < 0) { px = e.x; py = e.y; }
-      dot(px, py, '#1c1426', 5); dot(px, py, dead ? '#8a8a9a' : '#7ae0ff', 3);
+      dot(px, py, '#1c1426', 5); dot(px, py, dead ? '#8a8a9a' : this.inGroup(id) ? '#7aff8a' : '#7ae0ff', 3);
     }
     for (const d of G.world.doors) if (d.secret && G.found.has(d.id)) { dot(d.ox, d.oy, '#1c1426', 5); dot(d.ox, d.oy, '#b8a0ff', 3); }
     for (const n of G.npcs) { if (n.y >= OVER_H * TILE) continue; const mk = G.npcMarker(n.id); dot(n.x, n.y, mk ? '#ffd23a' : '#e8d8b0', mk ? 3 : 2); }
@@ -1154,8 +1134,9 @@ export class UI {
       let px = px0, py = py0;
       if (room >= 0) { const d = G.world.doors.find((q) => q.room === room); if (d) { px = d.ox; py = d.oy; } }
       const sx = px / TILE * S, sy = py / TILE * S;
-      x.fillStyle = '#1c1426'; x.fillRect(sx - 4, sy - 4, 8, 8); x.fillStyle = dead ? '#8a8a9a' : '#7ae0ff'; x.fillRect(sx - 3, sy - 3, 6, 6);
-      x.fillStyle = 'rgba(0,0,0,0.65)'; x.fillText(name, sx + 1, sy - 6); x.fillStyle = '#c8f4ff'; x.fillText(name, sx, sy - 7);
+      const gm = this.inGroup(id);
+      x.fillStyle = '#1c1426'; x.fillRect(sx - 4, sy - 4, 8, 8); x.fillStyle = dead ? '#8a8a9a' : gm ? '#7aff8a' : '#7ae0ff'; x.fillRect(sx - 3, sy - 3, 6, 6);
+      x.fillStyle = 'rgba(0,0,0,0.65)'; x.fillText(name, sx + 1, sy - 6); x.fillStyle = gm ? '#c8ffd0' : '#c8f4ff'; x.fillText(name, sx, sy - 7);
     }
     if (G.treasure) { const tx = G.treasure.x / TILE * S, ty = G.treasure.y / TILE * S; x.strokeStyle = '#d82a2a'; x.lineWidth = 3; x.beginPath(); x.moveTo(tx - 6, ty - 6); x.lineTo(tx + 6, ty + 6); x.moveTo(tx + 6, ty - 6); x.lineTo(tx - 6, ty + 6); x.stroke(); }
     if (G.objective) { x.fillStyle = '#ffd23a'; x.beginPath(); x.arc(G.objective.x / TILE * S, G.objective.y / TILE * S, 5, 0, 6.3); x.fill(); x.strokeStyle = '#1c1426'; x.lineWidth = 2; x.stroke(); }
@@ -1167,3 +1148,4 @@ export class UI {
     x.font = '600 13px "Pixelify Sans", sans-serif'; x.fillStyle = 'rgba(0,0,0,0.6)'; x.fillText('Vous êtes ici', (at.x / TILE) * S, (at.y / TILE) * S + 18);
   }
 }
+Object.assign(UI.prototype, social); // 1.0 : la vie en société

@@ -36,6 +36,12 @@ registerIcons({
     pb.hl(2, 12, 12, B[1]); pb.hl(3, 11, 10, B[3]); pb.disc(8, 13.5, 1.4, 0x3a3a46);
     if (t === 'off') { pb.line(1, 1, 14, 14, 0xc8342e, 2); }
   },
+  ui_crew(pb) { // le pavillon de l'équipage
+    pb.vl(2, 1, 15, 0x4f321a); pb.vl(3, 1, 15, 0x8c5c33); pb.set(2, 0, 0xf2c14a); pb.set(3, 0, 0xd49a2a);
+    for (let x = 4; x < 15; x++) { const w = Math.round(Math.sin(x / 2.2) * 0.8); for (let y = 2 + w; y < 10 + w; y++) pb.set(x, y, x > 12 ? 0x1c1c22 : 0x141418); }
+    pb.disc(9, 5, 2, 0xf3f0e2); pb.set(8, 5, 0x141418); pb.set(10, 5, 0x141418); pb.rect(8, 7, 3, 1, 0xf3f0e2);
+    pb.line(6, 8, 12, 9, 0xbcb8a8); pb.line(12, 8, 6, 9, 0xbcb8a8);
+  },
   // 1.0 : mobilier de collection et de sécurité
   f_trap(pb) { pb.ellipse(8, 10, 7, 3.4, 0x403f4e); pb.ellipse(8, 10, 5, 2, 0x2c2b36); for (let x = 2; x < 15; x += 2) { pb.set(x, 6, 0xa2a1b2); pb.set(x, 13, 0x7c7b8f); } pb.rect(6, 9, 4, 2, 0x5a596b); },
   f_musicbox(pb) { pb.rect(2, 8, 12, 6, 0x8c5c33); pb.hl(2, 8, 12, 0xc79357); pb.rect(2, 3, 12, 4, 0x6d4626); pb.rect(4, 4, 8, 2, 0x9c2530); pb.rect(4, 9, 8, 3, 0xd49a2a); pb.set(13, 2, 0xfff6c8); pb.set(14, 1, 0xffffff); },

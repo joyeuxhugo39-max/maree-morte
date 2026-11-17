@@ -21,9 +21,10 @@ export function migrateSave(d) {
   return d;
 }
 // les champs qu'écrit serialize() : tout autre champ d'une sauvegarde est conservé à part
-const SAVE_KEYS = new Set(['seen', 'st', 'kc', 'met', 'col', 'tut', 'name', 'look', 'level', 'xp', 'gold', 'hp', 'inv', 'eq', 'quests', 'track', 'chests', 'x', 'y', 'kills', 'upg', 'treasure', 'ach', 'title', 'cnt', 'respawnAt', 'found', 'boat', 'pk', 'caches', 'zs', 'pet', 'home', 'base', 'saved', 'sv', 'held']);
+const SAVE_KEYS = new Set(['friends', 'blocked', 'tradeLog', 'seen', 'st', 'kc', 'met', 'col', 'tut', 'name', 'look', 'level', 'xp', 'gold', 'hp', 'inv', 'eq', 'quests', 'track', 'chests', 'x', 'y', 'kills', 'upg', 'treasure', 'ach', 'title', 'cnt', 'respawnAt', 'found', 'boat', 'pk', 'caches', 'zs', 'pet', 'home', 'base', 'saved', 'sv', 'held']);
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { STRUCTS, PLANTER_GROW, HOME_OK, HOME_MAX, HOME_PRICE, QUEST_PICK, PROPERTY, HOME_LIMIT, RESALE, plotCategory } from '../shared/data/craft.js';
+import { social } from './social.js';
 import { LEGACY_VALUE, LEGACY_STRUCT, QUEST_ITEM_OLD_VALUE } from '../shared/data/legacy.js';
 import { generateWorld, canStand, moveWithCollision, moveBoat, zoneAt, tileAt, blocksShot, canSail, roomIdAt, Z, ZONES, SAFE } from '../shared/world.js';
 import { ITEMS, STACK_MAX, isStackable } from '../shared/data/items.js';
@@ -101,6 +102,7 @@ export class Game {
     this.players = new Map();
     this.sessions = new Map(); // conn -> session { player, bucket, lastMsg }
     this.version = GAME_VERSION;
+    this.socialInit();
     this.seenW = Math.ceil(this.world.W / SEEN_CELL); this.seenH = Math.ceil(this.world.OVER_H / SEEN_CELL); this.seenBytes = Math.ceil(this.seenW * this.seenH / 8);
     this.usedTokens = new Set(); this.fails = new Map(); this.bans = {}; this.reports = []; this.maintenance = null; // 1.0
     if (storage && storage.loadMeta) { Promise.resolve(storage.loadMeta('bans')).then((b) => { if (b) this.bans = b; }).catch(() => {}); Promise.resolve(storage.loadMeta('reports')).then((r) => { if (Array.isArray(r)) this.reports = r; }).catch(() => {}); }
@@ -160,6 +162,7 @@ export class Game {
   }
   logout(p) {
     if (!this.players.has(p.id)) return;
+    this.socialLogout(p);
     this.save(p);
     this.players.delete(p.id);
     if (!this.worldPersist) { this.removeBase(p.key); this.removeHome(p.key); }
@@ -201,7 +204,10 @@ export class Game {
       case 'drop': return this.dropSlot(p, m.slot | 0, m.n == null ? 0 : m.n | 0);
       case 'pick': return this.pick(p, m.id | 0);
       case 'open': return this.openProp(p, m.id | 0);
-      case 'chat': return this.chat(p, String(m.m || ''));
+      case 'chat': return this.chat(p, String(m.m || ''), String(m.ch || 'local'));
+      case 'soc': return this.socAction(p, String(m.a), String(m.name || ''));
+      case 'crew': return this.crewAction(p, String(m.a), m);
+      case 'trade': return this.tradeAction(p, String(m.a), m);
       case 'respawn': return this.respawn(p);
       case 'ping': return this.send(p, { t: 'pong', c: m.c });
       case 'fish': return this.onFish(p, +m.a);
@@ -285,6 +291,7 @@ export class Game {
       kr: this.kraken ? 1 : 0, homes: this.homesList(), seals: Object.fromEntries(Object.entries(this.seals).map(([k, v]) => [k, Math.max(0, Math.round(v - this.time))])), pet: p.pet,
     });
     this.broadcastChat(null, `${p.name} accoste à Port-Lanterne.`, 'sys');
+    this.socialLogin(p);
     if (!res.data) this.toast(p, 'Bienvenue ! Parlez à la Capitaine Morgane, près des quais (touche E).', 'quest');
     this.log(`[jeu] ${p.name} connecté (${this.players.size} en ligne)`);
   }
@@ -363,6 +370,7 @@ export class Game {
       }
       case 'event': return this.startWorldEvent ? this.startWorldEvent(String(a.kind || ''), true) : { err: 'aucun événement' };
       case 'save': return Promise.resolve(this.saveAll()).then(() => ({ ok: true }));
+      case 'mute': { const key = String(a.name || '').toLowerCase(); this.mutes[key] = Date.now() + (+a.minutes || 30) * 60000; if (this.storage.saveMeta) Promise.resolve(this.storage.saveMeta('mutes', this.mutes)).catch(() => {}); const q = findP(key); if (q) this.toast(q, 'Un administrateur vous a réduit au silence.', 'warn'); return { ok: true }; }
       default: return { err: 'commande inconnue' };
     }
   }
@@ -397,6 +405,7 @@ export class Game {
     p.met = new Set(d && Array.isArray(d.met) ? d.met.filter((x) => typeof x === 'string') : []);
     p.col = new Set(d && Array.isArray(d.col) ? d.col.filter((x) => typeof x === 'string') : []);
     p.tut = d ? (d.tut == null ? 99 : d.tut | 0) : 0; // tutoriel : les anciens pirates le connaissent déjà
+    this.socialLoad(p, d);
     if (d) {
       for (const k in d) if (!SAVE_KEYS.has(k)) p.heldF[k] = d[k];
       if (Array.isArray(d.held)) for (const it of d.held) if (it && typeof it.id === 'string') p.held.push({ id: it.id, n: Math.max(1, it.n | 0) });
@@ -465,7 +474,7 @@ export class Game {
     this.applyRefund(p);
   }
   serialize(p) {
-    return { ...(p.heldF || {}), sv: SAVE_VERSION, held: p.held || [], seen: p.seen ? b64(p.seen) : undefined, st: p.st, kc: p.kc, met: p.met ? [...p.met] : [], col: p.col ? [...p.col] : [], tut: p.tut, name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: { ...(p.heldQ || {}), ...p.quests }, track: p.track || [], chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: { ...(p.heldA || {}), ...p.ach }, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
+    return { ...(p.heldF || {}), ...this.socialSave(p), sv: SAVE_VERSION, held: p.held || [], seen: p.seen ? b64(p.seen) : undefined, st: p.st, kc: p.kc, met: p.met ? [...p.met] : [], col: p.col ? [...p.col] : [], tut: p.tut, name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: { ...(p.heldQ || {}), ...p.quests }, track: p.track || [], chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: { ...(p.heldA || {}), ...p.ach }, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
   }
   save(p) {
     p.lastSave = this.time;
@@ -1390,12 +1399,13 @@ export class Game {
     if (m.type === 'roi_squelette') for (const pid of m.tags.keys()) { const q = this.players.get(pid); if (q) this.unlock(q, 'roi_os'); }
     if (m.summoned && !m.event && !m.bossEvent && !m.horde) return;
     let top = killer, topD = 0;
-    for (const [pid, d] of m.tags) {
+    const tags = this.expandTags(m); // 1.0 : le groupe proche partage l'expérience et les objectifs (+10 % par compagnon)
+    for (const [pid, d] of tags) {
       const p = this.players.get(pid);
       if (!p || p.dead || dist(p, m) > 700) continue;
       if (d > topD) { topD = d; top = p; }
       const diff = p.level - def.level;
-      const xp = Math.max(1, Math.round(def.xp * (diff > 3 ? Math.max(0.15, 1 - (diff - 3) * 0.25) : 1)));
+      const xp = Math.max(1, Math.round(def.xp * (diff > 3 ? Math.max(0.15, 1 - (diff - 3) * 0.25) : 1) * ((m.gbonus && m.gbonus.get(pid)) || 1)));
       this.giveXp(p, xp);
       p.kills++;
       this.questKill(p, m.type);
@@ -2347,15 +2357,35 @@ export class Game {
   }
 
   // ------------------------------------------------------------ chat
-  chat(p, msg) {
+  isSafeAt(p) { return SAFE.has(p.zone); }
+  chat(p, msg, ch = 'local') {
     msg = msg.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 160);
     if (!msg) return;
     if (this.time - p.lastChat < 0.7) return this.toast(p, 'Doucement, moussaillon !', 'warn');
     p.lastChat = this.time;
     if (msg[0] === '/') {
       const [cmd] = msg.slice(1).split(' ');
+      const args = msg.slice(1).split(' ').slice(1), rest = (n) => args.slice(n).join(' ');
+      // 1.0 : canaux, messages privés, amis, blocages, groupes, équipages, échanges
+      const CH = { g: 'global', global: 'global', l: 'local', local: 'local', p: 'groupe', groupe: 'groupe', e: 'equipage', equipage: 'equipage', 'équipage': 'equipage' };
+      if (CH[cmd] && cmd !== 'equipage' && cmd !== 'équipage') return rest(0) ? this.chatChannel(p, rest(0), CH[cmd]) : null;
+      if (cmd === 'mp' || cmd === 'w' || cmd === 'chuchoter') return args[0] && rest(1) ? this.privateMsg(p, args[0], rest(1)) : this.sysTo(p, 'Usage : /mp <pirate> <message>');
+      if (cmd === 'r') return p.replyTo && rest(0) ? this.privateMsg(p, p.replyTo, rest(0)) : this.sysTo(p, 'Personne à qui répondre.');
+      if (cmd === 'ami') return this.socAction(p, 'friend', args[0]);
+      if (cmd === 'amis') return this.sysTo(p, p.friends.size ? 'Amis : ' + [...p.friends].map((k) => `${k}${this.byName(k) ? ' (en mer)' : ''}`).join(', ') : 'Aucun ami pour l’instant : /ami <pirate>.');
+      if (cmd === 'bloquer') return this.socAction(p, 'block', args[0]);
+      if (cmd === 'debloquer' || cmd === 'débloquer') return this.socAction(p, 'unblock', args[0]);
+      if (cmd === 'inviter') return this.socAction(p, 'invite', args[0]);
+      if (cmd === 'quitter') return this.socAction(p, 'leave', '');
+      if (cmd === 'echanger' || cmd === 'échanger') return this.tradeAction(p, 'ask', { name: args[0] });
+      if (cmd === 'equipage' || cmd === 'équipage') {
+        const sub = (args[0] || '').toLowerCase();
+        if (sub === 'creer' || sub === 'créer') return this.crewAction(p, 'create', { name: args.slice(2).join(' '), tag: args[1] });
+        if (['inviter', 'accepter', 'quitter', 'exclure', 'promouvoir', 'retrograder', 'rétrograder'].includes(sub)) return this.crewAction(p, { inviter: 'invite', accepter: 'accept', quitter: 'leave', exclure: 'kick', promouvoir: 'promote', retrograder: 'demote', 'rétrograder': 'demote' }[sub], { name: args[1] });
+        return rest(0) ? this.chatChannel(p, rest(0), 'equipage') : this.sysTo(p, 'Usage : /equipage creer <SIGLE> <nom> · inviter · accepter · quitter · exclure · promouvoir · retrograder ; /e <message>');
+      }
       if (cmd === 'who' || cmd === 'qui') return this.send(p, { t: 'chat', from: null, kind: 'sys', m: `En ligne (${this.players.size}) : ${[...this.players.values()].map((q) => `${q.name} (niv. ${q.level})`).join(', ')}` });
-      if (cmd === 'aide' || cmd === 'help') return this.send(p, { t: 'chat', from: null, kind: 'sys', m: 'Commandes : /qui, /pos, /suicide (retour en ville), /signaler <pirate> <motif>. Émotes : /danse /salut /rire /joie /colere /assis /doigt /salto (ou les touches 2 à 5).' });
+      if (cmd === 'aide' || cmd === 'help') return this.send(p, { t: 'chat', from: null, kind: 'sys', m: 'Canaux : /l local, /g global, /p groupe, /e équipage, /mp <pirate> privé, /r répondre. Social : /ami, /amis, /bloquer, /inviter, /quitter, /echanger <pirate>, /equipage. Divers : /qui, /pos, /suicide, /signaler <pirate> <motif>. Émotes : /danse /salut /rire /joie /colere /assis /doigt /salto (ou les touches 2 à 5).' });
       if (cmd === 'pos') return this.send(p, { t: 'chat', from: null, kind: 'sys', m: `Position : ${Math.floor(p.x / TILE)}, ${Math.floor(p.y / TILE)} — ${p.room >= 0 ? this.world.rooms[p.room].name : ZONES[p.zone].name}${SAFE.has(p.zone) ? ' (zone sûre)' : ''}` });
       if (cmd === 'suicide' || cmd === 'unstuck') { if (!p.dead) this.killPlayer(p, null); return; }
       if (cmd === 'signaler' || cmd === 'report') { const [, who, ...why] = msg.slice(1).split(' '); if (!who) return this.send(p, { t: 'chat', from: null, kind: 'sys', m: 'Usage : /signaler <pirate> <motif>' }); return this.report(p, who, why.join(' ')); }
@@ -2363,7 +2393,7 @@ export class Game {
       if (EMOTES[cmd]) { this.ev(p.x, p.y, ['emote', p.id, EMOTES[cmd]]); return; }
       return this.send(p, { t: 'chat', from: null, kind: 'sys', m: 'Commande inconnue. Tapez /aide.' });
     }
-    this.broadcastChat(p, msg, 'chat', p.level);
+    this.chatChannel(p, msg, ['local', 'global', 'groupe', 'equipage'].includes(ch) ? ch : 'local');
   }
 
   // ------------------------------------------------------------ hauts faits
@@ -2902,6 +2932,7 @@ export class Game {
   tick() { // 1.0 : durée de chaque tour mesurée (moyenne glissante et pire cas sur 10 s)
     const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
     this.tickInner();
+    this.socialTick();
     if (t0) { const ms = performance.now() - t0; this.tickMs = (this.tickMs || ms) * 0.95 + ms * 0.05; if (this.tickCount % 200 === 0) this.tickMax = 0; this.tickMax = Math.max(this.tickMax || 0, ms); }
   }
   tickInner() {
@@ -2967,7 +2998,7 @@ export class Game {
     if (p.dirtyQ) { p.dirtyQ = false; this.send(p, { t: 'q', q: p.quests, tr: p.track || [] }); }
   }
   entMeta(e, kind) {
-    if (kind === 'p') return { id: e.id, k: 'p', name: e.name, look: e.look, lvl: e.level, x: Math.round(e.x), y: Math.round(e.y), w: e.eq.weapon, g: e.eq.gun, dead: e.dead, ti: e.title ? ACHIEVEMENTS[e.title].title : '', bt: e.boat ? ITEMS[e.boat].boat.kind : '', pt: e.pet || '', vo: this.time < e.thiefUntil ? 1 : 0, rd: e.riding && e.eq.mount ? ITEMS[e.eq.mount].mount.kind : '' };
+    if (kind === 'p') return { cw: e.crew && this.crews.get(e.crew) ? this.crews.get(e.crew).tag : '', id: e.id, k: 'p', name: e.name, look: e.look, lvl: e.level, x: Math.round(e.x), y: Math.round(e.y), w: e.eq.weapon, g: e.eq.gun, dead: e.dead, ti: e.title ? ACHIEVEMENTS[e.title].title : '', bt: e.boat ? ITEMS[e.boat].boat.kind : '', pt: e.pet || '', vo: this.time < e.thiefUntil ? 1 : 0, rd: e.riding && e.eq.mount ? ITEMS[e.eq.mount].mount.kind : '' };
     if (kind === 'm') return { id: e.id, k: 'm', type: e.type, x: Math.round(e.x), y: Math.round(e.y), hp: Math.ceil(e.hp), mhp: e.maxHp, sun: e.def.night && e.sunproof && !e.horde ? 1 : 0, hd: e.horde ? 1 : 0 };
     return { id: e.id, k: 'd', item: e.item, n: e.n, x: Math.round(e.x), y: Math.round(e.y), own: e.owner, ou: Math.max(0, +(e.ownUntil - this.time).toFixed(1)) };
   }
@@ -3015,3 +3046,5 @@ export class Game {
     }
   }
 }
+// 1.0 : discussions, groupes, équipages et échanges (server/social.js)
+Object.assign(Game.prototype, social);

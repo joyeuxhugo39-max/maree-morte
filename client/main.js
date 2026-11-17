@@ -203,6 +203,7 @@ function onMsg(m) {
       }
       if (!oldGun && G.eq.gun) ui.toast('Arme à feu équipée : clic droit ou 1 pour tirer !', 'quest');
       if (ui.open === 'inventory' || ui.shopNpc) ui.renderInventory();
+      if (ui.open === 'trade') ui.renderTrade();
       if (ui.shopNpc) ui.renderShop();
       if (ui.open === 'forge') ui.renderForge();
       if (G.build) ui.renderBuildBar();
@@ -227,6 +228,10 @@ function onMsg(m) {
     case 'deed': ui.openDeed(m); break;
     case 'seen': ui.addSeen(m.c); break;
     case 'codex': G.codex = m; if (ui.open === 'codex') ui.renderCodex(); break;
+    case 'soc': ui.setSoc(m); break; // 1.0 : amis, groupe, équipage
+    case 'grp': ui.grp(m); break;
+    case 'ask': ui.ask(m); break;
+    case 'trade': ui.trade(m); break;
     case 'treasure': G.treasure = m.x == null ? null : { x: m.x, y: m.y }; ui.renderTracker(); break;
     case 'ach': {
       G.ach = m.ach || G.ach;
@@ -339,7 +344,7 @@ function upsert(meta, t) {
     G.ents.set(meta.id, e);
     if (meta.k === 'm' && (meta.hp < meta.mhp)) e.hp = Math.round(meta.hp / meta.mhp * 100);
   }
-  if (meta.k === 'p') { e.name = meta.name; e.look = meta.look; e.lookKey = JSON.stringify(meta.look); e.lvl = meta.lvl; e.weapon = meta.w; e.gun = meta.g; e.title = meta.ti || ''; e.bt = meta.bt || ''; e.pet = meta.pt || ''; e.thief = !!meta.vo; }
+  if (meta.k === 'p') { e.name = meta.name; e.look = meta.look; e.lookKey = JSON.stringify(meta.look); e.lvl = meta.lvl; e.weapon = meta.w; e.gun = meta.g; e.title = meta.ti || ''; e.bt = meta.bt || ''; e.pet = meta.pt || ''; e.thief = !!meta.vo; e.cw = meta.cw || ''; }
   else if (meta.k === 'm') { e.type = meta.type; e.sun = !!meta.sun; e.horde = !!meta.hd; }
   else if (meta.k === 'a') { e.name = meta.name; e.cap = meta.cap; if (meta.sink && !e.sinkT) e.sinkT = t - 3; }
   else e.type = meta.type;
@@ -623,6 +628,7 @@ function interact() {
     G.ui.lockpick(t.h0.name, t.h0.lock, (ok) => { if (ok !== null) G.send({ t: 'lock', k: t.d.plot, ok: ok ? 1 : 0 }); });
   }
   else if (t.kind === 'exit') useDoor(t.d, true, performance.now() / 1000);
+  else if (t.kind === 'player') G.ui.playerMenu(t.name, null); // 1.0 : inviter, échanger, ajouter en ami…
   else if (t.kind === 'board') G.send({ t: 'board', a: +G.aim.toFixed(3) });
   else if (t.kind === 'land') G.send({ t: 'land', a: +G.aim.toFixed(3) });
 }
@@ -690,6 +696,11 @@ function findInteract() {
     if (questNeeds(Q.item) <= 0) continue; // on ne ramasse que ce qu'une quête réclame
     bd = d;
     best = { kind: 'harvest', id: pr.id, x: pr.x, y: pr.y, h: pr.spr ? Math.min(40, pr.spr.h * 0.6) : 14, verb: Q.verb };
+  }
+  if (!best && !p.boat) for (const e of G.ents.values()) { // 1.0 : un autre pirate, tout près
+    if (e.k !== 'p' || e === p || e.dead || (e.flags & 2)) continue;
+    const d = Math.hypot(e.x - p.x, e.y - p.y);
+    if (d < 26 && d < bd) { bd = d; best = { kind: 'player', id: e.id, name: e.name, x: e.x, y: e.y, h: 46, verb: 'Interagir' }; }
   }
   if (!best && G.room < 0) {
     if (p.boat) { if (nearLand(p)) best = { kind: 'land', x: p.x, y: p.y, h: 34, verb: 'Accoster' }; }
@@ -1035,6 +1046,7 @@ function handleKeys(now) {
     if (k.key === 'h') { ui.toggle('help'); continue; }
     if (k.key === 'k') { ui.toggle('ach'); continue; }
     if (k.key === 'o') { ui.toggle('codex'); continue; }
+    if (k.key === 'p') { ui.toggle('crew'); continue; }
     if (k.key === 'r') { if (G.me && !G.me.dead) G.send({ t: 'fish', a: +G.aim.toFixed(3) }); continue; }
     if (k.key === 'e') { interact(); continue; }
     if (k.key === 'f') { G.send({ t: 'eat' }); continue; }

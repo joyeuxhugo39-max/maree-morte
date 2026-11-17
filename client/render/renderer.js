@@ -1448,9 +1448,14 @@ export class Renderer {
       if (e.k === 'p') {
         const me = e === G.player;
         const pvp = !me && G.player && G.zone >= 0 && !SAFE.has(G.zone) && !SAFE.has(zoneAt(this.world, e.x, e.y));
-        const name = textCanvas(e.name || '?', me ? '#ffe7a0' : pvp ? '#ff9a8a' : '#ffffff');
+        const mate = !me && G.ui.inGroup(e.id); // 1.0 : les compagnons de groupe en vert, le sigle d'équipage à droite du nom
+        const name = textCanvas(e.name || '?', me ? '#ffe7a0' : mate ? '#a8ffb0' : pvp ? '#ff9a8a' : '#ffffff');
         const lv = textCanvas(String(e.lvl || 1), '#c8b8ff');
-        if (!me || G.showMyName) { ctx.drawImage(name, x - (name.width >> 1) + 3, top - 9); ctx.drawImage(lv, x - (name.width >> 1) - lv.width + 2, top - 9); }
+        if (!me || G.showMyName) {
+          ctx.drawImage(name, x - (name.width >> 1) + 3, top - 9); ctx.drawImage(lv, x - (name.width >> 1) - lv.width + 2, top - 9);
+          const cw = me ? G.ui.myCrewTag : e.cw;
+          if (cw) { const tg = textCanvas(`[${cw}]`, cw === G.ui.myCrewTag ? '#8fe0a8' : '#9ab8d8'); ctx.globalAlpha = 0.9; ctx.drawImage(tg, x + (name.width >> 1) + 5, top - 9); ctx.globalAlpha = 1; }
+        }
         if (e.title && (!me || G.showMyName)) { const tt = textCanvas(e.title, '#f2c14a'); ctx.globalAlpha = 0.9; ctx.drawImage(tt, x - (tt.width >> 1), top - 16); ctx.globalAlpha = 1; }
         if (!me && (e.hp < 100 || pvp)) this.hpBar(ctx, x, top - 2, 16, e.hp / 100, pvp ? '#e0a040' : '#5cd65c');
         if (e.flags & 8) { ctx.fillStyle = '#ffd23a'; ctx.fillRect(x - 1, top - 14, 2, 2); }

@@ -47,8 +47,9 @@
     <div id="lootfeed"></div>
     <div id="buildbar" class="hidden"></div>
     <div id="chat" class="frame">
+      <div id="chat-tabs"></div>
       <div id="chat-log"></div>
-      <input id="chat-input" maxlength="160" placeholder="Entrée pour parler…" autocomplete="off">
+      <div id="chat-row"><button id="chat-ch" title="Canal de discussion (Tab pour changer)">Local</button><input id="chat-input" maxlength="160" placeholder="Entrée pour parler…" autocomplete="off"></div>
     </div>
 
     <div id="menu-btns">
@@ -57,6 +58,7 @@
       <button data-open="quests" title="Journal de bord (J)"><img class="mi" data-ic="ui_journal" alt=""><kbd>J</kbd></button>
       <button data-open="map" title="Carte (M)"><img class="mi" data-ic="map" alt=""><kbd>M</kbd></button>
       <button data-open="ach" title="Hauts faits (K)"><img class="mi" data-ic="trophy" alt=""><kbd>K</kbd></button>
+      <button data-open="crew" title="Compagnons : groupe, amis, équipage (P)"><img class="mi" data-ic="ui_crew" alt=""><kbd>P</kbd></button>
       <button data-open="codex" title="Codex et statistiques (O)"><img class="mi" data-ic="f_books" alt=""><kbd>O</kbd></button>
       <button data-open="help" title="Aide (H)"><img class="mi" data-ic="ui_help" alt=""><kbd>H</kbd></button>
       <button data-open="settings" title="Réglages"><img class="mi" data-ic="ui_helm" alt=""></button>
@@ -65,6 +67,9 @@
   </div>
 
   <div id="toasts"></div>
+  <div id="asks"></div>
+  <div id="grp-frames"></div>
+  <div id="pmenu" class="hidden"></div>
   <div id="maint" class="hidden"></div>
   <div id="tuto"></div>
   <div id="banner" class="hidden"><div class="b-line"></div><div id="banner-title"></div><div id="banner-sub"></div><div class="b-line"></div></div>
@@ -128,6 +133,23 @@
     <div id="codex-list"></div>
   </div>
 
+  <div id="panel-crew" class="panel hidden">
+    <div class="panel-head"><h2>Compagnons</h2><button class="x" data-close>✕</button></div>
+    <div id="crew-tabs" class="qtabs"></div>
+    <div id="crew-body"></div>
+  </div>
+
+  <div id="panel-trade" class="panel hidden">
+    <div class="panel-head"><h2 id="trade-title">Échange</h2><button class="x" data-close title="Annuler l’échange">✕</button></div>
+    <div id="trade-steps"></div>
+    <div id="trade-cols"><div id="trade-mine" class="tcol"></div><div id="trade-theirs" class="tcol"></div></div>
+    <div id="trade-sum"></div>
+    <div class="tbag-h">Votre sac — cliquez un objet pour le proposer</div>
+    <div id="trade-bag"></div>
+    <div id="trade-qty"></div>
+    <div id="trade-btns"><button class="btn" id="trade-cancel">Annuler</button><button class="btn" id="trade-act">Valider mon offre</button></div>
+  </div>
+
   <div id="panel-deed" class="panel hidden">
     <div class="panel-head"><h2 id="deed-title">Titre de propriété</h2><button class="x" data-close>✕</button></div>
     <div id="deed-body"></div>
@@ -155,6 +177,8 @@
       <label for="set-zoom">Zoom <select id="set-zoom"><option value="0">Automatique</option><option value="1">×1</option><option value="2">×2</option><option value="3">×3</option><option value="4">×4</option><option value="5">×5</option><option value="6">×6</option></select> <small>(ou la molette)</small></label>
       <label for="set-shake"><input id="set-shake" type="checkbox"> Tremblements de l'écran</label>
       <label for="set-myname"><input id="set-myname" type="checkbox"> Afficher mon nom au-dessus de moi</label>
+      <label for="set-global"><input id="set-global" type="checkbox"> Montrer le canal global dans l'onglet « Tout » du chat</label>
+      <label for="set-mpsound"><input id="set-mpsound" type="checkbox"> Son à la réception d'un message privé</label>
     </div>
   </div>
 
@@ -176,7 +200,9 @@
       <div><kbd>R</kbd> — pêcher face à l'eau (canne à pêche requise), puis <kbd>R</kbd> quand ça mord</div>
       <div><kbd>K</kbd> — hauts faits et titres · <kbd>/danse</kbd> <kbd>/salut</kbd> <kbd>/rire</kbd> <kbd>/assis</kbd> dans le chat</div>
       <div><kbd>I</kbd> inventaire · <kbd>J</kbd> quêtes · <kbd>M</kbd> carte · <kbd>Entrée</kbd> chat · <kbd>Échap</kbd> fermer</div>
-      <p>La ville de Port-Lanterne est protégée par la Flamme Bénite : aucun mort ne peut y entrer et vous y guérissez vite. La nuit, les morts sont plus forts et la Marée Morte attaque la plage. Mourir vous ramène en ville et coûte 10 % de vos doublons. Une flèche dorée indique toujours votre prochain objectif.</p>
+      <div><kbd>P</kbd> — compagnons : groupe, amis, équipage, pirates ignorés, historique des échanges · <kbd>E</kbd> près d'un pirate (ou clic sur son nom dans le chat) — l'inviter, lui proposer un échange, l'ajouter en ami</div>
+      <div>Dans le chat : <kbd>Tab</kbd> change de canal (local, global, groupe, équipage) · <kbd>/mp nom message</kbd> message privé · <kbd>/r</kbd> répondre · <kbd>↑</kbd> vos derniers messages · <kbd>/aide</kbd> toutes les commandes</div>
+      <p>La ville de Port-Lanterne est protégée par la Flamme Bénite : aucun mort ne peut y entrer et vous y guérissez vite. La nuit, les morts sont plus forts. Mourir vous ramène en ville et coûte 10 % de vos doublons. Une flèche dorée indique toujours votre prochain objectif.</p>
       <p>Le jour, la plupart des morts dorment sous terre : seuls ceux qui résistent au soleil restent dehors. La nuit, ils se relèvent, et une nuit sur trois, la pleine lune lâche la Horde. En mer, les navires maudits canonnent tout ce qui flotte : coulez-les pour piller leurs débris.</p>
       <p>Hors des villes (Port-Lanterne, Havre-des-Brumes, la Rade, l'Anse) et des maisons, les pirates peuvent s'affronter : le vainqueur ramasse l'or perdu. Les noms en rouge sont ceux des pirates qui peuvent vous attaquer. Certaines grottes ne se voient que de très près.</p>
     </div>
