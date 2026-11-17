@@ -193,6 +193,13 @@ function onMsg(m) {
     }
     case 'q': G.quests = m.q; G.refreshNpcs(); ui.renderTracker(); break;
     case 'map': G.mapPlayers = m.pl; break;
+    case 'erupt': { // le volcan se réveille
+      G.eruptUntil = now + m.dur; G.quakeAt = now + 0.6;
+      G.renderer.shake(6, 1.6); G.sfx.play('rumble'); G.sfx.play('boom', 0.9); setTimeout(() => G.sfx.play('roar', 0.5), 500);
+      ui.toast('Le Volcan de Cendrelune entre en éruption ! Fuyez les bombes de lave !', 'warn');
+      if (!G.cine) { ui.cineTitle('Éruption !', 'Le Volcan de Cendrelune se réveille', 'down'); setTimeout(() => { if (!G.cine) ui.cineTitle(null); }, 2800); }
+      break;
+    }
     case 'bite': if (G.player && G.player.fish) G.player.fish.bite = now; G.sfx.play('bite'); break;
     case 'dep': G.depleted.set(m.id, now + m.s); break;
     case 'gather': for (const [id, n] of m.got) ui.feed(`+${n} ${ITEMS[id].name}`, iconURL(ITEMS[id].icon, ITEMS[id].tint)); if (!m.got.length) ui.feed('Rien cette fois…'); if (ui.open === 'craft') ui.renderCraft(); break;
@@ -387,6 +394,12 @@ function onEvent(ev, t) {
       break;
     }
     case 'tele': R.teles.push({ x: ev[1], y: ev[2], r: ev[3], dur: ev[4], t0: now, style: ev[5] || 0 }); break;
+    case 'lavabomb': { // une bombe jaillit du cratère et retombe sur son cercle
+      const V = G.world.volcano, v = R.volc, x0 = v ? v.wx : V.cx, y0 = v ? v.wy : V.cy - V.h + 44;
+      R.lavaBombs.push({ x0: x0 + (Math.random() - 0.5) * 40, y0, x1: ev[1], y1: ev[2], t0: now, dur: ev[3], arc: 140 + Math.random() * 120 });
+      if (Math.random() < 0.3) G.sfx.play('shot', vol(ev[1], ev[2]) * 0.3);
+      break;
+    }
     case 'burn': if (e) { // un mort brûle au soleil et retourne sous terre
       e.dyingT = now; e.removeAt = now + 0.85; e.burnT = now;
       R.burst(e.x, e.y - 8, 22, { z: 10, col: ['#ffd24a', '#ff8a2a', '#e04a1a', '#3a2a2a'], up: 70, speed: 30, life: 0.9, g: -30 });
@@ -762,6 +775,7 @@ function ambience(now) {
   if (G.night && isFullMoon(G.worldTime)) for (const e of G.ents.values()) if (e.horde && !e.dyingT && Math.hypot(e.x - p.x, e.y - p.y) < 300) { G.epicUntil = now + 8; break; }
   for (const e of G.ents.values()) if (e.k === 'm' && !e.dyingT && MOBS[e.type] && MOBS[e.type].ship && Math.hypot(e.x - p.x, e.y - p.y) < 420) G.seaFight = Math.max(G.seaFight || 0, now + 6);
   if (p.boat && now < G.seaFight) theme = 'naval';
+  if (now < (G.eruptUntil || 0) && G.zone === Z.VOLCAN) G.epicUntil = Math.max(G.epicUntil || 0, now + 4); // l'éruption : musique de bataille
   if (now < (G.epicUntil || 0)) theme = 'epic';
   if (G.kraken && Math.hypot(G.world.kraken.x - p.x, G.world.kraken.y - p.y) < 560) theme = 'naval';
   if (G.cine && G.cine.theme) theme = G.cine.theme;
@@ -861,6 +875,10 @@ function frame(now, dt) {
   G.renderer.drunk = G.me && G.me.drunk > 0 ? Math.max(0, 1 - (now - G.meAt) / G.me.drunk) * 1 : 0;
   updateFolk(dt);
   if (now - (G.ambAt || 0) > 0.4) { G.ambAt = now; ambience(now); G.objective = computeObjective(); }
+  if (now < (G.eruptUntil || 0) && G.zone === Z.VOLCAN && now > (G.quakeAt || 0)) { // la terre tremble tant que dure l'éruption
+    G.quakeAt = now + 0.7 + Math.random() * 0.8; G.renderer.shake(1.6, 0.35);
+    if (Math.random() < 0.22) G.sfx.play('rumble', 0.45);
+  }
   updatePets(now, dt);
   R.petOut = p.pet || '';
   G.ui.ink(now < G.inkUntil);

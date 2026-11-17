@@ -17,6 +17,7 @@ import { PB } from './pixel.js';
 import { hash2 } from '../../shared/rng.js';
 import { extend06, petSheets, drawTentacle } from './sprites-06.js';
 import { extend07 } from './sprites-07.js';
+import { volcanoGen, makePuffs, makeSplats } from './sprites-volcan.js';
 
 const TAU = Math.PI * 2;
 const TREES = new Set(['tree', 'jtree', 'palm', 'deadtree']);
@@ -92,6 +93,11 @@ export class Renderer {
     this.env = buildEnvSprites();
     this.structSpr = buildStructSprites(this.env);
     extend06(this.env, this.structSpr); extend07(this.env); this.pets = petSheets(); this.tentacle = drawTentacle;
+    // le volcan se peint en tâche de fond, un peu à chaque image (ou d'un coup si l'on arrive devant)
+    this.volcJob = world.volcano ? volcanoGen(world.volcano) : null; this.volc = null; this.volcanAlpha = 1;
+    this.puffs = world.volcano ? makePuffs() : null; this.plume = [];
+    if (world.volcano) this.env.lava = makeSplats();
+    this.giants = []; this.lavaBombs = [];
     this.boats = boatSprites();
     this.room = null;
     this.parrot = parrotSheet();
@@ -124,7 +130,9 @@ export class Renderer {
     this.lights = [];
     this.smokers = [];
     for (const l of this.world.lavaLights || []) this.lights.push({ x: l.x, y: l.y, r: 46, c: 'warm', flicker: 1 });
+    this.giants = [];
     for (const p of this.world.props) {
+      if (p.type === 'volcan') { this.volcanoProp = p; continue; } // la montagne n'entre dans aucune case : voir volcanoReady
       const key = Math.floor(p.x / CHUNK_PX) + Math.floor(p.y / CHUNK_PX) * 100;
       if (!this.buckets.has(key)) this.buckets.set(key, []);
       this.buckets.get(key).push(p);
@@ -179,6 +187,7 @@ export class Renderer {
   render(G, now, dt) {
     const ctx = this.ctx, W = this.W, H = this.H;
     const f = dayFrac(G.worldTime || 0), dark = darkness(f);
+    this.darkNow = dark;
     // caméra
     const tgt = G.camTarget;
     this.cam.x += (tgt.x - this.cam.x) * Math.min(1, dt * 7);
@@ -223,6 +232,9 @@ export class Renderer {
       const b = this.buckets.get(cx + cy * 100);
       if (b) for (const p of b) if (p.spr && p.x - p.spr.ax < camX + W && p.x - p.spr.ax + p.spr.w > camX && p.y - p.spr.ay < camY + H && p.y - p.spr.ay + p.spr.h + 4 > camY) props.push(p);
     }
+    this.pumpVolcano(camX, camY);
+    if (!room) for (const p of this.giants) if (p.x - p.spr.ax < camX + W && p.x - p.spr.ax + p.spr.w > camX && p.y - p.spr.ay < camY + H && p.y - p.spr.ay + p.spr.h > camY) props.push(p);
+    if (this.volc) this.volcanAlpha += ((!room && this.volcanoBehind(G.player) ? 0.4 : 1) - this.volcanAlpha) * Math.min(1, dt * 8);
     // planchers et tapis des bases
     if (G.floors) for (const f of G.floors.values()) {
       const x = f.tx * TILE - camX, y = f.ty * TILE - camY;
@@ -238,7 +250,7 @@ export class Renderer {
     for (const e of G.ents.values()) if (e.k === 'd') this.drawDrop(ctx, e, camX, camY, now, G);
     // télégraphes
     for (let i = this.teles.length - 1; i >= 0; i--) {
-      const t = this.teles[i], k = (now - t.t0) / t.dur;
+      const t = this.teles[i], k = Math.max(0, (now - t.t0) / t.dur);
       if (k >= 1) { this.teles.splice(i, 1); continue; }
       const x = t.x - camX, y = t.y - camY, C = TELE_COL[t.style] || TELE_COL[0];
       ctx.fillStyle = `rgba(${C[0]},${C[1]},${C[2]},${0.15 + 0.25 * k})`;
@@ -247,7 +259,7 @@ export class Renderer {
       ctx.beginPath(); ctx.ellipse(x, y, t.r, t.r * 0.7, 0, 0, TAU); ctx.stroke();
     }
     for (let i = this.lteles.length - 1; i >= 0; i--) {
-      const t = this.lteles[i], k = (now - t.t0) / t.dur;
+      const t = this.lteles[i], k = Math.max(0, (now - t.t0) / t.dur);
       if (k >= 1) { this.lteles.splice(i, 1); continue; }
       const C = TELE_COL[t.style] || TELE_COL[0], L = Math.hypot(t.x1 - t.x0, t.y1 - t.y0);
       ctx.save(); ctx.translate(t.x0 - camX, t.y0 - camY); ctx.rotate(Math.atan2(t.y1 - t.y0, t.x1 - t.x0));
@@ -276,7 +288,7 @@ export class Renderer {
       if (d.st) continue;
       if (d.p) {
         const s = d.p.spr;
-        if (d.p.type === 'ship' || d.p.type === 'wreck' || d.p.type === 'lighthouse' || d.p.type === 'boat') continue;
+        if (d.p.type === 'ship' || d.p.type === 'wreck' || d.p.type === 'lighthouse' || d.p.type === 'boat' || d.p.type === 'volcan') continue;
         const w = Math.min(28, s.w * 0.34);
         ctx.beginPath(); ctx.ellipse(d.p.x - camX + (TREES.has(d.p.type) ? 3 : 0), d.p.y - camY - 1, w, Math.max(2, Math.min(7, w * 0.3)), 0, 0, TAU); ctx.fill();
       } else if (d.c || d.pet) {
@@ -304,6 +316,21 @@ export class Renderer {
     this.drawFishing(ctx, G, camX, camY, now);
     this.drawFx(ctx, camX, camY, now, dt);
     this.drawProjectiles(ctx, camX, camY, now, dt);
+    for (let i = this.lavaBombs.length - 1; i >= 0; i--) {
+      const b = this.lavaBombs[i], k = Math.max(0, (now - b.t0) / b.dur);
+      if (k >= 1) { this.decals.push({ x: b.x1, y: b.y1, kind: 'lava', v: Math.abs(Math.round(b.x1 * 7 + b.y1)) % 3, t0: now }); this.lavaBombs.splice(i, 1); continue; }
+      const x = b.x0 + (b.x1 - b.x0) * k, y = b.y0 + (b.y1 - b.y0) * k - Math.sin(k * Math.PI) * b.arc;
+      if (rnd() < 0.9) this.burst(x, y + 30, 1, { z: 30, col: ['#ffd060', '#ff7a1a', '#d84a14'], up: 4, speed: 9, life: 0.5, g: -10 });
+      if (rnd() < 0.55) this.plume.push({ x: x + (rnd() - 0.5) * 4, y: y + 10, z: 10, vx: 0, vz: 6, life: 1.4, max: 1.4, r0: 2, r1: 6, tint: 'dark', a: 0.75 });
+      const X = Math.round(x - camX), Y = Math.round(y - camY);
+      if (X < -40 || Y < -40 || X > W + 40 || Y > H + 40) continue;
+      ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.85; ctx.drawImage(this.glows.warm, X - 20, Y - 20, 40, 40); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+      const sp = Math.floor(now * 12 + i) & 1; // la croûte tourne en vol
+      ctx.fillStyle = '#2a120c'; ctx.fillRect(X - 4, Y - 3, 8, 6); ctx.fillRect(X - 3, Y - 4, 6, 8);
+      ctx.fillStyle = '#d84a14'; ctx.fillRect(X - 3, Y - 2, 6, 4); ctx.fillRect(X - 2, Y - 3, 4, 6);
+      ctx.fillStyle = '#ffb042'; ctx.fillRect(X - 2 + sp, Y - 2, 3, 3);
+      ctx.fillStyle = '#fff0a0'; ctx.fillRect(X - 1 + sp, Y - 2, 2, 1);
+    }
     this.drawParticles(ctx, camX, camY, dt);
     if (!room) {
       this.updateCritters(G, camX, camY, now, dt, dark);
@@ -383,6 +410,7 @@ export class Renderer {
     let alpha = 1;
     if (me && TREES.has(p.type) && me.y < p.y - 2 && me.y > p.y - s.h + 6 && Math.abs(me.x - p.x) < s.w * 0.45) alpha = 0.5;
     if (me && (p.type === 'tavern' || p.type === 'house' || p.type === 'forge') && me.y < p.y - 40 && me.y > p.y - s.h && Math.abs(me.x - p.x) < s.w / 2) alpha = 0.6;
+    if (p.type === 'volcan') alpha = this.volcanAlpha;
     if (alpha < 1) ctx.globalAlpha = alpha;
     if (TREES.has(p.type) && p.type !== 'deadtree') {
       // léger balancement des cimes
@@ -392,6 +420,7 @@ export class Renderer {
       ctx.drawImage(s.cv, 0, 0, s.w, cut, x + Math.round(sway), y, s.w, cut);
     } else ctx.drawImage(s.cv, x, y);
     if (alpha < 1) ctx.globalAlpha = 1;
+    if (p.fx) this.drawVolcanoFx(ctx, camX, camY, now, G, alpha);
     if (p.type === 'home' && G.homes) { // la pancarte au-dessus de la porte : le nom du propriétaire
       const h = G.homes.get(p.plot);
       const t = textCanvas(h ? h.name : 'À VENDRE', h ? '#2b1606' : '#7a1410', null);
@@ -417,6 +446,57 @@ export class Renderer {
       ctx.drawImage(fr, Math.round(p.x - s.ax + s.flame[0] - fr.width / 2 - camX), Math.round(p.y - s.ay + s.flame[1] - fr.height + 3 - camY));
       if (rnd() < 0.06) this.burst(p.x - s.ax + s.flame[0], p.y - 1, 1, { z: s.ay - s.flame[1] + 6, col: s.blue ? ['#bfe8ff', '#ffffff'] : ['#ffd24a', '#ff8a2a'], up: 20, g: -10, speed: 6, life: 0.7 });
     }
+  }
+  // le cratère respire : lueur, bulles, étincelles ; en éruption, il crache des bombes de lave
+  drawVolcanoFx(ctx, camX, camY, now, G, alpha) {
+    const s = this.volc, c = { x: s.wx, y: s.wy }, x = Math.round(c.x - camX), y = Math.round(c.y - camY);
+    const erupt = G.eruptUntil > now, nt = Math.min(1, (this.darkNow || 0) * 1.3);
+    ctx.globalCompositeOperation = 'lighter'; // le lac rougeoie : à peine le jour, franchement la nuit ou pendant l'éruption
+    ctx.globalAlpha = Math.min(1, (0.14 + 0.36 * nt + 0.05 * Math.sin(now * 2.3) + 0.04 * Math.sin(now * 7.1) + (erupt ? 0.35 : 0)) * alpha);
+    ctx.drawImage(this.glows.warm, x - s.crater.rx * 1.7, y - s.crater.ry * 2.6, s.crater.rx * 3.4, s.crater.ry * 3.8);
+    if (nt > 0.05 || erupt) {
+      ctx.globalAlpha = Math.min(1, ((erupt ? 0.3 : 0) + 0.22 * nt + 0.06 * Math.sin(now * 3.7)) * alpha);
+      ctx.drawImage(this.glows.red, x - s.crater.rx * 2.8, y - s.crater.ry * 5, s.crater.rx * 5.6, s.crater.ry * 6.4);
+    }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    if (rnd() < 0.35) { // bulles qui crèvent à la surface du lac
+      const a = rnd() * TAU, r = rnd() * 0.8;
+      this.burst(c.x + Math.cos(a) * s.crater.rx * r, c.y + 40 + Math.sin(a) * s.crater.ry * r, 3, { z: 40, col: ['#ffe48a', '#ffb042', '#ff7a1a'], up: 26, speed: 10, life: 0.5, g: 90 });
+    }
+    if (rnd() < (erupt ? 0.5 : 0.12)) this.burst(c.x + (rnd() - 0.5) * s.crater.rx, c.y + 40, erupt ? 4 : 2, { z: 40, col: ['#fff8d0', '#ffb042', '#ff7a1a', '#d84a14'], up: erupt ? 240 : 90, speed: erupt ? 70 : 20, life: erupt ? 1.3 : 0.9, g: 120, size: erupt ? 2 : 1 });
+  }
+  // la montagne est peinte : son pied rejoint les décors au sol, ses bandes les objets triés, ses lumières et sa fumée s'allument
+  volcanoReady(v) {
+    const V = this.world.volcano, ox = V.cx - v.ax, oy = V.cy - v.ay;
+    this.volc = v;
+    if (v.foot) this.giants.push({ type: 'volcan', x: V.cx, y: V.cy + v.foot.dy, spr: v.foot, ground: true });
+    v.bands.forEach((s, k) => this.giants.push({ type: 'volcan', x: V.cx, y: V.cy + s.dy, spr: s, fx: k === v.bands.length - 1 }));
+    for (const l of v.lights) this.lights.push({ x: ox + l.x, y: oy + l.y, r: l.r, c: 'warm', flicker: 1 });
+    for (const dx of [-14, 0, 14]) this.smokers.push({ x: ox + v.crater.x + dx, y: oy + v.crater.y - 4, t: 0, big: 1 });
+    v.wx = ox + v.crater.x; v.wy = oy + v.crater.y; // le cratère, dans le monde
+  }
+  pumpVolcano(camX, camY) {
+    if (!this.volcJob) return;
+    const V = this.world.volcano, cx = camX + this.W / 2, cy = camY + this.H / 2;
+    const near = Math.abs(cx - V.cx) < V.rx + this.W + 400 && cy > V.cy - V.ry - V.h - this.H - 600 && cy < V.cy + V.ry + this.H + 400;
+    const t0 = performance.now();
+    let r;
+    try { do r = this.volcJob.next(); while (!r.done && (near || performance.now() - t0 < 3)); } catch (e) { console.error(e); this.volcJob = null; return; }
+    if (r.done) { this.volcJob = null; this.volcanoReady(r.value); }
+  }
+  // derrière la montagne ? on regarde si l'une de ses bandes, dessinée après nous, couvre notre silhouette
+  volcanoBehind(me) {
+    const v = this.volc, V = this.world.volcano;
+    if (!v || !me) return false;
+    const sx = Math.round(me.x - (V.cx - v.ax)), sy = Math.round(me.y - (V.cy - v.ay));
+    if (sx < -8 || sy < -40 || sx >= v.w + 8 || sy >= v.h + 8) return false;
+    for (const [dx, dy] of [[0, -4], [0, -12], [-4, -18], [4, -18], [0, -26]]) {
+      const x = sx + dx, y = sy + dy;
+      if (x < 0 || y < 0 || x >= v.w || y >= v.h) continue;
+      const l = v.lay[y * v.w + x];
+      if (l >= 2 && V.cy + (l - 2) * v.BH - v.RY > me.y) return true;
+    }
+    return false;
   }
   drawNpc(ctx, n, camX, camY, now, G) {
     if (n.board) return;
@@ -786,7 +866,7 @@ export class Renderer {
     for (let i = this.fx.length - 1; i >= 0; i--) {
       const f = this.fx[i], t = now - f.t0;
       if (t > f.dur) { this.fx.splice(i, 1); continue; }
-      const k = t / f.dur;
+      const k = Math.max(0, t / f.dur);
       const o = f.follow && f.follow();
       const x = (o ? o.x : f.x) - camX, y = (o ? o.y : f.y) - camY;
       if (f.kind === 'thrust') {
@@ -950,6 +1030,25 @@ export class Renderer {
       if (rnd() < 0.6) this.burst(gx, gy, 1, { z: h + 10, col: ['#ffe14a', '#ff8a2a', '#fff'], up: 10, speed: 12, life: 0.3, g: 40 });
     }
   }
+  drawPlume(ctx, camX, camY, dt) {
+    const P = this.plume;
+    if (!P.length) return;
+    for (let i = P.length - 1; i >= 0; i--) {
+      const p = P[i];
+      p.life -= dt;
+      if (p.life <= 0) { P.splice(i, 1); continue; }
+      p.vz *= 1 - 0.1 * dt; p.vx += 2.4 * dt; // l'élan retombe, le vent l'emporte
+      p.x += p.vx * dt; p.z += p.vz * dt;
+      const k = 1 - p.life / p.max, r = Math.round(p.r0 + (p.r1 - p.r0) * Math.sqrt(k));
+      const cv = this.puffs[p.tint][Math.max(0, Math.min(20, r - 2))];
+      const x = Math.round(p.x - camX - r), y = Math.round(p.y - p.z - camY - r);
+      if (x > this.W + 40 || y > this.H + 40 || x < -60 || y < -60) continue;
+      ctx.globalAlpha = p.a * Math.min(1, k * 6) * Math.min(1, (1 - k) * 2.2);
+      ctx.drawImage(cv, x, y);
+    }
+    ctx.globalAlpha = 1;
+    if (P.length > 160) P.splice(0, P.length - 160);
+  }
   drawParticles(ctx, camX, camY, dt) {
     for (let i = this.parts.length - 1; i >= 0; i--) {
       const p = this.parts[i];
@@ -1088,10 +1187,18 @@ export class Renderer {
     }
     // fumée des cheminées
     for (const s of this.smokers) {
-      if (s.x < camX - 40 || s.x > camX + W + 40 || s.y < camY - 60 || s.y > camY + H + 40) continue;
+      if (s.x < camX - (s.big ? 300 : 40) || s.x > camX + W + (s.big ? 300 : 40) || s.y < camY - (s.big ? 400 : 60) || s.y > camY + H + (s.big ? 300 : 40)) continue;
       s.t -= dt;
-      if (s.t <= 0) { s.t = 0.35 + rnd() * 0.3; this.parts.push({ x: s.x + rnd() * 3, y: s.y + 40, z: 40, vx: 6 + rnd() * 4, vy: -2, vz: 12, g: -2, life: 2.4, max: 2.4, col: 'rgba(210,210,215,0.55)', size: 2, kind: 'smoke', drag: 0.4 }); }
+      if (s.t <= 0) {
+        if (s.big) { // le panache du volcan : de grosses bouffées qui montent, gonflent et dérivent avec le vent
+          const er = G.eruptUntil > now;
+          s.t = (er ? 0.07 : 0.22) + rnd() * 0.14;
+          this.plume.push({ x: s.x + (rnd() - 0.5) * 18, y: s.y, z: 0, vx: (er ? 8 : 5) + rnd() * 6, vz: (er ? 85 : 46) + rnd() * 14, life: er ? 9 : 11, max: er ? 9 : 11, r0: er ? 7 : 4, r1: er ? 22 : 19 + rnd() * 3, tint: er && rnd() < 0.45 ? 'red' : rnd() < 0.2 ? 'pale' : 'dark', a: 0.85 });
+        }
+        else { s.t = 0.35 + rnd() * 0.3; this.parts.push({ x: s.x + rnd() * 3, y: s.y + 40, z: 40, vx: 6 + rnd() * 4, vy: -2, vz: 12, g: -2, life: 2.4, max: 2.4, col: 'rgba(210,210,215,0.55)', size: 2, kind: 'smoke', drag: 0.4 }); }
+      }
     }
+    this.drawPlume(ctx, camX, camY, dt);
     // bulles du marais
     if (z === Z.SWAMP && rnd() < 0.15) {
       const x = camX + rnd() * W, y = camY + rnd() * H;
@@ -1314,6 +1421,14 @@ export class Renderer {
       if (t > 9) { this.decals.splice(i, 1); continue; }
       const s = this.env[d.kind] && this.env[d.kind][d.v || 0];
       if (!s) continue;
+      if (d.kind === 'lava') { // la lave refroidit : incandescente, puis une croûte sombre qui s'efface
+        const x = Math.round(d.x - s.ax - camX), y = Math.round(d.y - s.ay - camY);
+        ctx.globalAlpha = Math.min(1, (9 - t) / 2) * 0.9; ctx.drawImage(s.cv, x, y);
+        if (t < 3) { ctx.globalAlpha = 1 - t / 3; ctx.drawImage(s.hot, x, y); }
+        if (t < 1.6) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = (1 - t / 1.6) * 0.75; ctx.drawImage(this.glows.warm, x - 10, y - 12, s.w + 20, s.h + 24); ctx.globalCompositeOperation = 'source-over'; }
+        if (t < 2.5 && rnd() < 0.08) this.plume.push({ x: d.x + (rnd() - 0.5) * 14, y: d.y, z: 2, vx: 2, vz: 10, life: 2, max: 2, r0: 2, r1: 5, tint: 'pale', a: 0.5 });
+        continue;
+      }
       ctx.globalAlpha = Math.min(1, (9 - t) / 2) * 0.85;
       ctx.drawImage(s.cv, Math.round(d.x - s.ax - camX), Math.round(d.y - s.ay - camY));
     }

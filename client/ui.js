@@ -780,6 +780,13 @@ export class UI {
       if (W.solid[i] && W.tiles[i] > 1 && W.tiles[i] !== 10) col = 0x7a4a2a;
       d[i] = (0xff000000 | ((col & 255) << 16) | (col & 0xff00) | ((col >> 16) & 255)) >>> 0;
     }
+    const V = W.volcano; // le volcan sur la carte : un cône sombre et son cratère rouge
+    if (V) for (let y = Math.floor((V.cy - V.ry) / TILE); y <= (V.cy + V.ry) / TILE; y++) for (let x0 = Math.floor((V.cx - V.rx) / TILE); x0 <= (V.cx + V.rx) / TILE; x0++) {
+      const ex = (x0 * TILE + 8 - V.cx) / V.rx, ey = (y * TILE + 8 - V.cy) / V.ry, e = Math.sqrt(ex * ex + ey * ey);
+      if (e > 1) continue;
+      const col = e < 0.13 ? 0xff7a1a : e < 0.21 ? 0x8a2a10 : e < 0.5 ? 0x5a4648 : 0x403133;
+      d[y * MAP_W + x0] = (0xff000000 | ((col & 255) << 16) | (col & 0xff00) | ((col >> 16) & 255)) >>> 0;
+    }
     x.putImageData(img, 0, 0);
     this.miniBase = c;
   }

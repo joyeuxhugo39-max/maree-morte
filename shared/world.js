@@ -51,7 +51,7 @@ export const PROPS = {
   comptoir: { solid: 1 }, etagere: { solid: 1 }, cheminee: { solid: 1 }, table: { solid: 1 }, chaise: {}, ratelier: { solid: 1 },
   plante: { solid: 1 }, lit_deco: { solid: 1 }, fourneau: { solid: 1 }, tapis_deco: { ground: 1 }, grotte: {}, crane_rock: { solid: 1 }, cristal: { solid: 1 }, tonneau_d: { solid: 1 },
   home: { solid: 1 }, dalle: { ground: 1 }, sceau: { solid: 1 },
-  gibet: { solid: 1 }, corail: { solid: 1 }, obelisque: { solid: 1 }, fumerolle: { ground: 1 }, tente: { solid: 1 }, barreaux: { solid: 1 },
+  volcan: { solid: 1 }, gibet: { solid: 1 }, corail: { solid: 1 }, obelisque: { solid: 1 }, fumerolle: { ground: 1 }, tente: { solid: 1 }, barreaux: { solid: 1 },
   mannequin: { solid: 1 }, lavarock: { solid: 1 }, cage: { solid: 1 }, fort: { solid: 1 }, ruine: { solid: 1 }, totem: { solid: 1 },
   ship: { solid: 1 }, wreck: { solid: 1 }, boat: { solid: 1 },
 };
@@ -84,11 +84,11 @@ export function generateWorld(seed = 7) {
     [150, 268, 27, 16], [174, 282, 12, 9], // Anse-Tranquille
     [70, 330, 32, 24], [44, 352, 12, 10], // Atoll des Ossements
     [300, 330, 36, 27], [332, 352, 16, 12], // Île de la Quarantaine
-    [470, 330, 34, 30], // Volcan de Cendrelune
+    [470, 330, 48, 38], [438, 354, 15, 10], [503, 302, 12, 9], // Volcan de Cendrelune : une île taillée pour une montagne
     [590, 402, 34, 26], [560, 420, 14, 10], // Île des Damnés
     [402, 204, 7, 5], [244, 262, 6, 5], [522, 252, 6, 5], [384, 402, 8, 6], [204, 404, 9, 7], [114, 414, 6, 5], // îlots
   ];
-  const RD = { x: 408, y: 84 }, AT = { x: 150, y: 266 }, EM = { x: 352, y: 150 }, VC = { x: 470, y: 328 }, QC = { x: 298, y: 326 }, AO = { x: 70, y: 330 }, DM = { x: 590, y: 400 }, LG = { x: 516, y: 166 };
+  const RD = { x: 408, y: 84 }, AT = { x: 150, y: 266 }, EM = { x: 352, y: 150 }, VC = { x: 470, y: 328 }, VF = { rx: 25, ry: 15 }, QC = { x: 298, y: 326 }, AO = { x: 70, y: 330 }, DM = { x: 590, y: 400 }, LG = { x: 516, y: 166 };
   const HC = { x: 262, y: 78 }; // Havre-des-Brumes
   const BC = 16, bcw = Math.ceil(W / BC), blobCells = [];
   for (let cy = 0; cy * BC < OVER_H; cy++) for (let cx = 0; cx < bcw; cx++) {
@@ -154,7 +154,7 @@ export function generateWorld(seed = 7) {
     [Z.SIRENES, 516, 168, 1.4], [Z.ERMITE, 352, 150, 0.9], [Z.ANSE, 152, 270, 1.4],
     [Z.OSSEMENTS, 70, 330, 1.5], [Z.OSSEMENTS, 44, 352, 0.8],
     [Z.QUARANTAINE, 300, 330, 1.5], [Z.QUARANTAINE, 332, 352, 0.9],
-    [Z.VOLCAN, 470, 330, 1.6], [Z.DAMNES, 590, 402, 1.5], [Z.DAMNES, 560, 420, 0.9],
+    [Z.VOLCAN, 470, 330, 2.4], [Z.DAMNES, 590, 402, 1.5], [Z.DAMNES, 560, 420, 0.9],
     [Z.ILOT, 402, 204, 0.5], [Z.ILOT, 244, 262, 0.5], [Z.ILOT, 522, 252, 0.5], [Z.ILOT, 384, 402, 0.5], [Z.ILOT, 204, 404, 0.5], [Z.ILOT, 114, 414, 0.5],
   ];
   const RC8 = 8, rcw = Math.ceil(W / RC8), regCells = [];
@@ -212,16 +212,15 @@ export function generateWorld(seed = 7) {
       case Z.OSSEMENTS: t = v < 0.4 || n < 0.55 ? T.SAND : T.DIRT; break;
       case Z.QUARANTAINE: t = v < 0.08 ? T.SAND : (n > 0.6 ? T.MUD : n > 0.47 ? T.DIRT : T.GRASS); break;
       case Z.VOLCAN: {
-        const dc = Math.hypot(x - VC.x, (y - VC.y) * 1.15);
-        const lava = fbm(x / 5, y / 5, seed + 41, 2);
-        t = dc < 7.5 ? T.LAVA : dc < 10.5 ? T.ROCK : (v < 0.05 ? T.SAND : (lava > 0.7 && dc < 24 ? T.LAVA : T.ASH));
+        const ex = (x - VC.x) / VF.rx, ey = (y - VC.y) / VF.ry;
+        t = ex * ex + ey * ey < 0.86 ? T.ROCK : (v < 0.05 ? T.SAND : T.ASH); // le cône ; son pied reste praticable
         break;
       }
       case Z.DAMNES: t = v < 0.06 ? T.ASH : (n > 0.58 ? T.ASH : T.DGRASS); break;
     }
     const r = fbm(x / 8, y / 8, seed + 21, 3);
     if ((z === Z.JUNGLE || z === Z.PLAINS || z === Z.WRECK || z === Z.CRANE || z === Z.COLLINES || z === Z.DAMNES || z === Z.PENDUS) && r > 0.69 && v > 0.12) t = T.ROCK;
-    if (z === Z.VOLCAN && r > 0.66 && v > 0.12 && t === T.ASH) t = T.ROCK;
+    if (z === Z.VOLCAN && r > 0.7 && v > 0.12 && t === T.ASH && ((x - VC.x) / VF.rx) ** 2 + ((y - VC.y) / VF.ry) ** 2 > 1.2) t = T.ROCK; // pas de rochers cachés sous les pentes
     tiles[i] = t;
   }
   // l'eau peu profonde du marais devient vase
@@ -696,13 +695,46 @@ export function generateWorld(seed = 7) {
   for (let y = camp.y - 3; y <= camp.y + 3; y++) for (let x = camp.x - 4; x <= camp.x + 4; x++) occ[idx(x, y)] = 1;
   addProp('tente', camp.x - 2, camp.y - 1, 1); addProp('tente', camp.x + 2, camp.y - 1, 0); addProp('torch', camp.x, camp.y + 1);
   stampPath([[QC.x + 12, QC.y], [camp.x, camp.y + 2]], 0.9, T.DIRT);
-  // --- Volcan de Cendrelune : fumerolles et coulées
-  for (let k = 0; k < 18; k++) {
-    const a = k / 18 * Math.PI * 2, r = 12 + hash2(k, 3, 77) * 10;
-    const x = Math.round(VC.x + Math.cos(a) * r), y = Math.round(VC.y + Math.sin(a) * r * 0.85);
+  // --- Volcan de Cendrelune : une montagne de feu au milieu de l'île
+  const FLOWS = [2.25, 0.95, 3.55, -0.2]; // coulées : angles sur l'ellipse du pied de la montagne
+  const inFoot = (x, y, k = 1) => { const ex = (x - VC.x) / VF.rx, ey = (y - VC.y) / VF.ry; return ex * ex + ey * ey < k; };
+  for (let y = VC.y - VF.ry - 1; y <= VC.y + VF.ry + 1; y++) for (let x = VC.x - VF.rx - 1; x <= VC.x + VF.rx + 1; x++) if (inMap(x, y) && inFoot(x, y)) occ[idx(x, y)] = 1;
+  props.push({ id: pid++, type: 'volcan', v: 0, x: VC.x * TILE + 8, y: VC.y * TILE + 8 + VF.ry * TILE, tx: VC.x, ty: VC.y + VF.ry });
+  // le bas des pentes se marche (le cône, lui, est de la roche pleine), sauf là où descendent les coulées
+  for (let y = VC.y - VF.ry - 1; y <= VC.y + VF.ry + 1; y++) for (let x = VC.x - VF.rx - 1; x <= VC.x + VF.rx + 1; x++) {
+    if (!inMap(x, y) || !inFoot(x, y) || inFoot(x, y, 0.86)) continue;
+    const ex = (x - VC.x) / VF.rx, ey = (y - VC.y) / VF.ry, th = Math.atan2(ey, ex), e = Math.sqrt(ex * ex + ey * ey);
+    for (const a of FLOWS) { let d = Math.abs(th - a) % (Math.PI * 2); if (d > Math.PI) d = Math.PI * 2 - d; if (d < 0.034 + 0.05 * e) { tiles[idx(x, y)] = T.LAVA; break; } }
+  }
+  const BM = { x: VC.x, y: VC.y + VF.ry + 1 }; // l'entrée de la Forge du Brasier, au pied du cône
+  for (let y = BM.y - 1; y <= BM.y + 3; y++) for (let x = BM.x - 3; x <= BM.x + 3; x++) if (inMap(x, y)) { if (!inFoot(x, y)) tiles[idx(x, y)] = T.ASH; occ[idx(x, y)] = 1; }
+  for (const a0 of FLOWS) { // la lave descend jusqu'à l'île, avec des gués de roche refroidie
+    let a = a0, x = VC.x + Math.cos(a) * VF.rx * 0.97, y = VC.y + Math.sin(a) * VF.ry * 0.97;
+    const len = 11 + Math.round(hash2(a0 * 100 | 0, 3, 17) * 6);
+    for (let k = 0; k < len; k++) {
+      a += (hash2(k, a0 * 100 | 0, 91) - 0.5) * 0.45;
+      x += Math.cos(a) * 1.1; y += Math.sin(a) * 1.0;
+      if (k % 7 === 5 || k % 7 === 6) continue;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const tx = Math.round(x + dx), ty = Math.round(y + dy);
+        if (!inMap(tx, ty) || Math.hypot(tx - x, ty - y) > 1.3) continue;
+        const i = idx(tx, ty);
+        if (tiles[i] === T.ASH && !occ[i] && !path[i]) tiles[i] = T.LAVA;
+      }
+      if (k % 3 === 0) lavaLights.push({ x: x * TILE + 8, y: y * TILE + 8 });
+    }
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { // une mare au bout de la coulée
+      const tx = Math.round(x + dx), ty = Math.round(y + dy);
+      if (inMap(tx, ty) && Math.hypot(dx, dy * 1.2) < 2.7 && tiles[idx(tx, ty)] === T.ASH && !occ[idx(tx, ty)]) tiles[idx(tx, ty)] = T.LAVA;
+    }
+    lavaLights.push({ x: x * TILE + 8, y: y * TILE + 8 });
+  }
+  for (let k = 0; k < 22; k++) { // fumerolles tout autour du pied
+    const a = k / 22 * Math.PI * 2 + 0.13, s = 1.18 + hash2(k, 3, 77) * 0.5;
+    const x = Math.round(VC.x + Math.cos(a) * VF.rx * s), y = Math.round(VC.y + Math.sin(a) * VF.ry * s);
     if (inMap(x, y) && tiles[idx(x, y)] === T.ASH && !occ[idx(x, y)]) addProp('fumerolle', x, y, k % 3);
   }
-  for (let y = VC.y - 30; y <= VC.y + 30; y += 3) for (let x = VC.x - 34; x <= VC.x + 34; x += 3) if (inMap(x, y) && tiles[idx(x, y)] === T.LAVA) lavaLights.push({ x: x * TILE + 8, y: y * TILE + 8 });
+  const volcano = { cx: VC.x * TILE + 8, cy: VC.y * TILE + 8, rx: VF.rx * TILE, ry: VF.ry * TILE, h: 330, flows: FLOWS };
   // --- Île des Damnés : obélisques et ruines d'un château
   forceLand(DM.x - 6, DM.y - 7, DM.x + 6, DM.y + 3, T.ASH, Z.DAMNES);
   for (let y = DM.y - 7; y <= DM.y + 3; y++) for (let x = DM.x - 6; x <= DM.x + 6; x++) occ[idx(x, y)] = 1;
@@ -733,7 +765,7 @@ export function generateWorld(seed = 7) {
   };
   const walkT = (t) => t === T.SAND || t === T.GRASS || t === T.DIRT || t === T.ASH || t === T.DGRASS || t === T.MARSH;
   const mouthOs = mouthNear(AO.x, AO.y - 20, 1, walkT);
-  const mouthBrasier = mouthNear(VC.x, VC.y + 16, 0, (t) => t === T.ASH);
+  const mouthBrasier = addProp('grotte', BM.x, BM.y, 0);
   const mouthComte = mouthNear(DM.x, DM.y - 12, 1, walkT);
   // --- coffres du Grand Large (le dernier palier ne s'ouvre qu'aux plus forts)
   for (const c of [
@@ -1251,7 +1283,7 @@ export function generateWorld(seed = 7) {
       { id: 'jumeaux', plates: twinPlates, door: doors.findIndex((d) => d.seal === 'jumeaux'), room: sanct.id, open: 90 },
       { id: 'freres', plates: fortPlates, door: doors.findIndex((d) => d.seal === 'freres'), room: arena.id, open: 120 },
     ],
-    docks, lavaLights, seaRoutes, rade: RD, anse: AT, ermite: EM, volcan: VC, quarantaine: QC, ossements: AO, damnes: DM, lagon: LG, pendus: FP, fort: FT, brumes: BR,
+    docks, lavaLights, seaRoutes, volcano, rade: RD, anse: AT, ermite: EM, volcan: VC, quarantaine: QC, ossements: AO, damnes: DM, lagon: LG, pendus: FP, fort: FT, brumes: BR,
     seed, W, H, tiles, zones, solid, plankDir, waterDist, props, buildings, npcs, spawns, chests,
     spawnPoint, town: TC, lighthouse: LH, ruins: RC, cemetery: CEM, wreck: WR, coastY, dockEnd,
   };

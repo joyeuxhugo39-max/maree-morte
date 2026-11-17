@@ -116,6 +116,11 @@ export class Terrain {
     const ox = cx * CHUNK_PX - M, oy = cy * CHUNK_PX - M;
     const tm = new Uint8Array(SZ * SZ);
     for (let y = 0; y < SZ; y++) for (let x = 0; x < SZ; x++) tm[y * SZ + x] = this.sample(ox + x, oy + y);
+    const VV = W.volcano; // sous le volcan : de la cendre, sans falaises (on ne la voit qu'à travers le cône estompé)
+    if (VV && ox + SZ > VV.cx - VV.rx && ox < VV.cx + VV.rx && oy + SZ > VV.cy - VV.ry && oy < VV.cy + VV.ry) for (let y = 0; y < SZ; y++) for (let x = 0; x < SZ; x++) {
+      const ex = (ox + x - VV.cx) / VV.rx, ey = (oy + y - VV.cy) / VV.ry;
+      if (ex * ex + ey * ey < 1.02 && tm[y * SZ + x] === T.ROCK) tm[y * SZ + x] = T.ASH;
+    }
     const at = (lx, ly) => {
       if (lx < -M || ly < -M || lx >= CHUNK_PX + M || ly >= CHUNK_PX + M) return this.sample(ox + M + lx, oy + M + ly);
       return tm[(ly + M) * SZ + lx + M];
@@ -211,6 +216,7 @@ export class Terrain {
             if (below === 0) k = 0;
             col = P[Math.max(0, Math.min(4, k))];
             if (below === 0 || below === 1) col = mix(col, 0x1a1424, 0.3);
+            if (z === Z.VOLCAN) col = mix(col, 0x1a1216, 0.5); // falaises de basalte
           } else {
             const n = valueNoise(wx / 7, wy / 7, 63);
             let k = n < 0.35 ? 2 : 3;
@@ -220,6 +226,7 @@ export class Terrain {
             else if (at(lx - 1, ly) !== T.ROCK || at(lx + 1, ly) !== T.ROCK) k = 1;
             col = P[k];
             if ((z === Z.JUNGLE || z === Z.RUINS) && valueNoise(wx / 8, wy / 8, 66) > 0.56 && k > 1) col = mix(col, 0x3d7a3f, 0.7);
+            else if (z === Z.VOLCAN) col = mix(col, 0x221a1e, 0.55); // basalte
             else if (z === Z.PLAINS && valueNoise(wx / 8, wy / 8, 67) > 0.62 && k > 1) col = mix(col, 0x5a9a48, 0.55);
           }
           break;

@@ -31,6 +31,7 @@ const CHEST_LOOT = [
 CHEST_LOOT[4] = { gold: [400, 700], items: [['essence_damnee', 0.8, 1, 2], ['perle_ombre', 1, 2, 4], ['faux_damnee', 0.06, 1, 1], ['canon_damne', 0.06, 1, 1], ['armure_damnee', 0.05, 1, 1], ['tenue_comte', 0.04, 1, 1], ['dent_comte', 0.04, 1, 1], ['carte_tresor', 0.4, 1, 1]] };
 const CHEST_COOLDOWN_MS = 15 * 60 * 1000;
 // les îles du Grand Large, pour le haut fait d'explorateur
+const LAVA_BOMB = { id: 0, name: 'une bombe de lave' }; // la « source » des dégâts du volcan
 const FAR_ZONES = [Z.RADE, Z.COLLINES, Z.PENDUS, Z.SIRENES, Z.ANSE, Z.OSSEMENTS, Z.QUARANTAINE, Z.VOLCAN, Z.DAMNES, Z.BRUMES, Z.ERMITE];
 // cambriolage : les objets très rares qu'on ne trouve que chez les autres
 const BURGLE_RARE = [['montre_gousset', 30], ['bague_capitaine', 25], ['coffret_bijoux', 25], ['collier_perles_noires', 12], ['tableau_maitre', 8]];
@@ -72,6 +73,7 @@ export class Game {
     this.projs = [];
     this.bombs = [];
     this.teles = []; this.lteles = []; this.allies = []; this.kraken = null;
+    this.erupt = { nextAt: 0, until: 0, bombAt: 0, who: new Set() }; // le Volcan de Cendrelune
     this.timers = [];
     this.time = 0;
     this.worldTime = DAY_LENGTH * 0.08;
@@ -602,6 +604,45 @@ export class Game {
   lineTele(x0, y0, x1, y1, w, dur, dmg, src, style = 0) {
     if (dmg) this.lteles.push({ x0, y0, x1, y1, w, at: this.time + dur, dmg, src });
     this.ev(x0, y0, ['teleL', Math.round(x0), Math.round(y0), Math.round(x1), Math.round(y1), w, dur, style]);
+  }
+  // ------------------------------------------------------------ le Volcan de Cendrelune : éruptions
+  // Tant que des pirates foulent l'île, la montagne se réveille de temps en temps : elle tremble,
+  // crache des bombes de lave (annoncées au sol) pendant une vingtaine de secondes, puis se rendort.
+  updateVolcano() {
+    const V = this.world.volcano, E = this.erupt, t = this.time;
+    if (!V) return;
+    const here = [];
+    for (const p of this.players.values()) if (!p.dead && p.room === -1 && !p.boat && p.zone === Z.VOLCAN) here.push(p);
+    if (t < E.until) { // l'éruption bat son plein
+      for (const p of here) E.who.add(p);
+      if (t >= E.bombAt) {
+        E.bombAt = t + rand(0.35, 0.6);
+        for (const p of here) if (Math.random() < 0.8) this.lavaBomb(p.x + rand(-80, 80), p.y + rand(-60, 60));
+        const a = Math.random() * Math.PI * 2, e = rand(0.98, 1.6); // et un peu partout autour du cône
+        this.lavaBomb(V.cx + Math.cos(a) * V.rx * e, V.cy + Math.sin(a) * V.ry * e);
+      }
+      return;
+    }
+    if (E.who.size) { // c'est fini : ceux qui sont restés debout sur l'île l'ont bien mérité
+      for (const p of E.who) if (!p.dead && p.zone === Z.VOLCAN && this.players.has(p.id)) { this.unlock(p, 'eruption'); this.toast(p, 'Le volcan se calme… pour l’instant.', 'info'); }
+      E.who.clear();
+    }
+    if (!here.length) return;
+    if (!E.nextAt || E.nextAt < t - 600) E.nextAt = t + rand(25, 45); // on arrive : il grondera bientôt
+    if (t < E.nextAt) return;
+    E.until = t + 22; E.bombAt = t + 2.5; E.nextAt = E.until + rand(80, 130);
+    for (const p of here) {
+      E.who.add(p);
+      this.send(p, { t: 'erupt', dur: 22 });
+      this.send(p, { t: 'chat', from: null, lvl: 0, m: '🌋 Le Volcan de Cendrelune entre en éruption ! Fuyez les bombes de lave !', kind: 'boss', pid: 0 });
+    }
+  }
+  // une bombe de lave : un cercle au sol, la bombe qui vole depuis le cratère, puis l'impact
+  lavaBomb(x, y) {
+    if (zoneAt(this.world, x, y) !== Z.VOLCAN || !canStand(this.world, x, y)) return;
+    const dur = rand(1.5, 2.1);
+    this.tele(x, y, 24, dur, 34, LAVA_BOMB, 3);
+    this.ev(x, y, ['lavabomb', Math.round(x), Math.round(y), +dur.toFixed(2)]);
   }
   // les cibles d'un boss : les pirates proches, dans la même pièce
   bossTargets(m, r) { return [...this.players.values()].filter((p) => !p.dead && !SAFE.has(p.zone) && p.room === m.room && dist(p, m) < r); }
@@ -2475,6 +2516,7 @@ export class Game {
     if (this.tickCount % 10 === 0) { this.updateDots(); this.updateClouds(); }
     if (this.tickCount % 5 === 0) { this.updateSeals(); this.updateBurglars(); }
     if (this.tickCount % 10 === 0) this.updateKraken();
+    if (this.tickCount % 5 === 0) this.updateVolcano();
     if (this.tickCount % 40 === 0 && this.players.size > 1) { // les autres pirates sur la carte
       const pl = [...this.players.values()].map((q) => [q.id, q.name, Math.round(q.x), Math.round(q.y), q.room, q.dead ? 1 : 0]);
       for (const p of this.players.values()) this.send(p, { t: 'map', pl });

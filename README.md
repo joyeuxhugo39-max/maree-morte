@@ -25,6 +25,13 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Nouveautés de la version 0.7.1 : le Volcan de Cendrelune
+
+- **Un volcan immense** domine désormais l'île de Cendrelune : une montagne de plus de 800 pixels de large, peinte pixel par pixel à partir d'un relief (arêtes, ravines, cratère et lac de lave), avec quatre coulées qui descendent jusqu'à l'île et rejoignent ses rivières de lave. Un panache de fumée monte du cratère, qui rougeoie la nuit. Quand on passe derrière la montagne, elle devient transparente.
+- Le pied du cône se marche ; le cône lui-même, les coulées et le cratère sont infranchissables. L'entrée de la Forge du Brasier est toujours au pied sud.
+- **Éruptions** : tant que des pirates sont sur l'île, le volcan se réveille de temps en temps (toutes les deux minutes environ). Pendant une vingtaine de secondes, la terre tremble, la musique de bataille se lance et des bombes de lave jaillissent du cratère : chacune est annoncée par un cercle au sol, puis laisse une flaque qui refroidit.
+- Nouveau haut fait : **Sous la cendre** (rester debout sur l'île pendant toute une éruption), titre « Cracheur de feu ».
+
 ## Nouveautés de la version 0.7 : le Grand Large
 
 - **Une carte quatre fois plus grande.** L'archipel d'origine ne bouge pas ; à l'est et au sud s'ouvrent de nouvelles terres : Rade-aux-Flibustiers (ville de forbans), les Collines de la Rade, la Forêt des Pendus, le Lagon des Sirènes, l'Îlot de l'Ermite, Anse-Tranquille (village de pêcheurs), l'Atoll des Ossements, l'Île de la Quarantaine, le Volcan de Cendrelune, les Brumes Éternelles et l'**Île des Damnés** (niveaux 26-30, zone extrême, butin légendaire).
@@ -180,7 +187,7 @@ client/
   roomnet.js       multijoueur dans la page claude.ai (élection d'hôte)
   peernet.js       multijoueur direct entre navigateurs (page GitHub Pages)
   ui.js            interface HTML
-  render/          moteur de rendu et pixel art procédural
+  render/          moteur de rendu et pixel art procédural (sprites-volcan.js : la montagne)
 scripts/
   build-artifact.mjs  assemble la page unique : claude.ai (dist/) ou GitHub Pages (--pages, docs/)
 docs/              page publique GitHub Pages (générée)

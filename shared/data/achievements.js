@@ -4,6 +4,7 @@ export const ACHIEVEMENTS = {
   crabes: { name: 'Fléau des crabes', desc: 'Écraser 50 crabes putrides.', title: 'Écraseur de crabes' },
   faucheur: { name: 'Faucheur', desc: 'Abattre 250 morts-vivants.', title: 'Faucheur des marées' },
   riche: { name: 'Fortune de pirate', desc: 'Posséder 1 000 doublons.', title: 'Pirate fortuné' },
+  eruption: { name: 'Sous la cendre', desc: 'Rester debout sur l’île pendant toute une éruption du Volcan de Cendrelune.', title: 'Cracheur de feu' },
   niveau10: { name: 'Vieux loup', desc: 'Atteindre le niveau 10.', title: 'Vieux loup de mer' },
   elite: { name: 'Tueur de géants', desc: 'Vaincre une créature d’élite.', title: 'Tueur de géants' },
   boss: { name: 'Briseur de malédiction', desc: 'Vaincre le Capitaine Barbe-Cendre.', title: 'Briseur de malédiction' },
