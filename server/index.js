@@ -30,7 +30,12 @@ const server = http.createServer((req, res) => {
   });
 });
 
-const game = new Game({ storage: new FileStorage(DATA), log: (...a) => console.log(new Date().toISOString().slice(11, 19), ...a) });
+const storage = new FileStorage(DATA);
+const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
+// 1.0 : un instantané avant tout démarrage (donc avant chaque déploiement), puis toutes les heures
+await storage.snapshot('demarrage').then((n) => log('[sauvegarde] instantané', n)).catch((e) => log('[sauvegarde] instantané impossible', e.message));
+const game = new Game({ storage, log });
+setInterval(() => { storage.snapshot().then((n) => log('[sauvegarde] instantané', n)).catch((e) => log('[sauvegarde] instantané impossible', e.message)); }, 3600 * 1000);
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096 });
 
 wss.on('connection', (ws, req) => {
@@ -65,10 +70,14 @@ setInterval(() => {
   while (acc >= STEP) { game.tick(); acc -= STEP; }
 }, STEP / 2);
 
-function shutdown() {
+let stopping = false;
+async function shutdown() {
+  if (stopping) return; stopping = true;
   console.log('Arrêt : sauvegarde des pirates…');
-  game.saveAll();
-  setTimeout(() => process.exit(0), 800);
+  const limit = new Promise((r) => setTimeout(r, 10000)); // au pire dix secondes
+  await Promise.race([Promise.resolve(game.saveAll()).catch(() => {}), limit]);
+  console.log('Sauvegardes écrites. Bon vent.');
+  process.exit(0);
 }
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);

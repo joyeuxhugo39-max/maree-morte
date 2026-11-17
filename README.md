@@ -131,14 +131,13 @@ tient les morts à distance.
 
 ## Nouveautés de la version 0.2
 
-- **Guidage** : une flèche dorée pointe toujours vers votre prochain objectif (quête, trésor, invasion), avec la distance.
+- **Guidage** : une flèche dorée pointe toujours vers votre prochain objectif (quête, trésor), avec la distance.
 - **Musique adaptative** composée en direct : chant de marins le jour, nappes sinistres la nuit, tambours dans le marais, percussions de guerre près des boss.
 - **Météo** partagée par tous les joueurs : pluie et orages avec éclairs et tonnerre.
 - **Pêche** (touche R) : sardines, dorades, poissons-lanternes la nuit, espadons par gros temps, bouteilles à la mer.
 - **Cartes au trésor** : 4 fragments forment une carte ; creusez sur la croix rouge.
 - **Forge d'Isa** : renforcez l'arme, le pistolet et l'armure jusqu'à +5.
 - **Élites** : le Crabe-Roi (plage) et la Goule Alpha (jungle), avec leurs butins.
-- **Invasion de la Marée Morte** : chaque nuit, trois vagues attaquent la plage du port, jusqu'au Capitaine Noyé.
 - **Tableau des primes** sur la place : chasses répétables toutes les 10 minutes.
 - **Social** : bulles de chat au-dessus des têtes, émotes (`/danse`, `/salut`, `/rire`, `/joie`, `/colere`, `/assis`), 12 hauts faits et leurs titres (touche K).
 - **Vie du port** : habitants et chats qui se promènent ; restes des monstres vaincus ; écume du ressac.

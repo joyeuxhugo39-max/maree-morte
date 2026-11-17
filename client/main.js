@@ -210,13 +210,6 @@ function onMsg(m) {
     case 'st': applyBuild(m, now); break;
     case 'stor': ui.openStorage(m.items); break;
     case 'treasure': G.treasure = m.x == null ? null : { x: m.x, y: m.y }; ui.renderTracker(); break;
-    case 'evt': {
-      const was = G.evt && G.evt.state === 'on';
-      G.evt = m.e;
-      if (!was && m.e && m.e.state === 'on') { ui.banner('La Marée Morte', 'Les noyés attaquent la plage du port !'); G.sfx.play('horn'); }
-      ui.renderTracker();
-      break;
-    }
     case 'ach': {
       G.ach = m.ach || G.ach;
       const a = ACHIEVEMENTS[m.id];
@@ -274,7 +267,7 @@ function start(m, now) {
   G.myId = m.id; G.me = m.me; G.meAt = now;
   G.inv = m.inv; G.eq = m.eq; G.quests = m.q; G.chests = m.chests || {}; G.base = m.base;
   G.refreshNpcs && (G.me = m.me, G.refreshNpcs());
-  G.ach = m.ach || {}; G.treasure = m.treasure || null; G.evt = m.evt || null;
+  G.ach = m.ach || {}; G.treasure = m.treasure || null;
   G.structs.clear(); G.floors.clear(); G.bases = []; G.world.block.fill(0); G.world.doorOwner.clear();
   G.myKey = String(m.name).toLowerCase(); G.room = m.room == null ? -1 : m.room; G.lastRoom = -99; G.found = new Set(m.found || []); G.track = m.tr || [];
   if (m.build) applyBuild({ a: m.build.s, af: m.build.f, b: m.build.b }, now);
@@ -782,7 +775,6 @@ function computeObjective() { return outside(computeObjective0()); }
 function computeObjective0() {
   const p = G.player;
   if (!p) return null;
-  if (G.evt && G.evt.state === 'on') return { x: G.evt.x, y: G.evt.y, label: 'Invasion', col: '#ff6a5a' };
   if (G.treasure) return { x: G.treasure.x, y: G.treasure.y, label: 'Trésor', col: '#ff6a5a' };
   const npcAt = (id) => G.npcs.find((n) => n.id === id) || G.allNpcs.find((n) => n.id === id);
   const tracked = (G.track || []).filter((q) => G.quests && G.quests[q] && G.quests[q].s === 'active');
@@ -829,7 +821,6 @@ function ambience(now) {
   if (G.zone === Z.LIBERTALIA || (G.zone === Z.BASFONDS && !G.night)) theme = 'cite'; // 0.8 : la cité ne dort jamais
   if (G.zone === Z.INTERIOR && G.room >= 0) { const d = G.world.doors.find((q) => q.room === G.room); if (d && zoneAt(G.world, d.ox, d.oy) === Z.LIBERTALIA) theme = 'cite'; }
   if (p.boat) theme = now < G.seaFight ? 'naval' : 'sea';
-  if (G.evt && G.evt.state === 'on' && Math.hypot(G.evt.x - p.x, G.evt.y - p.y) < 420) theme = 'boss';
   for (const e of G.ents.values()) if (e.k === 'm' && !e.dyingT && MOBS[e.type] && MOBS[e.type].ai && !MOBS[e.type].sea && Math.hypot(e.x - p.x, e.y - p.y) < 280) G.epicUntil = now + 6;
   if (G.night && isFullMoon(G.worldTime)) for (const e of G.ents.values()) if (e.horde && !e.dyingT && Math.hypot(e.x - p.x, e.y - p.y) < 300) { G.epicUntil = now + 8; break; }
   for (const e of G.ents.values()) if (e.k === 'm' && !e.dyingT && MOBS[e.type] && MOBS[e.type].ship && Math.hypot(e.x - p.x, e.y - p.y) < 420) G.seaFight = Math.max(G.seaFight || 0, now + 6);

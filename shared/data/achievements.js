@@ -8,7 +8,7 @@ export const ACHIEVEMENTS = {
   niveau10: { name: 'Vieux loup', desc: 'Atteindre le niveau 10.', title: 'Vieux loup de mer' },
   elite: { name: 'Tueur de géants', desc: 'Vaincre une créature d’élite.', title: 'Tueur de géants' },
   boss: { name: 'Briseur de malédiction', desc: 'Vaincre le Capitaine Barbe-Cendre.', title: 'Briseur de malédiction' },
-  invasion: { name: 'Défenseur du port', desc: 'Repousser la Marée Morte.', title: 'Défenseur de Port-Lanterne' },
+  invasion: { name: 'Défenseur du port', desc: 'Repousser la Marée Morte (ancienne invasion, retirée en 0.9).', title: 'Défenseur de Port-Lanterne', legacy: 1 },
   peche: { name: 'Loup de mer', desc: 'Pêcher votre premier poisson.', title: 'Pêcheur' },
   espadon: { name: 'Prise légendaire', desc: 'Pêcher un espadon.', title: 'Maître pêcheur' },
   tresor: { name: 'Chasseur de trésor', desc: 'Déterrer un trésor.', title: 'Chasseur de trésor' },

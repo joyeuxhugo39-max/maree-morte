@@ -3,7 +3,22 @@
 import {
   TILE, TICK_RATE, AOI_X, AOI_Y, INV_SIZE, SLOTS, DAY_LENGTH, ROLL_TIME, ROLL_SPEED,
   INTERACT_RANGE, PICKUP_RANGE, T, dayFrac, isNight, weatherAt, DAY_LENGTH as DAYLEN, isFullMoon,
+  SAVE_VERSION, PROTOCOL, GAME_VERSION,
 } from '../shared/constants.js';
+// 1.0 : migrations des sauvegardes — chaque étape amène une sauvegarde d'une version à la suivante.
+// Une sauvegarde sans numéro date d'avant la 1.0 (version 8). Rien n'est jamais retiré : ce que ce
+// serveur ne connaît pas est conservé tel quel et réécrit à l'identique.
+const MIGRATIONS = {
+  8: (d) => { d.sv = 10; return d; }, // 0.8 → 1.0 : mêmes champs, de nouveaux s'ajoutent avec des valeurs par défaut
+};
+export function migrateSave(d) {
+  if (!d || typeof d !== 'object') return d;
+  let v = d.sv | 0 || 8, guard = 0;
+  while (v < SAVE_VERSION && guard++ < 50) { const step = MIGRATIONS[v]; if (!step) { d.sv = SAVE_VERSION; break; } d = step(d) || d; v = d.sv | 0; }
+  return d;
+}
+// les champs qu'écrit serialize() : tout autre champ d'une sauvegarde est conservé à part
+const SAVE_KEYS = new Set(['name', 'look', 'level', 'xp', 'gold', 'hp', 'inv', 'eq', 'quests', 'track', 'chests', 'x', 'y', 'kills', 'upg', 'treasure', 'ach', 'title', 'cnt', 'respawnAt', 'found', 'boat', 'pk', 'caches', 'zs', 'pet', 'home', 'base', 'saved', 'sv', 'held']);
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { STRUCTS, PLANTER_GROW, HOME_OK, HOME_MAX, HOME_PRICE, QUEST_PICK } from '../shared/data/craft.js';
 import { LEGACY_VALUE, LEGACY_STRUCT, QUEST_ITEM_OLD_VALUE } from '../shared/data/legacy.js';
@@ -60,7 +75,6 @@ const segDist = (px, py, x0, y0, x1, y1) => {
   const t = L ? Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / L)) : 0;
   return Math.hypot(px - (x0 + dx * t), py - (y0 + dy * t));
 };
-const INV_WAVES = [[['zsailor', 6], ['crab', 3]], [['drowned', 5], ['buccaneer', 3]], [['capitaine_noye', 1], ['drowned', 3], ['zsailor', 3]]];
 
 export class Game {
   constructor({ storage, log = console.log, seed = 7, solo = false }) {
@@ -107,9 +121,6 @@ export class Game {
       if (ok) this.digSpots.push([x * TILE + 8, y * TILE + 10]);
     }
     // point d'arrivée de la Marée Morte : la plage au sud-ouest du port
-    this.invCenter = { x: 124 * TILE + 8, y: 110 * TILE + 8 };
-    for (let r = 0; r < 12; r++) { let found = false; for (let a = 0; a < 16 && !found; a++) { const x = 124 * TILE + Math.cos(a / 16 * 6.28) * r * TILE, y = 111 * TILE + Math.sin(a / 16 * 6.28) * r * TILE; if (canStand(W, x, y, true) && tileAt(W, x, y) === T.SAND) { this.invCenter = { x, y }; found = true; } } if (found) break; }
-    this.invasion = null; this.invNight = -1;
     // artisanat et bases
     this.depleted = new Map();
     this.homes = new Map(); this.plotByRoom = new Map(this.world.plots.map((pl) => [pl.room, pl.k])); this.seals = Object.fromEntries((this.world.seals || []).map((s) => [s.id, 0]));
@@ -209,7 +220,11 @@ export class Game {
     s.pending = false;
     if (!this.sessions.has(conn)) return;
     if (!res.ok) return conn.send({ t: 'err', msg: res.err || 'Mot de passe incorrect.' });
-    let data = res.data;
+    if (res.data && (res.data.sv | 0) > SAVE_VERSION) { // jamais d'écrasement par une version plus ancienne
+      this.log(`[sauvegarde] ${name} : sauvegarde v${res.data.sv} plus récente que le serveur (v${SAVE_VERSION}), connexion refusée`);
+      return conn.send({ t: 'err', msg: 'Ce pirate a été sauvegardé par une version plus récente du jeu. Revenez quand le serveur sera à jour.' });
+    }
+    let data = migrateSave(res.data);
     for (const other of [...this.players.values()]) {
       if (other.key !== key) continue;
       data = this.serialize(other); // l'état vivant est plus récent que la sauvegarde
@@ -229,7 +244,7 @@ export class Game {
     this.send(p, {
       t: 'welcome', id: p.id, seed: this.world.seed, wt: this.worldTime, solo: this.solo,
       me: this.meState(p), inv: p.inv, eq: p.eq, q: p.quests, tr: p.track || [], chests: p.chests, look: p.look, base: p.base,
-      name: p.name, x: p.x, y: p.y, isNew: !res.data, ach: p.ach, treasure: p.treasure, evt: this.invasionState(),
+      name: p.name, x: p.x, y: p.y, isNew: !res.data, ach: p.ach, treasure: p.treasure,
       history: (this.chatLog || []).slice(-12),
       build: this.buildSnapshot(p.key), dep: [...this.depleted].filter(([, t]) => t > this.time).map(([id, t]) => [id, Math.round(t - this.time)]),
       respawnAt: p.respawnAt, found: [...p.found], boat: p.boat, room: p.room,
@@ -256,13 +271,20 @@ export class Game {
       upg: {}, treasure: null, ach: {}, title: null, cnt: { crab: 0, fish: 0, ships: 0, horde: 0, dice: 0 }, zs: new Set(), fishing: null, respawnAt: null,
       found: new Set(), boat: null, room: -1, pk: 0, pvpLog: new Map(), caches: {}, pet: null, burgle: null, thiefUntil: 0, robbed: {},
     };
+    p.held = []; p.heldQ = {}; p.heldA = {}; p.heldF = {}; // 1.0 : ce que ce serveur ne connaît pas, gardé intact
     if (d) {
+      for (const k in d) if (!SAVE_KEYS.has(k)) p.heldF[k] = d[k];
+      if (Array.isArray(d.held)) for (const it of d.held) if (it && typeof it.id === 'string') p.held.push({ id: it.id, n: Math.max(1, it.n | 0) });
+      if (d.quests && typeof d.quests === 'object') for (const q in d.quests) if (!QUESTS[q]) p.heldQ[q] = d.quests[q];
+      if (d.ach && typeof d.ach === 'object') for (const k in d.ach) if (!ACHIEVEMENTS[k]) p.heldA[k] = d.ach[k];
+      if (d.eq) for (const s in d.eq) if (d.eq[s] && !ITEMS[d.eq[s]] && !LEGACY_VALUE[d.eq[s]]) p.held.push({ id: d.eq[s], n: 1 });
       p.level = Math.max(1, Math.min(MAX_LEVEL, d.level | 0 || 1));
       p.xp = Math.max(0, d.xp | 0); p.gold = Math.max(0, d.gold | 0);
       if (Array.isArray(d.inv)) for (let i = 0; i < INV_SIZE; i++) {
         const it = d.inv[i];
         p.inv[i] = it && ITEMS[it.id] ? { id: it.id, n: Math.max(1, Math.min(STACK_MAX, it.n | 0)) } : null;
         if (it && !ITEMS[it.id] && LEGACY_VALUE[it.id]) p.legacyGold = (p.legacyGold || 0) + LEGACY_VALUE[it.id] * Math.max(1, it.n | 0); // 0.8 : matériaux et outils revendus
+        else if (it && it.id && !ITEMS[it.id]) p.held.push({ id: String(it.id), n: Math.max(1, it.n | 0) }); // inconnu ici : mis de côté, pas perdu
       }
       if (d.eq) for (const s of SLOTS) p.eq[s] = d.eq[s] && ITEMS[d.eq[s]] && ITEMS[d.eq[s]].slot === s ? d.eq[s] : null;
       if (d.quests && typeof d.quests === 'object') for (const q in d.quests) if (QUESTS[q]) p.quests[q] = { s: d.quests[q].s === 'done' ? 'done' : 'active', p: Array.isArray(d.quests[q].p) ? d.quests[q].p.map((v) => v | 0) : [], t: +d.quests[q].t || 0 };
@@ -290,6 +312,8 @@ export class Game {
     } else {
       this.addItem(p, 'banane', 3);
     }
+    // ce qui était mis de côté et que ce serveur connaît désormais revient dans le sac
+    p.held = p.held.filter((it) => !(ITEMS[it.id] && this.addItem(p, it.id, it.n) === 0));
     this.recalc(p);
     p.hp = d && d.hp > 0 ? Math.min(p.stats.maxHp, d.hp) : p.stats.maxHp;
     p.en = p.stats.maxEn;
@@ -313,7 +337,7 @@ export class Game {
     this.applyRefund(p);
   }
   serialize(p) {
-    return { name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: p.quests, track: p.track || [], chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: p.ach, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
+    return { ...(p.heldF || {}), sv: SAVE_VERSION, held: p.held || [], name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: { ...(p.heldQ || {}), ...p.quests }, track: p.track || [], chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: { ...(p.heldA || {}), ...p.ach }, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
   }
   save(p) {
     p.lastSave = this.time;
@@ -321,7 +345,11 @@ export class Game {
     if (p.dead) { data.x = this.world.spawnPoint.x; data.y = this.world.spawnPoint.y; data.hp = 0; }
     Promise.resolve(this.storage.save(p.key, data)).catch((e) => this.log('[sauvegarde] échec', p.name, e && e.message));
   }
-  saveAll() { for (const p of this.players.values()) this.save(p); if (this.worldPersist) Promise.resolve(this.storage.saveWorld(this.exportWorld())).catch(() => {}); }
+  saveAll() { // renvoie une promesse : l'arrêt du serveur attend la fin des écritures
+    for (const p of this.players.values()) this.save(p);
+    const w = this.worldPersist && !this.worldFrozen ? Promise.resolve(this.storage.saveWorld(this.exportWorld())).catch(() => {}) : Promise.resolve();
+    return Promise.all([w, this.storage.flush ? this.storage.flush() : null]);
+  }
 
   recalc(p) {
     p.stats = computeStats(p.level, p.eq, p.upg, !!p.riding, this.activeBuffs(p));
@@ -1189,7 +1217,6 @@ export class Game {
     if (m.grab) m.grab.dmg += amount;
     m.hp -= amount;
     m.tags.set(p.id, (m.tags.get(p.id) || 0) + amount);
-    if (m.event && this.invasion) this.invasion.parts.add(p.id);
     this.ev(m.x, m.y, dot ? ['dmg', m.id, amount, 0, p.id, dot] : ['dmg', m.id, amount, crit ? 1 : 0, p.id]);
     if (m.state !== 'chase') { m.state = 'chase'; m.target = p.id; }
     if (!m.boss && !m.def.ai && (kx || ky)) { const [nx, ny] = moveWithCollision(this.world, m.x, m.y, kx, ky, true); m.x = nx; m.y = ny; }
@@ -2182,7 +2209,7 @@ export class Game {
     p.ach[id] = Date.now();
     this.send(p, { t: 'ach', id, ach: p.ach });
     this.ev(p.x, p.y, ['ach', p.id]);
-    if (id === 'boss' || id === 'invasion' || id === 'espadon') this.broadcastChat(null, `🏆 ${p.name} obtient le haut fait « ${ACHIEVEMENTS[id].name} » !`, 'sys');
+    if (id === 'boss' || id === 'espadon') this.broadcastChat(null, `🏆 ${p.name} obtient le haut fait « ${ACHIEVEMENTS[id].name} » !`, 'sys');
   }
   setTitle(p, id) {
     if (id !== null && !p.ach[id]) return;
@@ -2259,72 +2286,6 @@ export class Game {
     this.toast(p, `${ITEMS[p.eq[slot]].name} renforcé à +${L + 1} !`, 'level');
     if (L + 1 >= 3) this.unlock(p, 'forge');
   }
-  // ------------------------------------------------------------ invasion de la Marée Morte
-  invasionState() {
-    const v = this.invasion;
-    if (!v) return null;
-    return { state: v.state, wave: v.wave + 1, total: INV_WAVES.length, left: v.mobs.filter((m) => m.state !== 'dead').length, x: Math.round(this.invCenter.x), y: Math.round(this.invCenter.y) };
-  }
-  broadcastEvt() { const st = this.invasionState(); for (const p of this.players.values()) this.send(p, { t: 'evt', e: st }); }
-  updateInvasion(f) {
-    const nightIdx = Math.floor(this.worldTime / DAYLEN);
-    const v = this.invasion;
-    if (!v) {
-      if (this.night && f > 0.7 && f < 0.8 && this.invNight !== nightIdx && this.players.size > 0) {
-        this.invNight = nightIdx;
-        this.invasion = { state: 'on', wave: -1, mobs: [], parts: new Set(), next: this.time + 3 };
-        this.broadcastChat(null, '🌊 La Marée Morte déferle sur la plage au sud-ouest du port ! Tous aux armes !', 'boss');
-        this.broadcastEvt();
-      }
-      return;
-    }
-    if (!this.night) { // l'aube : la marée se retire
-      for (const m of v.mobs) if (m.state !== 'dead') { m.state = 'dead'; this.ev(m.x, m.y, ['die', m.id]); }
-      this.broadcastChat(null, 'Le jour se lève : la Marée Morte se retire dans les profondeurs…', 'night');
-      this.invasion = null; this.broadcastEvt(); return;
-    }
-    const alive = v.mobs.filter((m) => m.state !== 'dead' && this.mobs.includes(m));
-    if (alive.length === 0 && this.time >= v.next) {
-      if (v.wave + 1 >= INV_WAVES.length) return this.winInvasion();
-      v.wave++;
-      v.mobs = [];
-      for (const [type, n] of INV_WAVES[v.wave]) for (let k = 0; k < n; k++) {
-        let x = this.invCenter.x, y = this.invCenter.y;
-        for (let tries = 0; tries < 12; tries++) {
-          const a = Math.random() * Math.PI * 2, r = rand(20, 80);
-          const tx = this.invCenter.x + Math.cos(a) * r, ty = this.invCenter.y + Math.sin(a) * r * 0.6;
-          if (canStand(this.world, tx, ty, true)) { x = tx; y = ty; break; }
-        }
-        const mob = this.addMob(type, x, y, true);
-        mob.event = true; mob.sx = this.invCenter.x; mob.sy = this.invCenter.y;
-        v.mobs.push(mob);
-        this.ev(x, y, ['fx', 'summon', x, y]);
-      }
-      v.next = this.time + 4;
-      this.broadcastChat(null, v.wave + 1 < INV_WAVES.length ? `Vague ${v.wave + 1}/${INV_WAVES.length} de la Marée Morte !` : 'Le Capitaine Noyé surgit des flots !', 'night');
-    } else if (alive.length && v.lastLeft !== alive.length) v.next = this.time + 4;
-    v.lastLeft = alive.length;
-    if (this.tickCount % 20 === 0) this.broadcastEvt();
-  }
-  winInvasion() {
-    const v = this.invasion;
-    const names = [];
-    for (const id of v.parts) {
-      const p = this.players.get(id);
-      if (!p) continue;
-      names.push(p.name);
-      p.gold += 90; p.dirtyMe = true;
-      this.giveXp(p, 260);
-      if (Math.random() < 0.2) this.giveOrDrop(p, 'ecaille_leviathan', 1);
-      this.giveOrDrop(p, 'rhum', 1);
-      this.toast(p, 'La Marée Morte est repoussée ! +260 XP, +90 doublons.', 'level');
-      this.unlock(p, 'invasion');
-    }
-    this.broadcastChat(null, `🏆 La Marée Morte est repoussée${names.length ? ' par ' + names.join(', ') : ''} ! Port-Lanterne est sauf.`, 'boss');
-    this.invasion = null;
-    this.broadcastEvt();
-  }
-
   // ------------------------------------------------------------ récolte
   bestTool(p, kind) { let t = 0; for (const s of p.inv) if (s && ITEMS[s.id].tool === kind) t = Math.max(t, ITEMS[s.id].tier || 1); return t; }
   broadcastAll(msg) { for (const q of this.players.values()) this.send(q, msg); }
@@ -2700,9 +2661,10 @@ export class Game {
     this.bases.delete(key);
     this.broadcastAll({ t: 'st', r, rb: [b.name] });
   }
-  exportWorld() { return { v: 2, bases: [], homes: [...this.homes.values()].map((h) => ({ ...this.exportHome(h.key), key: h.key, name: h.name })), refunds: [...this.refunds].map(([key, r]) => [key, r.gold, r.items]) }; }
+  exportWorld() { return { v: 2, sv: SAVE_VERSION, bases: [], homes: [...this.homes.values()].map((h) => ({ ...this.exportHome(h.key), key: h.key, name: h.name })), refunds: [...this.refunds].map(([key, r]) => [key, r.gold, r.items]) }; }
   importWorld(w) {
     if (!w) return;
+    if ((w.sv | 0) > SAVE_VERSION) { this.worldFrozen = true; this.log(`[monde] sauvegarde du monde v${w.sv} plus récente que le serveur : chargée en lecture seule, jamais écrasée`); }
     for (const b of w.bases || []) this.refundBase(b.key, b);
     for (const h of w.homes || []) this.importHome(h.key, h.name, h);
     for (const [key, gold, items] of w.refunds || []) this.addRefund(key, gold | 0, Array.isArray(items) ? items.filter((it) => it && ITEMS[it.id]) : []);
@@ -2743,7 +2705,6 @@ export class Game {
       if (p.fishing) this.updateFishing(p);
       if (p.gold >= 1000 && !p.ach.riche) this.unlock(p, 'riche');
     }
-    if (this.tickCount % 10 === 0) this.updateInvasion(f);
     if (this.tickCount % 10 === 0) { this.updateDots(); this.updateClouds(); }
     if (this.tickCount % 5 === 0) { this.updateSeals(); this.updateBurglars(); }
     if (this.tickCount % 10 === 0) this.updateKraken();
@@ -2754,7 +2715,7 @@ export class Game {
       for (const p of this.players.values()) this.send(p, { t: 'map', pl });
     }
     this.updateAllies();
-    if (this.worldPersist && this.worldDirty && this.time - this.lastWorldSave > 8) { this.worldDirty = false; this.lastWorldSave = this.time; Promise.resolve(this.storage.saveWorld(this.exportWorld())).catch(() => {}); }
+    if (this.worldPersist && !this.worldFrozen && this.worldDirty && this.time - this.lastWorldSave > 8) { this.worldDirty = false; this.lastWorldSave = this.time; Promise.resolve(this.storage.saveWorld(this.exportWorld())).catch(() => {}); }
     this.updateMobs();
     this.updateProjs();
     for (const [id, d] of this.drops) if (this.time > d.expire) this.drops.delete(id);

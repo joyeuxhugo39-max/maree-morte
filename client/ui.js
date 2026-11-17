@@ -179,7 +179,6 @@ export class UI {
       if (G.night) buffs.push(isFullMoon(G.worldTime) ? '🌕 Pleine lune : la Horde rôde' : '☾ Nuit');
       else if (isFullMoon(G.worldTime + 120)) buffs.push('🌕 Pleine lune ce soir');
       if (ZONES[G.zone] && ZONES[G.zone].hard) buffs.push('☠ Zone extrême');
-      if (G.evt && G.evt.state === 'on') buffs.push('🌊 Invasion !');
       const bh = buffs.map((b) => `<span class="buff">${esc(b)}</span>`).join('');
       if (bh !== this.lastBuffs) { $('buffs').innerHTML = bh; this.lastBuffs = bh; }
       this.updateHotbar(now);
@@ -535,7 +534,6 @@ export class UI {
   goalsDone(qid) { return this.goalProgress(qid).every(([a, b]) => a >= b); }
   renderTracker() {
     const G = this.G, html = [];
-    if (G.evt && G.evt.state === 'on') html.push(`<div class="track evt"><b>🌊 La Marée Morte attaque !</b><div>Vague ${Math.max(1, G.evt.wave)}/${G.evt.total} · ${G.evt.left} mort${G.evt.left > 1 ? 's' : ''} restant${G.evt.left > 1 ? 's' : ''}</div><div>Défendez la plage au sud-ouest du port.</div></div>`);
     if (G.treasure) html.push('<div class="track"><b>✗ Carte au trésor</b><div>Suivez la flèche et creusez sur la croix (E).</div></div>');
     const tracked = (G.track || []).filter((q) => G.quests && G.quests[q] && G.quests[q].s === 'active');
     const order = tracked.length ? tracked : QUEST_ORDER; // les quêtes suivies, sinon les premières en cours
@@ -549,7 +547,7 @@ export class UI {
       const next = QUEST_ORDER.find((q) => this.questStateOf(q) === 'available');
       if (next) html.push(`<div class="track"><b>Nouvelle quête disponible</b><div>${esc(NPCS[QUESTS[next].giver].name)} a du travail pour vous (!)</div></div>`);
     }
-    $('tracker').innerHTML = html.slice(0, tracked.length ? Math.max(tracked.length, 1) + (G.evt && G.evt.state === 'on' ? 1 : 0) + (G.treasure ? 1 : 0) : this.G.aide === 'complet' ? 3 : 1).join('');
+    $('tracker').innerHTML = html.slice(0, tracked.length ? Math.max(tracked.length, 1) + (G.treasure ? 1 : 0) : this.G.aide === 'complet' ? 3 : 1).join('');
     $('tracker').querySelectorAll('.track[data-q]').forEach((el) => (el.onclick = () => { this.show('quests'); this.renderQuests(el.dataset.q); }));
     if (this.open === 'quests') this.renderQuests();
   }
@@ -756,7 +754,8 @@ export class UI {
   renderAch() {
     const G = this.G, list = $('ach-list'), ach = G.ach || {}, me = G.me || {};
     const cur = me.title;
-    const total = Object.keys(ACHIEVEMENTS).length, got = Object.keys(ach).filter((k) => ACHIEVEMENTS[k]).length;
+    const shown = (k) => !ACHIEVEMENTS[k].legacy || ach[k]; // 0.9 : un haut fait retiré reste à qui l'a gagné
+    const total = Object.keys(ACHIEVEMENTS).filter(shown).length, got = Object.keys(ach).filter((k) => ACHIEVEMENTS[k]).length;
     $('ach-sum').innerHTML = `<b>${got} / ${total}</b> hauts faits · titre porté : <b>${cur && ACHIEVEMENTS[cur] ? esc(ACHIEVEMENTS[cur].title) : 'aucun'}</b><div class="bar"><i style="width:${Math.round(got / total * 100)}%"></i></div>`;
     if (cur) { const b = document.createElement('button'); b.className = 'chip'; b.textContent = 'Retirer le titre'; b.onclick = () => G.send({ t: 'title', id: null }); $('ach-sum').appendChild(b); }
     const cnt = me.cnt || {}, secrets = G.world.doors.filter((d) => d.secret).length;
@@ -777,7 +776,7 @@ export class UI {
     if (rest.length) CATS.push(['Autres', rest]);
     list.innerHTML = '';
     for (const [name, ids] of CATS) {
-      const ok = ids.filter((id) => ACHIEVEMENTS[id]);
+      const ok = ids.filter((id) => ACHIEVEMENTS[id] && shown(id));
       if (!ok.length) continue;
       const h = document.createElement('h4'); h.textContent = `${name} — ${ok.filter((id) => ach[id]).length}/${ok.length}`; list.appendChild(h);
       for (const id of ok) {
@@ -967,7 +966,6 @@ export class UI {
     for (const n of G.npcs) { if (n.y >= OVER_H * TILE) continue; const mk = G.npcMarker(n.id); dot(n.x, n.y, mk ? '#ffd23a' : '#e8d8b0', mk ? 3 : 2); }
     if (G.objective) dot(G.objective.x, G.objective.y, '#ffd23a', 4);
     if (G.treasure) { dot(G.treasure.x, G.treasure.y, '#ff2a2a', 4); }
-    if (G.evt && G.evt.state === 'on') dot(G.evt.x, G.evt.y, '#ff6a2a', 6);
     x.fillStyle = '#000'; x.fillRect(c.width / 2 - 2, c.height / 2 - 2, 5, 5);
     x.fillStyle = '#fff'; x.fillRect(c.width / 2 - 1, c.height / 2 - 1, 3, 3);
   }
@@ -1034,7 +1032,6 @@ export class UI {
     }
     if (G.treasure) { const tx = G.treasure.x / TILE * S, ty = G.treasure.y / TILE * S; x.strokeStyle = '#d82a2a'; x.lineWidth = 3; x.beginPath(); x.moveTo(tx - 6, ty - 6); x.lineTo(tx + 6, ty + 6); x.moveTo(tx + 6, ty - 6); x.lineTo(tx - 6, ty + 6); x.stroke(); }
     if (G.objective) { x.fillStyle = '#ffd23a'; x.beginPath(); x.arc(G.objective.x / TILE * S, G.objective.y / TILE * S, 5, 0, 6.3); x.fill(); x.strokeStyle = '#1c1426'; x.lineWidth = 2; x.stroke(); }
-    if (G.evt && G.evt.state === 'on') { x.strokeStyle = '#ff5a2a'; x.lineWidth = 3; x.beginPath(); x.arc(G.evt.x / TILE * S, G.evt.y / TILE * S, 14, 0, 6.3); x.stroke(); }
     const at = this.mapPos();
     if (G.player) {
       const px = at.x / TILE * S, py = at.y / TILE * S;
