@@ -19,21 +19,21 @@ export const arena = {
   arenaInit() {
     this.fosseRoom = this.world.rooms.findIndex((r) => r.kind === 'fosse');
     this.arenaRun = null; this.duel = null;
-    this.board = { week: weekKey(Date.now()), top: {}, last: [] };
-    if (this.storage && this.storage.loadMeta) Promise.resolve(this.storage.loadMeta('arene')).then((b) => { if (b && b.top) this.board = b; this.boardRoll(); }).catch(() => {});
+    this.fosseBoard = { week: weekKey(Date.now()), top: {}, last: [] };
+    if (this.storage && this.storage.loadMeta) Promise.resolve(this.storage.loadMeta('arene')).then((b) => { if (b && b.top) this.fosseBoard = b; this.boardRoll(); }).catch(() => {});
   },
-  storeBoard() { if (this.storage.saveMeta) Promise.resolve(this.storage.saveMeta('arene', this.board)).catch(() => {}); },
+  storeBoard() { if (this.storage.saveMeta) Promise.resolve(this.storage.saveMeta('arene', this.fosseBoard)).catch(() => {}); },
   // une nouvelle semaine : on retient le podium, le premier est sacré Champion de la Fosse
   boardRoll() {
     const wk = weekKey(Date.now());
-    if (this.board.week === wk) return;
-    const podium = Object.entries(this.board.top).sort((a, b) => b[1].w - a[1].w || a[1].t - b[1].t).slice(0, 3);
-    this.board = { week: wk, top: {}, last: podium.map(([k, v]) => [k, v.n, v.w]), champ: podium.length ? podium[0][0] : null };
+    if (this.fosseBoard.week === wk) return;
+    const podium = Object.entries(this.fosseBoard.top).sort((a, b) => b[1].w - a[1].w || a[1].t - b[1].t).slice(0, 3);
+    this.fosseBoard = { week: wk, top: {}, last: podium.map(([k, v]) => [k, v.n, v.w]), champ: podium.length ? podium[0][0] : null };
     for (const q of this.players.values()) if (podium.length && q.key === podium[0][0]) this.unlock(q, 'champion_fosse');
     if (podium.length) this.broadcastChat(null, `🏆 Nouvelle semaine à la Fosse ! Le champion de la semaine passée : ${podium[0][1].n} (vague ${podium[0][1].w}).`, 'boss');
     this.storeBoard();
   },
-  boardTop() { return Object.values(this.board.top).sort((a, b) => b.w - a.w || a.t - b.t).slice(0, 15).map((v) => [v.n, v.w]); },
+  boardTop() { return Object.values(this.fosseBoard.top).sort((a, b) => b.w - a.w || a.t - b.t).slice(0, 15).map((v) => [v.n, v.w]); },
   inFosse(p) { return p && p.room === this.fosseRoom && this.fosseRoom >= 0; },
   fosseRect() { const r = this.world.rooms[this.fosseRoom]; return r; },
   floorSpot(fx, fy) { // un point du sol de la Fosse (fx, fy entre 0 et 1)
@@ -47,7 +47,7 @@ export const arena = {
     this.boardRoll();
     switch (a) {
       case 'waves': return this.arenaStart(p);
-      case 'board': return this.send(p, { t: 'arena', board: this.boardTop(), week: this.board.week, last: this.board.last, champ: this.board.champ === p.key });
+      case 'board': return this.send(p, { t: 'arena', board: this.boardTop(), week: this.fosseBoard.week, last: this.fosseBoard.last, champ: this.fosseBoard.champ === p.key });
       case 'duel': return this.duelAsk(p, String(m.name || ''), Math.max(0, Math.min(5000, m.bet | 0)));
       case 'accept': return this.duelAccept(p);
       case 'decline': { const c = p.duelAsk && this.players.get(p.duelAsk.from); p.duelAsk = null; if (c) this.toast(c, `${p.name} refuse le duel.`, 'info'); return; }
@@ -108,10 +108,10 @@ export const arena = {
       const gold = Math.round(done * done * 12 + done * 30 * Math.max(1, q.level / 10));
       if (gold) { q.gold += gold; q.dirtyMe = true; }
       if (done) this.giveXp(q, done * 25 * q.level);
-      const best = this.board.top[q.key];
-      if (!best || done > best.w) { this.board.top[q.key] = { n: q.name, w: done, t: Math.round(this.time - r.start) }; }
+      const best = this.fosseBoard.top[q.key];
+      if (!best || done > best.w) { this.fosseBoard.top[q.key] = { n: q.name, w: done, t: Math.round(this.time - r.start) }; }
       if (done >= 10) this.unlock(q, 'gladiateur');
-      this.toast(q, `La Fosse vous acclame : ${done} vague${done > 1 ? 's' : ''} tenue${done > 1 ? 's' : ''}${gold ? `, +${gold} doublons` : ''}. Meilleur score de la semaine : ${this.board.top[q.key].w}.`, 'quest');
+      this.toast(q, `La Fosse vous acclame : ${done} vague${done > 1 ? 's' : ''} tenue${done > 1 ? 's' : ''}${gold ? `, +${gold} doublons` : ''}. Meilleur score de la semaine : ${this.fosseBoard.top[q.key].w}.`, 'quest');
     }
     this.storeBoard();
     this.broadcastRoom(`🏆 Fin du combat : ${done} vague${done > 1 ? 's' : ''}.`);

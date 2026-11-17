@@ -306,7 +306,7 @@ export class Game {
     this.socialLogin(p);
     this.justiceLogin(p);
     if (this.wevt) this.pushEvent(p);
-    if (this.board && this.board.champ === p.key) this.unlock(p, 'champion_fosse');
+    if (this.fosseBoard && this.fosseBoard.champ === p.key) this.unlock(p, 'champion_fosse');
     if (!res.data) this.toast(p, 'Bienvenue ! Parlez à la Capitaine Morgane, près des quais (touche E).', 'quest');
     this.log(`[jeu] ${p.name} connecté (${this.players.size} en ligne)`);
   }
