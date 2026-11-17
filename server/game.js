@@ -21,7 +21,7 @@ export function migrateSave(d) {
   return d;
 }
 // les champs qu'écrit serialize() : tout autre champ d'une sauvegarde est conservé à part
-const SAVE_KEYS = new Set(['songs', 'rep', 'inf', 'jail', 'hon', 'pvph', 'glory', 'gxp', 'friends', 'blocked', 'tradeLog', 'seen', 'st', 'kc', 'met', 'col', 'tut', 'name', 'look', 'level', 'xp', 'gold', 'hp', 'inv', 'eq', 'quests', 'track', 'chests', 'x', 'y', 'kills', 'upg', 'treasure', 'ach', 'title', 'cnt', 'respawnAt', 'found', 'boat', 'pk', 'caches', 'zs', 'pet', 'home', 'base', 'saved', 'sv', 'held']);
+const SAVE_KEYS = new Set(['mem', 'songs', 'rep', 'inf', 'jail', 'hon', 'pvph', 'glory', 'gxp', 'friends', 'blocked', 'tradeLog', 'seen', 'st', 'kc', 'met', 'col', 'tut', 'name', 'look', 'level', 'xp', 'gold', 'hp', 'inv', 'eq', 'quests', 'track', 'chests', 'x', 'y', 'kills', 'upg', 'treasure', 'ach', 'title', 'cnt', 'respawnAt', 'found', 'boat', 'pk', 'caches', 'zs', 'pet', 'home', 'base', 'saved', 'sv', 'held']);
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { STRUCTS, PLANTER_GROW, HOME_OK, HOME_MAX, HOME_PRICE, QUEST_PICK, PROPERTY, HOME_LIMIT, RESALE, plotCategory } from '../shared/data/craft.js';
 import { social } from './social.js';
@@ -29,6 +29,7 @@ import { justice, SHIELD_AFTER_DEATH } from './justice.js';
 import { events } from './events.js';
 import { arena } from './arena.js';
 import { tavern } from './tavern.js';
+import { MEM_KEYS } from '../shared/data/scenes.js';
 import { repLevel, buyPrice, sellPrice } from '../shared/data/places.js';
 import { LEGACY_VALUE, LEGACY_STRUCT, QUEST_ITEM_OLD_VALUE } from '../shared/data/legacy.js';
 import { generateWorld, canStand, moveWithCollision, moveBoat, zoneAt, tileAt, blocksShot, canSail, roomIdAt, Z, ZONES, SAFE } from '../shared/world.js';
@@ -221,6 +222,7 @@ export class Game {
       case 'bail': return this.bail(p);
       case 'arena': return this.arenaAction(p, String(m.a), m);
       case 'tav': return this.tavernAction(p, String(m.a), m);
+      case 'mem': { const k = String(m.k); if (MEM_KEYS.has(k) && p.mem.size < 200) p.mem.add(k); return; }
       case 'song': { const k = String(m.k), s = HOUSE_MUSIC.find(([x]) => x && x === k); if (!s || p.songs.has(k)) return; p.songs.add(k); p.dirtyMe = true; const n = HOUSE_MUSIC.length - 1; if (p.songs.size >= n) this.unlock(p, 'melomane'); return this.toast(p, `♪ Nouvel air noté dans votre carnet : « ${s[1]} » (${p.songs.size}/${n}). La boîte à musique de votre maison saura le jouer.`, 'quest'); }
       case 'ladder': return this.send(p, { t: 'ladder', top: this.ladderTop(), hist: p.pvpHist, me: [p.honor | 0, Math.floor(p.infamy || 0)] });
       case 'respawn': return this.respawn(p);
@@ -303,7 +305,7 @@ export class Game {
       history: (this.chatLog || []).slice(-12),
       build: this.buildSnapshot(p.key), dep: [...this.depleted].filter(([, t]) => t > this.time).map(([id, t]) => [id, Math.round(t - this.time)]),
       respawnAt: p.respawnAt, found: [...p.found], boat: p.boat, room: p.room,
-      kr: this.kraken ? 1 : 0, homes: this.homesList(), seals: Object.fromEntries(Object.entries(this.seals).map(([k, v]) => [k, Math.max(0, Math.round(v - this.time))])), pet: p.pet,
+      kr: this.kraken ? 1 : 0, mem: [...p.mem], homes: this.homesList(), seals: Object.fromEntries(Object.entries(this.seals).map(([k, v]) => [k, Math.max(0, Math.round(v - this.time))])), pet: p.pet,
     });
     this.broadcastChat(null, `${p.name} accoste à Port-Lanterne.`, 'sys');
     this.socialLogin(p);
@@ -425,6 +427,7 @@ export class Game {
     p.tut = d ? (d.tut == null ? 99 : d.tut | 0) : 0; // tutoriel : les anciens pirates le connaissent déjà
     this.socialLoad(p, d);
     this.justiceLoad(p, d);
+    p.mem = new Set(d && Array.isArray(d.mem) ? d.mem.filter((k) => MEM_KEYS.has(k)) : []); // 1.0 : les choix qui comptent
     p.songs = new Set(['day', ...(d && Array.isArray(d.songs) ? d.songs.filter((k) => HOUSE_MUSIC.some(([x]) => x && x === k)) : [])]);
     if (d) {
       for (const k in d) if (!SAVE_KEYS.has(k)) p.heldF[k] = d[k];
@@ -494,7 +497,7 @@ export class Game {
     this.applyRefund(p);
   }
   serialize(p) {
-    return { ...(p.heldF || {}), ...this.socialSave(p), ...this.justiceSave(p), songs: [...(p.songs || [])], sv: SAVE_VERSION, held: p.held || [], seen: p.seen ? b64(p.seen) : undefined, st: p.st, kc: p.kc, met: p.met ? [...p.met] : [], col: p.col ? [...p.col] : [], tut: p.tut, name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: { ...(p.heldQ || {}), ...p.quests }, track: p.track || [], chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: { ...(p.heldA || {}), ...p.ach }, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
+    return { ...(p.heldF || {}), ...this.socialSave(p), ...this.justiceSave(p), songs: [...(p.songs || [])], mem: [...(p.mem || [])], sv: SAVE_VERSION, held: p.held || [], seen: p.seen ? b64(p.seen) : undefined, st: p.st, kc: p.kc, met: p.met ? [...p.met] : [], col: p.col ? [...p.col] : [], tut: p.tut, name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: { ...(p.heldQ || {}), ...p.quests }, track: p.track || [], chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: { ...(p.heldA || {}), ...p.ach }, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
   }
   save(p) {
     p.lastSave = this.time;

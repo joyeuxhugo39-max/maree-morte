@@ -68,6 +68,7 @@ export class Scene {
       if (this.aborted) throw ABORT;
       if (Array.isArray(s)) await this.line(s[0], s[1]);
       else if (s && s.ask) await this.ask(s);
+      else if (s && s.choose) await this.choose(s);
     }
   }
   async ask(s) {
@@ -81,6 +82,14 @@ export class Scene {
       await this.line('me', s.ask[pick.k].q, true);
       await this.seq(s.ask[pick.k].a);
     }
+  }
+  // 1.0 : un choix qui compte — le pirate s'en souviendra, et les personnages aussi
+  async choose(s) {
+    const pick = await this.menu(s.choose.map((c, k) => ({ label: c.q, k, cls: 'go' })), true);
+    const c = s.choose[pick.k];
+    if (c.mem) { (this.G.mem || (this.G.mem = new Set())).add(c.mem); this.G.send({ t: 'mem', k: c.mem }); }
+    await this.line('me', c.q, true);
+    await this.seq(c.a);
   }
   // une réplique : portrait actif, nom, texte tapé avec la voix du personnage ; clic / Espace pour finir puis continuer
   line(who, text, quick = false) {

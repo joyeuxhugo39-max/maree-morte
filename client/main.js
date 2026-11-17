@@ -311,7 +311,7 @@ function onMsg(m) {
 function start(m, now) {
   const again = !!G.player;
   G.ents.clear(); G.renderer.projs.clear(); G.renderer.bombs.length = 0; G.renderer.teles.length = 0;
-  G.myId = m.id; G.me = m.me; G.meAt = now;
+  G.myId = m.id; G.me = m.me; G.meAt = now; G.mem = new Set(m.mem || []);
   G.inv = m.inv; G.eq = m.eq; G.quests = m.q; G.chests = m.chests || {}; G.base = m.base;
   G.ui.setSeen(m.seen); // 1.0 : la brume de la carte
   G.codex = m.codex || G.codex; G.tut = m.tut == null ? 99 : m.tut;

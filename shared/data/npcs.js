@@ -1,3 +1,4 @@
+import { REMEMBER } from './scenes.js';
 // Personnages non-joueurs de Port-Lanterne et de Havre-des-Brumes.
 export const NPCS = {
   morgane: {
@@ -338,3 +339,5 @@ Object.assign(NPCS, {
 });
 for (const id of ['passeur', 'passeur_havre', 'passeur_rade', 'passeur_anse']) NPCS[id].shop.push('billet_libertalia');
 NPCS.passeur.shop.push('radeau', 'ane');
+// 1.0 : ce dont chacun se souvient de vous (voir scenes.js)
+for (const [id, lines] of Object.entries(REMEMBER)) if (NPCS[id]) NPCS[id].remember = lines;

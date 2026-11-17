@@ -709,9 +709,20 @@ export class UI {
       this.G.sfx.play(m.gain > 0 ? 'coin' : 'deny');
     }, wait);
   }
+  // 1.0 : ce dont un personnage se souvient — vos quêtes, vos choix, vos exploits
+  memoryLine(npcId) {
+    const G = this.G, N = NPCS[npcId];
+    for (const [c, line] of N.remember || []) {
+      const [k, v] = [c.slice(0, 1), c.slice(2)];
+      const ok = k === 'q' ? this.questStateOf(v) === 'done' : k === 'm' ? !!(G.mem && G.mem.has(v)) : k === 'a' ? !!(G.ach && G.ach[v]) : false;
+      if (ok) return line.replace(/\{nom\}/g, G.player ? G.player.name : '');
+    }
+    return null;
+  }
   dialogMain(npcId) {
     const G = this.G, N = NPCS[npcId];
-    const greet = N.greet[Math.floor(Math.random() * N.greet.length)];
+    const mem = this.memoryLine(npcId);
+    const greet = mem && Math.random() < 0.7 ? mem : N.greet[Math.floor(Math.random() * N.greet.length)];
     const ch = [];
     for (const qid of QUEST_ORDER) {
       const q = QUESTS[qid], s = this.questStateOf(qid);

@@ -1,6 +1,7 @@
 // Quêtes. Objectifs : kill {mob,n} | collect {item,n} | talk {npc} | explore {zone} | act {act,n} (0.8 : une action, ex. gagner aux dés)
 // requires : quêtes à terminer avant ; level : niveau minimum conseillé.
 import { Z } from '../world.js';
+import { OLD_SCENES } from './scenes.js';
 
 export const QUESTS = {
   premier_pas: {
@@ -711,3 +712,5 @@ export function goalsMet(qid, st, countItem) {
     return (st.p[i] || 0) >= need;
   });
 }
+// 1.0 : les anciennes quêtes ont, elles aussi, de vraies conversations (voir scenes.js)
+for (const [k, v] of Object.entries(OLD_SCENES)) if (QUESTS[k]) { if (!QUESTS[k].scene && v.scene) QUESTS[k].scene = v.scene; if (!QUESTS[k].sceneDone && v.sceneDone) QUESTS[k].sceneDone = v.sceneDone; }
