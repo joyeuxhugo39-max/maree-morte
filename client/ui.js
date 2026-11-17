@@ -15,6 +15,7 @@ import { slotFrameURL, plankURL, mouseURL, lockURL } from './render/ui-art.js';
 import { humanSheet, SKINS, HAIRS, CLOTH, CLOTH_KEYS, FW, FH, mobSheet, portraitOf } from './render/sprites-chars.js';
 import { MINI_COL } from './render/terrain.js';
 import { social } from './social-ui.js';
+import { tavernUI } from './tavern-ui.js';
 import { PLACES, REP_LEVELS, repLevel, placeOf, buyPrice, sellPrice, taxOf, discountOf } from '../shared/data/places.js';
 
 const $ = (id) => document.getElementById(id);
@@ -137,6 +138,7 @@ export class UI {
     this.closeMenus();
     if (this.open) $('panel-' + this.open).classList.add('hidden');
     if (this.open === 'shop') this.shopNpc = null;
+    if (this.open === 'tavern') { this.tavNpc = null; this.arm = null; }
     if (this.open === 'storage') { $('panel-inventory').classList.add('hidden'); $('panel-inventory').style.transform = ''; $('panel-storage').style.transform = ''; this.storageOpen = false; }
     this.open = null; this.sel = -1;
     $('tooltip').classList.add('hidden');
@@ -186,7 +188,7 @@ export class UI {
       if (G.zone === Z.TOWN) buffs.push('🔥 Flamme Bénite');
       if (G.player && G.player.boat) buffs.push('⛵ ' + ((ITEMS[G.player.boat] && ITEMS[G.player.boat].name) || 'Barque'));
       if (me.ride) buffs.push('🐎 En selle (C pour descendre)');
-      const BN = { spd: '💨 Célérité', atk: '💪 Force du taureau', def: '🛡 Tonique de fer' };
+      const BN = { spd: '💨 Célérité', atk: '💪 Force du taureau', def: '🛡 Tonique de fer', chant: '🎶 Entrain' };
       for (const [k, s] of me.bf || []) { const left = Math.max(0, Math.ceil(s - (now - G.meAt))); if (left > 0) buffs.push(`${BN[k] || k} ${left}s`); }
       if (me.rc > 0) buffs.push(`🐚 Rappel… ${Math.max(0, me.rc - (now - G.meAt)).toFixed(1)}s`);
       if (now < (G.spyUntil || 0)) buffs.push(`🔭 Longue-vue ${Math.ceil(G.spyUntil - now)}s`);
@@ -729,6 +731,11 @@ export class UI {
     }
     if (N.shop) ch.push({ label: '🛒 Voir la marchandise', go: () => this.openShop(npcId) });
     if (N.dice) ch.push({ label: '🎲 Jouer aux dés', cls: 'q', go: () => this.diceMenu(npcId) });
+    const np = (this.G.npcs || []).find((q) => q.id === npcId), npr = np ? roomIdAt(this.G.world, np.x, np.y) : -1;
+    if (npr >= 0 && ['tavern', 'auberge'].includes(this.G.world.rooms[npr].kind)) { // 1.0 : les jeux de taverne
+      ch.push({ label: '🍺 Jeux de taverne (bras de fer, rhum, cartes)', cls: 'q', go: () => this.openTavern(npcId) });
+      ch.push({ label: '🎶 Entonner une chanson à boire', go: () => { this.G.send({ t: 'tav', a: 'sing' }); this.close(); } });
+    }
     if (N.arena) { // 1.0 : la Fosse
       ch.push({ label: '⚔ Descendre dans la Fosse (vagues, seul ou avec votre groupe)', cls: 'q', go: () => { this.G.send({ t: 'arena', a: 'waves' }); this.close(); } });
       ch.push({ label: '🏆 Le classement de la semaine', go: () => { this.arenaBoardAsk = npcId; this.G.send({ t: 'arena', a: 'board' }); } });
@@ -1188,3 +1195,4 @@ export class UI {
   }
 }
 Object.assign(UI.prototype, social); // 1.0 : la vie en société
+Object.assign(UI.prototype, tavernUI); // 1.0 : les jeux de taverne

@@ -230,6 +230,7 @@ function onMsg(m) {
     case 'seen': ui.addSeen(m.c); break;
     case 'codex': G.codex = m; if (ui.open === 'codex') ui.renderCodex(); break;
     case 'soc': ui.setSoc(m); break; // 1.0 : amis, groupe, équipage
+    case 'tav': ui.tav(m); break; // 1.0 : les jeux de taverne
     case 'arena': { // 1.0 : la Fosse
       if (m.board) {
         const top = m.board.length ? m.board.map(([n, w], i) => `${i + 1}. ${n} — vague ${w}`).join('\n') : 'Personne n’a encore combattu cette semaine.';
@@ -884,6 +885,7 @@ function ambience(now) {
   if (now < (G.eruptUntil || 0) && G.zone === Z.VOLCAN) G.epicUntil = Math.max(G.epicUntil || 0, now + 4); // l'éruption : musique de bataille
   if (G.wevt && G.wevt.wave && G.player && Math.hypot(G.wevt.x - G.player.x, G.wevt.y - G.player.y) < 520) G.epicUntil = Math.max(G.epicUntil || 0, now + 4); // l'invasion : musique de bataille
   if (now < (G.epicUntil || 0)) theme = 'epic';
+  if (now < (G.songUntil || 0)) theme = 'cite'; // une chanson à boire
   if (G.kraken && Math.hypot(G.world.kraken.x - p.x, G.world.kraken.y - p.y) < 560) theme = 'naval';
   if (G.cine && G.cine.theme) theme = G.cine.theme;
   G.sfx.setTheme(theme);
@@ -1017,6 +1019,7 @@ function handleKeys(now) {
     if (G.scene.on) { G.scene.key(k.code); continue; }
     if (!$('dialog').classList.contains('hidden') && /^Digit[1-9]$/.test(k.code)) { ui.pickChoice(+k.code.slice(5) - 1); continue; }
     if (k.code === 'Escape') { if (G.build && !ui.open) stopBuild(); else ui.close(); continue; }
+    if (ui.open === 'tavern' && k.code === 'Space') { ui.armTap(); continue; } // le bras de fer
     if (k.key === 'i' || k.code === 'Tab') { ui.toggle('inventory'); continue; }
     if (k.key === 'b') { if (G.build) stopBuild(); else startBuild(null); continue; }
     if (k.key === 'c') { G.send({ t: 'ride' }); continue; }

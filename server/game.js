@@ -28,6 +28,7 @@ import { social } from './social.js';
 import { justice, SHIELD_AFTER_DEATH } from './justice.js';
 import { events } from './events.js';
 import { arena } from './arena.js';
+import { tavern } from './tavern.js';
 import { repLevel, buyPrice, sellPrice } from '../shared/data/places.js';
 import { LEGACY_VALUE, LEGACY_STRUCT, QUEST_ITEM_OLD_VALUE } from '../shared/data/legacy.js';
 import { generateWorld, canStand, moveWithCollision, moveBoat, zoneAt, tileAt, blocksShot, canSail, roomIdAt, Z, ZONES, SAFE } from '../shared/world.js';
@@ -111,6 +112,7 @@ export class Game {
     this.justiceInit();
     this.eventsInit();
     this.arenaInit();
+    this.tavernInit();
     this.seenW = Math.ceil(this.world.W / SEEN_CELL); this.seenH = Math.ceil(this.world.OVER_H / SEEN_CELL); this.seenBytes = Math.ceil(this.seenW * this.seenH / 8);
     this.usedTokens = new Set(); this.fails = new Map(); this.bans = {}; this.reports = []; this.maintenance = null; // 1.0
     if (storage && storage.loadMeta) { Promise.resolve(storage.loadMeta('bans')).then((b) => { if (b) this.bans = b; }).catch(() => {}); Promise.resolve(storage.loadMeta('reports')).then((r) => { if (Array.isArray(r)) this.reports = r; }).catch(() => {}); }
@@ -218,6 +220,7 @@ export class Game {
       case 'trade': return this.tradeAction(p, String(m.a), m);
       case 'bail': return this.bail(p);
       case 'arena': return this.arenaAction(p, String(m.a), m);
+      case 'tav': return this.tavernAction(p, String(m.a), m);
       case 'song': { const k = String(m.k), s = HOUSE_MUSIC.find(([x]) => x && x === k); if (!s || p.songs.has(k)) return; p.songs.add(k); p.dirtyMe = true; const n = HOUSE_MUSIC.length - 1; if (p.songs.size >= n) this.unlock(p, 'melomane'); return this.toast(p, `♪ Nouvel air noté dans votre carnet : « ${s[1]} » (${p.songs.size}/${n}). La boîte à musique de votre maison saura le jouer.`, 'quest'); }
       case 'ladder': return this.send(p, { t: 'ladder', top: this.ladderTop(), hist: p.pvpHist, me: [p.honor | 0, Math.floor(p.infamy || 0)] });
       case 'respawn': return this.respawn(p);
@@ -446,7 +449,7 @@ export class Game {
       if (d.treasure && typeof d.treasure.x === 'number') p.treasure = { x: d.treasure.x, y: d.treasure.y };
       if (d.ach && typeof d.ach === 'object') for (const k in d.ach) if (ACHIEVEMENTS[k]) p.ach[k] = d.ach[k];
       if (d.title && p.ach[d.title]) p.title = d.title;
-      if (d.cnt) { p.cnt.crab = d.cnt.crab | 0; p.cnt.fish = d.cnt.fish | 0; p.cnt.ships = d.cnt.ships | 0; p.cnt.dice = d.cnt.dice | 0; }
+      if (d.cnt && typeof d.cnt === 'object') for (const k in d.cnt) if (/^[a-z]{2,12}$/.test(k)) p.cnt[k] = Math.max(0, d.cnt[k] | 0); // 1.0 : tous les compteurs
       if (d.respawnAt && typeof d.respawnAt.tx === 'number') p.respawnAt = { tx: d.respawnAt.tx | 0, ty: d.respawnAt.ty | 0 };
       if (!this.worldPersist && d.base) p.pendingBase = d.base; // 0.8 : remboursée à la connexion
       if (!this.worldPersist && d.home) p.pendingHome = d.home;
@@ -515,7 +518,7 @@ export class Game {
   activeBuffs(p) {
     if (!p.buffs) return null;
     const b = {};
-    for (const [k, v] of Object.entries(p.buffs)) if (v.until > this.time) b[k] = v.v;
+    for (const [k, v] of Object.entries(p.buffs)) if (v.until > this.time) { const s = k === 'chant' ? 'atk' : k; b[s] = (b[s] || 0) + v.v; } // l'entrain d'une chanson s'ajoute à la force
     return b;
   }
   updateBuffs(p) {
@@ -3118,3 +3121,4 @@ Object.assign(Game.prototype, social);
 Object.assign(Game.prototype, justice); // 1.0 : protection, infamie, primes, honneur, Geôle
 Object.assign(Game.prototype, events); // 1.0 : les invasions rares et annoncées
 Object.assign(Game.prototype, arena); // 1.0 : l'Arène de la Fosse
+Object.assign(Game.prototype, tavern); // 1.0 : les jeux de taverne
