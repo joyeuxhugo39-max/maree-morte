@@ -8,7 +8,7 @@ import { ITEMS } from '../shared/data/items.js';
 import { NPCS } from '../shared/data/npcs.js';
 import { tileAt } from '../shared/world.js';
 
-export const HULL = { radeau: 60, barque: 100, sloop: 180, brick: 260, goelette: 300, galion: 420 };
+export const HULL = { radeau: 60, barque: 100, sloop: 180, brick: 260, goelette: 300, galion: 420, veuve: 520, spectre: 320 };
 const REPAIR_COST = 3; // doublons par point de coque
 const angDiff = (a, b) => { let d = Math.abs(a - b) % (Math.PI * 2); return d > Math.PI ? Math.PI * 2 - d : d; };
 export const isShipwright = (id) => !!(NPCS[id] && (NPCS[id].repair || (NPCS[id].shop || []).some((i) => ITEMS[i] && ITEMS[i].boat)));

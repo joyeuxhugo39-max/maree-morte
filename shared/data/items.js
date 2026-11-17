@@ -308,6 +308,15 @@ O('tenue_chasseur', { name: 'Tenue de chasseur de primes', atk: 8, crit: 0.08, d
 O('uniforme_marine', { name: 'Uniforme de la Marine', def: 16, hp: 50, value: 4200, rarity: 2, outfit: { top: 'capitaine', topCol: 'navy', pants: 'white', boots: 'black', hat: 'tricorne', hatCol: 'navy' }, desc: 'Arraché à un officier trop curieux. À Libertalia, il fait rire. Ailleurs, il protège.' });
 O('tenue_vaudou', { name: 'Tenue du houngan', regen: 2.5, hp: 40, def: 8, value: 3800, rarity: 2, outfit: { top: 'vareuse', topCol: 'purple', pants: 'black', boots: 'black', hat: 'crane', cape: 'purple' }, desc: 'Plumes, os et colliers de perles. Les esprits veillent sur vous.' });
 O('habit_gouverneur', { name: 'Habit de gouverneur', def: 14, hp: 70, goldFind: 0.15, value: 9500, rarity: 3, outfit: { top: 'capitaine', topCol: 'red', pants: 'white', boots: 'black', hat: 'plume', hatCol: 'red', cape: 'red' }, desc: 'Velours, dentelle et boutons d’or. Le dernier gouverneur ne le portera plus. Doublons +15 %.' });
+// 1.0 : de nouveaux poissons (et leur taille, voir seasons.js), les navires légendaires, le tricorne des saisons
+Object.assign(ITEMS, {
+  thon_rouge: { name: 'Thon rouge', use: { heal: 90, en: 20 }, value: 140, rarity: 1, icon: 'fish_s', tint: 'red', desc: 'Ne mord qu’en eaux profondes. Un monstre de muscle. Rend 90 PV.' },
+  coelacanthe: { name: 'Cœlacanthe', value: 900, rarity: 3, icon: 'fish_s', tint: 'ghost', desc: 'Un poisson plus vieux que les dinosaures. Ne mord qu’en eaux profondes, la nuit. Les collectionneurs se l’arrachent.' },
+  poisson_or: { name: 'Poisson d’or', value: 1500, rarity: 3, icon: 'fish_s', tint: 'gold', desc: 'Il brille comme un doublon. On dit qu’il exauce un vœu ; il exauce surtout la bourse de qui le vend.' },
+  veuve_ecarlate: { name: 'La Veuve Écarlate', boat: { kind: 'veuve', speed: 206, cannon: 4 }, value: 60000, rarity: 3, unique: 1, legend: 1, rep: ['lib', 5], icon: 'galleon_i', tint: 'red', desc: 'Navire légendaire. Quatre canons par bord, des voiles couleur de sang, la coque la plus solide de l’archipel. Maître Calfat ne la vend qu’aux héros de Libertalia.' },
+  spectre_brumes: { name: 'Le Spectre des Brumes', boat: { kind: 'spectre', speed: 236, cannon: 2 }, value: 40000, rarity: 3, unique: 1, legend: 1, icon: 'schooner_i', tint: 'ghost', desc: 'Navire légendaire, arraché au Galion Fantôme. Il file plus vite que le vent, et ses voiles luisent dans la brume.' },
+  tricorne_saison: { name: 'Tricorne des saisons', slot: 'hat', def: 8, crit: 0.06, value: 0, rarity: 3, unique: 1, icon: 'crown', look: 'tricorne', lookCol: 'yellow', desc: 'Remis aux champions d’une saison (concours de pêche, Grand Tour de Libertalia). Il ne se vend pas : il se porte.' },
+});
 // 1.0 : la plongée — une cloche pour descendre, un scaphandre pour tenir plus longtemps
 Object.assign(ITEMS, {
   cloche_plongee: { name: 'Cloche de plongée', use: { dive: 1 }, value: 1200, rarity: 1, icon: 'lantern', tint: 'grey', desc: 'À bord de votre navire, au-dessus d’un site de plongée (les bulles à la surface) : E pour descendre. Elle ne s’use pas.' },

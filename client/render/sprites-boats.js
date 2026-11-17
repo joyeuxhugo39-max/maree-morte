@@ -17,6 +17,8 @@ const PAL = {
   // 0.8 : goélette (coque bleu canard), galion (rouge sombre et or)
   goelette: { rim: 0xe8d0a0, rimD: 0xa8885a, plank: 0x9a7048, plankD: 0x7a5434, side: 0x1a4a52, keel: 0x0a1e22 },
   galion: { rim: 0xf2c14a, rimD: 0xa86e1c, plank: 0x7a4a2a, plankD: 0x5a341c, side: 0x5a1418, keel: 0x1a0a0a },
+  veuve: { rim: 0xf2c14a, rimD: 0xa86e1c, plank: 0x3a1a1e, plankD: 0x26100f, side: 0x14080a, keel: 0x080404 }, // 1.0 : navires légendaires
+  spectre: { rim: 0xbae8d0, rimD: 0x5a8a7a, plank: 0x4a6a62, plankD: 0x34504a, side: 0x1e3a36, keel: 0x0a1a18 },
 };
 const SAILS = {
   white: SAIL,
@@ -231,6 +233,8 @@ export function boatSprites() {
     const r = radeau(d); (cache.radeau = cache.radeau || [])[d] = [r, r];
     const g = bigShip(d, PAL.goelette, SAILS.white, 62, 8, [0.38, 0.62]); (cache.goelette = cache.goelette || [])[d] = [g, g];
     const gl = bigShip(d, PAL.galion, SAILS.white, 82, 11.5, [0.28, 0.5, 0.72]); (cache.galion = cache.galion || [])[d] = [gl, gl];
+    const ve = bigShip(d, PAL.veuve, SAILS.red, 86, 12, [0.24, 0.44, 0.62, 0.78]); (cache.veuve = cache.veuve || [])[d] = [ve, ve];
+    const sp = bigShip(d, PAL.spectre, SAILS.ghost, 64, 8, [0.36, 0.62]); (cache.spectre = cache.spectre || [])[d] = [sp, sp];
   }
   SP = SAIL;
   return cache;

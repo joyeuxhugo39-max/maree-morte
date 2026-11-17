@@ -231,6 +231,13 @@ function onMsg(m) {
     case 'codex': G.codex = m; if (ui.open === 'codex') ui.renderCodex(); break;
     case 'soc': ui.setSoc(m); break; // 1.0 : amis, groupe, équipage
     case 'tav': ui.tav(m); break; // 1.0 : les jeux de taverne
+    case 'race': { // 1.0 : le Grand Tour de Libertalia
+      if (m.off) { G.race = null; if (m.done) { ui.banner('Arrivée !', `Grand Tour de Libertalia — ${ui.mmss1(m.done)}`); G.sfx.play('level'); } break; }
+      G.race = { i: m.i, gates: m.gates, t0: m.t0 ? (m.go ? now : (G.race && G.race.t0) || now) : 0 };
+      if (m.go) ui.banner('Partez !', 'Le chrono tourne'); else if (m.i > 1) G.sfx.play('coin', 0.6);
+      break;
+    }
+    case 'season': ui.seasonData = m; if (ui.open === 'crew' && ui.crewTab === 'saison') ui.renderCrew(); break;
     case 'dng': { // 1.0 : le Bastion Englouti — grilles, Écluse, leviers
       const D = G.world.dungeon; G.dng = m; G.dngAt = now;
       D.gates.forEach((g, k) => { for (const i of g) G.world.block[i] = m.open[k] ? 0 : 1; });
@@ -536,6 +543,7 @@ function onEvent(ev, t) {
       const [, k, x, y, id] = ev;
       if (k === 'spawn' || k === 'summon') { R.smoke(x, y, 8, k === 'summon' ? 'rgba(120,255,140,0.5)' : 'rgba(150,200,140,0.4)', { size: 3 }); if (k === 'summon') G.sfx.play('summon', vol(x, y)); }
       else if (k === 'respawn') R.burst(x, y, 20, { col: ['#ffffff', '#bfe8ff'], up: 60, speed: 30, life: 0.8 });
+      else if (k === 'bell') { R.burst(x, y - 24, 10, { col: ['#bae8d0', '#ffffff'], up: 20, speed: 30, life: 0.9 }); G.sfx.play('level', vol(x, y) * 0.7); R.shake(1, 0.3); } // 1.0 : une cloche marine
       else if (k === 'lever') { R.burst(x, y - 18, 8, { col: ['#ffd24a', '#c8c7d4'], up: 30, speed: 25, life: 0.5 }); G.sfx.play('door', vol(x, y)); } // 1.0 : un levier du Bastion
       else if (k === 'recall') { R.addFx({ kind: 'ring', x, y, r: 40, dur: 3, col: 'rgba(255,170,220,A)', w: 2 }); G.sfx.play('conch', vol(x, y) * 0.7); }
       else if (k === 'smoke') { R.smoke(x, y, 30, 'rgba(40,34,44,0.7)', { size: 4, life: 1.6, spread: 30 }); G.sfx.play('boom', vol(x, y) * 0.3); }
@@ -662,6 +670,7 @@ function interact() {
   else if (t.kind === 'player') G.ui.playerMenu(t.name, null); // 1.0 : inviter, échanger, ajouter en ami…
   else if (t.kind === 'lever') G.send({ t: 'lever', i: t.i }); // 1.0 : le Bastion
   else if (t.kind === 'dive') G.send({ t: 'dive' }); // 1.0 : la cloche de plongée
+  else if (t.kind === 'bell') G.send({ t: 'bell', i: t.i });
   else if (t.kind === 'embark') G.send({ t: 'embark', name: t.name }); // 1.0 : navires partagés
   else if (t.kind === 'disembark') G.send({ t: 'disembark' });
   else if (t.kind === 'board') G.send({ t: 'board', a: +G.aim.toFixed(3) });
@@ -736,6 +745,7 @@ function findInteract() {
     const d = Math.hypot(L.x - p.x, L.y - p.y);
     if (d < 30 && d < bd) { bd = d; best = { kind: 'lever', i, x: L.x, y: L.y, h: 26, verb: 'Tirer le levier' }; }
   });
+  if (!p.boat && G.room < 0 && G.world.bells) G.world.bells.forEach((b, i) => { const d = Math.hypot(b.x - p.x, b.y - p.y); if (d < 36 && d < bd) { bd = d; best = { kind: 'bell', i, x: b.x, y: b.y - 10, h: 30, verb: 'Faire sonner la cloche' }; } }); // 1.0 : un secret
   if (p.boat && G.world.diveSpots) for (const s of G.world.diveSpots) if (Math.hypot(s.x - p.x, s.y - p.y) < 90) return { kind: 'dive', x: p.x, y: p.y, h: 36, verb: `Plonger : ${s.name}` }; // 1.0 : les fonds marins
   if (G.me && G.me.ab) return { kind: 'disembark', x: p.x, y: p.y, h: 34, verb: 'Débarquer' }; // 1.0 : à bord d'un compagnon
   if (!best && !p.boat && G.room < 0) for (const e of G.ents.values()) { // 1.0 : monter à bord du navire d'un compagnon

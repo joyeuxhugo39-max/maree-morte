@@ -20,6 +20,7 @@ import { extend07 } from './sprites-07.js';
 import { extend08, citeSprite, proprieteSprite, extendProps08 } from './sprites-cite.js';
 import { volcanoGen, makePuffs, makeSplats } from './sprites-volcan.js';
 import './sprites-08.js';
+import { raceCourse } from '../../shared/data/seasons.js';
 import { mountSheet } from './sprites-mounts.js';
 
 const TAU = Math.PI * 2;
@@ -343,6 +344,7 @@ export class Renderer {
     if (room && room.dungeon) this.drawDungeon(ctx, G, camX, camY, now); // 1.0 : grilles et Écluse du Bastion
     if (room && room.kind === 'underwater') this.drawUnderwater(ctx, G, camX, camY, now, dt); // 1.0 : les fonds marins
     if (!room) this.drawDiveSpots(ctx, G, camX, camY, now); // 1.0 : les bulles des sites de plongée
+    if (!room && G.race) this.drawRace(ctx, G, camX, camY, now); // 1.0 : les portes du Grand Tour
     if (!room) this.drawGarlands(ctx, camX, camY, now, dark, false);
     if (!room) {
       this.updateCritters(G, camX, camY, now, dt, dark);
@@ -581,6 +583,21 @@ export class Renderer {
     ctx.globalCompositeOperation = 'source-over';
     const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, H * 0.85); v.addColorStop(0, 'rgba(0,30,50,0)'); v.addColorStop(1, 'rgba(0,30,50,0.5)');
     ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+  }
+  drawRace(ctx, G, camX, camY, now) {
+    const C = raceCourse(this.world), next = G.race.i % C.length;
+    C.forEach((g, k) => {
+      const X = Math.round(g.x - camX), Y = Math.round(g.y - camY), on = k === next;
+      if (X < -60 || X > this.W + 60 || Y < -80 || Y > this.H + 60) return;
+      ctx.fillStyle = '#3a2414'; ctx.fillRect(X - 30, Y - 34, 3, 34); ctx.fillRect(X + 27, Y - 34, 3, 34);
+      ctx.fillStyle = on ? `rgba(255,210,74,${0.75 + 0.25 * Math.sin(now * 6)})` : 'rgba(200,180,140,0.5)';
+      ctx.fillRect(X - 27, Y - 34, 54, 7);
+      for (let x = -26; x < 26; x += 6) { ctx.fillStyle = (x / 6 + Math.floor(now * 2)) % 2 ? '#8e1a26' : '#f3f0e2'; ctx.fillRect(X + x, Y - 27, 3, 4); }
+      if (on) { const t = textCanvas(`${k === 0 && G.race.t0 ? 'ARRIVÉE' : 'PORTE ' + (k + 1)}`, '#ffd24a'); ctx.drawImage(t, X - (t.width >> 1), Y - 44); }
+    });
+    const p = G.player, g = C[next]; if (!p || !g) return;
+    const a = Math.atan2(g.y - p.y, g.x - p.x), d = Math.hypot(g.x - p.x, g.y - p.y);
+    if (d > 120) { const X = p.x - camX + Math.cos(a) * 34, Y = p.y - camY - 12 + Math.sin(a) * 26; ctx.save(); ctx.translate(X, Y); ctx.rotate(a); ctx.fillStyle = '#ffd24a'; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-5, -6); ctx.lineTo(-2, 0); ctx.lineTo(-5, 6); ctx.closePath(); ctx.fill(); ctx.restore(); }
   }
   drawDiveSpots(ctx, G, camX, camY, now) {
     for (const s of this.world.diveSpots || []) {

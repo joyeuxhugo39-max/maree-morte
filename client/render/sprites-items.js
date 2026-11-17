@@ -168,7 +168,7 @@ const P = {
     pb.disc(4, 11, 1.6, 0x9a9aa8);
   },
   fish_s(pb, t = 'silver') {
-    const C = { silver: [0x5a6a7a, 0x9aaabb, 0xd0dce6], blue: [0x1e4a7a, 0x3a78b0, 0x8ac0e8], gold: [0x8a5a14, 0xe0a030, 0xffe08a], glow: [0x0e4a3a, 0x2ab08a, 0xaaffe0], sword: [0x1a2a5a, 0x3a5aa0, 0xa8c8f0] }[t] || [0x5a6a7a, 0x9aaabb, 0xd0dce6];
+    const C = { silver: [0x5a6a7a, 0x9aaabb, 0xd0dce6], blue: [0x1e4a7a, 0x3a78b0, 0x8ac0e8], gold: [0x8a5a14, 0xe0a030, 0xffe08a], glow: [0x0e4a3a, 0x2ab08a, 0xaaffe0], sword: [0x1a2a5a, 0x3a5aa0, 0xa8c8f0], red: [0x5a1418, 0xb03a34, 0xf08a7a], ghost: [0x3a4a5a, 0x7a8a9a, 0xe8e0c8] }[t] || [0x5a6a7a, 0x9aaabb, 0xd0dce6];
     pb.ellipse(7, 8, 5.5, 3.2, C[1]); pb.ellipse(7, 7, 4.5, 1.6, C[2]);
     pb.line(12, 8, 15, 5, C[0], 1.5); pb.line(12, 8, 15, 11, C[0], 1.5);
     pb.set(3, 7, 0x141014); pb.set(7, 5, C[0]); pb.set(8, 11, C[0]);

@@ -202,6 +202,7 @@ export class UI {
       const dt = now - G.meAt, jb = []; // 1.0 : la justice
       const ev = G.wevt; // 1.0 : une invasion annoncée
       const ar = G.arena; // 1.0 : la Fosse
+      if (G.race) jb.push(['prot', G.race.t0 ? `🏇 Grand Tour : porte ${G.race.i}/${G.race.gates} — ${this.mmss1(now - G.race.t0)}` : '🏇 Grand Tour : en selle, à la première porte !']);
       if (ar && ar.run && G.room >= 0 && G.world.rooms[G.room].kind === 'fosse') jb.push(['wanted', `⚔ Fosse : vague ${ar.run.wave} — ${ar.run.left} adversaire${ar.run.left > 1 ? 's' : ''}`]);
       if (ar && ar.duel && G.room >= 0 && G.world.rooms[G.room].kind === 'fosse') jb.push(['wanted', `🤺 ${ar.duel.a} contre ${ar.duel.b}${ar.duel.fight ? '' : ` — paris ${ar.duel.pot[0]} / ${ar.duel.pot[1]}, ${Math.max(0, Math.ceil(ar.duel.at - (now - ar.t0)))} s`}`]);
       if (ev) jb.push(['wanted', ev.wave ? `☠ ${ev.name} : vague ${ev.wave}/3 — ${ev.left} morts` : `☠ Flotte maudite → ${ev.name} : ${this.mmss(Math.max(0, ev.in - (now - ev.at0)))}`]);
@@ -310,6 +311,7 @@ export class UI {
   }
   lockpickEnd(ok) { const st = this.lp; if (!st) return; this.lp = null; $('lockpick').classList.add('hidden'); st.done(ok); }
   hurtFlash() { const v = $('vignette'); v.classList.add('hurt'); clearTimeout(this.hurtT); this.hurtT = setTimeout(() => v.classList.remove('hurt'), 120); }
+  mmss1(s) { const m = Math.floor(s / 60), r = (s % 60).toFixed(1); return `${m}:${r.padStart(4, '0')}`; }
   mmss(s) { s = Math.ceil(s); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
   showDeath(lost, by, jail, pk) {
     $('death-txt').textContent = `${by ? `Terrassé par : ${by}. ` : ''}${lost ? `Vous perdez ${lost} doublon${lost > 1 ? 's' : ''}.` : pk ? 'Pas d’acharnement : vous ne perdez rien.' : 'Vous ne perdez rien.'}${jail ? ` Direction la Geôle de Port-Lanterne (${jail} s).` : pk ? ' Pavillon blanc pendant deux minutes à votre retour.' : ''}`;
@@ -751,6 +753,7 @@ export class UI {
       ch.push({ label: '🍺 Jeux de taverne (bras de fer, rhum, cartes)', cls: 'q', go: () => this.openTavern(npcId) });
       ch.push({ label: '🎶 Entonner une chanson à boire', go: () => { this.G.send({ t: 'tav', a: 'sing' }); this.close(); } });
     }
+    if (npcId === 'palefrenier') ch.push({ label: '🏇 Le Grand Tour de Libertalia (course en selle)', cls: 'q', go: () => { this.G.send({ t: 'race' }); this.close(); } }); // 1.0
     if (N.arena) { // 1.0 : la Fosse
       ch.push({ label: '⚔ Descendre dans la Fosse (vagues, seul ou avec votre groupe)', cls: 'q', go: () => { this.G.send({ t: 'arena', a: 'waves' }); this.close(); } });
       ch.push({ label: '🏆 Le classement de la semaine', go: () => { this.arenaBoardAsk = npcId; this.G.send({ t: 'arena', a: 'board' }); } });
@@ -861,7 +864,8 @@ export class UI {
         const a = ACHIEVEMENTS[id], has = !!ach[id], pr = PROG[id];
         const row = document.createElement('div'); row.className = 'ach' + (has ? ' got' : '');
         const date = has && typeof ach[id] === 'number' && ach[id] > 1e12 ? new Date(ach[id]).toLocaleDateString('fr-FR') : '';
-        row.innerHTML = `<img src="${iconURL('trophy')}"><div><b>${esc(a.name)}</b><small>${esc(a.desc)}</small><small class="tt">Titre : « ${esc(a.title)} »</small>${has ? (date ? `<small class="date">Obtenu le ${date}</small>` : '') : pr ? `<small>${Math.min(pr[0], pr[1])} / ${pr[1]}</small><div class="bar"><i style="width:${Math.min(100, Math.round(pr[0] / Math.max(1, pr[1]) * 100))}%"></i></div>` : ''}</div>`;
+        const hide = a.secret && !has; // 1.0 : un secret reste secret tant qu'on ne l'a pas percé
+        row.innerHTML = `<img src="${iconURL('trophy')}"><div><b>${hide ? '???' : esc(a.name)}</b><small>${hide ? 'Un secret de l’archipel. Les livres en parlent, parfois.' : esc(a.desc)}</small><small class="tt">Titre : « ${hide ? '???' : esc(a.title)} »</small>${has ? (date ? `<small class="date">Obtenu le ${date}</small>` : '') : pr ? `<small>${Math.min(pr[0], pr[1])} / ${pr[1]}</small><div class="bar"><i style="width:${Math.min(100, Math.round(pr[0] / Math.max(1, pr[1]) * 100))}%"></i></div>` : ''}</div>`;
         if (has && cur !== id) { const b = document.createElement('button'); b.className = 'chip'; b.textContent = 'Porter'; b.onclick = () => G.send({ t: 'title', id }); row.appendChild(b); }
         list.appendChild(row);
       }

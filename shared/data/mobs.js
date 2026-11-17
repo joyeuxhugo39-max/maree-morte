@@ -188,3 +188,4 @@ mob('amiral_englouti', { name: 'L’Amiral Englouti', level: 24, hp: 6500, dmg: 
 // 1.0 : le roi noyé de la cité engloutie d'Ys
 mob('roi_ys', { name: 'Gradlon, roi d’Ys-la-Noyée', level: 27, hp: 7600, dmg: 44, speed: 34, aggro: 220, leash: 340, range: 30, atkCd: 1.4, windup: 0.55, xp: 4200, gold: [520, 800], r: 14, respawn: 900, elite: 1, big: 1, swims: 1, groan: 1,
   ai: 'noye', phases: [0.5], title: 'Le roi qui dort sous la mer', weapon: ['bigsaber', 'gold'], loot: [['trident_orage', 0.18, 1, 1], ['harpon_abysses', 0.15, 1, 1], ['habit_gouverneur', 0.06, 1, 1], ['rhum_vieux', 1, 1, 3]] });
+MOBS.galion_fantome.loot.push(['spectre_brumes', 0.03, 1, 1]); // 1.0 : un navire légendaire

@@ -284,9 +284,9 @@ export const social = {
     tab = this.crewTab || (this.soc && this.soc.group ? 'groupe' : 'amis');
     this.crewTab = tab;
     const G = this.G, s = this.soc || { friends: [], blocked: [], log: [] };
-    const tabs = [['groupe', 'Groupe'], ['amis', `Amis (${s.friends.filter((f) => f[1]).length}/${s.friends.length})`], ['equipage', 'Équipage'], ['honneur', 'Honneur'], ['ignores', 'Ignorés'], ['echanges', 'Échanges']];
+    const tabs = [['groupe', 'Groupe'], ['amis', `Amis (${s.friends.filter((f) => f[1]).length}/${s.friends.length})`], ['equipage', 'Équipage'], ['honneur', 'Honneur'], ['saison', 'Saison'], ['ignores', 'Ignorés'], ['echanges', 'Échanges']];
     $('crew-tabs').innerHTML = tabs.map(([k, l]) => `<button data-k="${k}" class="${k === tab ? 'on' : ''}">${l}</button>`).join('');
-    $('crew-tabs').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.k === 'honneur') G.send({ t: 'ladder' }); this.renderCrew(b.dataset.k); };
+    $('crew-tabs').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.k === 'honneur') G.send({ t: 'ladder' }); if (b.dataset.k === 'saison') G.send({ t: 'season' }); this.renderCrew(b.dataset.k); };
     const body = $('crew-body');
     const row = (name, sub, btns, on = true) => `<div class="soc-row${on ? '' : ' off'}"><i class="dot${on ? ' on' : ''}"></i><span class="sn" data-name="${esc(name)}">${esc(name)}</span><span class="ss">${sub}</span><span class="sb">${btns}</span></div>`;
     const btn = (a, label, name, cls = '') => `<button class="btn mini ${cls}" data-a="${a}" data-n="${esc(name || '')}">${label}</button>`;
@@ -314,6 +314,7 @@ export const social = {
       h += `<p class="soc-help">Vous êtes prévenu quand un ami prend la mer ou rentre au port.</p>`;
     } else if (tab === 'equipage') h += this.crewHTML(s, row, btn, addBox);
     else if (tab === 'honneur') h += this.honorHTML();
+    else if (tab === 'saison') h += this.seasonHTML();
     else if (tab === 'ignores') {
       h += `<p class="soc-help">Vous n’entendez plus les pirates ignorés : ni leurs messages, ni leurs invitations, ni leurs propositions d’échange.</p>`;
       h += s.blocked.length ? s.blocked.map((n) => row(n, 'ignoré', btn('unblock', 'Ne plus ignorer', n), false)).join('') : '<p class="soc-empty">Personne n’est ignoré.</p>';
@@ -374,6 +375,19 @@ export const social = {
     h += hist.length ? [...hist].reverse().map((x) => `<div class="soc-log ${x.k === 'tue' ? 'win' : 'loss'}"><div>${x.k === 'tue' ? '⚔ Vous avez abattu' : '☠ Abattu par'} <b>${esc(x.who)}</b> (niv. ${x.lvl}) <span>${esc(x.where || '')} · ${new Date(x.at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></div><div class="how-${x.how}">${HOW[x.how] || ''}${x.lost ? ` · ${x.lost} doublons perdus` : ''}</div></div>`).join('') : '<p class="soc-empty">Aucun duel pour l’instant.</p>';
     h += '<h4 class="soc-h">Classement de l’honneur</h4>';
     h += L.top && L.top.length ? `<table class="ladder"><tr><th>#</th><th>Pirate</th><th>Honneur</th><th>Victoires</th><th>Défaites</th></tr>${L.top.map(([n, hon, k, d], i) => `<tr class="${this.G.player && n === this.G.player.name ? 'me' : ''}"><td>${i + 1}</td><td>${esc(n)}</td><td>${hon}</td><td>${k}</td><td>${d}</td></tr>`).join('')}</table>` : '<p class="soc-empty">Le classement est vide : aucun duel n’a encore eu lieu.</p>';
+    return h;
+  },
+  // 1.0 : la saison — concours de pêche, Grand Tour de Libertalia, records, podium de la saison passée
+  seasonHTML() {
+    const S = this.seasonData;
+    if (!S) return '<p class="soc-empty">Un instant…</p>';
+    const t = (s) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`;
+    const table = (rows, head, fmt) => rows.length ? `<table class="ladder"><tr><th>#</th><th>Pirate</th><th>${head}</th></tr>${rows.map(([n, v], i) => `<tr class="${this.G.player && n === this.G.player.name ? 'me' : ''}"><td>${['🥇', '🥈', '🥉'][i] || i + 1}</td><td>${esc(n)}</td><td>${fmt(v)}</td></tr>`).join('')}</table>` : '<p class="soc-empty">Personne pour l’instant : la place est à prendre.</p>';
+    let h = `<p class="soc-help">Saison de <b>${esc(S.name)}</b>. À la fin du mois, les trois premiers de chaque concours reçoivent 5000, 3000 et 1500 doublons ; les premiers, le Tricorne des saisons et le titre de Champion des saisons.</p>`;
+    h += '<h4 class="soc-h">🎣 Concours de pêche</h4><p class="soc-help">Pour chaque espèce, votre plus belle prise compte, rapportée à la plus grande possible.</p>' + table(S.fish, 'Points', (v) => v);
+    if (S.records.length) h += `<div class="soc-log">${S.records.map(([f, n, kg]) => `<div>${esc(f)} : <b>${String(kg).replace('.', ',')} kg</b> — ${esc(n)}</div>`).join('')}</div>`;
+    h += '<h4 class="soc-h">🏇 Grand Tour de Libertalia</h4><p class="soc-help">Tobias, aux Écuries du Nord de Libertalia, donne le départ. Six portes autour de l’île, en selle, et retour.</p>' + table(S.race, 'Temps', t);
+    if (S.last) h += `<h4 class="soc-h">La saison passée (${esc(S.last.name)})</h4><div class="soc-log"><div>Pêche : ${S.last.fish.map(([n, v]) => `${esc(n)} (${v})`).join(', ') || '—'}</div><div>Grand Tour : ${S.last.race.map(([n, v]) => `${esc(n)} (${t(v)})`).join(', ') || '—'}</div></div>`;
     return h;
   },
   bindCrewForm() {

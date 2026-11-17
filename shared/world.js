@@ -60,7 +60,7 @@ export const PROPS = {
   comptoir: { solid: 1 }, etagere: { solid: 1 }, cheminee: { solid: 1 }, table: { solid: 1 }, chaise: {}, ratelier: { solid: 1 },
   plante: { solid: 1 }, lit_deco: { solid: 1 }, fourneau: { solid: 1 }, tapis_deco: { ground: 1 }, grotte: {}, crane_rock: { solid: 1 }, cristal: { solid: 1 }, tonneau_d: { solid: 1 },
   home: { solid: 1 }, dalle: { ground: 1 }, sceau: { solid: 1 },
-  volcan: { solid: 1 }, gibet: { solid: 1 }, corail: { solid: 1 }, obelisque: { solid: 1 }, fumerolle: { ground: 1 }, tente: { solid: 1 }, barreaux: { solid: 1 }, levier: { solid: 1 },
+  volcan: { solid: 1 }, gibet: { solid: 1 }, corail: { solid: 1 }, obelisque: { solid: 1 }, fumerolle: { ground: 1 }, tente: { solid: 1 }, barreaux: { solid: 1 }, levier: { solid: 1 }, cloche_marine: { solid: 1 },
   mannequin: { solid: 1 }, lavarock: { solid: 1 }, cage: { solid: 1 }, fort: { solid: 1 }, ruine: { solid: 1 }, totem: { solid: 1 },
   ship: { solid: 1 }, wreck: { solid: 1 }, boat: { solid: 1 },
   // 0.8 : Libertalia
@@ -1740,6 +1740,18 @@ export function generateWorld(seed = 7) {
     for (let k = 0; k < Math.max(3, Math.round(S.w / 12)); k++) { const s = spot(); if (s) { occ[idx(s[0], s[1])] = 1; airPockets.push({ room: S.room, x: s[0] * TILE + 8, y: s[1] * TILE + 8 }); } }
     diveSpots.push({ key: S.key, room: S.room, door: S.door, x: S.at[0] * TILE + 8, y: S.at[1] * TILE + 8, name: rooms[S.room].name });
   }
+  // 1.0 : un secret — trois cloches marines sur trois îles lointaines, à faire sonner dans la même nuit
+  const bells = [];
+  for (const [cx, cy] of [[EM.x + 6, EM.y + 4], [AO.x + 10, AO.y - 6], [LG.x + 12, LG.y - 18]]) {
+    let at = null;
+    for (let rr = 0; rr < 30 && !at; rr++) for (let a = 0; a < 32 && !at; a++) {
+      const x = Math.round(cx + Math.cos(a / 32 * 6.283) * rr), y = Math.round(cy + Math.sin(a / 32 * 6.283) * rr);
+      if (!inMap(x, y + 1) || y >= OVER_H - 2) continue;
+      const t = tiles[idx(x, y)], t2 = tiles[idx(x, y + 1)];
+      if ((t === T.SAND || t === T.GRASS || t === T.DIRT || t === T.ROCK && false) && (t2 === T.SAND || t2 === T.GRASS || t2 === T.DIRT) && !occ[idx(x, y)] && !solid[idx(x, y)] && !occ[idx(x, y + 1)]) at = [x, y];
+    }
+    if (at) { const b = addProp('cloche_marine', at[0], at[1], bells.length, 0, -2); bells.push({ x: b.x, y: b.y + 8, prop: b.id }); }
+  }
   const OUT = {
     block: new Uint8Array(N), // constructions des joueurs : 1 bloque tout, 2 bloque les morts
     islandOf, islands, // 1.0 : chaque case de terre connaît son île
@@ -1754,7 +1766,7 @@ export function generateWorld(seed = 7) {
     libertalia: LB, libFort: LFT, jail: jailRoom.id,
     seed, W, H, tiles, zones, solid, plankDir, waterDist, props, buildings, npcs, spawns, chests,
     spawnPoint, town: TC, lighthouse: LH, ruins: RC, cemetery: CEM, wreck: WR, coastY, dockEnd,
-    dungeon, airPockets, diveSpots,
+    dungeon, airPockets, diveSpots, bells,
   };
   for (const g of dungeon.gates) for (const i of g) OUT.block[i] = 1; // les grilles du Bastion sont fermées
   return OUT;

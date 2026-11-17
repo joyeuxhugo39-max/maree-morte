@@ -369,9 +369,20 @@ function levier() {
   pb.outline('auto');
   return mk(pb, 7, 20);
 }
+// 1.0 : une cloche marine, verdie par le sel, sous son portique de bois flotté (un secret)
+function clocheMarine() {
+  const pb = new PB(20, 30);
+  pb.rect(2, 4, 2, 24, WOOD[2]); pb.rect(16, 4, 2, 24, WOOD[2]); pb.vl(2, 4, 24, WOOD[4]); pb.rect(1, 3, 18, 3, WOOD[1]); pb.hl(1, 3, 18, WOOD[3]);
+  const V = [0x2a4a3e, 0x3e6a56, 0x5a8a70, 0x86b898];
+  for (let y = 8; y < 20; y++) { const w = 2 + Math.round((y - 8) * 0.42); for (let x = 10 - w; x < 10 + w; x++) pb.set(x, y, x < 10 - w + 2 ? V[3] : x > 10 + w - 3 ? V[0] : V[1 + ((x + y) % 4 === 0 ? 1 : 0)]); }
+  pb.hl(4, 20, 12, V[0]); pb.hl(5, 19, 10, V[2]); pb.vl(10, 6, 2, IRON[2]); pb.disc(10, 21.5, 1.4, 0x3a3a46);
+  pb.rect(1, 27, 18, 2, STONE[1]);
+  pb.outline('auto');
+  return mk(pb, 10, 28);
+}
 export function extend08(env) {
   const many = (fn, n) => Array.from({ length: n }, (_, v) => fn(v));
-  env.levier = [levier()];
+  env.levier = [levier()]; env.cloche_marine = many(clocheMarine, 3);
   env.rempart = many(rempart, 16); env.tour = many(tour, 2); env.porte_cite = [porteCite()];
   env.fontaine = [fontaine()]; env.statue = [statue()]; env.linge = many(linge, 3); env.drapeau = many(drapeau, 2);
   env.canne = many(canne, 4); env.paletuvier = many(paletuvier, 3);

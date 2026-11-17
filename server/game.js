@@ -21,7 +21,7 @@ export function migrateSave(d) {
   return d;
 }
 // les champs qu'écrit serialize() : tout autre champ d'une sauvegarde est conservé à part
-const SAVE_KEYS = new Set(['hulls', 'mem', 'songs', 'rep', 'inf', 'jail', 'hon', 'pvph', 'glory', 'gxp', 'friends', 'blocked', 'tradeLog', 'seen', 'st', 'kc', 'met', 'col', 'tut', 'name', 'look', 'level', 'xp', 'gold', 'hp', 'inv', 'eq', 'quests', 'track', 'chests', 'x', 'y', 'kills', 'upg', 'treasure', 'ach', 'title', 'cnt', 'respawnAt', 'found', 'boat', 'pk', 'caches', 'zs', 'pet', 'home', 'base', 'saved', 'sv', 'held']);
+const SAVE_KEYS = new Set(['fishRec', 'hulls', 'mem', 'songs', 'rep', 'inf', 'jail', 'hon', 'pvph', 'glory', 'gxp', 'friends', 'blocked', 'tradeLog', 'seen', 'st', 'kc', 'met', 'col', 'tut', 'name', 'look', 'level', 'xp', 'gold', 'hp', 'inv', 'eq', 'quests', 'track', 'chests', 'x', 'y', 'kills', 'upg', 'treasure', 'ach', 'title', 'cnt', 'respawnAt', 'found', 'boat', 'pk', 'caches', 'zs', 'pet', 'home', 'base', 'saved', 'sv', 'held']);
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { STRUCTS, PLANTER_GROW, HOME_OK, HOME_MAX, HOME_PRICE, QUEST_PICK, PROPERTY, HOME_LIMIT, RESALE, plotCategory } from '../shared/data/craft.js';
 import { social } from './social.js';
@@ -32,6 +32,7 @@ import { tavern } from './tavern.js';
 import { naval } from './naval.js';
 import { dungeonLogic } from './dungeon.js';
 import { sea } from './sea.js';
+import { seasons } from './seasons.js';
 import { MEM_KEYS } from '../shared/data/scenes.js';
 import { repLevel, buyPrice, sellPrice } from '../shared/data/places.js';
 import { LEGACY_VALUE, LEGACY_STRUCT, QUEST_ITEM_OLD_VALUE } from '../shared/data/legacy.js';
@@ -71,6 +72,7 @@ const HOME_STORE = 48; // le coffre de la maison (0.8 : il remplace les coffres 
 const HOUSE_MUSIC = [['', 'silence'], ['day', 'Airs de Port-Lanterne'], ['sea', 'Chant du grand large'], ['cite', 'Gigue de Libertalia'], ['night', 'Nocturne des Brumes'], ['naval', 'Bordée de combat'], ['swamp', 'Souffle des marais'], ['epic', 'Charge de la pleine lune'], ['boss', 'Duel des capitaines']];
 // 1.0 : la collection d'airs — chaque musique entendue pour la première fois est notée dans le carnet du pirate
 const LORE_PAGES = [
+  '« Carnet d’un sonneur » : Trois cloches marines dorment sur trois îles : chez l’ermite, sur l’atoll des os, au-dessus du lagon. Qui les fait chanter toutes trois dans la même journée, la mer lui ouvre sa bourse.',
   '« Journal d’un mousse » : Le capitaine dit que la mer ne garde pas ses morts depuis que le Cœur de Corail a disparu. Moi, j’ai vu ma mère sur la plage, cette nuit. Elle ne m’a pas reconnu.',
   '« Traité des marées » : Les anciens parlaient d’une cité sous la mer, au large du Gouffre. On n’y entrait qu’avec de l’air enfermé dans une cloche de bronze.',
   '« Registre de Libertalia, an I » : Ni roi, ni maître. Le premier qui posera une couronne sur sa tête sera jeté à la mer. — Aubin Sans-Maître.',
@@ -118,6 +120,7 @@ export class Game {
     this.arenaInit();
     this.tavernInit();
     this.dungeonInit();
+    this.seasonsInit();
     this.seenW = Math.ceil(this.world.W / SEEN_CELL); this.seenH = Math.ceil(this.world.OVER_H / SEEN_CELL); this.seenBytes = Math.ceil(this.seenW * this.seenH / 8);
     this.usedTokens = new Set(); this.fails = new Map(); this.bans = {}; this.reports = []; this.maintenance = null; // 1.0
     if (storage && storage.loadMeta) { Promise.resolve(storage.loadMeta('bans')).then((b) => { if (b) this.bans = b; }).catch(() => {}); Promise.resolve(storage.loadMeta('reports')).then((r) => { if (Array.isArray(r)) this.reports = r; }).catch(() => {}); }
@@ -229,6 +232,9 @@ export class Game {
       case 'repair': return this.repair(p);
       case 'lever': return this.pullLever(p, m.i | 0);
       case 'dive': return this.dive(p);
+      case 'race': return this.raceStart(p);
+      case 'bell': return this.ringBell(p, m.i | 0);
+      case 'season': this.seasonRoll(); return this.send(p, this.seasonState());
       case 'arena': return this.arenaAction(p, String(m.a), m);
       case 'tav': return this.tavernAction(p, String(m.a), m);
       case 'mem': { const k = String(m.k); if (MEM_KEYS.has(k) && p.mem.size < 200) p.mem.add(k); return; }
@@ -320,6 +326,7 @@ export class Game {
     this.socialLogin(p);
     this.justiceLogin(p);
     if (this.wevt) this.pushEvent(p);
+    this.seasonPrizes(p);
     if (this.inDungeon(p)) this.pushDng(p);
     if (this.fosseBoard && this.fosseBoard.champ === p.key) this.unlock(p, 'champion_fosse');
     if (!res.data) this.toast(p, 'Bienvenue ! Parlez à la Capitaine Morgane, près des quais (touche E).', 'quest');
@@ -438,6 +445,7 @@ export class Game {
     this.socialLoad(p, d);
     this.justiceLoad(p, d);
     this.navalLoad(p, d);
+    this.seasonsLoad(p, d);
     p.mem = new Set(d && Array.isArray(d.mem) ? d.mem.filter((k) => MEM_KEYS.has(k)) : []); // 1.0 : les choix qui comptent
     p.songs = new Set(['day', ...(d && Array.isArray(d.songs) ? d.songs.filter((k) => HOUSE_MUSIC.some(([x]) => x && x === k)) : [])]);
     if (d) {
@@ -508,7 +516,7 @@ export class Game {
     this.applyRefund(p);
   }
   serialize(p) {
-    return { ...(p.heldF || {}), ...this.socialSave(p), ...this.justiceSave(p), songs: [...(p.songs || [])], mem: [...(p.mem || [])], hulls: p.hulls, sv: SAVE_VERSION, held: p.held || [], seen: p.seen ? b64(p.seen) : undefined, st: p.st, kc: p.kc, met: p.met ? [...p.met] : [], col: p.col ? [...p.col] : [], tut: p.tut, name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: { ...(p.heldQ || {}), ...p.quests }, track: p.track || [], chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: { ...(p.heldA || {}), ...p.ach }, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
+    return { ...(p.heldF || {}), ...this.socialSave(p), ...this.justiceSave(p), songs: [...(p.songs || [])], mem: [...(p.mem || [])], hulls: p.hulls, fishRec: p.fishRec, sv: SAVE_VERSION, held: p.held || [], seen: p.seen ? b64(p.seen) : undefined, st: p.st, kc: p.kc, met: p.met ? [...p.met] : [], col: p.col ? [...p.col] : [], tut: p.tut, name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: { ...(p.heldQ || {}), ...p.quests }, track: p.track || [], chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: { ...(p.heldA || {}), ...p.ach }, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
   }
   save(p) {
     p.lastSave = this.time;
@@ -1671,6 +1679,20 @@ export class Game {
       if (p.level >= 10) this.unlock(p, 'niveau10');
     }
   }
+  // 1.0 : un secret — les trois cloches marines, à faire sonner dans la même journée
+  ringBell(p, i) {
+    const b = this.world.bells[i];
+    if (!b || p.dead || p.room >= 0 || Math.hypot(b.x - p.x, b.y - p.y) > 40) return;
+    if ((p.bellAt || 0) > this.time) return; p.bellAt = this.time + 2;
+    this.ev(b.x, b.y, ['fx', 'bell', b.x, b.y]);
+    p.bells = p.bells || {}; p.bells[i] = this.time;
+    const rung = Object.values(p.bells).filter((t) => this.time - t < DAY_LENGTH).length;
+    if (rung >= this.world.bells.length && !p.ach.secret_cloches) {
+      p.gold += 3000; p.dirtyMe = true; this.giveOrDrop(p, 'boussole_maudite', 1); this.unlock(p, 'secret_cloches');
+      this.toast(p, 'Les trois cloches chantent ensemble… La mer vous ouvre sa bourse : +3000 doublons et une boussole qui ne montre pas le nord.', 'quest');
+      this.broadcastChat(null, `🔔 Quelque part, trois cloches marines ont sonné ensemble. ${p.name} a percé un secret de l’archipel.`, 'sys');
+    } else this.toast(p, `La cloche marine sonne, grave et lointaine… (${rung}/${this.world.bells.length} aujourd’hui)`, 'info');
+  }
   // 1.0 : Acte III — l'Âme d'Anselme vient à qui la cherche, devant l'épave du Léviathan
   act3Tick(p) {
     const st = p.quests.a3_ame;
@@ -1961,6 +1983,7 @@ export class Game {
   onMove(p, m) {
     if (p.dead) return;
     if (p.aboard) { p.dir = (m.d | 0) & 3; return; } // à bord d'un autre : c'est le capitaine qui mène
+    if (p.race) this.raceCheck(p); // 1.0 : le Grand Tour
     const x = +m.x, y = +m.y;
     if (!isFinite(x) || !isFinite(y)) return;
     if (this.time < (p.grabbedUntil || 0)) { p.lastMoveAt = this.time; if (Math.hypot(x - p.x, y - p.y) > 3) this.sendPos(p); return; }
@@ -2337,6 +2360,8 @@ export class Game {
     if (!N || !N.shop || !N.shop.includes(item) || !this.nearNpc(p, npc, 90)) return;
     const np = this.npcPos.get(npc), place = np ? this.placeAt(np.x, np.y) : null;
     const it = ITEMS[item], price = buyPrice(it.value, repLevel(p.rep[place] || 0)); // 1.0 : remise de réputation
+    if (it.rep && repLevel(p.rep[it.rep[0]] || 0) < it.rep[1]) return this.toast(p, `${it.name} ne se vend qu’aux Héros de Libertalia (réputation la plus haute).`, 'warn'); // 1.0 : un navire légendaire
+    if (it.unique && (this.countItem(p, item) > 0 || Object.values(p.eq).includes(item))) return this.toast(p, 'Vous possédez déjà cet objet unique.', 'warn');
     if (p.gold < price) return this.toast(p, 'Pas assez de doublons !', 'warn');
     const left = this.addItem(p, item, 1);
     if (left) return this.toast(p, 'Inventaire plein !', 'warn');
@@ -2559,7 +2584,8 @@ export class Game {
     if (f.state !== 'bite') { this.ev(p.x, p.y, ['fishend', p.id, 0]); return this.toast(p, 'Trop tôt ! Attendez que ça morde (!).', 'warn'); }
     const night = this.night, w = weatherAt(this.worldTime);
     const table = [['sardine', 40], ['bar', 26], ['dorade', 11 * (f.deep ? 1.6 : 1)], ['botte_rouillee', 8], ['bouteille_mer', 6], ['carte_dechiree', 3],
-      ['espadon', (2 + w.storm * 7) * (f.deep ? 1.8 : 1)], ['poisson_lanterne', night ? 14 : 0]];
+      ['espadon', (2 + w.storm * 7) * (f.deep ? 1.8 : 1)], ['poisson_lanterne', night ? 14 : 0],
+      ['thon_rouge', f.deep ? 4 : 0], ['coelacanthe', f.deep && night ? 0.8 : 0], ['poisson_or', 0.35]]; // 1.0 : de nouvelles prises
     const tot = table.reduce((a, b) => a + b[1], 0);
     let r = Math.random() * tot, item = 'sardine';
     for (const [id, wgt] of table) { if ((r -= wgt) <= 0) { item = id; break; } }
@@ -2568,6 +2594,7 @@ export class Game {
     this.ev(f.x, f.y, ['fishend', p.id, 1, item]);
     if (ITEMS[item].use && ITEMS[item].use.heal || item === 'espadon') { p.cnt.fish++; this.unlock(p, 'peche'); }
     if (item === 'espadon') this.unlock(p, 'espadon');
+    this.fishCaught(p, item); // 1.0 : la taille, les records, le concours
   }
   // ------------------------------------------------------------ trésors
   dig(p) {
@@ -3100,6 +3127,7 @@ export class Game {
         this.justiceTick(p);
         this.act3Tick(p);
         this.seaTick(p);
+        if (p.race) this.raceCheck(p);
       }
       if (p.fishing) this.updateFishing(p);
       if (p.gold >= 1000 && !p.ach.riche) this.unlock(p, 'riche');
@@ -3110,6 +3138,7 @@ export class Game {
     if (this.tickCount % 5 === 0) for (const p of this.players.values()) this.updateBuffs(p);
     if (this.tickCount % 5 === 0) this.updateVolcano();
     if (this.tickCount % 20 === 0) { this.justiceGlobalTick(); this.eventTick(); }
+    if (this.tickCount % 1200 === 0) this.seasonRoll(); // une fois par minute : la saison a-t-elle changé ?
     if (this.tickCount % 5 === 0) { this.arenaTick(); this.dungeonTick(); }
     this.navalTick();
     if (this.tickCount % 40 === 0 && this.players.size > 1) { // les autres pirates sur la carte
@@ -3187,3 +3216,4 @@ Object.assign(Game.prototype, tavern); // 1.0 : les jeux de taverne
 Object.assign(Game.prototype, naval); // 1.0 : navires partagés et coques
 Object.assign(Game.prototype, dungeonLogic); // 1.0 : le Bastion Englouti
 Object.assign(Game.prototype, sea); // 1.0 : les fonds marins
+Object.assign(Game.prototype, seasons); // 1.0 : saisons, concours de pêche, Grand Tour
