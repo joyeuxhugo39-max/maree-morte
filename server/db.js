@@ -58,6 +58,55 @@ export class FileStorage {
     if (!ok) return { ok: false, err: 'Ce nom de pirate existe déjà et le mot de passe est incorrect.' };
     return { ok: true, data: acc.data };
   }
+  // 1.0 : données du compte sans mot de passe (reprise après une coupure, jeton déjà vérifié)
+  async loadData(key) { await this.ready; const acc = await this.read(key); return acc ? acc.data : null; }
+  // petites données du serveur : bannissements, signalements, classements...
+  async loadMeta(name) { await this.ready; return this.readFile(path.join(this.dir, '..', 'meta-' + name + '.json')); }
+  saveMeta(name, obj) {
+    const f = path.join(this.dir, '..', 'meta-' + name + '.json');
+    return this.enqueue('meta:' + name, async () => { const tmp = f + '.tmp'; await fs.writeFile(tmp, JSON.stringify(obj)); await fs.copyFile(f, f + '.bak').catch(() => {}); await fs.rename(tmp, f); });
+  }
+  // journal des transactions : une ligne JSON par événement, un fichier par jour, écrit par paquets
+  audit(entry) {
+    (this.auditBuf = this.auditBuf || []).push(JSON.stringify(entry));
+    if (!this.auditT) this.auditT = setTimeout(() => this.flushAudit(), 2000);
+  }
+  async flushAudit() {
+    this.auditT = null;
+    const lines = this.auditBuf || []; this.auditBuf = [];
+    if (!lines.length) return;
+    const dir = path.join(this.dir, '..', 'journal');
+    await fs.mkdir(dir, { recursive: true });
+    await fs.appendFile(path.join(dir, new Date().toISOString().slice(0, 10) + '.jsonl'), lines.join('\n') + '\n').catch((e) => console.error('[journal]', e.message));
+  }
+  async readJournal(day, q = '', limit = 300) {
+    const f = path.join(this.dir, '..', 'journal', (day || new Date().toISOString().slice(0, 10)) + '.jsonl');
+    const txt = await fs.readFile(f, 'utf8').catch(() => '');
+    const lines = txt.split('\n').filter((l) => l && (!q || l.toLowerCase().includes(q.toLowerCase())));
+    return lines.slice(-limit).reverse().map((l) => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(Boolean);
+  }
+  async listAccounts(q = '', limit = 200) {
+    await this.ready;
+    const files = (await fs.readdir(this.dir)).filter((n) => n.endsWith('.json'));
+    const out = [];
+    for (const f of files) {
+      const acc = await this.readFile(path.join(this.dir, f)); if (!acc) continue;
+      if (q && !String(acc.name || '').toLowerCase().includes(q.toLowerCase())) continue;
+      const dd = acc.data || {};
+      out.push({ name: acc.name, created: acc.created, updated: acc.updated, level: dd.level || 1, gold: dd.gold || 0, sv: dd.sv || 8 });
+      if (out.length >= limit) break;
+    }
+    return out.sort((a, b) => (b.updated || 0) - (a.updated || 0));
+  }
+  async listSnapshots() { return (await fs.readdir(path.join(this.dir, '..', 'backups')).catch(() => [])).sort().reverse(); }
+  async restoreAccount(snap, key) {
+    const f = crypto.createHash('sha1').update(key).digest('hex') + '.json';
+    const src = path.join(this.dir, '..', 'backups', path.basename(snap), 'accounts', f);
+    const acc = await this.readFile(src); if (!acc) throw new Error('compte absent de cet instantané');
+    await this.snapshot('avant-restauration');
+    await this.enqueue(key, () => this.rawWrite(key, acc));
+    return true;
+  }
   async loadWorld() { return this.readFile(path.join(this.dir, '..', 'world.json')); }
   async saveWorld(obj) {
     const f = path.join(this.dir, '..', 'world.json'), tmp = f + '.' + process.pid + '.tmp';
@@ -69,7 +118,7 @@ export class FileStorage {
     return this.worldQ;
   }
   // attend la fin de toutes les écritures en cours (arrêt propre)
-  async flush() { await Promise.all([...this.queues.values(), this.worldQ || Promise.resolve()]); }
+  async flush() { await this.flushAudit(); await Promise.all([...this.queues.values(), this.worldQ || Promise.resolve()]); }
   // instantané complet (comptes + monde) dans data/backups/AAAAMMJJHH, avec rotation
   async snapshot(tag = '') {
     await this.ready; await this.flush();

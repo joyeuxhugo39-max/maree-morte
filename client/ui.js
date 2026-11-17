@@ -7,7 +7,7 @@ import { ZONES, Z, SAFE, roomIdAt, zoneAt } from '../shared/world.js';
 import { T } from '../shared/constants.js';
 import { SLOTS, SLOT_NAMES, RARITY, INV_SIZE, MAP_W, OVER_H, TILE, clockString, dayFrac, darkness, weatherAt, isFullMoon } from '../shared/constants.js';
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
-import { UPG_SLOTS, UPG_MAX, upgradeCost, UPG_TEXT } from '../shared/formulas.js';
+import { UPG_SLOTS, UPG_MAX, upgradeCost, UPG_TEXT, reqLevel } from '../shared/formulas.js';
 import { STRUCTS, HOME_OK } from '../shared/data/craft.js';
 import { iconURL } from './render/sprites-items.js';
 import { MOBS } from '../shared/data/mobs.js';
@@ -223,6 +223,14 @@ export class UI {
     setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 450); }, kind === 'quest' || kind === 'level' ? 4200 : 2600);
   }
   // ------------------------------------------------------------ cinématiques, encre, confirmation, crochetage
+  // 1.0 : annonce de maintenance, avec compte à rebours dans le bandeau
+  maintenance(mt) {
+    clearInterval(this.maintT);
+    if (!mt) { this.toast('Maintenance annulée.', 'info'); return; }
+    const tick = () => { const s = Math.max(0, Math.round((mt.at - Date.now()) / 1000)); this.maintText = s > 0 ? `⚓ Maintenance dans ${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s — ${mt.msg}` : `⚓ Maintenance : ${mt.msg}`; const el = document.getElementById('maint'); if (el) { el.textContent = this.maintText; el.classList.remove('hidden'); } if (s <= 0) clearInterval(this.maintT); };
+    tick(); this.maintT = setInterval(tick, 1000);
+    this.toast(`Maintenance prévue : ${mt.msg}`, 'warn');
+  }
   cine(on) { document.body.classList.toggle('cine', !!on); if (!on) { this.cineTitle(null); this.cineSub(''); } }
   cineTitle(name, tag, cls = '') {
     const el = $('cine-title');
@@ -361,6 +369,7 @@ export class UI {
     const it = ITEMS[id]; if (!it) return '';
     const r = RARITY[it.rarity || 0];
     const lines = [];
+    if (it.slot) { const need = reqLevel(it), my = this.G.me ? this.G.me.lvl : 1; lines.push(`<div class="${my >= need ? 'tt' : 'tw'}">Niveau requis : ${need}${my < need ? ' (vous êtes niveau ' + my + ')' : ''}</div>`); }
     const stat = (k, label, pct) => { if (it[k]) lines.push(`<div class="ts">+${pct ? Math.round(it[k] * 100) + ' %' : it[k]} ${label}</div>`); };
     stat('atk', 'attaque'); stat('gun', 'puissance de tir'); stat('def', 'défense'); stat('hp', 'PV max'); stat('crit', 'coup critique', true); stat('spd', 'vitesse', true); stat('regen', 'régénération PV/s');
     if (it.slot === 'weapon') {

@@ -1,6 +1,6 @@
 // Point d'entrée du client : état, réseau, prédiction locale, boucle principale.
 import { generateWorld, moveWithCollision, moveBoat, canSail, canStand, roomIdAt, tileAt, zoneAt, Z, ZONES, SAFE } from '../shared/world.js';
-import { TILE, ROLL_SPEED, ROLL_TIME, SPEED_MUL, INTERACT_RANGE, isNight, dayFrac, weatherAt, WEATHER_PERIOD, T, isFullMoon, moonPhase } from '../shared/constants.js';
+import { TILE, ROLL_SPEED, ROLL_TIME, SPEED_MUL, INTERACT_RANGE, isNight, dayFrac, weatherAt, WEATHER_PERIOD, T, isFullMoon, moonPhase, PROTOCOL } from '../shared/constants.js';
 import { MOBS } from '../shared/data/mobs.js';
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { mulberry32 } from '../shared/rng.js';
@@ -134,14 +134,18 @@ async function boot(hotData = {}) {
     }
     if (!G.net) return G.ui.loginError('Serveur injoignable.');
     G.loginInfo = { name, look };
-    G.send({ t: 'login', name, pass: online && !solo ? pass : 'solo', look });
+    const rs = resumeInfo(); // 1.0 : reprise après une coupure, sans redemander le mot de passe
+    G.send({ t: 'login', v: PROTOCOL, name, pass: online && !solo ? pass : 'solo', look, rt: rs && rs.name === name ? rs.rt : undefined });
   };
   if (PAGES && !online) G.ui.showLogin({ noPass: true, offerSolo: true, note: 'En ligne : tous ceux qui ouvrent ce lien jouent dans le même monde. Votre progression reste dans ce navigateur.', onSubmit: submit });
   else G.ui.showLogin({ solo: !online, offerSolo: online, onSubmit: submit });
+  const rs0 = resumeInfo();
+  if (online && rs0 && rs0.auto) { try { sessionStorage.setItem('mm_resume', JSON.stringify({ ...rs0, auto: 0 })); } catch (e) { /* */ } G.ui.loginError('Reconnexion en cours…'); submit({ name: rs0.name, pass: '', look: null, solo: false }); }
   // reprise automatique après une mise à jour de la page
   const resume = hotData && hotData.name;
   if (resume) { $('lg-name').value = hotData.name; setTimeout(() => submit({ name: hotData.name, look: hotData.look || G.ui.look, solo: true }), 600); }
 }
+function resumeInfo() { try { return JSON.parse(sessionStorage.getItem('mm_resume') || 'null'); } catch (e) { return null; } }
 function hookNet() {
   G.net.onmsg = onMsg;
   G.net.onhost = (isHost) => {
@@ -152,7 +156,14 @@ function hookNet() {
     if (G.mode !== 'online') return;
     $('death').classList.remove('hidden');
     $('death').querySelector('h1').textContent = 'Connexion perdue';
-    $('death-txt').textContent = 'Le serveur ne répond plus. Rechargez la page pour reprendre la mer.';
+    const rs = resumeInfo();
+    if (rs && !G.kicked) { // on attend que le serveur réponde, puis on relance la page et l'on reprend la partie
+      $('death-txt').textContent = 'Le serveur ne répond plus. Reconnexion automatique dès son retour…';
+      try { sessionStorage.setItem('mm_resume', JSON.stringify({ ...rs, auto: 1 })); } catch (e) { /* */ }
+      const t0 = Date.now();
+      const poll = () => fetch('/sante', { cache: 'no-store' }).then((r) => { if (r.ok) location.reload(); else throw 0; }).catch(() => { if (Date.now() - t0 < 600000) setTimeout(poll, 2000); else $('death-txt').textContent = 'Le serveur est toujours absent. Rechargez la page plus tard.'; });
+      setTimeout(poll, 1500);
+    } else $('death-txt').textContent = 'Le serveur ne répond plus. Rechargez la page pour reprendre la mer.';
     $('respawn-btn').textContent = 'Recharger';
     $('respawn-btn').onclick = () => location.reload();
   };
@@ -162,8 +173,12 @@ function hookNet() {
 function onMsg(m) {
   const now = nowS(), ui = G.ui;
   switch (m.t) {
-    case 'err': ui.loginError(m.msg); break;
-    case 'welcome': start(m, now); break;
+    case 'err': ui.loginError(m.msg); if (m.reload) setTimeout(() => location.reload(), 2500); break;
+    case 'maint': G.maint = m.m; ui.maintenance(m.m); break;
+    case 'welcome':
+      if (m.rt && G.mode === 'online') { try { sessionStorage.setItem('mm_resume', JSON.stringify({ name: m.name, rt: m.rt, auto: 0 })); } catch (e) { /* */ } }
+      start(m, now); if (m.maint) { G.maint = m.maint; ui.maintenance(m.maint); }
+      break;
     case 's': snapshot(m, now); break;
     case 'me': {
       const prev = G.me;
@@ -252,7 +267,7 @@ function onMsg(m) {
     case 'qdone': { const q = QUESTS[m.q]; ui.toast(`Quête terminée : ${q.name}`, 'quest'); G.sfx.play('quest'); break; }
     case 'dice': ui.diceResult(m); break;
     case 'dead': ui.showDeath(m.lost, m.by); G.sfx.play('die'); break;
-    case 'kick': ui.toast(m.msg, 'warn'); break;
+    case 'kick': G.kicked = true; ui.toast(m.msg, 'warn'); try { sessionStorage.removeItem('mm_resume'); } catch (e) { /* */ } break;
     case 'pong': G.ping = Math.round(performance.now() - m.c); break;
     case 'homes': G.homes = new Map(m.list.map(([k, name, lock]) => [k, { name, lock: lock || 0 }])); break;
     case 'seal': { G.seals[m.id] = now + m.open; if (m.id === 'jumeaux') G.sealUntil = now + m.open; const S = G.world.seals.find((q) => q.id === m.id), d = S && G.world.doors[S.door]; if (d && G.player && Math.hypot(G.player.x - d.ox, G.player.y - d.oy) < 400) { G.sfx.play('seal'); G.renderer.shake(3, 0.8); } break; }

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marée Morte — Capitainerie</title>
+<style>
+:root { --ink: #2b1d14; --parch: #ecd9ac; --wood: #3a2414; --red: #9c2530; --gold: #c9a24c; }
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.45 system-ui, sans-serif; background: #1a120c; color: var(--ink); }
+header { background: var(--wood); color: #f2d488; padding: 12px 18px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; border-bottom: 4px solid var(--gold); }
+header h1 { margin: 0; font: 700 22px Georgia, serif; }
+header input { padding: 6px 8px; border-radius: 4px; border: 2px solid var(--gold); background: #f6e9c6; min-width: 220px; }
+nav { display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 16px; background: #2a1a10; }
+nav button { background: #5a3a22; color: #f6e6c2; border: 2px solid #1a0e06; border-radius: 6px 6px 2px 2px; padding: 6px 12px; cursor: pointer; }
+nav button.on { background: var(--red); }
+main { padding: 16px; }
+.card { background: var(--parch); border: 3px solid var(--wood); border-radius: 4px; padding: 14px 16px; margin-bottom: 14px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; } th, td { text-align: left; padding: 5px 8px; border-bottom: 1px dashed rgba(90, 50, 20, 0.35); white-space: nowrap; }
+th { color: #5a1408; } .btn { background: linear-gradient(#f6d26a, #d9a03a); border: 2px solid #3a2008; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-weight: 600; }
+.btn.red { background: linear-gradient(#e0544a, #9c2530); color: #fff; } input, select, textarea { padding: 6px; border: 2px solid #6a4426; border-radius: 3px; background: #fbf2da; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0; } .muted { color: #6a4a30; font-size: 13px; } pre { white-space: pre-wrap; margin: 0; }
+.kpi { display: inline-block; min-width: 130px; margin: 4px 12px 4px 0; } .kpi b { display: block; font-size: 22px; color: #5a1408; }
+</style></head><body>
+<header><h1>⚓ Capitainerie de Marée Morte</h1><input id="tok" type="password" placeholder="Jeton d'administration"><button class="btn" id="go">Entrer</button><span id="msg" class="muted"></span></header>
+<nav id="nav"></nav><main id="main"><div class="card">Saisissez le jeton (variable d'environnement ADMIN_TOKEN du serveur).</div></main>
+<script>
+const $ = (s) => document.querySelector(s), esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let tok = sessionStorage.getItem('mm_admin') || '';
+$('#tok').value = tok;
+async function api(cmd, body, qs = '') {
+  const r = await fetch('/admin/api/' + cmd + qs, { method: body ? 'POST' : 'GET', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({ err: 'réponse illisible' }));
+  if (!r.ok) throw new Error(j.err || r.status);
+  return j;
+}
+const table = (rows, cols) => rows.length ? `<table><tr>${cols.map(([, h]) => `<th>${h}</th>`).join('')}</tr>${rows.map((r) => `<tr>${cols.map(([k]) => `<td>${typeof k === 'function' ? k(r) : esc(r[k])}</td>`).join('')}</tr>`).join('')}</table>` : '<p class="muted">Rien à afficher.</p>';
+const date = (t) => t ? new Date(t).toLocaleString('fr-FR') : '';
+const VIEWS = {
+  'État': async () => { const s = await api('status'); return `<div class="card">${[['Version', s.version], ['Joueurs en ligne', s.players], ['Monstres actifs', s.alive + ' / ' + s.mobs], ['Tour moyen', s.tickMs + ' ms'], ['Pire tour (10 s)', s.tickMax + ' ms'], ['Mémoire', s.mem + ' Mo'], ['Maisons', s.homes], ['En ligne depuis', Math.round(s.uptime / 60) + ' min'], ['Nuit', s.night ? 'oui' : 'non']].map(([k, v]) => `<span class="kpi">${k}<b>${esc(v)}</b></span>`).join('')}${s.maintenance ? `<p><b>Maintenance prévue :</b> ${esc(s.maintenance.msg)} — ${date(s.maintenance.at)}</p>` : ''}</div>`; },
+  'Joueurs': async () => { const l = await api('players'); return `<div class="card">${table(l, [['name', 'Pirate'], ['level', 'Niv.'], ['gold', 'Doublons'], ['zone', 'Zone'], [(r) => r.x + ', ' + r.y, 'Position'], ['pk', 'Victimes'], ['ip', 'IP'], [(r) => `<button class="btn" onclick="act('kick',{name:'${esc(r.name)}'})">Expulser</button> <button class="btn red" onclick="banAsk('${esc(r.name)}')">Bannir</button>`, '']])}</div>`; },
+  'Comptes': async () => `<div class="card"><div class="row"><input id="aq" placeholder="Nom contient…"><button class="btn" onclick="show('Comptes')">Chercher</button></div><div id="acc"></div></div>`,
+  'Signalements': async () => { const l = await api('reports'); return `<div class="card">${table(l, [[(r) => date(r.at), 'Date'], ['from', 'De'], ['who', 'Contre'], ['reason', 'Motif'], [(r) => `<details><summary>chat</summary><pre>${esc((r.chat || []).map((c) => (c.from || '') + ' : ' + (c.m || c.msg || '')).join('\n'))}</pre></details>`, 'Contexte']])}</div>`; },
+  'Journal': async () => `<div class="card"><div class="row"><input id="jd" type="date" value="${new Date().toISOString().slice(0, 10)}"><input id="jq" placeholder="Filtre (nom, achat, vente, échange…)"><button class="btn" onclick="journal()">Afficher</button></div><div id="jr"></div></div>`,
+  'Bannis': async () => { const b = await api('bans'); const rows = Object.entries(b).map(([k, v]) => ({ k, ...v })); return `<div class="card">${table(rows, [['k', 'Pirate'], ['reason', 'Motif'], [(r) => r.until > 9e14 ? 'définitif' : date(r.until), "Jusqu'au"], [(r) => `<button class="btn" onclick="act('unban',{name:'${esc(r.k)}'})">Lever</button>`, '']])}</div>`; },
+  'Actions': async () => { const sn = await api('snapshots'); return `
+    <div class="card"><b>Annonce à tous</b><div class="row"><input id="an" style="flex:1" placeholder="Message"><button class="btn" onclick="act('announce',{msg:$('#an').value})">Annoncer</button></div></div>
+    <div class="card"><b>Maintenance</b><div class="row"><input id="mm" type="number" min="0" value="10" style="width:80px"> minutes <input id="mt" style="flex:1" placeholder="Motif" value="Mise à jour du serveur."><label><input id="mc" type="checkbox"> fermer les connexions</label><button class="btn" onclick="act('maintenance',{minutes:+$('#mm').value,msg:$('#mt').value,closed:$('#mc').checked})">Programmer</button><button class="btn" onclick="act('maintenance',{minutes:0})">Annuler</button></div></div>
+    <div class="card"><b>Événement</b><div class="row"><select id="ev"><option value="invasion">Invasion d'une ville</option><option value="armada">Armada au large</option><option value="tresor">Trésor flottant</option></select><button class="btn" onclick="act('event',{kind:$('#ev').value})">Déclencher</button></div></div>
+    <div class="card"><b>Sauvegardes</b><div class="row"><button class="btn" onclick="act('save',{})">Sauvegarder maintenant</button><button class="btn" onclick="act('snapshot',{})">Instantané</button></div>
+      <div class="row"><select id="sn">${sn.map((n) => `<option>${esc(n)}</option>`).join('')}</select><input id="rn" placeholder="Pirate à restaurer"><button class="btn red" onclick="if(confirm('Restaurer ce pirate ? Son état actuel est gardé dans un instantané.')) act('restore',{snapshot:$('#sn').value,name:$('#rn').value})">Restaurer</button></div>
+      <p class="muted">Restauration complète : arrêter le serveur, puis <code>node scripts/restore.mjs &lt;instantané&gt;</code>.</p></div>`; },
+};
+async function act(cmd, body) { try { const r = await api(cmd, body); $('#msg').textContent = '✔ ' + cmd + (r && r.err ? ' : ' + r.err : ''); show(cur); } catch (e) { $('#msg').textContent = '✖ ' + e.message; } }
+function banAsk(name) { const h = prompt('Durée du bannissement en heures (vide = définitif) :', '24'); if (h === null) return; const reason = prompt('Motif :', '') || ''; act('ban', { name, hours: h ? +h : 0, reason }); }
+async function journal() { try { const l = await api('journal', null, `?day=${$('#jd').value}&q=${encodeURIComponent($('#jq').value)}`); $('#jr').innerHTML = table(l, [['t', 'Heure'], ['kind', 'Type'], ['who', 'Pirate'], [(r) => esc(JSON.stringify(Object.fromEntries(Object.entries(r).filter(([k]) => !['t', 'kind', 'who'].includes(k))))), 'Détails']]); } catch (e) { $('#jr').textContent = e.message; } }
+let cur = 'État';
+async function show(name) {
+  cur = name; [...$('#nav').children].forEach((b) => b.classList.toggle('on', b.textContent === name));
+  try { $('#main').innerHTML = await VIEWS[name](); if (name === 'Comptes') { const l = await api('accounts', null, '?q=' + encodeURIComponent(($('#aq') || {}).value || '')); $('#acc').innerHTML = table(l, [['name', 'Pirate'], ['level', 'Niv.'], ['gold', 'Doublons'], [(r) => date(r.updated), 'Dernière sauvegarde'], [(r) => date(r.created), 'Créé'], ['sv', 'Version']]); } $('#msg').textContent = ''; }
+  catch (e) { $('#main').innerHTML = `<div class="card">${esc(e.message)}</div>`; }
+}
+$('#nav').innerHTML = Object.keys(VIEWS).map((k) => `<button>${k}</button>`).join('');
+[...$('#nav').children].forEach((b) => (b.onclick = () => show(b.textContent)));
+$('#go').onclick = () => { tok = $('#tok').value; sessionStorage.setItem('mm_admin', tok); show('État'); };
+if (tok) show('État');
+setInterval(() => { if (tok && cur === 'État') show('État'); }, 10000);
+</script></body></html>

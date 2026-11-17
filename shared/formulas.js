@@ -2,6 +2,17 @@ import { ITEMS } from './data/items.js';
 import { PLAYER_SPEED, SLOTS } from './constants.js';
 
 export const MAX_LEVEL = 30;
+// 1.0 : niveau requis pour s'équiper — explicite (it.lvl) ou déduit de la valeur ; les montures sont plus accessibles
+const REQ_STEPS = [[20, 1], [60, 2], [120, 4], [250, 6], [500, 8], [900, 11], [1600, 14], [2600, 17], [4200, 20], [7000, 23], [10000, 26]];
+export function reqLevel(it) {
+  if (!it || !it.slot) return 1;
+  if (it.lvl) return it.lvl;
+  const v = it.value || 0;
+  let L = 28;
+  for (const [max, lv] of REQ_STEPS) if (v <= max) { L = lv; break; }
+  if (it.slot === 'mount') L = Math.max(1, Math.round(L * 0.6));
+  return L;
+}
 export function xpToNext(level) { return Math.round(50 * Math.pow(level, 1.6) + 30); }
 
 // riding : la monture équipée n'apporte ses bonus qu'en selle ; buffs : potions en cours { spd, atk, def }

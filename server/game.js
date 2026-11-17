@@ -28,7 +28,7 @@ import { MOBS } from '../shared/data/mobs.js';
 import { QUESTS, questState, goalsMet, npcVisible } from '../shared/data/quests.js';
 import { NPCS } from '../shared/data/npcs.js';
 import { SKILLS } from '../shared/data/skills.js';
-import { computeStats, xpToNext, mitigate, displayLook, sanitizeLook, MAX_LEVEL, UPG_SLOTS, UPG_MAX, upgradeCost } from '../shared/formulas.js';
+import { computeStats, xpToNext, mitigate, displayLook, sanitizeLook, MAX_LEVEL, UPG_SLOTS, UPG_MAX, upgradeCost, reqLevel } from '../shared/formulas.js';
 
 const DT = 1 / TICK_RATE;
 const PVP_MUL = 0.6; // les dégâts entre joueurs sont réduits
@@ -85,6 +85,9 @@ export class Game {
     this.nextId = 1;
     this.players = new Map();
     this.sessions = new Map(); // conn -> session { player, bucket, lastMsg }
+    this.version = GAME_VERSION;
+    this.usedTokens = new Set(); this.fails = new Map(); this.bans = {}; this.reports = []; this.maintenance = null; // 1.0
+    if (storage && storage.loadMeta) { Promise.resolve(storage.loadMeta('bans')).then((b) => { if (b) this.bans = b; }).catch(() => {}); Promise.resolve(storage.loadMeta('reports')).then((r) => { if (Array.isArray(r)) this.reports = r; }).catch(() => {}); }
     this.mobs = [];
     this.drops = new Map();
     this.projs = [];
@@ -211,15 +214,26 @@ export class Game {
   async login(conn, s, m) {
     const name = String(m.name || '').trim().replace(/\s+/g, ' ');
     const pass = String(m.pass || '');
+    if ((m.v | 0) !== PROTOCOL) return conn.send({ t: 'err', msg: 'Une nouvelle version du jeu est disponible : rechargez la page.', reload: 1 });
+    if (this.maintenance && this.maintenance.closed) return conn.send({ t: 'err', msg: 'Maintenance en cours : ' + (this.maintenance.msg || 'revenez dans quelques minutes.') });
     if (!NAME_RE.test(name)) return conn.send({ t: 'err', msg: 'Nom invalide : 3 à 16 lettres ou chiffres.' });
-    if (!this.solo && (pass.length < 4 || pass.length > 64)) return conn.send({ t: 'err', msg: 'Mot de passe : 4 caractères minimum.' });
-    const key = name.toLowerCase();
+    const key = name.toLowerCase(), ip = conn.ip || 'local';
+    const ban = this.banOf(key);
+    if (ban) return conn.send({ t: 'err', msg: `Ce pirate est banni${ban.until < 9e15 ? " jusqu'au " + new Date(ban.until).toLocaleString('fr-FR') : ''}. Motif : ${ban.reason || 'non précisé'}.` });
+    const wait = this.loginBlocked(key, ip);
+    if (wait) return conn.send({ t: 'err', msg: `Trop d'essais. Réessayez dans ${Math.ceil(wait / 60)} minute${wait > 60 ? 's' : ''}.` });
+    const rt = typeof m.rt === 'string' && !this.usedTokens.has(m.rt) ? await this.checkToken(m.rt) : null; // reprise après une coupure, sans redemander le mot de passe
+    if (!rt && !this.solo && (pass.length < 4 || pass.length > 64)) return conn.send({ t: 'err', msg: 'Mot de passe : 4 caractères minimum.' });
     s.pending = true;
     let res;
-    try { res = await this.storage.auth(key, name, pass); } catch (e) { res = { ok: false, err: 'Erreur du serveur de sauvegarde.' }; }
+    try {
+      if (rt && rt.key === key && rt.until > Date.now() && this.storage.loadData) res = { ok: true, data: await this.storage.loadData(key) };
+      else res = await this.storage.auth(key, name, pass);
+    } catch (e) { res = { ok: false, err: 'Erreur du serveur de sauvegarde.' }; }
     s.pending = false;
     if (!this.sessions.has(conn)) return;
-    if (!res.ok) return conn.send({ t: 'err', msg: res.err || 'Mot de passe incorrect.' });
+    if (!res.ok) { this.loginFailed(key, ip); this.audit('connexion-refusee', { who: key, ip }); return conn.send({ t: 'err', msg: res.err || 'Mot de passe incorrect.' }); }
+    if (rt) { this.usedTokens.add(m.rt); if (this.usedTokens.size > 5000) this.usedTokens.clear(); }
     if (res.data && (res.data.sv | 0) > SAVE_VERSION) { // jamais d'écrasement par une version plus ancienne
       this.log(`[sauvegarde] ${name} : sauvegarde v${res.data.sv} plus récente que le serveur (v${SAVE_VERSION}), connexion refusée`);
       return conn.send({ t: 'err', msg: 'Ce pirate a été sauvegardé par une version plus récente du jeu. Revenez quand le serveur sera à jour.' });
@@ -241,8 +255,10 @@ export class Game {
     if (p.pendingBase) { this.refundBase(p.key, p.pendingBase); p.pendingBase = null; }
     if (p.pendingHome) { this.importHome(p.key, p.name, p.pendingHome); p.pendingHome = null; }
     this.convertLegacy(p);
+    const token = await this.makeToken(key);
+    p.ip = ip; this.audit('connexion', { who: key, ip });
     this.send(p, {
-      t: 'welcome', id: p.id, seed: this.world.seed, wt: this.worldTime, solo: this.solo,
+      t: 'welcome', id: p.id, seed: this.world.seed, wt: this.worldTime, solo: this.solo, rt: token, ver: GAME_VERSION, maint: this.maintenance || null,
       me: this.meState(p), inv: p.inv, eq: p.eq, q: p.quests, tr: p.track || [], chests: p.chests, look: p.look, base: p.base,
       name: p.name, x: p.x, y: p.y, isNew: !res.data, ach: p.ach, treasure: p.treasure,
       history: (this.chatLog || []).slice(-12),
@@ -253,6 +269,89 @@ export class Game {
     this.broadcastChat(null, `${p.name} accoste à Port-Lanterne.`, 'sys');
     if (!res.data) this.toast(p, 'Bienvenue ! Parlez à la Capitaine Morgane, près des quais (touche E).', 'quest');
     this.log(`[jeu] ${p.name} connecté (${this.players.size} en ligne)`);
+  }
+
+  // ------------------------------------------------------------ 1.0 : sécurité et administration
+  newToken() { const a = new Uint8Array(18); globalThis.crypto.getRandomValues(a); return [...a].map((b) => b.toString(16).padStart(2, '0')).join(''); }
+  // jeton de reprise signé (HMAC) : il survit à un redémarrage du serveur, valable vingt minutes
+  async hmacKey() {
+    if (!this._hk) this._hk = (async () => {
+      let sec = this.storage.loadMeta ? await Promise.resolve(this.storage.loadMeta('secret')).catch(() => null) : null;
+      if (!sec || !sec.k) { sec = { k: this.newToken() + this.newToken() }; if (this.storage.saveMeta) await Promise.resolve(this.storage.saveMeta('secret', sec)).catch(() => {}); }
+      return globalThis.crypto.subtle.importKey('raw', new TextEncoder().encode(sec.k), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    })();
+    return this._hk;
+  }
+  async sign(s) { const sig = await globalThis.crypto.subtle.sign('HMAC', await this.hmacKey(), new TextEncoder().encode(s)); return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join(''); }
+  async makeToken(key) { if (!(globalThis.crypto && globalThis.crypto.subtle)) return null; const body = key + '|' + (Date.now() + 20 * 60 * 1000); return encodeURIComponent(body) + '.' + await this.sign(body); }
+  async checkToken(tok) {
+    if (!(globalThis.crypto && globalThis.crypto.subtle)) return null;
+    try {
+      const [b, sig] = String(tok).split('.'); const body = decodeURIComponent(b);
+      if (!sig || (await this.sign(body)) !== sig) return null;
+      const [key, until] = body.split('|');
+      return +until > Date.now() ? { key, until: +until } : null;
+    } catch (e) { return null; }
+  }
+  // cinq essais ratés par nom, ou vingt par adresse, en dix minutes : on patiente un quart d'heure
+  loginFailed(key, ip) {
+    const now = Date.now();
+    for (const [k, max] of [['n:' + key, 5], ['ip:' + ip, 20]]) {
+      const e = this.fails.get(k) || { n: 0, since: now, until: 0 };
+      if (now - e.since > 600000) { e.n = 0; e.since = now; }
+      if (++e.n >= max) { e.until = now + 900000; e.n = 0; e.since = now; }
+      this.fails.set(k, e);
+    }
+  }
+  loginBlocked(key, ip) { const now = Date.now(); let w = 0; for (const k of ['n:' + key, 'ip:' + ip]) { const e = this.fails.get(k); if (e && e.until > now) w = Math.max(w, (e.until - now) / 1000); } return w; }
+  banOf(key) { const b = this.bans[key]; if (!b) return null; if (b.until && b.until < Date.now()) { delete this.bans[key]; this.storeBans(); return null; } return b; }
+  storeBans() { if (this.storage.saveMeta) Promise.resolve(this.storage.saveMeta('bans', this.bans)).catch(() => {}); }
+  audit(kind, data) { if (this.storage.audit) this.storage.audit(Object.assign({ t: new Date().toISOString(), kind }, data)); }
+  report(p, target, reason) {
+    const r = { at: Date.now(), from: p.name, who: String(target).slice(0, 20), reason: String(reason || '').slice(0, 200), chat: (this.chatLog || []).slice(-15) };
+    this.reports.push(r); if (this.reports.length > 500) this.reports.shift();
+    if (this.storage.saveMeta) Promise.resolve(this.storage.saveMeta('reports', this.reports)).catch(() => {});
+    this.audit('signalement', { from: p.key, who: r.who, reason: r.reason });
+    this.toast(p, 'Signalement transmis aux administrateurs. Merci.', 'info');
+  }
+  // commandes réservées aux administrateurs (voir server/index.js : /admin, protégé par ADMIN_TOKEN)
+  admin(cmd, a = {}) {
+    const findP = (n) => [...this.players.values()].find((q) => q.key === String(n || '').toLowerCase());
+    this.audit('admin', { cmd, a });
+    switch (cmd) {
+      case 'status': {
+        const mem = typeof process !== 'undefined' && process.memoryUsage ? process.memoryUsage() : {};
+        return { version: GAME_VERSION, protocol: PROTOCOL, players: this.players.size, mobs: this.mobs.length, alive: this.mobs.filter((m) => m.state !== 'dead').length, drops: this.drops.size, projs: this.projs.length,
+          tickMs: +(this.tickMs || 0).toFixed(2), tickMax: +(this.tickMax || 0).toFixed(2), uptime: Math.round(this.time), mem: Math.round((mem.heapUsed || 0) / 1048576), homes: this.homes.size, maintenance: this.maintenance || null, night: this.night };
+      }
+      case 'players': return [...this.players.values()].map((q) => ({ name: q.name, level: q.level, gold: q.gold, zone: ZONES[q.zone] ? ZONES[q.zone].name : q.zone, x: Math.round(q.x / TILE), y: Math.round(q.y / TILE), ip: q.ip, pk: q.pk }));
+      case 'reports': return this.reports.slice(-100).reverse();
+      case 'bans': return this.bans;
+      case 'ban': {
+        const key = String(a.name || '').toLowerCase(); if (!key) return { err: 'nom manquant' };
+        this.bans[key] = { reason: String(a.reason || '').slice(0, 200), until: a.hours ? Date.now() + a.hours * 3600000 : 9e15, at: Date.now() };
+        this.storeBans();
+        const q = findP(key); if (q) { this.send(q, { t: 'kick', msg: 'Vous avez été banni : ' + this.bans[key].reason }); this.dropConn(q); }
+        return { ok: true };
+      }
+      case 'unban': delete this.bans[String(a.name || '').toLowerCase()]; this.storeBans(); return { ok: true };
+      case 'kick': { const q = findP(a.name); if (!q) return { err: 'absent' }; this.send(q, { t: 'kick', msg: a.msg || 'Déconnecté par un administrateur.' }); this.dropConn(q); return { ok: true }; }
+      case 'announce': this.broadcastChat(null, '📣 ' + String(a.msg || '').slice(0, 200), 'boss'); for (const q of this.players.values()) this.toast(q, String(a.msg || '').slice(0, 200), 'quest'); return { ok: true };
+      case 'maintenance': { // annonce un arrêt dans N minutes ; closed : refuse les nouvelles connexions
+        const min = Math.max(0, +a.minutes || 0);
+        this.maintenance = min || a.closed ? { at: Date.now() + min * 60000, msg: String(a.msg || 'Mise à jour du serveur.').slice(0, 200), closed: !!a.closed } : null;
+        this.broadcastAll({ t: 'maint', m: this.maintenance });
+        return { ok: true, maintenance: this.maintenance };
+      }
+      case 'event': return this.startWorldEvent ? this.startWorldEvent(String(a.kind || ''), true) : { err: 'aucun événement' };
+      case 'save': return Promise.resolve(this.saveAll()).then(() => ({ ok: true }));
+      default: return { err: 'commande inconnue' };
+    }
+  }
+  dropConn(p) {
+    const os = [...this.sessions.entries()].find(([, v]) => v.player === p);
+    this.logout(p);
+    if (os) { os[1].player = null; try { os[0].close(); } catch (e) { /* déjà fermée */ } }
   }
 
   createPlayer(conn, name, key, d, look) {
@@ -1977,6 +2076,8 @@ export class Game {
     if (!s) return;
     const it = ITEMS[s.id];
     if (!it.slot) return;
+    const need = reqLevel(it);
+    if (p.level < need) return this.toast(p, `${it.name} : niveau ${need} requis.`, 'warn');
     const prev = p.eq[it.slot];
     p.eq[it.slot] = s.id;
     p.inv[i] = prev ? { id: prev, n: 1 } : null;
@@ -2054,6 +2155,7 @@ export class Game {
     const left = this.addItem(p, item, 1);
     if (left) return this.toast(p, 'Inventaire plein !', 'warn');
     p.gold -= price; p.dirtyMe = true;
+    this.audit('achat', { who: p.key, item, price, npc, gold: p.gold });
     this.send(p, { t: 'loot', id: item, n: 1, buy: price });
   }
   sell(p, i) {
@@ -2067,6 +2169,7 @@ export class Game {
     const price = Math.max(1, Math.floor(it.value * 0.35));
     s.n--; if (!s.n) p.inv[i] = null;
     p.gold += price; p.dirtyMe = true; p.dirtyInv = true; p.dirtyQ = true;
+    this.audit('vente', { who: p.key, item: s.id, price, gold: p.gold });
     this.send(p, { t: 'sold', id: s.id, price });
   }
   openProp(p, id) {
@@ -2172,6 +2275,7 @@ export class Game {
     const a = [r(), r()], b = [r(), r()], sa = a[0] + a[1], sb = b[0] + b[1];
     const gain = sa > sb ? (sa === 12 ? bet * 2 : bet) : -bet;
     p.gold += gain; p.dirtyMe = true;
+    this.audit('des', { who: p.key, bet, gain, gold: p.gold });
     if (gain > 0) { p.cnt.dice = (p.cnt.dice || 0) + 1; if (p.cnt.dice >= 10) this.unlock(p, 'flambeur'); this.questAct(p, 'dice_win'); }
     this.flush(p);
     this.send(p, { t: 'dice', a, b, gain, bet });
@@ -2193,9 +2297,10 @@ export class Game {
     if (msg[0] === '/') {
       const [cmd] = msg.slice(1).split(' ');
       if (cmd === 'who' || cmd === 'qui') return this.send(p, { t: 'chat', from: null, kind: 'sys', m: `En ligne (${this.players.size}) : ${[...this.players.values()].map((q) => `${q.name} (niv. ${q.level})`).join(', ')}` });
-      if (cmd === 'aide' || cmd === 'help') return this.send(p, { t: 'chat', from: null, kind: 'sys', m: 'Commandes : /qui, /pos, /suicide (retour en ville). Émotes : /danse /salut /rire /joie /colere /assis /doigt /salto (ou les touches 2 à 5).' });
+      if (cmd === 'aide' || cmd === 'help') return this.send(p, { t: 'chat', from: null, kind: 'sys', m: 'Commandes : /qui, /pos, /suicide (retour en ville), /signaler <pirate> <motif>. Émotes : /danse /salut /rire /joie /colere /assis /doigt /salto (ou les touches 2 à 5).' });
       if (cmd === 'pos') return this.send(p, { t: 'chat', from: null, kind: 'sys', m: `Position : ${Math.floor(p.x / TILE)}, ${Math.floor(p.y / TILE)} — ${p.room >= 0 ? this.world.rooms[p.room].name : ZONES[p.zone].name}${SAFE.has(p.zone) ? ' (zone sûre)' : ''}` });
       if (cmd === 'suicide' || cmd === 'unstuck') { if (!p.dead) this.killPlayer(p, null); return; }
+      if (cmd === 'signaler' || cmd === 'report') { const [, who, ...why] = msg.slice(1).split(' '); if (!who) return this.send(p, { t: 'chat', from: null, kind: 'sys', m: 'Usage : /signaler <pirate> <motif>' }); return this.report(p, who, why.join(' ')); }
       const EMOTES = { danse: 'danse', salut: 'salut', rire: 'rire', colere: 'colere', 'colère': 'colere', joie: 'joie', assis: 'assis', doigt: 'doigt', salto: 'salto' };
       if (EMOTES[cmd]) { this.ev(p.x, p.y, ['emote', p.id, EMOTES[cmd]]); return; }
       return this.send(p, { t: 'chat', from: null, kind: 'sys', m: 'Commande inconnue. Tapez /aide.' });
@@ -2672,7 +2777,12 @@ export class Game {
   }
 
   // ------------------------------------------------------------ boucle
-  tick() {
+  tick() { // 1.0 : durée de chaque tour mesurée (moyenne glissante et pire cas sur 10 s)
+    const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
+    this.tickInner();
+    if (t0) { const ms = performance.now() - t0; this.tickMs = (this.tickMs || ms) * 0.95 + ms * 0.05; if (this.tickCount % 200 === 0) this.tickMax = 0; this.tickMax = Math.max(this.tickMax || 0, ms); }
+  }
+  tickInner() {
     this.time += DT;
     this.tickCount++;
     this.worldTime += DT;
