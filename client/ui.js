@@ -4,7 +4,7 @@ import { QUESTS, QUEST_ORDER, questState } from '../shared/data/quests.js';
 import { NPCS } from '../shared/data/npcs.js';
 import { SKILLS, HOTBAR, EMOTES } from '../shared/data/skills.js';
 import { ZONES, Z, SAFE, roomIdAt, zoneAt } from '../shared/world.js';
-import { T } from '../shared/constants.js';
+import { T, SEEN_CELL } from '../shared/constants.js';
 import { SLOTS, SLOT_NAMES, RARITY, INV_SIZE, MAP_W, OVER_H, TILE, clockString, dayFrac, darkness, weatherAt, isFullMoon } from '../shared/constants.js';
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { UPG_SLOTS, UPG_MAX, upgradeCost, UPG_TEXT, reqLevel } from '../shared/formulas.js';
@@ -12,7 +12,7 @@ import { STRUCTS, HOME_OK } from '../shared/data/craft.js';
 import { iconURL } from './render/sprites-items.js';
 import { MOBS } from '../shared/data/mobs.js';
 import { slotFrameURL, plankURL, mouseURL, lockURL } from './render/ui-art.js';
-import { humanSheet, SKINS, HAIRS, CLOTH, CLOTH_KEYS, FW, FH } from './render/sprites-chars.js';
+import { humanSheet, SKINS, HAIRS, CLOTH, CLOTH_KEYS, FW, FH, mobSheet, portraitOf } from './render/sprites-chars.js';
 import { MINI_COL } from './render/terrain.js';
 
 const $ = (id) => document.getElementById(id);
@@ -124,6 +124,7 @@ export class UI {
     if (name === 'map') this.renderBigMap();
     if (name === 'forge') this.renderForge();
     if (name === 'ach') this.renderAch();
+    if (name === 'codex') this.renderCodex();
     if (name === 'settings') this.renderSettings();
     this.G.sfx.play('click');
   }
@@ -215,14 +216,18 @@ export class UI {
     if (kind === 'loot') return this.feed(msg, icon);
     if (this.G.aide !== 'complet' && (kind === 'info' || kind === 'quest') && /ZQSD|\(touche E\)|clic gauche/.test(msg)) return;
     const box = $('toasts');
-    const el = document.createElement('div'); el.className = 'toast ' + kind;
+    // 1.0 : moins envahissant — un message répété s'additionne au lieu de s'empiler, trois au plus à l'écran
+    const same = [...box.children].find((c) => c.dataset.msg === msg && !c.classList.contains('out'));
+    if (same) { same.dataset.n = (+same.dataset.n || 1) + 1; same.querySelector('span').textContent = `${msg} ×${same.dataset.n}`; clearTimeout(same._t); same._t = setTimeout(() => { same.classList.add('out'); setTimeout(() => same.remove(), 450); }, 2600); return; }
+    const el = document.createElement('div'); el.className = 'toast ' + kind; el.dataset.msg = msg;
     if (icon) { const im = document.createElement('img'); im.src = icon; el.appendChild(im); }
     const sp = document.createElement('span'); sp.textContent = msg; el.appendChild(sp);
     box.appendChild(el);
-    while (box.children.length > 5) box.firstChild.remove();
-    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 450); }, kind === 'quest' || kind === 'level' ? 4200 : 2600);
+    while (box.children.length > 3) box.firstChild.remove();
+    el._t = setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 450); }, kind === 'quest' || kind === 'level' ? 4200 : 2600);
   }
   // ------------------------------------------------------------ cinématiques, encre, confirmation, crochetage
+  tuto(html) { const el = $('tuto'); if (!el) return; if (html === this.tutoHtml) return; this.tutoHtml = html; if (!html) { el.classList.remove('on'); return; } el.innerHTML = html; el.classList.add('on'); }
   // 1.0 : annonce de maintenance, avec compte à rebours dans le bandeau
   maintenance(mt) {
     clearInterval(this.maintT);
@@ -968,6 +973,91 @@ export class UI {
     x.putImageData(img, 0, 0);
     this.miniBase = c;
   }
+  // ------------------------------------------------------------ 1.0 : le codex — tout ce que l'archipel a montré de lui-même
+  renderCodex(tab = this.codexTab || 'monstres') {
+    const G = this.G, cx = G.codex || { kc: {}, met: [], col: [], st: {} }, me = G.me || {};
+    this.codexTab = tab;
+    const TABS = [['monstres', 'Monstres'], ['boss', 'Boss'], ['armes', 'Armes'], ['objets', 'Objets'], ['pnj', 'Personnages'], ['iles', 'Îles'], ['secrets', 'Secrets'], ['stats', 'Statistiques']];
+    const isBoss = (k) => { const d = MOBS[k]; return d && (d.boss || (d.elite && (d.big || d.ai || d.sea))); };
+    const mobs = Object.keys(MOBS).filter((k) => !MOBS[k].ship && k !== 'tentacule');
+    const col = new Set(cx.col), met = new Set(cx.met), kc = cx.kc || {};
+    const weapons = Object.keys(ITEMS).filter((k) => ITEMS[k].slot === 'weapon' || ITEMS[k].slot === 'gun');
+    const others = Object.keys(ITEMS).filter((k) => !ITEMS[k].quest && !(ITEMS[k].slot === 'weapon' || ITEMS[k].slot === 'gun'));
+    const npcs = Object.keys(NPCS).filter((k) => !NPCS[k].board);
+    const isl = (G.world.islands || []).filter((i) => i.n > 150), rev = this.revealed || [];
+    const secrets = G.world.doors.filter((d) => d.secret);
+    const counts = { monstres: [mobs.filter((k) => !isBoss(k) && kc[k]).length, mobs.filter((k) => !isBoss(k)).length], boss: [mobs.filter((k) => isBoss(k) && kc[k]).length, mobs.filter(isBoss).length],
+      armes: [weapons.filter((k) => col.has(k)).length, weapons.length], objets: [others.filter((k) => col.has(k)).length, others.length], pnj: [npcs.filter((k) => met.has(k)).length, npcs.length],
+      iles: [isl.filter((i) => rev[i.id]).length, isl.length], secrets: [secrets.filter((d) => G.found && G.found.has(d.id)).length + (me.cch || 0), secrets.length + 6] };
+    const all = Object.values(counts).reduce((a, [g, t]) => [a[0] + g, a[1] + t], [0, 0]);
+    $('codex-sum').innerHTML = `<b>${all[0]} / ${all[1]}</b> entrées découvertes<div class="bar"><i style="width:${Math.round(all[0] / all[1] * 100)}%"></i></div>`;
+    $('codex-tabs').innerHTML = TABS.map(([k, n]) => `<button class="${k === tab ? 'on' : ''}" data-t="${k}">${n}${counts[k] ? ` <small>${counts[k][0]}/${counts[k][1]}</small>` : ''}</button>`).join('');
+    $('codex-tabs').querySelectorAll('button').forEach((b) => (b.onclick = () => this.renderCodex(b.dataset.t)));
+    const box = $('codex-list'); box.innerHTML = '';
+    const card = (ok, art, title, sub, body = '') => { const el = document.createElement('div'); el.className = 'cx' + (ok ? '' : ' locked'); if (art) el.appendChild(art); const t = document.createElement('div'); t.innerHTML = `<b>${ok ? esc(title) : '???'}</b><small>${ok ? sub : 'Pas encore découvert'}</small>${ok ? body : ''}`; el.appendChild(t); box.appendChild(el); };
+    const mobArt = (k, ok) => { const c = document.createElement('canvas'); c.width = 20; c.height = 22; c.className = 'cx-art'; try { const sh = mobSheet(k), pt = portraitOf(sh), x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(pt, 0, 0, pt.width, pt.height, (20 - pt.width) / 2, 0, pt.width, pt.height); } catch (e) { /* forme sans portrait */ } if (!ok) c.style.filter = 'brightness(0)'; return c; };
+    const itemArt = (k, ok) => { const im = document.createElement('img'); im.className = 'cx-art'; im.src = iconURL(ITEMS[k].icon, ITEMS[k].tint); if (!ok) im.style.filter = 'brightness(0) opacity(0.5)'; return im; };
+    const npcArt = (k, ok) => { const c = document.createElement('canvas'); c.width = 20; c.height = 22; c.className = 'cx-art'; const N = NPCS[k]; if (N.look) { const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(humanSheet(N.look).cv, 0, 0, FW, 22, 0, 0, FW, 22); } if (!ok) c.style.filter = 'brightness(0)'; return c; };
+    if (tab === 'monstres') for (const k of mobs.filter((m) => !isBoss(m))) { const d = MOBS[k]; card(!!kc[k], mobArt(k, !!kc[k]), d.name, `Niveau ${d.level} · ${d.hp} PV · vaincu ${kc[k] || 0} fois${d.night ? ' · ne sort que la nuit' : ''}`); }
+    if (tab === 'boss') for (const k of mobs.filter(isBoss)) {
+      const d = MOBS[k], ok = !!kc[k];
+      const loot = (d.loot || []).filter(([id]) => ITEMS[id] && !ITEMS[id].quest).map(([id, ch]) => `<span class="cx-loot" title="${esc(ITEMS[id].name)}"><img src="${iconURL(ITEMS[id].icon, ITEMS[id].tint)}">${ch >= 1 ? '100' : Math.round(ch * 100)} %</span>`).join('');
+      card(ok, mobArt(k, ok), d.name, `${esc(d.title || 'Élite')} · niveau ${d.level} · vaincu ${kc[k] || 0} fois`, loot ? `<div class="cx-loots">Récompenses possibles : ${loot}</div>` : '');
+    }
+    if (tab === 'armes') for (const k of weapons) { const it = ITEMS[k]; card(col.has(k), itemArt(k, col.has(k)), it.name, `${it.slot === 'gun' ? 'Arme à feu' : 'Arme de mêlée'} · ${it.value} doublons`, `<div class="cx-desc">${esc(it.desc || '')}</div>`); }
+    if (tab === 'objets') for (const k of others) { const it = ITEMS[k]; card(col.has(k), itemArt(k, col.has(k)), it.name, `${it.slot ? SLOT_NAMES[it.slot] || it.slot : it.home ? 'Mobilier' : it.boat ? 'Navire' : 'Objet'}${it.rarity ? ' · ' + (RARITY[it.rarity] || {}).name : ''}`); }
+    if (tab === 'pnj') for (const k of npcs) { const N = NPCS[k]; card(met.has(k), npcArt(k, met.has(k)), N.name, esc(N.title || '')); }
+    if (tab === 'iles') for (const i of isl) { const ok = !!rev[i.id]; card(ok, null, (ZONES[i.zone] || {}).name || 'Île sans nom', `${Math.round(i.n / 10) * 10} cases de terre · ${(ZONES[i.zone] || {}).lvl || ''}`); }
+    if (tab === 'secrets') { for (const d of secrets) { const ok = !!(G.found && G.found.has(d.id)); card(ok, null, d.name, 'Passage secret découvert'); } card((me.cch || 0) > 0, null, `Cachettes d’armes : ${me.cch || 0} / 6`, 'Des coffres oubliés, chacun garde une arme'); }
+    if (tab === 'stats') {
+      const s = cx.st || {}, h = Math.floor((s.time || 0) / 3600), mn = Math.floor(((s.time || 0) % 3600) / 60);
+      const rows = [['Temps de jeu', `${h} h ${String(mn).padStart(2, '0')} min`], ['Monstres éliminés', me.kills || 0], ['Boss et élites vaincus', s.boss || 0], ['Pirates battus', me.pk || 0], ['Morts', s.deaths || 0],
+        ['Doublons gagnés', Math.round(s.gin || 0)], ['Doublons dépensés', Math.round(s.gout || 0)], ['Quêtes terminées', Object.values(G.quests || {}).filter((q) => q.s === 'done').length], ['Îles découvertes', `${counts.iles[0]} / ${counts.iles[1]}`],
+        ['Objets collectionnés', `${col.size} / ${Object.keys(ITEMS).filter((k) => !ITEMS[k].quest).length}`], ['Distance parcourue en mer', `${(Math.round((s.sea || 0) / 20) / 10).toLocaleString('fr-FR')} lieues`], ['Parties de dés gagnées', (me.cnt || {}).dice || 0], ['Pirate depuis le', s.since ? new Date(s.since).toLocaleDateString('fr-FR') : '—']];
+      box.innerHTML = `<div class="cx-stats">${rows.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>`;
+    }
+  }
+  // ------------------------------------------------------------ 1.0 : la brume des îles inconnues
+  setSeen(b64s) {
+    const W = this.G.world; this.seenW = Math.ceil(W.W / SEEN_CELL); this.seenH = Math.ceil(W.OVER_H / SEEN_CELL);
+    this.seen = new Uint8Array(Math.ceil(this.seenW * this.seenH / 8));
+    if (b64s) try { const r = atob(b64s); for (let i = 0; i < Math.min(r.length, this.seen.length); i++) this.seen[i] = r.charCodeAt(i); } catch (e) { /* tout reste dans la brume */ }
+    this.fogDirty = true;
+  }
+  addSeen(cells) { if (!this.seen) return; for (const c of cells) this.seen[c >> 3] |= 1 << (c & 7); this.fogDirty = true; }
+  isSeenTile(x, y) { if (!this.seen) return true; const c = Math.floor(y / SEEN_CELL) * this.seenW + Math.floor(x / SEEN_CELL); return !!(this.seen[c >> 3] & (1 << (c & 7))); }
+  // une île sort de la brume dès qu'on a vu un seul de ses rivages ; la brume reste sur les autres
+  buildFog() {
+    const W = this.G.world, N = MAP_W * OVER_H, isl = W.islandOf;
+    this.fogDirty = false; this.fogAt = performance.now();
+    const revealed = new Uint8Array(W.islands.length + 1);
+    for (let i = 0; i < N; i++) { const id = isl[i]; if (id && !revealed[id] && this.isSeenTile(i % MAP_W, (i / MAP_W) | 0)) revealed[id] = 1; }
+    this.revealed = revealed;
+    const D = new Uint8Array(N);
+    for (let i = 0; i < N; i++) D[i] = isl[i] && !revealed[isl[i]] ? 0 : 12;
+    for (let y = 0; y < OVER_H; y++) for (let x = 0; x < MAP_W; x++) { const i = y * MAP_W + x; let v = D[i]; if (!v) continue; if (x > 0) v = Math.min(v, D[i - 1] + 1); if (y > 0) v = Math.min(v, D[i - MAP_W] + 1); D[i] = v; }
+    for (let y = OVER_H - 1; y >= 0; y--) for (let x = MAP_W - 1; x >= 0; x--) { const i = y * MAP_W + x; let v = D[i]; if (!v) continue; if (x < MAP_W - 1) v = Math.min(v, D[i + 1] + 1); if (y < OVER_H - 1) v = Math.min(v, D[i + MAP_W] + 1); D[i] = v; }
+    const c = this.fogCv || (this.fogCv = document.createElement('canvas')); c.width = MAP_W; c.height = OVER_H;
+    const x = c.getContext('2d'), img = x.createImageData(MAP_W, OVER_H), d = img.data;
+    const h2 = (a, b) => { let h = Math.imul(a * 374761393 + b * 668265263, 1274126177); h ^= h >>> 13; return (h >>> 0) / 4294967296; };
+    const vn = (px, py, s) => { const gx = Math.floor(px / s), gy = Math.floor(py / s), fx = px / s - gx, fy = py / s - gy, a = h2(gx, gy), b = h2(gx + 1, gy), cc = h2(gx, gy + 1), dd = h2(gx + 1, gy + 1); const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy); return a + (b - a) * sx + (cc - a) * sy + (a - b - cc + dd) * sx * sy; };
+    for (let i = 0; i < N; i++) {
+      const dist = D[i]; if (dist >= 9) continue;
+      const px = i % MAP_W, py = (i / MAP_W) | 0, n = vn(px, py, 9) * 0.6 + vn(px, py, 4) * 0.4;
+      const a = Math.max(0, Math.min(1, (1 - dist / 9) * 1.35 + (n - 0.5) * 0.5));
+      const k = 0.82 + n * 0.18, o = i * 4;
+      d[o] = 214 * k; d[o + 1] = 220 * k; d[o + 2] = 228 * k; d[o + 3] = Math.round(a * 248);
+    }
+    x.putImageData(img, 0, 0);
+  }
+  fogCanvas() { if (this.fogDirty && (!this.fogCv || performance.now() - (this.fogAt || 0) > 800)) this.buildFog(); return this.fogCv; }
+  labelHidden(tx, ty) { // le nom d'un lieu reste caché tant que son île dort sous la brume
+    if (!this.revealed) return false;
+    const L = this.G.world.islandOf;
+    for (let r = 0; r <= 22; r += 2) for (let a = 0; a < 16; a++) { const x = Math.round(tx + Math.cos(a / 16 * 6.283) * r), y = Math.round(ty + Math.sin(a / 16 * 6.283) * r); if (x < 0 || y < 0 || x >= MAP_W || y >= OVER_H) continue; const id = L[y * MAP_W + x]; if (id) return !this.revealed[id]; }
+    return false;
+  }
+  onFog(tx, ty) { return !!(this.revealed && this.G.world.islandOf[ty * MAP_W + tx] && !this.revealed[this.G.world.islandOf[ty * MAP_W + tx]]); }
   // position sur l'archipel (dans un bâtiment : sa porte)
   mapPos() {
     const G = this.G, p = G.player;
@@ -984,6 +1074,7 @@ export class UI {
     x.imageSmoothingEnabled = false;
     x.fillStyle = '#1b4f7c'; x.fillRect(0, 0, c.width, c.height);
     x.drawImage(this.miniBase, tx, ty, w, h, 0, 0, c.width, c.height);
+    const fog = this.fogCanvas(); if (fog) { x.imageSmoothingEnabled = true; x.drawImage(fog, tx, ty, w, h, 0, 0, c.width, c.height); x.imageSmoothingEnabled = false; }
     const dot = (wx, wy, col, s = 2) => { const sx = (wx / TILE - tx) * Z2, sy = (wy / TILE - ty) * Z2; if (sx < 0 || sy < 0 || sx > c.width || sy > c.height) return; x.fillStyle = col; x.fillRect(Math.round(sx - s / 2), Math.round(sy - s / 2), s, s); };
     if (!inside) for (const e of G.ents.values()) {
       if (e.k === 'm' && !e.dyingT) { const d = MOBS[e.type] || {}; dot(e.x, e.y, d.ship ? '#1c1426' : e.type === 'boss' || d.elite ? '#ff2a2a' : '#e05040', d.ship ? 5 : e.type === 'boss' || d.elite ? 4 : 2); if (d.ship) dot(e.x, e.y, '#ff8a6a', 3); }
@@ -1051,9 +1142,10 @@ export class UI {
     const S = 2, c = $('bigmap'); c.width = MAP_W * S; c.height = OVER_H * S;
     const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
     x.drawImage(this.miniBase, 0, 0, c.width, c.height);
+    const fog = this.fogCanvas(); if (fog) { x.imageSmoothingEnabled = true; x.drawImage(fog, 0, 0, c.width, c.height); x.imageSmoothingEnabled = false; } // les îles inconnues dorment sous la brume
     this.mapArt(x, S, c.width, c.height);
     x.font = '700 17px "Pirata One", serif'; x.textAlign = 'center'; x.lineJoin = 'round';
-    for (const [name, tx, ty] of POI) { x.strokeStyle = 'rgba(244,232,200,0.85)'; x.lineWidth = 4; x.strokeText(name, tx * S, ty * S); x.fillStyle = name === 'LIBERTALIA' ? '#6a1410' : '#2e1c0c'; x.fillText(name, tx * S, ty * S); }
+    for (const [name, tx, ty] of POI) { if (this.labelHidden(tx, ty)) continue; x.strokeStyle = 'rgba(244,232,200,0.85)'; x.lineWidth = 4; x.strokeText(name, tx * S, ty * S); x.fillStyle = name === 'LIBERTALIA' ? '#6a1410' : '#2e1c0c'; x.fillText(name, tx * S, ty * S); }
     for (const d of G.world.doors) if (d.secret && G.found.has(d.id)) { const dx = d.ox / TILE * S, dy = d.oy / TILE * S; x.fillStyle = '#1c1426'; x.beginPath(); x.arc(dx, dy, 6, 0, 6.3); x.fill(); x.fillStyle = '#b8a0ff'; x.beginPath(); x.arc(dx, dy, 4, 0, 6.3); x.fill(); x.font = '600 13px "Pixelify Sans", sans-serif'; x.fillStyle = 'rgba(0,0,0,0.6)'; x.fillText(d.name, dx + 1, dy - 9); x.fillStyle = '#e0d4ff'; x.fillText(d.name, dx, dy - 10); }
     for (const n of G.npcs) { const mk = G.npcMarker(n.id); if (!mk) continue; let nx = n.x, ny = n.y; if (ny >= OVER_H * TILE) { const rid = G.world.roomGrid[Math.floor(ny / TILE) * MAP_W + Math.floor(nx / TILE)], d = G.world.doors.find((q) => q.room === rid); if (!d) continue; nx = d.ox; ny = d.oy; } x.fillStyle = '#ffd23a'; x.font = '700 16px "Pixelify Sans", sans-serif'; x.fillText(mk, nx / TILE * S, ny / TILE * S - 6); }
     x.font = '600 12px "Pixelify Sans", sans-serif';

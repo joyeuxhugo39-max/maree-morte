@@ -5,6 +5,8 @@ export const TILE = 16;
 export const GAME_VERSION = '1.0.0';
 export const PROTOCOL = 10;
 export const SAVE_VERSION = 10;
+// 1.0 : la brume de la carte — ce que chaque pirate a vu, par carrés de 8 cases
+export const SEEN_CELL = 8;
 export const MAP_W = 960; // 0.8 : l'île de Libertalia s'ajoute à l'est
 export const MAP_H = 560;
 export const OVER_H = 448; // hauteur de l'archipel ; en dessous : intérieurs et grottes

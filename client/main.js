@@ -50,7 +50,7 @@ const G = {
   structs: new Map(), floors: new Map(), bases: [], depleted: new Map(), build: null, aide: 'discret',
   room: -1, lastRoom: -1, found: new Set(), doorCd: 0, myKey: null,
   startBuild: (id) => startBuild(id),
-  send(m) { if (G.net) G.net.send(m); },
+  send(m) { if (G.net) G.net.send(m); if (m && G.tutFlags) { if (m.t === 'atk') G.tutFlags.atk = 1; if (m.t === 'sk') G.tutFlags[m.s] = 1; } },
   countItem(id) { let c = 0; for (const s of G.inv || []) if (s && s.id === id) c += s.n; return c; },
   npcMarker(id) {
     let mk = null;
@@ -225,6 +225,8 @@ function onMsg(m) {
     case 'st': applyBuild(m, now); break;
     case 'stor': ui.openStorage(m.items, m.cap, m.vault); break;
     case 'deed': ui.openDeed(m); break;
+    case 'seen': ui.addSeen(m.c); break;
+    case 'codex': G.codex = m; if (ui.open === 'codex') ui.renderCodex(); break;
     case 'treasure': G.treasure = m.x == null ? null : { x: m.x, y: m.y }; ui.renderTracker(); break;
     case 'ach': {
       G.ach = m.ach || G.ach;
@@ -282,6 +284,8 @@ function start(m, now) {
   G.ents.clear(); G.renderer.projs.clear(); G.renderer.bombs.length = 0; G.renderer.teles.length = 0;
   G.myId = m.id; G.me = m.me; G.meAt = now;
   G.inv = m.inv; G.eq = m.eq; G.quests = m.q; G.chests = m.chests || {}; G.base = m.base;
+  G.ui.setSeen(m.seen); // 1.0 : la brume de la carte
+  G.codex = m.codex || G.codex; G.tut = m.tut == null ? 99 : m.tut;
   G.refreshNpcs && (G.me = m.me, G.refreshNpcs());
   G.ach = m.ach || {}; G.treasure = m.treasure || null;
   G.structs.clear(); G.floors.clear(); G.bases = []; G.world.block.fill(0); G.world.doorOwner.clear();
@@ -902,6 +906,48 @@ function updateFolk(dt) {
   for (const c of G.cats) wander(c, 30, [3, 10]);
 }
 const TITLE_PATH = [[150, 104], [124, 112], [100, 118], [96, 86], [108, 54], [126, 26], [80, 60], [44, 92], [33, 72], [30, 32], [60, 40], [112, 80], [150, 96]];
+// 1.0 : le tutoriel — les gestes de base, un par un, puis des conseils qui n'arrivent qu'au bon moment
+const TUTO = [
+  { t: 'Déplacez-vous', k: 'Z Q S D ou flèches', done: (G) => G.tutFlags.moved > 36 },
+  { t: 'Parlez à la Capitaine Morgane, sur les quais', k: 'E près d’elle', done: (G) => !!(G.quests && G.quests.premier_pas) },
+  { t: 'Frappez avec votre sabre', k: 'Clic gauche', done: (G) => G.tutFlags.atk },
+  { t: 'Esquivez d’une roulade', k: 'Espace', done: (G) => G.tutFlags.roll },
+  { t: 'Ouvrez votre sac de marin : survolez un objet pour le comparer', k: 'I', done: (G) => G.tutFlags.inventory },
+  { t: 'Ouvrez le journal de bord : choisissez les quêtes à suivre', k: 'J', done: (G) => G.tutFlags.quests },
+  { t: 'Tirez avec votre pistolet', k: 'Clic droit', done: (G) => G.tutFlags.shot, skip: (G) => !(G.eq && G.eq.gun) },
+];
+const TIPS = [
+  ['carte', (G) => G.me && G.me.lvl >= 3, 'La carte (M) : les îles inconnues dorment sous la brume. Approchez-les pour la lever.'],
+  ['equip', (G) => G.me && G.me.lvl >= 4, 'Équipement : chaque arme a un niveau requis. Isa, à Port-Lanterne, renforce vos armes.'],
+  ['bateau', (G) => (G.inv || []).some((s) => s && ITEMS[s.id] && ITEMS[s.id].boat), 'Navigation : clic droit sur votre navire (sac) près de l’eau pour le mettre à l’eau ; E près d’un rivage pour accoster.'],
+  ['monture', (G) => (G.inv || []).some((s) => s && ITEMS[s.id] && ITEMS[s.id].slot === 'mount') || (G.eq && G.eq.mount), 'Monture : équipez-la (case Monture du sac), puis C pour monter ou descendre.'],
+  ['maison', (G) => G.me && G.me.gold >= 450, 'Propriétés : E devant une porte « À vendre » pour visiter ou acheter. Deux propriétés au plus.'],
+  ['codex', (G) => G.me && G.me.kills >= 15, 'Le codex (O) garde la trace de vos découvertes : monstres, boss et leurs trésors, îles, secrets, statistiques.'],
+  ['autres', (G) => [...G.ents.values()].some((e) => e.k === 'p'), 'Un autre pirate ! Entrée pour parler, /aide pour les commandes. Hors des zones sûres, méfiance.'],
+];
+function tutorial(now) {
+  if (!G.player || !G.me || G.cine || (G.scene && G.scene.on)) return;
+  G.tutFlags = G.tutFlags || { moved: 0 };
+  if (G.tutLast) G.tutFlags.moved += Math.hypot(G.player.x - G.tutLast.x, G.player.y - G.tutLast.y);
+  G.tutLast = { x: G.player.x, y: G.player.y };
+  if (G.ui.open) G.tutFlags[G.ui.open] = 1;
+  let text = null;
+  if (G.tut < TUTO.length) {
+    let s = TUTO[G.tut];
+    while (s && (s.done(G) || (s.skip && s.skip(G)))) { G.tut++; G.send({ t: 'tut', s: G.tut }); G.sfx.play('pickup'); s = TUTO[G.tut]; }
+    if (s) text = `<b>${s.t}</b><kbd>${s.k}</kbd><small>${G.tut + 1} / ${TUTO.length}</small>`;
+    else { G.tut = 99; G.send({ t: 'tut', s: 99 }); G.ui.toast('Vous connaissez les gestes du pirate. Bon vent !', 'quest'); }
+  }
+  if (!text && G.tut >= TUTO.length) { // un conseil à la fois, une seule fois
+    let shown = {}; try { shown = JSON.parse(localStorage.getItem('mm_tips_' + G.player.name) || '{}'); } catch (e) { /* */ }
+    if (G.tipUntil && now < G.tipUntil) text = G.tipText;
+    else if (!G.tipNext || now > G.tipNext) {
+      const tip = TIPS.find(([k, cond]) => !shown[k] && cond(G));
+      if (tip) { shown[tip[0]] = 1; try { localStorage.setItem('mm_tips_' + G.player.name, JSON.stringify(shown)); } catch (e) { /* */ } G.tipText = `<b>Conseil</b>${tip[2]}`; G.tipUntil = now + 12; G.tipNext = now + 40; text = G.tipText; }
+    }
+  }
+  G.ui.tuto(text);
+}
 function frame(now, dt) {
   G.worldTime += dt;
   G.night = isNight(dayFrac(G.worldTime));
@@ -966,6 +1012,7 @@ function frame(now, dt) {
   G.ui.ink(now < G.inkUntil);
   G.camTarget = updateCine(G, now) || G.scene.update() || { x: p.x, y: p.y - 12 };
   R.render(G, now, dt);
+  if (!G.tutT || now - G.tutT > 0.25) { G.tutT = now; tutorial(now); }
   G.ui.update(now);
 }
 function handleKeys(now) {
@@ -987,6 +1034,7 @@ function handleKeys(now) {
     if (k.key === 'm') { ui.toggle('map'); continue; }
     if (k.key === 'h') { ui.toggle('help'); continue; }
     if (k.key === 'k') { ui.toggle('ach'); continue; }
+    if (k.key === 'o') { ui.toggle('codex'); continue; }
     if (k.key === 'r') { if (G.me && !G.me.dead) G.send({ t: 'fish', a: +G.aim.toFixed(3) }); continue; }
     if (k.key === 'e') { interact(); continue; }
     if (k.key === 'f') { G.send({ t: 'eat' }); continue; }

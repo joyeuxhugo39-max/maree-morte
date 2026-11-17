@@ -57,6 +57,7 @@
       <button data-open="quests" title="Journal de bord (J)"><img class="mi" data-ic="ui_journal" alt=""><kbd>J</kbd></button>
       <button data-open="map" title="Carte (M)"><img class="mi" data-ic="map" alt=""><kbd>M</kbd></button>
       <button data-open="ach" title="Hauts faits (K)"><img class="mi" data-ic="trophy" alt=""><kbd>K</kbd></button>
+      <button data-open="codex" title="Codex et statistiques (O)"><img class="mi" data-ic="f_books" alt=""><kbd>O</kbd></button>
       <button data-open="help" title="Aide (H)"><img class="mi" data-ic="ui_help" alt=""><kbd>H</kbd></button>
       <button data-open="settings" title="Réglages"><img class="mi" data-ic="ui_helm" alt=""></button>
       <button id="mute" title="Son"><img class="mi" id="mute-ic" alt=""></button>
@@ -65,6 +66,7 @@
 
   <div id="toasts"></div>
   <div id="maint" class="hidden"></div>
+  <div id="tuto"></div>
   <div id="banner" class="hidden"><div class="b-line"></div><div id="banner-title"></div><div id="banner-sub"></div><div class="b-line"></div></div>
 
   <!-- panneaux -->
@@ -117,6 +119,13 @@
     <div id="stor-cap" class="hint"></div>
     <div id="stor-grid"></div>
     <div class="hint">Clic : reprendre · Clic droit sur votre sac : ranger. Tous les coffres de votre maison partagent ce contenu.</div>
+  </div>
+
+  <div id="panel-codex" class="panel hidden">
+    <div class="panel-head"><h2>Codex du pirate</h2><button class="x" data-close>✕</button></div>
+    <div id="codex-sum"></div>
+    <div id="codex-tabs" class="qtabs"></div>
+    <div id="codex-list"></div>
   </div>
 
   <div id="panel-deed" class="panel hidden">

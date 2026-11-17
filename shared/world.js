@@ -1604,8 +1604,27 @@ export function generateWorld(seed = 7) {
   const roomGrid = new Int16Array(N).fill(-1);
   for (const r of rooms) for (let y = r.y0 - 2; y <= r.y0 + r.h; y++) for (let x = r.x0 - 1; x <= r.x0 + r.w; x++) roomGrid[idx(x, y)] = r.id;
 
+  // ---------- 13. 1.0 : les îles (brume de la carte, codex) ----------
+  const islandOf = new Uint16Array(W * OVER_H), islands = [];
+  for (let y = 0; y < OVER_H; y++) for (let x = 0; x < W; x++) {
+    const i0 = idx(x, y), t0 = tiles[i0];
+    if (islandOf[i0] || t0 === T.WATER || t0 === T.DEEP) continue;
+    const id = islands.length + 1, st = [i0]; islandOf[i0] = id;
+    let n = 0, sx = 0, sy = 0, x0 = x, x1 = x, y0 = y, y1 = y;
+    const zc = new Map();
+    while (st.length) {
+      const j = st.pop(), jx = j % W, jy = (j / W) | 0;
+      n++; sx += jx; sy += jy; if (jx < x0) x0 = jx; if (jx > x1) x1 = jx; if (jy < y0) y0 = jy; if (jy > y1) y1 = jy;
+      zc.set(zones[j], (zc.get(zones[j]) || 0) + 1);
+      for (const k of [j - 1, j + 1, j - W, j + W]) { if (k < 0 || k >= W * OVER_H || (k === j - 1 && jx === 0) || (k === j + 1 && jx === W - 1)) continue; const tk = tiles[k]; if (!islandOf[k] && tk !== T.WATER && tk !== T.DEEP) { islandOf[k] = id; st.push(k); } }
+    }
+    let zone = 0, best = -1; for (const [z, c] of zc) if (c > best && z !== Z.SEA) { best = c; zone = z; }
+    islands.push({ id, n, cx: Math.round(sx / n), cy: Math.round(sy / n), x0, y0, x1, y1, zone, zones: [...zc.keys()] });
+  }
+
   return {
     block: new Uint8Array(N), // constructions des joueurs : 1 bloque tout, 2 bloque les morts
+    islandOf, islands, // 1.0 : chaque case de terre connaît son île
     doorOwner: new Map(), rooms, doors, sail, roomGrid, havre: HC, havreDock, OVER_H,
     plots: plots.map((b) => ({ k: b.plot, name: b.name, room: b.room, door: b.doorId, tx: b.x, ty: b.y, w: b.w, h: b.h, cat: b.cat || (b.plot >= 16 && b.plot <= 18 ? 'cabane' : 'ville') })),
     twin: { plates: twinPlates, door: doors.findIndex((d) => d.seal === 'jumeaux'), room: sanct.id }, kraken: { x: KR.x * TILE + 8, y: KR.y * TILE + 8 },

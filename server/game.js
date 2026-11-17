@@ -3,8 +3,11 @@
 import {
   TILE, TICK_RATE, AOI_X, AOI_Y, INV_SIZE, SLOTS, DAY_LENGTH, ROLL_TIME, ROLL_SPEED,
   INTERACT_RANGE, PICKUP_RANGE, T, dayFrac, isNight, weatherAt, DAY_LENGTH as DAYLEN, isFullMoon,
-  SAVE_VERSION, PROTOCOL, GAME_VERSION,
+  SAVE_VERSION, PROTOCOL, GAME_VERSION, SEEN_CELL,
 } from '../shared/constants.js';
+// 1.0 : la brume — un bit par carré de 8 cases de l'archipel, encodé en base64 dans la sauvegarde
+const b64 = (u8) => { let s = ''; for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]); return btoa(s); };
+const unb64 = (s, len) => { const out = new Uint8Array(len); try { const r = atob(String(s)); for (let i = 0; i < Math.min(len, r.length); i++) out[i] = r.charCodeAt(i); } catch (e) { /* illisible : tout est brume */ } return out; };
 // 1.0 : migrations des sauvegardes — chaque étape amène une sauvegarde d'une version à la suivante.
 // Une sauvegarde sans numéro date d'avant la 1.0 (version 8). Rien n'est jamais retiré : ce que ce
 // serveur ne connaît pas est conservé tel quel et réécrit à l'identique.
@@ -18,7 +21,7 @@ export function migrateSave(d) {
   return d;
 }
 // les champs qu'écrit serialize() : tout autre champ d'une sauvegarde est conservé à part
-const SAVE_KEYS = new Set(['name', 'look', 'level', 'xp', 'gold', 'hp', 'inv', 'eq', 'quests', 'track', 'chests', 'x', 'y', 'kills', 'upg', 'treasure', 'ach', 'title', 'cnt', 'respawnAt', 'found', 'boat', 'pk', 'caches', 'zs', 'pet', 'home', 'base', 'saved', 'sv', 'held']);
+const SAVE_KEYS = new Set(['seen', 'st', 'kc', 'met', 'col', 'tut', 'name', 'look', 'level', 'xp', 'gold', 'hp', 'inv', 'eq', 'quests', 'track', 'chests', 'x', 'y', 'kills', 'upg', 'treasure', 'ach', 'title', 'cnt', 'respawnAt', 'found', 'boat', 'pk', 'caches', 'zs', 'pet', 'home', 'base', 'saved', 'sv', 'held']);
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { STRUCTS, PLANTER_GROW, HOME_OK, HOME_MAX, HOME_PRICE, QUEST_PICK, PROPERTY, HOME_LIMIT, RESALE, plotCategory } from '../shared/data/craft.js';
 import { LEGACY_VALUE, LEGACY_STRUCT, QUEST_ITEM_OLD_VALUE } from '../shared/data/legacy.js';
@@ -98,6 +101,7 @@ export class Game {
     this.players = new Map();
     this.sessions = new Map(); // conn -> session { player, bucket, lastMsg }
     this.version = GAME_VERSION;
+    this.seenW = Math.ceil(this.world.W / SEEN_CELL); this.seenH = Math.ceil(this.world.OVER_H / SEEN_CELL); this.seenBytes = Math.ceil(this.seenW * this.seenH / 8);
     this.usedTokens = new Set(); this.fails = new Map(); this.bans = {}; this.reports = []; this.maintenance = null; // 1.0
     if (storage && storage.loadMeta) { Promise.resolve(storage.loadMeta('bans')).then((b) => { if (b) this.bans = b; }).catch(() => {}); Promise.resolve(storage.loadMeta('reports')).then((r) => { if (Array.isArray(r)) this.reports = r; }).catch(() => {}); }
     this.mobs = [];
@@ -182,6 +186,7 @@ export class Game {
       case 'talk': return this.onTalk(p, String(m.npc));
       case 'qa': return this.acceptQuest(p, String(m.q));
       case 'dice': return this.playDice(p, +m.bet);
+      case 'tut': p.tut = Math.max(p.tut | 0, Math.min(99, m.s | 0)); return;
       case 'qt': return this.turnIn(p, String(m.q));
       case 'track': return this.trackQuest(p, String(m.q), !!m.on);
       case 'qab': return this.abandonQuest(p, String(m.q));
@@ -270,7 +275,8 @@ export class Game {
     const token = await this.makeToken(key);
     p.ip = ip; this.audit('connexion', { who: key, ip });
     this.send(p, {
-      t: 'welcome', id: p.id, seed: this.world.seed, wt: this.worldTime, solo: this.solo, rt: token, ver: GAME_VERSION, maint: this.maintenance || null,
+      t: 'welcome', id: p.id, seed: this.world.seed, wt: this.worldTime, solo: this.solo, rt: token, ver: GAME_VERSION, maint: this.maintenance || null, seen: b64(p.seen),
+      codex: { kc: p.kc, met: [...p.met], col: [...p.col], st: p.st }, tut: p.tut,
       me: this.meState(p), inv: p.inv, eq: p.eq, q: p.quests, tr: p.track || [], chests: p.chests, look: p.look, base: p.base,
       name: p.name, x: p.x, y: p.y, isNew: !res.data, ach: p.ach, treasure: p.treasure,
       history: (this.chatLog || []).slice(-12),
@@ -383,6 +389,14 @@ export class Game {
       found: new Set(), boat: null, room: -1, pk: 0, pvpLog: new Map(), caches: {}, pet: null, burgle: null, thiefUntil: 0, robbed: {},
     };
     p.held = []; p.heldQ = {}; p.heldA = {}; p.heldF = {}; // 1.0 : ce que ce serveur ne connaît pas, gardé intact
+    p.seen = d && d.seen ? unb64(d.seen, this.seenBytes) : new Uint8Array(this.seenBytes);
+    // 1.0 : statistiques personnelles et codex (monstres, personnages rencontrés, objets obtenus)
+    const st0 = d && d.st && typeof d.st === 'object' ? d.st : {};
+    p.st = { time: +st0.time || 0, boss: st0.boss | 0, gin: +st0.gin || 0, gout: +st0.gout || 0, sea: +st0.sea || 0, deaths: st0.deaths | 0, quests: st0.quests | 0, since: +st0.since || Date.now() };
+    p.kc = d && d.kc && typeof d.kc === 'object' ? { ...d.kc } : {};
+    p.met = new Set(d && Array.isArray(d.met) ? d.met.filter((x) => typeof x === 'string') : []);
+    p.col = new Set(d && Array.isArray(d.col) ? d.col.filter((x) => typeof x === 'string') : []);
+    p.tut = d ? (d.tut == null ? 99 : d.tut | 0) : 0; // tutoriel : les anciens pirates le connaissent déjà
     if (d) {
       for (const k in d) if (!SAVE_KEYS.has(k)) p.heldF[k] = d[k];
       if (Array.isArray(d.held)) for (const it of d.held) if (it && typeof it.id === 'string') p.held.push({ id: it.id, n: Math.max(1, it.n | 0) });
@@ -430,6 +444,9 @@ export class Game {
     p.en = p.stats.maxEn;
     p.zone = zoneAt(this.world, p.x, p.y);
     p.room = roomIdAt(this.world, p.x, p.y);
+    this.markSeen(p, true); // on voit au moins là où l'on se tient
+    if (d && !d.seen) this.revealKnown(p); // sauvegarde d'avant la 1.0 : les îles déjà parcourues sortent de la brume
+    if (!d) { const sp0 = this.world.spawnPoint; const keep = [p.x, p.y]; p.x = sp0.x; p.y = sp0.y; this.markSeen(p, true); [p.x, p.y] = keep; }
     return p;
   }
   // 0.8 : les anciens matériaux de quête au-delà de ce que réclament les quêtes en cours, et tout ce qui
@@ -448,7 +465,7 @@ export class Game {
     this.applyRefund(p);
   }
   serialize(p) {
-    return { ...(p.heldF || {}), sv: SAVE_VERSION, held: p.held || [], name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: { ...(p.heldQ || {}), ...p.quests }, track: p.track || [], chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: { ...(p.heldA || {}), ...p.ach }, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
+    return { ...(p.heldF || {}), sv: SAVE_VERSION, held: p.held || [], seen: p.seen ? b64(p.seen) : undefined, st: p.st, kc: p.kc, met: p.met ? [...p.met] : [], col: p.col ? [...p.col] : [], tut: p.tut, name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: { ...(p.heldQ || {}), ...p.quests }, track: p.track || [], chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: { ...(p.heldA || {}), ...p.ach }, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
   }
   save(p) {
     p.lastSave = this.time;
@@ -1382,6 +1399,8 @@ export class Game {
       this.giveXp(p, xp);
       p.kills++;
       this.questKill(p, m.type);
+      p.kc[m.type] = (p.kc[m.type] || 0) + 1; p.dirtyCodex = true;
+      if (m.boss || (def.elite && def.big)) p.st.boss++;
       this.unlock(p, 'premier_sang');
       if (m.type === 'crab' && ++p.cnt.crab >= 50) this.unlock(p, 'crabes');
       if (p.kills >= 250) this.unlock(p, 'faucheur');
@@ -1510,6 +1529,7 @@ export class Game {
     if (p.hp <= 0) this.killPlayer(p, src);
   }
   killPlayer(p, src) {
+    if (p.st) p.st.deaths++;
     if (p.riding) this.dismount(p);
     p.recallAt = 0;
     p.hp = 0; p.dead = true; p.deathAt = this.time; p.moving = false;
@@ -1838,6 +1858,7 @@ export class Game {
       return;
     }
     p.moveBudget -= d;
+    if (boat) p.st.sea += d / TILE; // en cases
     p.x = x; p.y = y;
     p.dir = (m.d | 0) & 3;
     p.moving = !!m.m;
@@ -1847,6 +1868,28 @@ export class Game {
     for (const dr of this.drops.values()) if (Math.abs(dr.x - p.x) < PICKUP_RANGE && Math.abs(dr.y - p.y) < PICKUP_RANGE) this.pick(p, dr.id, true);
   }
 
+  revealIsland(p, isl) {
+    const W = this.world;
+    for (let y = isl.y0; y <= isl.y1; y++) for (let x = isl.x0; x <= isl.x1; x++) if (W.islandOf[y * W.W + x] === isl.id) { const c = Math.floor(y / SEEN_CELL) * this.seenW + Math.floor(x / SEEN_CELL); p.seen[c >> 3] |= 1 << (c & 7); }
+  }
+  revealKnown(p) {
+    const known = new Set([...p.zs, Z.TOWN]);
+    if (p.ach.navigateur) known.add(Z.HAVRE); if (p.ach.rade) known.add(Z.RADE); if (p.ach.citoyen) known.add(Z.LIBERTALIA);
+    for (const h of this.homesOf(p.key)) { const pl = this.world.plots[h.k]; const isl = this.world.islands[this.world.islandOf[pl.ty * this.world.W + pl.tx] - 1]; if (isl) this.revealIsland(p, isl); }
+    for (const isl of this.world.islands) if (isl.zones.some((z) => known.has(z))) this.revealIsland(p, isl);
+  }
+  // 1.0 : la brume se lève autour du pirate (rayon de deux carrés, soit une quinzaine de cases)
+  markSeen(p, quiet = false) {
+    if (p.room >= 0 || !p.seen) return;
+    const cx = Math.floor(p.x / TILE / SEEN_CELL), cy = Math.floor(p.y / TILE / SEEN_CELL), fresh = [];
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+      if (dx * dx + dy * dy > 5) continue;
+      const x = cx + dx, y = cy + dy; if (x < 0 || y < 0 || x >= this.seenW || y >= this.seenH) continue;
+      const c = y * this.seenW + x; if (p.seen[c >> 3] & (1 << (c & 7))) continue;
+      p.seen[c >> 3] |= 1 << (c & 7); fresh.push(c);
+    }
+    if (fresh.length && !quiet) this.send(p, { t: 'seen', c: fresh });
+  }
   sendPos(p, extra) { this.send(p, Object.assign({ t: 'pos', x: p.x, y: p.y, boat: p.boat || null, room: p.room }, extra)); }
   setZone(p, z) {
     if (z === p.zone) return;
@@ -1939,6 +1982,7 @@ export class Game {
   // ------------------------------------------------------------ objets
   addItem(p, id, n) {
     if (!ITEMS[id]) return n;
+    if (p.col && !p.col.has(id)) { p.col.add(id); p.dirtyCodex = true; }
     if (isStackable(id)) {
       for (const s of p.inv) if (s && s.id === id && s.n < STACK_MAX) { const k = Math.min(n, STACK_MAX - s.n); s.n += k; n -= k; if (!n) break; }
     }
@@ -2219,6 +2263,7 @@ export class Game {
   // ------------------------------------------------------------ quêtes et PNJ
   onTalk(p, npc) {
     if (!NPCS[npc] || !this.nearNpc(p, npc)) return;
+    if (!p.met.has(npc)) { p.met.add(npc); p.dirtyCodex = true; }
     for (const qid in p.quests) {
       const st = p.quests[qid];
       if (st.s !== 'active') continue;
@@ -2243,6 +2288,7 @@ export class Game {
     if (!goalsMet(qid, st, (id) => this.countItem(p, id))) return this.toast(p, 'Les objectifs ne sont pas remplis.', 'warn');
     for (const g of q.goals) if (g.type === 'collect') this.removeItem(p, g.item, g.n);
     p.quests[qid] = q.repeat ? { s: 'done', p: [], t: Date.now() } : { s: 'done', p: [] };
+    p.st.quests++;
     p.track = (p.track || []).filter((x) => x !== qid);
     p.gold += q.rewards.gold || 0;
     for (const [id, n] of q.rewards.items || []) this.giveOrDrop(p, id, n);
@@ -2888,6 +2934,13 @@ export class Game {
       if (p.en < p.stats.maxEn) p.en = Math.min(p.stats.maxEn, p.en + 7 * DT);
       if (Math.ceil(p.hp) !== before || Math.floor(p.en) !== beforeEn) p.dirtyMe = true;
       if (this.time - p.lastSave > 30) this.save(p);
+      if ((this.tickCount + p.id) % 20 === 0) {
+        this.markSeen(p);
+        p.st.time += 1;
+        if (p.goldLast != null) { const dg = p.gold - p.goldLast; if (dg > 0) p.st.gin += dg; else p.st.gout -= dg; }
+        p.goldLast = p.gold;
+        if (p.dirtyCodex) { p.dirtyCodex = false; this.send(p, { t: 'codex', kc: p.kc, met: [...p.met], col: [...p.col], st: p.st }); }
+      }
       if (p.fishing) this.updateFishing(p);
       if (p.gold >= 1000 && !p.ach.riche) this.unlock(p, 'riche');
     }
