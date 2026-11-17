@@ -2,6 +2,7 @@
 // requires : quêtes à terminer avant ; level : niveau minimum conseillé.
 import { Z } from '../world.js';
 import { OLD_SCENES } from './scenes.js';
+import { ACTE3 } from './acte3.js';
 
 export const QUESTS = {
   premier_pas: {
@@ -683,6 +684,7 @@ QUESTS.prime_lib_contrebande = primeLib('Prime : contrebandiers', 'contrebandier
 QUESTS.prime_lib_naufrageurs = primeLib('Prime : naufrageurs', 'naufrageur', 10, 19, 3800, 750, 'Naufrageurs abattus');
 QUESTS.prime_lib_gardes = primeLib('Prime : gardes maudits', 'garde_maudit', 10, 21, 4400, 850, 'Gardes maudits du fort abattus');
 QUESTS.prime_lib_goules = primeLib('Prime : goules écarlates', 'goule_ecarlate', 10, 23, 5000, 950, 'Goules écarlates abattues');
+Object.assign(QUESTS, ACTE3); // 1.0 : Acte III — La Flamme et la Marée
 export const QUEST_ORDER = Object.keys(QUESTS);
 
 // état d'une quête pour un joueur : 'locked' | 'available' | 'active' | 'ready' | 'done'
@@ -692,7 +694,7 @@ export function questState(qid, pq, level) {
   if (st && st.s === 'done') { if (q.repeat && (!st.t || Date.now() - st.t > q.repeat * 1000)) return level < q.level - 1 ? 'locked' : 'available'; return 'done'; }
   if (st && st.s === 'active') return goalsMet(qid, st, null) ? 'ready' : 'active';
   for (const r of q.requires || []) if (!pq[r] || pq[r].s !== 'done') return 'locked';
-  if (q.excl && pq[q.excl]) return 'locked'; // l'autre choix a été fait
+  if ([].concat(q.excl || []).some((e) => pq[e])) return 'locked'; // un autre choix a été fait
   if (level < q.level - 1) return 'locked';
   return 'available';
 }

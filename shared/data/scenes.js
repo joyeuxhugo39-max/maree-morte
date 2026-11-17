@@ -617,6 +617,8 @@ export const OLD_SCENES = {
 // les personnages se souviennent : q:quête terminée, m:choix retenu, a:haut fait — la première ligne qui s'applique peut remplacer le salut
 export const REMEMBER = {
   morgane: [
+    ['q:a3_fin_apaiser', "Les noyés ne reviennent presque plus. La mer se vide, doucement. C'est toi, n'est-ce pas ? Je le sens."],
+    ['q:a3_fin_brasier', "La mer a brûlé une nuit entière. Je n'avais jamais rien vu d'aussi beau ni d'aussi terrible. Mon équipage était dedans, je crois. Merci."],
     ['q:fin_morgane', "La mer est calme depuis que tu m'as confié la Couronne. Je dors, maintenant. Merci, {nom}."],
     ['q:fin_fanfaron', "Tu as laissé la Couronne à Ambroise… Je ne te juge pas. Enfin, un peu. Les marées montent à l'envers, ces temps-ci."],
     ['q:dernier_chant', "Mon équipage dort pour de bon, grâce à toi. Je n'oublierai pas, Capitaine."],
@@ -631,6 +633,11 @@ export const REMEMBER = {
     ['m:rhum_intact', "Pas une goutte, hein ? Menteur. Mais un menteur poli. J'aime bien les menteurs polis."],
   ],
   gaspard: [
+    ['q:a3_fin_apaiser', "Elle respire, ta Flamme. Chaque soir je viens la regarder, et chaque soir elle est plus douce."],
+    ['q:a3_fin_gardien', "Gardien. Tu as les yeux de quelqu'un qui sent chaque mort partir vers la mer. Je connais ce regard. Repose-toi, un peu."],
+    ['q:a3_fin_brasier', "Une braise, là où brûlait la Flamme… On la rallumera. Toi et moi, on la rallumera. Et la mer est vide, enfin."],
+    ['m:gaspard_pardon', "Tu m'as pardonné. Je n'arrive toujours pas à le faire moi-même. Mais j'essaie, grâce à toi."],
+    ['m:gaspard_colere', "Tu as eu raison d'être en colère. Je compte toujours. Chaque nuit."],
     ['q:oeil_guetteur', "Depuis le phare, je vois l'Île au Crâne. Silencieuse. C'est toi, ça."],
     ['q:os_lanterne', "La Flamme brûle plus haut depuis que tu l'as nourrie. Elle te reconnaît, tu sais."],
   ],
@@ -668,6 +675,8 @@ export const REMEMBER = {
 };
 
 // les clés de mémoire possibles (le serveur refuse les autres)
+import { ACTE3 } from './acte3.js';
 export const MEM_KEYS = new Set();
 const walk = (steps) => { for (const s of steps || []) if (s && s.choose) for (const c of s.choose) { if (c.mem) MEM_KEYS.add(c.mem); walk(c.a); } else if (s && s.ask) for (const a of s.ask) walk(a.a); };
 for (const q of Object.values(OLD_SCENES)) { walk(q.scene); walk(q.sceneDone); }
+for (const q of Object.values(ACTE3)) { walk(q.scene); walk(q.sceneDone); for (const g of q.goals) walk(g.scene); }

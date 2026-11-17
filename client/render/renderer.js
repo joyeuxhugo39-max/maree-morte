@@ -1742,8 +1742,14 @@ export class Renderer {
   drawBossBar(ctx, G) {
     let boss = null;
     for (const e of G.ents.values()) if (e.k === 'm' && e.type === 'kraken' && !e.dyingT) boss = e;
-    if (!boss) for (const e of G.ents.values()) if (e.k === 'm' && e.type === 'boss' && !e.dyingT) boss = e;
-    if (!boss) for (const e of G.ents.values()) if (e.k === 'm' && !e.dyingT && MOBS[e.type] && MOBS[e.type].elite && (!boss || e.hp < boss.hp)) boss = e;
+    if (!boss && G.player) { // 1.0 : le boss ou l'élite le plus proche (blessé de préférence), pas toujours Barbe-Cendre
+      let bd = 1e9;
+      for (const e of G.ents.values()) {
+        if (e.k !== 'm' || e.dyingT || !MOBS[e.type] || !(e.type === 'boss' || MOBS[e.type].elite)) continue;
+        const d = Math.hypot(e.x - G.player.x, e.y - G.player.y) - (e.hp < 100 ? 120 : 0);
+        if (d < bd) { bd = d; boss = e; }
+      }
+    }
     if (!boss || !G.player || document.body.classList.contains('cine') || Math.hypot(boss.x - G.player.x, boss.y - G.player.y) > (boss.type === 'kraken' ? 560 : 320)) return;
     const def = MOBS[boss.type], W = this.W, w = Math.min(boss.type === 'kraken' ? 280 : 220, W - 120), x = Math.round((W - w) / 2), y = 28;
     const name = textCanvas(def.name.toUpperCase(), '#ffd0a0', '#1c1426', 1);

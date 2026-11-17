@@ -55,6 +55,7 @@ export const ITEMS = {
   couronne_crabe: { name: 'Couronne du Crabe-Roi', slot: 'hat', def: 5, crit: 0.05, value: 420, rarity: 2, icon: 'crown', look: 'couronne', desc: 'Un peu collante. Très royale.' },
   ecaille_leviathan: { name: 'Écaille du Léviathan', slot: 'trinket', def: 4, regen: 1.2, hp: 30, value: 650, rarity: 3, icon: 'scale', desc: 'Arrachée à la Marée Morte elle-même.' },
   // ----- quête -----
+  page_anselme: { quest: 1, name: 'Page du journal d’Anselme', value: 0, icon: 'map', tint: 'grey', desc: 'Une écriture penchée comme des mâts dans la tempête, à moitié effacée par le sel. Objet de quête (Acte III).' },
   tonnelet: { name: 'Tonnelet de rhum perdu', quest: 1, value: 0, icon: 'barrel', desc: 'Le rhum de Bartholomé. Ne pas boire en route.' },
   lame_rouillee: { name: 'Lame de boucanier', quest: 1, value: 0, icon: 'w:sabre_rouille', desc: 'Une vieille lame arrachée à un boucanier zombie. Isa en fera de l’acier neuf. Objet de quête.' },
   planche_epave: { name: 'Planche d’épave', quest: 1, value: 0, icon: 'wreckwood', desc: 'Du bon chêne, rejeté par la mer. On en trouve près du bois flotté (E). Objet de quête.' },
@@ -307,6 +308,12 @@ O('tenue_chasseur', { name: 'Tenue de chasseur de primes', atk: 8, crit: 0.08, d
 O('uniforme_marine', { name: 'Uniforme de la Marine', def: 16, hp: 50, value: 4200, rarity: 2, outfit: { top: 'capitaine', topCol: 'navy', pants: 'white', boots: 'black', hat: 'tricorne', hatCol: 'navy' }, desc: 'Arraché à un officier trop curieux. À Libertalia, il fait rire. Ailleurs, il protège.' });
 O('tenue_vaudou', { name: 'Tenue du houngan', regen: 2.5, hp: 40, def: 8, value: 3800, rarity: 2, outfit: { top: 'vareuse', topCol: 'purple', pants: 'black', boots: 'black', hat: 'crane', cape: 'purple' }, desc: 'Plumes, os et colliers de perles. Les esprits veillent sur vous.' });
 O('habit_gouverneur', { name: 'Habit de gouverneur', def: 14, hp: 70, goldFind: 0.15, value: 9500, rarity: 3, outfit: { top: 'capitaine', topCol: 'red', pants: 'white', boots: 'black', hat: 'plume', hatCol: 'red', cape: 'red' }, desc: 'Velours, dentelle et boutons d’or. Le dernier gouverneur ne le portera plus. Doublons +15 %.' });
+// 1.0 : Acte III — ce qu'il reste du feu d'Anselme, selon le choix fait
+Object.assign(ITEMS, {
+  lanterne_apaisee: { name: 'Lanterne apaisée', slot: 'trinket', regen: 3, hp: 70, def: 4, value: 9000, rarity: 3, unique: 1, lvl: 28, icon: 'lantern', desc: 'La première lumière de la Flamme rallumée doucement. Les morts qui la voient s’endorment un peu.' },
+  braise_gardien: { name: 'Braise du gardien', slot: 'trinket', def: 12, hp: 90, value: 9000, rarity: 3, unique: 1, lvl: 28, icon: 'ember', desc: 'Elle ne s’éteindra pas tant que vous vivrez. Vous sentez chaque mort que la Flamme chasse vers la mer.' },
+  tison_marees: { name: 'Tison des Marées', slot: 'trinket', atk: 10, gun: 10, crit: 0.05, value: 9000, rarity: 3, unique: 1, lvl: 28, icon: 'torch_i', desc: 'Tout ce qu’il reste du feu d’Anselme, après la nuit où la mer a brûlé. Les morts le craignent plus que n’importe quelle lame.' },
+});
 // les trophées de boss : objets de collection irremplaçables (jamais volés), à exposer chez soi
 for (const [boss, [id, name, desc]] of Object.entries(TROPHIES)) ITEMS[id] = { home: 1, name, place: 't_' + id, value: 1500, rarity: 3, unique: 1, trophy: boss, icon: 'f_trophy', desc: desc + ' Trophée de boss : à exposer chez vous.' };
 

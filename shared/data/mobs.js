@@ -178,3 +178,7 @@ mob('galion_fantome', { name: 'Le Galion Fantôme', level: 28, hp: 14000, dmg: 5
   loot: [['canon_damne', 0.25, 1, 1], ['tenue_comte', 0.1, 1, 1], ['carte_tresor', 0.5, 1, 1]] });
 // 1.0 : chaque boss laisse parfois son trophée (un objet de collection à exposer chez soi)
 for (const [boss, [id]] of Object.entries(TROPHIES)) if (MOBS[boss]) (MOBS[boss].loot = MOBS[boss].loot || []).push([id, 0.3, 1, 1]);
+// 1.0 : Acte III — l'âme du prêtre qui alluma la Flamme, devant l'épave du Léviathan
+mob('ame_anselme', { name: 'L’Âme du Père Anselme', level: 28, hp: 9000, dmg: 44, speed: 36, aggro: 260, leash: 380, range: 30, atkCd: 1.4, windup: 0.55, xp: 4800, gold: [500, 800], r: 14, respawn: 99999, elite: 1, big: 1,
+  ai: 'flamme', phases: [0.66, 0.33], title: 'Premier gardien de la Flamme', weapon: ['bigsaber', 'gold'], loot: [['rhum_vieux', 1, 1, 2], ['lame_vespere', 0.08, 1, 1], ['habit_gouverneur', 0.05, 1, 1]] });
+for (const m of ['damne', 'arquebusier_damne']) MOBS[m].loot.push(['page_anselme', 0.3, 1, 1]);

@@ -1115,6 +1115,17 @@ export class Game {
         }
         break;
       }
+      case 'flamme': { // 1.0 : l'Âme du Père Anselme — le feu qui chasse les morts brûle aussi les vivants
+        if (ready('ring', 6)) {
+          for (const p of this.bossTargets(m, 260)) { this.tele(p.x, p.y, 26, 1.2, 40, m, 3); this.tele(p.x + rand(-40, 40), p.y + rand(-30, 30), 20, 1.5, 32, m, 3); }
+          this.ev(m.x, m.y, ['shout', m.id, 'Brûlez, et reposez en paix !']);
+        } else if (P >= 1 && ready('nova', 11)) {
+          for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; this.tele(m.x + Math.cos(a) * 64, m.y + Math.sin(a) * 50, 22, 1.4, 38, m, 3); }
+          for (let k = 0; k < 14; k++) { const a = (k + 0.5) / 14 * Math.PI * 2; this.tele(m.x + Math.cos(a) * 118, m.y + Math.sin(a) * 90, 22, 2.0, 34, m, 3); }
+          this.ev(m.x, m.y, ['shout', m.id, 'La Flamme ne s’éteindra jamais !']); m.pauseUntil = now + 1.2;
+        } else if (P >= 2 && ready('sum', 18)) this.summonAdds(m, t, 'calcine', 2, 3, 'Mes ouailles, debout !');
+        break;
+      }
       case 'noye': { // Capitaine Noyé
         if (ready('gey', 6)) {
           for (const p of this.bossTargets(m, 240)) { this.tele(p.x, p.y, 22, 1.1, 26, m, 7); for (let k = 0; k < 2; k++) this.tele(p.x + rand(-34, 34), p.y + rand(-26, 26), 22, 1.3, 26, m, 7); }
@@ -1640,6 +1651,22 @@ export class Game {
       p.lookVer++;
       if (p.level >= 10) this.unlock(p, 'niveau10');
     }
+  }
+  // 1.0 : Acte III — l'Âme d'Anselme vient à qui la cherche, devant l'épave du Léviathan
+  act3Tick(p) {
+    const st = p.quests.a3_ame;
+    if (!st || st.s !== 'active' || (st.p[0] || 0) >= 1 || p.dead || p.room >= 0 || !this.world.wreck) return;
+    const wx = this.world.wreck.x * TILE + 8, wy = this.world.wreck.y * TILE + 8;
+    if (Math.hypot(p.x - wx, p.y - wy) > 260) return;
+    if (this.mobs.some((m) => m.type === 'ame_anselme' && m.state !== 'dead')) return;
+    if ((this.animeAt || 0) > this.time) return;
+    this.animeAt = this.time + 20;
+    let at = null; for (let k = 0; k < 30 && !at; k++) { const x = p.x + rand(-90, 90), y = p.y + rand(-70, 70); if (canStand(this.world, x, y) && Math.hypot(x - p.x, y - p.y) > 50) at = [x, y]; }
+    if (!at) return;
+    const m = this.addMob('ame_anselme', at[0], at[1], true);
+    m.event = true; m.sunproof = true; m.state = 'chase'; m.target = p.id;
+    this.ev(m.x, m.y, ['fx', 'rise', m.x, m.y]); this.ev(m.x, m.y, ['shout', m.id, 'Qui ose approcher du feu ?']);
+    for (const q of this.players.values()) if (q.room < 0 && Math.hypot(q.x - m.x, q.y - m.y) < 600) this.toast(q, 'Une lueur monte de l’épave… L’Âme du Père Anselme se dresse !', 'warn');
   }
   // 1.0 : au-delà du niveau 30, l'expérience devient de la Gloire
   giveGlory(p, xp) {
@@ -2371,6 +2398,7 @@ export class Game {
     for (const [id, n] of q.rewards.items || []) this.giveOrDrop(p, id, n);
     this.giveXp(p, q.rewards.xp || 0);
     const np = this.npcPos.get(q.turnin); if (np) this.addRep(p, this.placeAt(np.x, np.y), 30);
+    if (q.ach) this.unlock(p, q.ach); // 1.0 : une fin choisie, un titre
     p.dirtyQ = true; p.dirtyMe = true;
     this.send(p, { t: 'qdone', q: qid });
     this.ev(p.x, p.y, ['fx', 'quest', p.x, p.y, p.id]);
@@ -3042,6 +3070,7 @@ export class Game {
         p.goldLast = p.gold;
         if (p.dirtyCodex) { p.dirtyCodex = false; this.send(p, { t: 'codex', kc: p.kc, met: [...p.met], col: [...p.col], st: p.st }); }
         this.justiceTick(p);
+        this.act3Tick(p);
       }
       if (p.fishing) this.updateFishing(p);
       if (p.gold >= 1000 && !p.ach.riche) this.unlock(p, 'riche');
