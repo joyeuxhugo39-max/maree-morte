@@ -25,6 +25,62 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Nouveautés de la version 1.0
+
+Une page de présentation publique accompagne le jeu : `docs/accueil.html` (sur GitHub Pages,
+`…/maree-morte/accueil.html`), avec ses captures dans `docs/img/`.
+
+### Le monde vivant
+
+- **Plus d'invasion chaque nuit** : la Marée Morte ne relève plus les noyés toutes les nuits. À la place, de **grandes invasions** rares (toutes les deux à trois heures), annoncées cinq minutes à l'avance : trois vagues de morts, puis leur capitaine. Les défenseurs sont récompensés.
+- **Des villes animées** : les habitants vivent leur journée. Le jour, les marchands tiennent leur étal et les matelots s'affairent sur les quais. Le soir, on se retrouve devant les tavernes pour chanter et danser. La nuit, chacun rentre chez soi et le guet passe avec ses lanternes. Les rues sont éclairées de lanternes et de guirlandes.
+- **Réputation des lieux** : chaque port a sa réputation (Inconnu, Connu, Apprécié, Respecté, Honoré, Héros). Elle fait baisser les prix, et certaines marchandises ne se vendent qu'aux héros du lieu.
+- **Taxes** : chaque port prélève sa taxe sur les achats et les ventes (5 % à Port-Lanterne et à l'Anse, 8 % à la Rade et à Havre-des-Brumes, 12 % à Libertalia).
+- **La brume de la carte** : la carte se dévoile au fil des voyages.
+- **La collection d'airs** : chaque musique entendue pour la première fois est notée dans le carnet du pirate, et la boîte à musique de la maison peut la rejouer.
+- **Animations et vastitude** : les personnages respirent, et des voiles passent au loin sur la haute mer.
+
+### L'histoire
+
+- **Acte III** : qui a déclenché la Marée Morte ? Une enquête en cinq quêtes (la Flamme, les pages arrachées, la ballade, l'aveu, l'âme d'Anselme), puis **trois fins exclusives** : apaiser, garder ou embraser la Flamme. Chaque pirate n'en choisit qu'une.
+- **Conversations jouées** pour les 45 anciennes quêtes, avec des questions au choix.
+- **Les PNJ se souviennent** : de vos quêtes, de vos réponses, de vos hauts faits, et le disent.
+
+### Les activités
+
+- **Navires partagés** : un membre du groupe ou de l'équipage monte à bord comme canonnier (touche E près du navire) et tire en bordée, à bâbord ou à tribord. Chaque bras de plus fait filer le navire plus vite.
+- **Coques** : un navire encaisse une part des coups et peut sombrer. Les coques se réparent au chantier naval (3 doublons le point).
+- **Les fonds marins** : avec une cloche de plongée (Ysaline ou Corentin), on plonge depuis son navire au-dessus des sites où remontent des bulles. On y trouve l'épave du Léviathan, les Grottes des Abysses et Ys-la-Noyée avec son roi. L'air dure 45 secondes : les poches d'air le rendent, le casque de scaphandrier le double. On remonte par la corde de l'ancre.
+- **Le Bastion Englouti**, donjon pour plusieurs pirates. Chaque grille s'ouvre quand deux leviers éloignés sont tirés ensemble. L'Écluse se remplit d'eau en 75 secondes : il faut ouvrir la grille suivante à temps pour atteindre l'Amiral Englouti. Vide, le Bastion se referme et se repeuple.
+- **L'Arène de la Fosse** : des vagues à repousser, sans mort (on est mis hors de combat), et un classement chaque semaine. On y trouve aussi des duels avec mise et des paris des spectateurs (la Fosse garde 5 %).
+- **Les tavernes** : bras de fer, concours de rhum, Trente-et-un, et des chansons à boire, à apprendre, qui donnent de l'entrain à ceux qui chantent (+10 % d'attaque).
+- **Les saisons** : chaque mois a son concours de pêche, où les prises ont une taille et chaque espèce un record, et son **Grand Tour de Libertalia**, une course en selle à travers six portes. Le podium reçoit des doublons et le Tricorne des saisons ; les absents trouvent leur récompense à leur retour.
+- **Navires légendaires** : la Veuve Écarlate, que seuls les héros de Libertalia peuvent acheter, et le Spectre des Brumes, à arracher au Galion Fantôme.
+- **Un secret** dort quelque part sous la mer.
+
+### Les pirates entre eux
+
+- **Chat complet** : canaux général, groupe, équipage et messages privés (Tab change de canal, ↑ ↓ l'historique), filtres, et des noms cliquables.
+- **Amis et ignorés**, **groupes** qui partagent l'expérience, **équipages** avec pavillon et rangs (touche P).
+- **Échanges sécurisés** : les deux pirates valident, puis tout passe d'un coup, avec un historique.
+- **JcJ encadré** : il est permis à partir du niveau 10, entre pirates de moins de dix niveaux d'écart. On est protégé deux minutes après une mort, et jamais entre membres d'un même groupe ou équipage.
+- **La prison** : trois meurtres de trop et le pirate est recherché. Arrêté, il passe un moment à la geôle, sauf s'il paie sa caution au gardien.
+- **Honneur et gloire** : un classement des combattants. Au niveau maximal, l'expérience remplit une barre de gloire, et chaque rang de gloire ajoute des PV et des dégâts.
+
+### Le pirate
+
+- **Propriétés** : deux au plus, à revendre, en huit catégories (de la petite cabane au manoir). On les meuble, on y expose des trophées, et on peut s'y faire cambrioler.
+- **Armes et progression** : chaque arme a un rôle clair et des dégâts par seconde affichés, et un niveau est requis pour les plus fortes. Les boss sont plus solides en groupe et donnent un butin personnel.
+- **Tutoriel progressif**, **codex** (touche O : monstres, boss, armes, objets, personnages, îles, secrets, statistiques) et des réglages d'aide (complète, discrète ou aucune).
+
+### Sous le capot
+
+- **Sauvegardes** : format versionné avec migrations, sauvegarde automatique, écriture atomique, copie de secours en cas de fichier abîmé, et instantanés horaires et quotidiens dans `data/backups`. On revient en arrière avec `node scripts/restore.mjs`.
+- **Sécurité** : protocole versionné, limites de débit, vérification par le serveur de chaque action (déplacements, mini-jeux, échanges).
+- **Administration** : avec `ADMIN_TOKEN`, la console `/admin` du serveur Node permet de voir l'état du serveur, les pirates et les signalements, de bannir, d'exclure ou de rendre muet, de faire une annonce, de passer en maintenance, de lancer une invasion, de sauvegarder, de faire un instantané ou de restaurer un pirate. Sans jeton, elle est désactivée.
+- **Test de charge** : `node scripts/charge.mjs 50 20` simule 50 pirates pendant 20 secondes et mesure la durée du tour du serveur.
+- La version 1.0 change le monde partagé de la page publique : les pages 0.9 et 1.0 ne se rejoignent pas.
+
 ## Nouveautés de la version 0.8.1 : une interface de pirate
 
 - Tous les panneaux qui s'ouvrent passent au même style que la carte au trésor : sac, journal de bord, hauts faits, boutiques, forge, coffre de la maison, aide, réglages, dialogues, confirmations, choix de quantité et écran d'accueil.
@@ -204,15 +260,17 @@ les garder. Le `Dockerfile` permet aussi un déploiement sur n'importe quel serv
 | Clic droit ou 1 | tirer |
 | 2 à 5 | émotes : danse, salut, doigt d'honneur, salto |
 | Espace | roulade |
-| E | parler, ouvrir, ramasser, creuser, fouiller, entrer, mettre à l'eau, accoster |
+| E | parler, ouvrir, ramasser, creuser, fouiller, entrer, mettre à l'eau, accoster, monter à bord, plonger, tirer un levier |
 | Molette | zoomer, dézoomer |
 | C | monter sur sa monture, en descendre |
+| P | compagnons : groupe, amis, équipage, honneur, saison, échanges |
+| O | codex |
 | B | meubler sa maison |
 | Espace, 1 à 9, Échap | en conversation : réplique suivante, choisir une question, quitter |
 | R | pêcher, puis ferrer |
 | F | manger le meilleur soin |
 | I / J / M / K / H | inventaire, quêtes, carte, hauts faits, aide |
-| Entrée | chat (`/qui`, `/pos`, `/aide`) |
+| Entrée | chat (`/qui`, `/pos`, `/aide`) ; Tab change de canal, ↑ ↓ l'historique |
 
 ## Organisation du code
 
@@ -224,20 +282,34 @@ shared/            code commun au serveur et au client
   data/            objets, monstres, quêtes (et leurs scènes), PNJ, compétences, mobilier (craft.js), anciens objets remboursés (legacy.js)
 server/
   game.js          simulation autoritaire (IA, combat, butin, quêtes, boutiques, chat)
-  db.js            comptes et sauvegardes
-  index.js         serveur HTTP + WebSocket
+  social.js        chat, amis, groupes, équipages, échanges
+  justice.js       JcJ, recherche, prison, réputation
+  events.js        grandes invasions annoncées
+  arena.js         la Fosse, duels et paris
+  tavern.js        mini-jeux de taverne
+  naval.js         navires partagés, coques
+  dungeon.js       le Bastion Englouti
+  sea.js           plongée et air
+  seasons.js       concours de pêche, Grand Tour, podiums
+  db.js            comptes, sauvegardes, instantanés
+  index.js         serveur HTTP + WebSocket, console /admin (admin.html)
 client/
   main.js          boucle du jeu, prédiction, interpolation, événements
   net.js           transports WebSocket et solo
   roomnet.js       multijoueur dans la page claude.ai (élection d'hôte)
   peernet.js       multijoueur direct entre navigateurs (page GitHub Pages)
   ui.js            interface HTML, carte au trésor
+  social-ui.js     chat, compagnons, échanges
+  tavern-ui.js     mini-jeux de taverne
+  townsfolk.js     habitants des villes
   scene.js         dialogues cinématiques (portraits, répliques, questions au choix)
   cine.js          cinématiques des boss
   render/          moteur de rendu et pixel art procédural (sprites-volcan.js : la montagne ; sprites-cite.js : Libertalia)
 scripts/
   build-artifact.mjs  assemble la page unique : claude.ai (dist/) ou GitHub Pages (--pages, docs/)
-docs/              page publique GitHub Pages (générée)
+  restore.mjs      restaure un instantané (serveur arrêté)
+  charge.mjs       test de charge
+docs/              page publique GitHub Pages : index.html (le jeu, généré), accueil.html (présentation), img/
 ```
 
 ## Ajouter du contenu

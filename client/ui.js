@@ -1184,7 +1184,7 @@ export class UI {
   renderBigMap() {
     const G = this.G;
     const S = 2, c = $('bigmap'); c.width = MAP_W * S; c.height = OVER_H * S;
-    const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+    const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.textRendering = 'optimizeSpeed'; // pas de ligature « fi » en Pixelify Sans
     x.drawImage(this.miniBase, 0, 0, c.width, c.height);
     const fog = this.fogCanvas(); if (fog) { x.imageSmoothingEnabled = true; x.drawImage(fog, 0, 0, c.width, c.height); x.imageSmoothingEnabled = false; } // les îles inconnues dorment sous la brume
     this.mapArt(x, S, c.width, c.height);

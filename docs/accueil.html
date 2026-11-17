@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marée Morte</title>
+<meta name="description" content="Marée Morte : un MMORPG pirate en pixel art, gratuit, qui se joue dans le navigateur. Pirates contre zombies, navires, plongée, donjons, tavernes et trois fins.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Pixelify+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --nuit: #0d1620; --abysse: #13222f; --vague: #1c3446; --ecume: #e9dcc0;
+    --parchemin: #efe2c2; --encre: #2a1d12; --or: #e2b34a; --or-fonce: #a87a1e;
+    --braise: #d4573b; --texte: #e9e1cf; --doux: #a9b3ad; --ligne: #2c4558;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--nuit); color: var(--texte); font: 17px/1.6 'Pixelify Sans', system-ui, sans-serif; font-variant-ligatures: none; -webkit-font-smoothing: antialiased; }
+  a { color: var(--or); }
+  img { display: block; max-width: 100%; height: auto; image-rendering: pixelated; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+  h1, h2, h3 { font-family: 'Pirata One', Georgia, serif; font-weight: 400; letter-spacing: .5px; line-height: 1.1; margin: 0; }
+
+  /* --- en-tête --- */
+  .hero { position: relative; overflow: hidden; border-bottom: 3px solid var(--or-fonce); }
+  .hero::before { content: ''; position: absolute; inset: 0; background: url(img/libertalia-nuit.jpg) center/cover; filter: saturate(1.1) brightness(.55); image-rendering: pixelated; }
+  .hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(13,22,32,.35) 0%, rgba(13,22,32,.2) 45%, var(--nuit) 100%); }
+  .hero .wrap { position: relative; z-index: 1; padding-top: 72px; padding-bottom: 64px; text-align: center; }
+  .version { display: inline-block; font-size: 14px; color: var(--nuit); background: var(--or); padding: 2px 10px; border-radius: 3px; margin-bottom: 16px; letter-spacing: 1px; }
+  .hero h1 { font-size: clamp(56px, 12vw, 112px); color: var(--parchemin); text-shadow: 0 3px 0 var(--encre), 0 0 28px rgba(0,0,0,.6); }
+  .accroche { font-size: clamp(18px, 2.6vw, 22px); max-width: 640px; margin: 14px auto 30px; color: var(--ecume); text-shadow: 0 2px 6px rgba(0,0,0,.8); }
+  .boutons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn { display: inline-block; font: 600 20px 'Pixelify Sans', sans-serif; text-decoration: none; padding: 12px 28px; border-radius: 4px; border: 2px solid var(--encre); transition: transform .08s; }
+  .btn:hover { transform: translateY(-2px); }
+  .btn:active { transform: translateY(1px); }
+  .btn.jouer { background: var(--or); color: var(--encre); box-shadow: 0 4px 0 var(--or-fonce), 0 6px 18px rgba(0,0,0,.5); }
+  .btn.second { background: rgba(13,22,32,.75); color: var(--parchemin); border-color: var(--ecume); }
+  .gratuit { margin-top: 18px; font-size: 14px; color: var(--doux); }
+
+  /* --- sections --- */
+  section { padding: 56px 0; }
+  section + section { border-top: 1px solid var(--ligne); }
+  h2 { font-size: clamp(34px, 5vw, 46px); color: var(--or); margin-bottom: 10px; }
+  .chapeau { color: var(--doux); max-width: 720px; margin: 0 0 30px; }
+
+  .histoire { display: grid; grid-template-columns: 1.1fr 1fr; gap: 32px; align-items: center; }
+  .parchemin { background: var(--parchemin); color: var(--encre); padding: 26px 28px; border-radius: 3px; box-shadow: 0 0 0 2px var(--or-fonce), 6px 6px 0 rgba(0,0,0,.35); font-size: 17px; }
+  .parchemin p { margin: 0 0 12px; }
+  .parchemin p:last-child { margin: 0; }
+  .parchemin h3 { font-size: 30px; margin-bottom: 10px; color: #6b2b18; }
+  .cadre { border: 3px solid var(--encre); box-shadow: 0 0 0 2px var(--or-fonce), 0 10px 26px rgba(0,0,0,.5); border-radius: 2px; overflow: hidden; background: #000; }
+
+  .galerie { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; }
+  figure { margin: 0; }
+  figcaption { margin-top: 10px; }
+  figcaption b { font-family: 'Pirata One', serif; font-weight: 400; font-size: 24px; color: var(--parchemin); display: block; }
+  figcaption span { color: var(--doux); font-size: 15px; }
+
+  .cartes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .carte { background: var(--abysse); border: 1px solid var(--ligne); border-left: 4px solid var(--or-fonce); padding: 18px 18px 16px; border-radius: 3px; }
+  .carte h3 { font-size: 25px; color: var(--parchemin); margin-bottom: 6px; }
+  .carte p { margin: 0; color: var(--doux); font-size: 15.5px; }
+
+  .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .mode { background: var(--vague); padding: 20px; border-radius: 3px; }
+  .mode h3 { font-size: 26px; color: var(--or); margin-bottom: 6px; }
+  .mode p { margin: 0; font-size: 15.5px; }
+
+  .touches { width: 100%; border-collapse: collapse; font-size: 16px; }
+  .touches td { padding: 8px 10px; border-bottom: 1px solid var(--ligne); vertical-align: top; }
+  .touches td:first-child { white-space: nowrap; width: 1%; }
+  kbd { font: 600 14px 'Pixelify Sans', monospace; background: var(--parchemin); color: var(--encre); border-radius: 3px; padding: 1px 7px; box-shadow: 0 2px 0 var(--or-fonce); margin: 0 2px 2px 0; display: inline-block; }
+  .deux-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0 32px; }
+
+  .appel { text-align: center; padding: 70px 0; background: radial-gradient(ellipse at center, var(--vague) 0%, var(--nuit) 70%); }
+  .appel h2 { margin-bottom: 18px; }
+  footer { padding: 26px 0 40px; color: var(--doux); font-size: 14px; text-align: center; }
+  footer a { color: var(--doux); }
+
+  @media (max-width: 860px) {
+    .histoire, .deux-col { grid-template-columns: 1fr; }
+    .cartes, .modes { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 600px) {
+    body { font-size: 16px; }
+    .galerie, .cartes, .modes { grid-template-columns: 1fr; }
+    .hero .wrap { padding-top: 52px; padding-bottom: 44px; }
+    section { padding: 42px 0; }
+    .parchemin { padding: 20px; }
+    .touches td:first-child { white-space: normal; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="version">VERSION 1.0</div>
+    <h1>Marée Morte</h1>
+    <p class="accroche">Un MMORPG de pirates contre les morts, en pixel art. On joue directement dans le navigateur, seul ou à plusieurs, sans rien installer.</p>
+    <div class="boutons">
+      <a class="btn jouer" href="./">⚓ Jouer maintenant</a>
+      <a class="btn second" href="#monde">Découvrir l’archipel</a>
+    </div>
+    <p class="gratuit">Gratuit · sans compte · ordinateur avec clavier et souris</p>
+  </div>
+</header>
+
+<main>
+  <section id="monde">
+    <div class="wrap histoire">
+      <div class="parchemin">
+        <h3>L’archipel maudit</h3>
+        <p>Le Capitaine Barbe-Cendre a volé le Cœur de Corail, et la Marée Morte relève les noyés. À Port-Lanterne, seule la Flamme Bénite tient encore les morts à distance.</p>
+        <p>Débarquez sans un sou et devenez pirate : abordez les galions fantômes, plongez dans les cités englouties, gagnez la confiance des ports… et choisissez enfin ce que deviendra la Flamme. Trois fins, une seule possible pour chaque pirate.</p>
+        <p>Tout le jeu, images et musique comprises, est créé par son propre code : aucun fichier image ou son externe.</p>
+      </div>
+      <div class="cadre"><img src="img/ame-anselme.jpg" alt="Un pirate face à une âme en flammes dans une crypte" width="960" height="540" loading="lazy"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Ce qui vous attend</h2>
+      <p class="chapeau">Des îles à conquérir, un océan à traverser et des fonds marins à explorer. Voici quelques escales de la version 1.0.</p>
+      <div class="galerie">
+        <figure><div class="cadre"><img src="img/ys-la-noyee.jpg" alt="Un plongeur dans les ruines englouties d’Ys" width="960" height="540" loading="lazy"></div>
+          <figcaption><b>Ys-la-Noyée</b><span>Descendez en cloche de plongée et surveillez votre air : seules les poches d’air vous laissent rester plus longtemps.</span></figcaption></figure>
+        <figure><div class="cadre"><img src="img/bastion-ecluse.jpg" alt="Une écluse qui se remplit d’eau dans un donjon" width="960" height="540" loading="lazy"></div>
+          <figcaption><b>Le Bastion Englouti</b><span>Un donjon pour plusieurs pirates : les leviers se tirent à deux, en même temps, avant que l’Écluse ne soit pleine.</span></figcaption></figure>
+        <figure><div class="cadre"><img src="img/canonnier.jpg" alt="Deux pirates à bord d’un même navire en pleine bataille" width="960" height="567" loading="lazy"></div>
+          <figcaption><b>Un navire, un équipage</b><span>Vos compagnons montent à bord comme canonniers et tirent en bordée. Attention à la coque : un navire peut sombrer.</span></figcaption></figure>
+        <figure><div class="cadre"><img src="img/taverne.jpg" alt="Une taverne animée, des pirates qui chantent" width="960" height="540" loading="lazy"></div>
+          <figcaption><b>Les tavernes</b><span>Bras de fer, concours de rhum, Trente-et-un, et des chansons à boire qui donnent de l’entrain à ceux qui les chantent.</span></figcaption></figure>
+        <figure><div class="cadre"><img src="img/libertalia-nuit.jpg" alt="Une ville pirate éclairée par des lanternes la nuit" width="960" height="540" loading="lazy"></div>
+          <figcaption><b>Des villes vivantes</b><span>Libertalia la nuit, avec ses lanternes, ses guirlandes et ses habitants qui vont et viennent selon l’heure.</span></figcaption></figure>
+        <figure><div class="cadre"><img src="img/invasion.jpg" alt="Une vague de morts-vivants attaque le port" width="960" height="540" loading="lazy"></div>
+          <figcaption><b>Les grandes invasions</b><span>Rares et annoncées à l’avance : trois vagues de morts et leur capitaine. Tout le monde est appelé à défendre la ville.</span></figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>La vie de pirate</h2>
+      <p class="chapeau">Un monde persistant à partager. Ce que vous faites y laisse une trace : les gens se souviennent de vous.</p>
+      <div class="cartes">
+        <div class="carte"><h3>Trois actes</h3><p>Une grande histoire jusqu’à l’Acte III, des scènes jouées, et des personnages qui se souviennent de vos choix.</p></div>
+        <div class="carte"><h3>Navires légendaires</h3><p>Du radeau au galion, jusqu’à la Veuve Écarlate pour les héros de Libertalia, et un navire que seule la brume peut donner.</p></div>
+        <div class="carte"><h3>Groupes et équipages</h3><p>Chat par canaux, amis, groupes qui partagent l’expérience, équipages avec pavillon et rangs, et échanges sécurisés.</p></div>
+        <div class="carte"><h3>La Fosse</h3><p>L’arène aux combats sans mort, des duels avec paris et un classement chaque semaine. Hors de l’arène, les nouveaux venus sont protégés.</p></div>
+        <div class="carte"><h3>Honneur et prison</h3><p>Chaque ville a sa réputation, ses taxes et ses prix. Les brigands recherchés finissent à la geôle, sauf caution.</p></div>
+        <div class="carte"><h3>Maisons</h3><p>Jusqu’à deux propriétés à acheter, meubler et revendre : cabane, maison de ville ou manoir.</p></div>
+        <div class="carte"><h3>Saisons</h3><p>Chaque mois, un concours de pêche et le Grand Tour de Libertalia à cheval. Les premiers du podium sont récompensés.</p></div>
+        <div class="carte"><h3>Brouillard et carte</h3><p>La carte se dévoile au fil de vos voyages. Les bulles en surface trahissent des sites de plongée.</p></div>
+        <div class="carte"><h3>Musique</h3><p>Une bande originale par lieu, des chansons de taverne à apprendre, et une collection à compléter.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Comment jouer</h2>
+      <p class="chapeau">Ouvrez le lien et choisissez un nom : votre progression est gardée dans votre navigateur.</p>
+      <div class="modes">
+        <div class="mode"><h3>Ensemble</h3><p>Tous ceux qui ouvrent la page partagent le même archipel. Le monde tourne dans le navigateur d’un des joueurs ; si celui-ci part, un autre reprend la main.</p></div>
+        <div class="mode"><h3>En solo</h3><p>Le bouton « Jouer en solo » lance l’archipel rien que pour vous. Le jeu y passe aussi tout seul si le réseau bloque les connexions entre navigateurs.</p></div>
+        <div class="mode"><h3>Sur un serveur</h3><p>Pour un monde public qui ne s’arrête jamais, le jeu a son propre serveur. Le code est libre de lecture sur <a href="https://github.com/joyeuxhugo39-max/maree-morte">GitHub</a>.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Les commandes</h2>
+      <div class="deux-col">
+        <table class="touches"><tbody>
+          <tr><td><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd></td><td>se déplacer (ou WASD, ou les flèches)</td></tr>
+          <tr><td><kbd>Clic gauche</kbd></td><td>coup de sabre vers le curseur</td></tr>
+          <tr><td><kbd>Clic droit</kbd><kbd>1</kbd></td><td>tirer ; à bord d’un navire, une bordée</td></tr>
+          <tr><td><kbd>Espace</kbd></td><td>roulade</td></tr>
+          <tr><td><kbd>E</kbd></td><td>parler, ouvrir, fouiller, entrer, monter à bord, plonger</td></tr>
+          <tr><td><kbd>C</kbd></td><td>monter en selle, en descendre</td></tr>
+          <tr><td><kbd>R</kbd></td><td>pêcher, puis ferrer</td></tr>
+          <tr><td><kbd>F</kbd></td><td>manger le meilleur soin</td></tr>
+        </tbody></table>
+        <table class="touches"><tbody>
+          <tr><td><kbd>I</kbd></td><td>inventaire</td></tr>
+          <tr><td><kbd>J</kbd><kbd>M</kbd><kbd>K</kbd></td><td>quêtes, carte, hauts faits</td></tr>
+          <tr><td><kbd>P</kbd></td><td>compagnons : groupe, amis, équipage, honneur, saison</td></tr>
+          <tr><td><kbd>O</kbd></td><td>le codex</td></tr>
+          <tr><td><kbd>B</kbd></td><td>meubler sa maison</td></tr>
+          <tr><td><kbd>Entrée</kbd></td><td>chat ; <kbd>Tab</kbd> change de canal</td></tr>
+          <tr><td><kbd>2</kbd>–<kbd>5</kbd></td><td>émotes</td></tr>
+          <tr><td><kbd>H</kbd></td><td>l’aide complète</td></tr>
+        </tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <section class="appel">
+    <div class="wrap">
+      <h2>La marée monte.</h2>
+      <a class="btn jouer" href="./">⚓ Prendre la mer</a>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">Marée Morte 1.0 · un jeu original, graphismes et musique générés par le code · <a href="https://github.com/joyeuxhugo39-max/maree-morte">code source</a></div>
+</footer>
+
+</body>
+</html>
