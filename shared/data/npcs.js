@@ -67,7 +67,7 @@ Object.assign(NPCS, {
     name: 'Corentin', title: 'Passeur du port',
     look: { skin: 1, hair: 1, hairStyle: 'court', beard: 1, top: 'vareuse', topCol: 'teal', pants: 'navy', boots: 'black', hat: 'bonnet', hatCol: 'red' },
     greet: ['La mer, ça se mérite. Et ça se rame.', 'Une barque, matelot ? Elle ne coule presque plus.', "Le vent tourne à l'est. Bon signe pour Havre-des-Brumes."],
-    shop: ['barque', 'canne_peche', 'bandage'],
+    shop: ['barque', 'canne_peche', 'bandage', 'cloche_plongee'],
     topics: [
       { q: 'Comment naviguer ?', a: "Achète-moi une barque. Sur un quai ou une plage, face à l'eau, appuie sur E pour la mettre à l'eau. Pour accoster, longe le rivage et appuie de nouveau sur E. À bord, pas de sabre : seulement le pistolet." },
       { q: 'Où aller ?', a: "Plein est, Havre-des-Brumes : un village de pêcheurs, à l'abri des morts. Au sud-est, l'Île au Crâne : n'y va pas sans un bon sabre. Et quelques îlots perdus, ici et là, que personne n'a fouillés depuis longtemps." },
@@ -97,7 +97,7 @@ Object.assign(NPCS, {
     name: 'Ysaline', title: 'Charpentière de marine', repair: 1,
     look: { skin: 1, hair: 0, hairStyle: 'queue', top: 'gilet', topCol: 'brown', pants: 'navy', boots: 'brown', hat: 'bandana', hatCol: 'teal' },
     greet: ["Une coque, c'est comme un cœur : il faut l'écouter.", 'Attention aux copeaux !', 'Le sloop là-bas ? Le plus rapide de l’archipel. Et il a du répondant.'],
-    shop: ['barque', 'sloop', 'fusil_harpon', 'pistolet_double', 'harpon', 'cimeterre', 'rapiere', 'dague_cristal', 'flamberge', 'poivriere', 'pistolet_duel', 'pistolet_cristal', 'amulette_lanterne', 'pendentif_cristal'],
+    shop: ['cloche_plongee', 'scaphandre', 'barque', 'sloop', 'fusil_harpon', 'pistolet_double', 'harpon', 'cimeterre', 'rapiere', 'dague_cristal', 'flamberge', 'poivriere', 'pistolet_duel', 'pistolet_cristal', 'amulette_lanterne', 'pendentif_cristal'],
     topics: [
       { q: 'Barque ou sloop ?', a: "La barque, c'est pour se promener. Le sloop file bien plus vite et porte un canon : clic droit pour tirer, sur les morts comme sur les pirates trop curieux." },
     ],

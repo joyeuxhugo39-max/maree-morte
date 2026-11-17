@@ -14,6 +14,8 @@ export const ACHIEVEMENTS = {
   fin_apaiser: { name: 'La Flamme apaisée', desc: 'Acte III : rallumer la Flamme doucement, pour que les morts reposent là où ils tombent.', title: 'Apaiseur des Marées' },
   fin_gardien: { name: 'Le gardien de la Flamme', desc: 'Acte III : prendre la garde de la Flamme, et son fardeau.', title: 'Gardien de la Flamme' },
   fin_brasier: { name: 'La nuit où la mer brûla', desc: 'Acte III : retourner la Flamme contre la mer.', title: 'Brûleur de Marées' },
+  plongeur: { name: 'Plongeur des abysses', desc: 'Plonger sur les trois sites : l’épave du Léviathan, les Grottes des Abysses et Ys-la-Noyée.', title: 'Plongeur des abysses' },
+  roi_ys: { name: 'Les cloches se taisent', desc: 'Vaincre Gradlon, roi d’Ys-la-Noyée.', title: 'Briseur de cloches' },
   bastion: { name: 'Le Bastion tombé', desc: 'Vaincre l’Amiral Englouti au fond du Bastion, avec ses compagnons.', title: 'Briseur de grilles' },
   gladiateur: { name: 'Gladiateur', desc: 'Tenir dix vagues dans la Fosse de Libertalia.', title: 'Gladiateur de la Fosse' },
   duelliste: { name: 'Fine lame', desc: 'Remporter un duel dans la Fosse.', title: 'Fine lame' },

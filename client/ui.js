@@ -166,6 +166,9 @@ export class UI {
       $('hp-txt').textContent = `${me.hp} / ${me.maxHp}`;
       $('en-fill').style.width = (me.en / me.maxEn * 100).toFixed(1) + '%';
       $('en-txt').textContent = `${me.en} / ${me.maxEn}`;
+      const airB = $('air-bar'); // 1.0 : l'air, sous la mer
+      if (me.air >= 0 && me.airMax) { airB.classList.remove('hidden'); $('air-fill').style.width = (me.air / me.airMax * 100).toFixed(1) + '%'; $('air-txt').textContent = `🫧 Air ${me.air} / ${me.airMax}`; airB.classList.toggle('low', me.air <= 10); }
+      else airB.classList.add('hidden');
       if (me.lvl >= MAX_LEVEL && me.gxpNext) { // 1.0 : la Gloire
         $('xp-fill').style.width = (me.glory >= 50 ? 100 : me.gxp / me.gxpNext * 100).toFixed(1) + '%';
         $('xp-txt').textContent = me.glory >= 50 ? `★ Gloire ${me.glory} — la plus haute` : `★ Gloire ${me.glory || 0} — ${me.gxp} / ${me.gxpNext}`;

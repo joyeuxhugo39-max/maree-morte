@@ -695,6 +695,7 @@ export const MOB_LOOKS = {
   naufrageur: { skin: 3, hair: 4, hairStyle: 'hirsute', top: 'vareuse', topCol: 'orange', pants: 'navy', boots: 'black', hat: 'bonnet', hatCol: 'orange', beard: 2, eyeCol: 0xffd24a, seed: 28 },
   garde_maudit: { skin: 'drowned', undead: 1, hair: 4, hairStyle: 'queue', top: 'manteau', topCol: 'red', pants: 'white', boots: 'black', hat: 'tricorne', hatCol: 'black', eyeCol: 0x9fffe8, seed: 29 },
   goule_ecarlate: { skin: 'ghoul', undead: 1, hunch: 1, hair: 0, hairStyle: 'hirsute', top: 'haillons', topCol: 'red', pants: 'red', boots: 'red', eyeCol: 0xff3a3a, claws: 1, seed: 30 },
+  roi_ys: { big: 1, skin: 'drowned', undead: 1, hair: 6, hairStyle: 'long', beard: 2, beardCol: 6, top: 'capitaine', topCol: 'teal', pants: 'teal', boots: 'teal', hat: 'couronne', cape: 'teal', eyeCol: 0x9fffe8, seed: 53 },
   amiral_englouti: { big: 1, skin: 'drowned', undead: 1, hair: 6, hairStyle: 'queue', beard: 2, beardCol: 6, top: 'capitaine', topCol: 'navy', pants: 'white', boots: 'black', hat: 'capitaine', hatCol: 'navy', eyeCol: 0x7ae0ff, cape: 'navy', seed: 47 },
   ame_anselme: { big: 1, skin: 'ash', undead: 1, hair: 6, hairStyle: 'long', beard: 2, beardCol: 6, top: 'manteau', topCol: 'white', pants: 'black', boots: 'black', eyeCol: 0xffb03a, cape: 'red', seed: 41 }, // 1.0 : l'âme d'Anselme
   reine_mangrove: { big: 1, skin: 'drowned', undead: 1, hair: 4, hairStyle: 'long', top: 'vareuse', topCol: 'green', pants: 'green', boots: 'teal', hat: 'couronne', cape: 'green', eyeCol: 0x9dff6a, seed: 31 },

@@ -308,6 +308,11 @@ O('tenue_chasseur', { name: 'Tenue de chasseur de primes', atk: 8, crit: 0.08, d
 O('uniforme_marine', { name: 'Uniforme de la Marine', def: 16, hp: 50, value: 4200, rarity: 2, outfit: { top: 'capitaine', topCol: 'navy', pants: 'white', boots: 'black', hat: 'tricorne', hatCol: 'navy' }, desc: 'Arraché à un officier trop curieux. À Libertalia, il fait rire. Ailleurs, il protège.' });
 O('tenue_vaudou', { name: 'Tenue du houngan', regen: 2.5, hp: 40, def: 8, value: 3800, rarity: 2, outfit: { top: 'vareuse', topCol: 'purple', pants: 'black', boots: 'black', hat: 'crane', cape: 'purple' }, desc: 'Plumes, os et colliers de perles. Les esprits veillent sur vous.' });
 O('habit_gouverneur', { name: 'Habit de gouverneur', def: 14, hp: 70, goldFind: 0.15, value: 9500, rarity: 3, outfit: { top: 'capitaine', topCol: 'red', pants: 'white', boots: 'black', hat: 'plume', hatCol: 'red', cape: 'red' }, desc: 'Velours, dentelle et boutons d’or. Le dernier gouverneur ne le portera plus. Doublons +15 %.' });
+// 1.0 : la plongée — une cloche pour descendre, un scaphandre pour tenir plus longtemps
+Object.assign(ITEMS, {
+  cloche_plongee: { name: 'Cloche de plongée', use: { dive: 1 }, value: 1200, rarity: 1, icon: 'lantern', tint: 'grey', desc: 'À bord de votre navire, au-dessus d’un site de plongée (les bulles à la surface) : E pour descendre. Elle ne s’use pas.' },
+  scaphandre: { name: 'Casque de scaphandrier', slot: 'hat', def: 6, air: 45, value: 2600, rarity: 2, icon: 'bonehelm', tint: 'grey', lookCol: 'navy', look: 'bonnet', desc: 'Un casque de cuivre et de verre : deux fois plus d’air sous l’eau.' },
+});
 // 1.0 : Acte III — ce qu'il reste du feu d'Anselme, selon le choix fait
 Object.assign(ITEMS, {
   lanterne_apaisee: { name: 'Lanterne apaisée', slot: 'trinket', regen: 3, hp: 70, def: 4, value: 9000, rarity: 3, unique: 1, lvl: 28, icon: 'lantern', desc: 'La première lumière de la Flamme rallumée doucement. Les morts qui la voient s’endorment un peu.' },

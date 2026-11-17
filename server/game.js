@@ -31,6 +31,7 @@ import { arena } from './arena.js';
 import { tavern } from './tavern.js';
 import { naval } from './naval.js';
 import { dungeonLogic } from './dungeon.js';
+import { sea } from './sea.js';
 import { MEM_KEYS } from '../shared/data/scenes.js';
 import { repLevel, buyPrice, sellPrice } from '../shared/data/places.js';
 import { LEGACY_VALUE, LEGACY_STRUCT, QUEST_ITEM_OLD_VALUE } from '../shared/data/legacy.js';
@@ -227,6 +228,7 @@ export class Game {
       case 'disembark': return this.disembark(p, null);
       case 'repair': return this.repair(p);
       case 'lever': return this.pullLever(p, m.i | 0);
+      case 'dive': return this.dive(p);
       case 'arena': return this.arenaAction(p, String(m.a), m);
       case 'tav': return this.tavernAction(p, String(m.a), m);
       case 'mem': { const k = String(m.k); if (MEM_KEYS.has(k) && p.mem.size < 200) p.mem.add(k); return; }
@@ -571,7 +573,7 @@ export class Game {
       st: { atk: p.stats.atk, gun: p.stats.gun, def: p.stats.def, crit: Math.round(p.stats.crit * 100), speed: p.stats.speed, regen: +p.stats.regen.toFixed(1) },
       cry: Math.max(0, +(p.cry - this.time).toFixed(1)), drunk: Math.max(0, +(p.drunkUntil - this.time).toFixed(1)),
       dead: p.dead, kills: p.kills, upg: p.upg, title: p.title, boat: p.boat, room: p.room, pk: p.pk, pet: p.pet || '', vo: this.time < p.thiefUntil ? 1 : 0,
-      ...this.justiceMe(p), gxpNext: GLORY_XP, ...this.navalMe(p), songs: [...(p.songs || [])],
+      ...this.justiceMe(p), gxpNext: GLORY_XP, ...this.navalMe(p), air: this.seaRoom(p) ? Math.ceil(p.air || 0) : -1, airMax: this.airMax(p), songs: [...(p.songs || [])],
       ride: p.riding && p.eq.mount ? ITEMS[p.eq.mount].mount.kind : '', cnt: p.cnt, zsn: p.zs.size, zst: FAR_ZONES.length, cch: Object.keys(p.caches).length, bf: p.buffs ? Object.entries(p.buffs).filter(([, v]) => v.until > this.time).map(([k, v]) => [k, Math.ceil(v.until - this.time)]) : [], rc: p.recallAt ? +(p.recallAt - this.time).toFixed(1) : 0,
     };
   }
@@ -1638,7 +1640,7 @@ export class Game {
     if (!p.dead || this.time - p.deathAt < 1.5) return;
     p.dead = false; p.hp = p.stats.maxHp; p.en = p.stats.maxEn;
     if (p.boat) { p.boat = null; p.lookVer++; }
-    p.aboard = 0;
+    p.aboard = 0; p.diveBoat = null; p.air = null;
     if (p.shieldNext) { p.shieldNext = false; p.shieldUntil = this.time + SHIELD_AFTER_DEATH; p.lookVer++; this.toast(p, `Pavillon blanc : personne ne peut vous attaquer pendant ${SHIELD_AFTER_DEATH / 60} minutes (et vous n’attaquez personne).`, 'info'); }
     if (p.jail > 0) { p.invulnUntil = this.time + 3; this.imprison(p, 0); this.ev(p.x, p.y, ['fx', 'respawn', p.x, p.y]); return; }
     const sp = this.world.spawnPoint;
@@ -2042,10 +2044,11 @@ export class Game {
       if (p.room !== d.room || Math.abs(p.x - d.ex) > 18 || Math.abs(p.y - d.ey) > 24) return;
       if (d.jail && this.jailBlocks(p)) { p.cds.door = this.time + 1.5; return; }
       p.cds.door = this.time + 0.6;
+      if (d.dive) return this.surface(p, d); // 1.0 : la corde de l'ancre remonte à la surface
       this.teleport(p, d.rx, d.ry + 2, { door: d.id, out: 1 });
     } else {
       if (p.room !== -1 || Math.abs(p.x - d.ox) > 18 || Math.abs(p.y - d.oy) > 28) return;
-      if (d.jail) return; // on n'entre à la Geôle que conduit par la garde
+      if (d.jail || d.dive) return; // on n'entre à la Geôle que conduit par la garde ; dans les fonds, qu'avec la cloche
       if (d.seal && (this.seals[d.seal] || 0) < this.time) { p.cds.door = this.time + 1.5; return this.toast(p, 'La porte est scellée. Deux dalles, deux pirates…', 'warn'); }
       if (d.plot != null) {
         const h = this.homes.get(d.plot);
@@ -2201,6 +2204,7 @@ export class Game {
       if (Math.random() < 0.3) this.giveOrDrop(p, 'carte_dechiree', 1);
       return this.toast(p, `${MSG[Math.floor(Math.random() * MSG.length)]} (+${gold} doublons)`, 'quest');
     }
+    if (it.use.dive) return this.dive(p); // 1.0 : la cloche de plongée
     if (it.use.recall) {
       if (p.boat) return this.toast(p, 'Accostez d’abord.', 'warn');
       if (this.jailBlocks(p)) return;
@@ -3095,6 +3099,7 @@ export class Game {
         if (p.dirtyCodex) { p.dirtyCodex = false; this.send(p, { t: 'codex', kc: p.kc, met: [...p.met], col: [...p.col], st: p.st }); }
         this.justiceTick(p);
         this.act3Tick(p);
+        this.seaTick(p);
       }
       if (p.fishing) this.updateFishing(p);
       if (p.gold >= 1000 && !p.ach.riche) this.unlock(p, 'riche');
@@ -3181,3 +3186,4 @@ Object.assign(Game.prototype, arena); // 1.0 : l'Arène de la Fosse
 Object.assign(Game.prototype, tavern); // 1.0 : les jeux de taverne
 Object.assign(Game.prototype, naval); // 1.0 : navires partagés et coques
 Object.assign(Game.prototype, dungeonLogic); // 1.0 : le Bastion Englouti
+Object.assign(Game.prototype, sea); // 1.0 : les fonds marins

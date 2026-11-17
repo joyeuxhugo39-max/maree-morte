@@ -185,3 +185,6 @@ for (const m of ['damne', 'arquebusier_damne']) MOBS[m].loot.push(['page_anselme
 // 1.0 : le maître du Bastion Englouti, au fond de la troisième salle
 mob('amiral_englouti', { name: 'L’Amiral Englouti', level: 24, hp: 6500, dmg: 40, speed: 38, aggro: 200, leash: 300, range: 30, atkCd: 1.4, windup: 0.55, xp: 3600, gold: [420, 640], r: 14, respawn: 900, elite: 1, big: 1, swims: 1, groan: 1,
   ai: 'amiral', phases: [0.5, 0.25], title: 'Seigneur du Bastion', weapon: ['bigsaber', 'steel'], loot: [['harpon_abysses', 0.18, 1, 1], ['sabre_jumeaux', 0.12, 1, 1], ['uniforme_marine', 0.15, 1, 1], ['rhum_vieux', 1, 1, 3]] });
+// 1.0 : le roi noyé de la cité engloutie d'Ys
+mob('roi_ys', { name: 'Gradlon, roi d’Ys-la-Noyée', level: 27, hp: 7600, dmg: 44, speed: 34, aggro: 220, leash: 340, range: 30, atkCd: 1.4, windup: 0.55, xp: 4200, gold: [520, 800], r: 14, respawn: 900, elite: 1, big: 1, swims: 1, groan: 1,
+  ai: 'noye', phases: [0.5], title: 'Le roi qui dort sous la mer', weapon: ['bigsaber', 'gold'], loot: [['trident_orage', 0.18, 1, 1], ['harpon_abysses', 0.15, 1, 1], ['habit_gouverneur', 0.06, 1, 1], ['rhum_vieux', 1, 1, 3]] });

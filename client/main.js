@@ -661,6 +661,7 @@ function interact() {
   else if (t.kind === 'exit') useDoor(t.d, true, performance.now() / 1000);
   else if (t.kind === 'player') G.ui.playerMenu(t.name, null); // 1.0 : inviter, échanger, ajouter en ami…
   else if (t.kind === 'lever') G.send({ t: 'lever', i: t.i }); // 1.0 : le Bastion
+  else if (t.kind === 'dive') G.send({ t: 'dive' }); // 1.0 : la cloche de plongée
   else if (t.kind === 'embark') G.send({ t: 'embark', name: t.name }); // 1.0 : navires partagés
   else if (t.kind === 'disembark') G.send({ t: 'disembark' });
   else if (t.kind === 'board') G.send({ t: 'board', a: +G.aim.toFixed(3) });
@@ -735,6 +736,7 @@ function findInteract() {
     const d = Math.hypot(L.x - p.x, L.y - p.y);
     if (d < 30 && d < bd) { bd = d; best = { kind: 'lever', i, x: L.x, y: L.y, h: 26, verb: 'Tirer le levier' }; }
   });
+  if (p.boat && G.world.diveSpots) for (const s of G.world.diveSpots) if (Math.hypot(s.x - p.x, s.y - p.y) < 90) return { kind: 'dive', x: p.x, y: p.y, h: 36, verb: `Plonger : ${s.name}` }; // 1.0 : les fonds marins
   if (G.me && G.me.ab) return { kind: 'disembark', x: p.x, y: p.y, h: 34, verb: 'Débarquer' }; // 1.0 : à bord d'un compagnon
   if (!best && !p.boat && G.room < 0) for (const e of G.ents.values()) { // 1.0 : monter à bord du navire d'un compagnon
     if (e.k !== 'p' || !(e.flags & 16) || e.dead) continue;
@@ -895,6 +897,7 @@ function ambience(now) {
   let theme = G.night ? 'night' : 'day';
   if (G.zone === Z.SWAMP || G.zone === Z.WRECK || G.zone === Z.CAVE || G.zone === Z.PENDUS || G.zone === Z.QUARANTAINE || G.zone === Z.DAMNES || G.zone === Z.VOLCAN || G.zone === Z.OSSEMENTS) theme = 'swamp';
   if (G.zone === Z.INTERIOR) theme = 'day';
+  if (G.room >= 0 && G.world.rooms[G.room] && G.world.rooms[G.room].kind === 'underwater') theme = 'night'; // 1.0 : le silence des fonds
   if (G.zone === Z.LIBERTALIA || (G.zone === Z.BASFONDS && !G.night)) theme = 'cite'; // 0.8 : la cité ne dort jamais
   if (G.zone === Z.INTERIOR && G.room >= 0) { const d = G.world.doors.find((q) => q.room === G.room); if (d && zoneAt(G.world, d.ox, d.oy) === Z.LIBERTALIA) theme = 'cite'; }
   if (G.room >= 0) { const pl = G.world.plots.find((q) => q.room === G.room), h = pl && G.homes.get(pl.k); if (h && h.music) theme = h.music; } // la boîte à musique de la maison
@@ -996,7 +999,7 @@ function frame(now, dt) {
     const first = G.lastRoom === -99;
     G.lastRoom = G.room; G.snapCam = true;
     const r = G.room >= 0 ? G.world.rooms[G.room] : null;
-    if (r) G.ui.banner(r.name, r.kind === 'cave' ? 'Grotte — danger' : r.kind === 'arene' ? 'Arène — danger' : r.kind === 'prison' ? 'Purgez votre peine, ou payez la caution au gardien' : 'Zone sûre');
+    if (r) G.ui.banner(r.name, r.kind === 'underwater' ? `Sous la mer — niveaux ${r.lvl ? r.lvl.join('-') : '?'} — surveillez votre air` : r.kind === 'cave' ? 'Grotte — danger' : r.kind === 'arene' ? 'Arène — danger' : r.kind === 'prison' ? 'Purgez votre peine, ou payez la caution au gardien' : 'Zone sûre');
     else if (first) G.ui.banner(ZONES[z].name, ZONES[z].lvl);
     G.zone = z; G.zoneAt = now; G.ui.setZone(z, r);
     G.sfx.ambience(r ? (r.kind === 'cave' ? 0.15 : 0.05) : z === Z.BEACH || z === Z.TOWN || z === Z.WRECK ? 1 : 0.4);
@@ -1095,7 +1098,7 @@ function updatePlayer(now, dt) {
   } else {
     if (rolling) { vx = Math.cos(p.rollA) * ROLL_SPEED; vy = Math.sin(p.rollA) * ROLL_SPEED; }
     else {
-      let spd = me.st.speed * (me.cry > 0 && now - G.meAt < me.cry ? 1.2 : 1);
+      let spd = me.st.speed * (me.cry > 0 && now - G.meAt < me.cry ? 1.2 : 1) * (G.room >= 0 && G.world.rooms[G.room].kind === 'underwater' ? 0.72 : 1); // sous l'eau, on nage
       spd *= SPEED_MUL[tileAt(G.world, p.x, p.y)] || 1;
       vx = ax.x * spd; vy = ax.y * spd;
       if (G.renderer.drunk > 0 && (ax.x || ax.y)) { const w = Math.sin(now * 2.3) * 0.5 * G.renderer.drunk; const c = Math.cos(w), s = Math.sin(w); [vx, vy] = [vx * c - vy * s, vx * s + vy * c]; }

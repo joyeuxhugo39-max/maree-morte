@@ -341,6 +341,8 @@ export class Renderer {
     }
     this.drawParticles(ctx, camX, camY, dt);
     if (room && room.dungeon) this.drawDungeon(ctx, G, camX, camY, now); // 1.0 : grilles et Écluse du Bastion
+    if (room && room.kind === 'underwater') this.drawUnderwater(ctx, G, camX, camY, now, dt); // 1.0 : les fonds marins
+    if (!room) this.drawDiveSpots(ctx, G, camX, camY, now); // 1.0 : les bulles des sites de plongée
     if (!room) this.drawGarlands(ctx, camX, camY, now, dark, false);
     if (!room) {
       this.updateCritters(G, camX, camY, now, dt, dark);
@@ -348,6 +350,7 @@ export class Renderer {
       this.drawAtmosphere(ctx, G, camX, camY, now, dt, dark);
     } else this.critters.length = 0;
     this.drawLighting(ctx, G, camX, camY, now, dark, f);
+    if (room && room.kind === 'underwater') this.drawUnderwaterTop(ctx, now); // 1.0 : sous la mer
     if (!room && dark > 0.2 && isFullMoon(G.worldTime || 0)) { ctx.fillStyle = `rgba(120,18,30,${0.12 * dark})`; ctx.fillRect(0, 0, W, H); } // la pleine lune rougit la nuit
     if (!room) { this.drawCritters(ctx, camX, camY, now, dark, true); this.drawWeather(ctx, G, now, dt, dark); }
     else { this.weather = { rain: 0, storm: 0, kind: 0 }; this.rain.length = 0; }
@@ -549,6 +552,43 @@ export class Renderer {
           ctx.globalAlpha = 1; ctx.fillStyle = g.cols[i]; ctx.fillRect(X - 1, Y, 2, 3); ctx.fillStyle = '#fff6d8'; ctx.fillRect(X - 1, Y, 1, 1);
         } else { ctx.fillStyle = '#3a2414'; ctx.fillRect(X - 1, Y - 1, 3, 1); ctx.fillStyle = g.cols[i]; ctx.globalAlpha = 0.75; ctx.fillRect(X - 1, Y, 2, 3); ctx.globalAlpha = 1; }
       }
+    }
+  }
+  // 1.0 : sous l'eau — teinte bleu-vert, rais de lumière, particules en suspension, colonnes de bulles des poches d'air
+  drawUnderwater(ctx, G, camX, camY, now, dt) {
+    const W = this.W, H = this.H;
+    ctx.globalCompositeOperation = 'lighter';
+    for (const a of this.world.airPockets) {
+      if (a.room !== G.room || a.x < camX - 40 || a.x > camX + W + 40 || a.y < camY - 60 || a.y > camY + H + 40) continue;
+      ctx.globalAlpha = 0.55 + 0.15 * Math.sin(now * 3 + a.x); ctx.drawImage(this.glows.cold, a.x - camX - 22, a.y - camY - 22, 44, 44); ctx.globalAlpha = 1;
+      if (rnd() < 0.5) this.burst(a.x + (rnd() - 0.5) * 8, a.y, 1, { z: 2, col: ['#e8fbff', '#bfefff'], up: 40, speed: 4, life: 1.2, g: -30, size: 1 });
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'rgba(200,240,255,0.35)'; // particules en suspension
+    for (let k = 0; k < 40; k++) { const x = ((hash2(k, 3, 1) * W + now * (3 + k % 5)) % W), y = ((hash2(k, 4, 1) * H + Math.sin(now * 0.7 + k) * 8 - now * 2) % H + H) % H; ctx.fillRect(x, y, 1, 1); }
+    if (G.player && rnd() < 0.05) this.burst(G.player.x + 3, G.player.y - 22, 1, { z: 4, col: ['#ffffff', '#d8f6ff'], up: 30, speed: 3, life: 1.4, g: -26, size: 1 }); // on souffle des bulles
+  }
+  // après l'éclairage : l'eau teinte tout de bleu-vert, et la lumière de la surface descend en rais
+  drawUnderwaterTop(ctx, now) {
+    const W = this.W, H = this.H;
+    ctx.fillStyle = 'rgba(20,120,150,0.24)'; ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter';
+    for (let k = 0; k < 6; k++) {
+      const x = ((k * 211 + now * 9) % (W + 200)) - 100, w = 40 + 30 * Math.sin(now * 0.4 + k);
+      const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(140,230,255,0.16)'); g.addColorStop(1, 'rgba(140,230,255,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + w, 0); ctx.lineTo(x + w * 0.4 - 80, H); ctx.lineTo(x - 120, H); ctx.closePath(); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, H * 0.85); v.addColorStop(0, 'rgba(0,30,50,0)'); v.addColorStop(1, 'rgba(0,30,50,0.5)');
+    ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+  }
+  drawDiveSpots(ctx, G, camX, camY, now) {
+    for (const s of this.world.diveSpots || []) {
+      if (s.x < camX - 60 || s.x > camX + this.W + 60 || s.y < camY - 60 || s.y > camY + this.H + 60) continue;
+      ctx.strokeStyle = `rgba(220,250,255,${0.35 + 0.2 * Math.sin(now * 2)})`; ctx.lineWidth = 1;
+      for (let k = 0; k < 3; k++) { const r = ((now * 14 + k * 12) % 36) + 4; ctx.globalAlpha = 1 - r / 40; ctx.beginPath(); ctx.ellipse(s.x - camX, s.y - camY, r, r * 0.5, 0, 0, TAU); ctx.stroke(); }
+      ctx.globalAlpha = 1;
+      if (rnd() < 0.4) this.burst(s.x + (rnd() - 0.5) * 20, s.y + (rnd() - 0.5) * 10, 1, { z: 1, col: ['#ffffff', '#d8f6ff'], up: 18, speed: 4, life: 0.7, g: 20, size: 1 });
     }
   }
   // 1.0 : le Bastion Englouti — les grilles fermées, l'eau de l'Écluse, les leviers tirés
@@ -1412,7 +1452,7 @@ export class Renderer {
     }
   }
   drawLighting(ctx, G, camX, camY, now, dark, f) {
-    const W = this.W, H = this.H, room = this.room, cave = room && room.kind === 'cave';
+    const W = this.W, H = this.H, room = this.room, cave = room && (room.kind === 'cave' || room.kind === 'underwater');
     // teinte du crépuscule et de l'aube
     const dusk = room ? 0 : f > 0.5 && f < 0.66 ? Math.sin((f - 0.5) / 0.16 * Math.PI) : f > 0.87 && f < 0.99 ? Math.sin((f - 0.87) / 0.12 * Math.PI) * 0.7 : 0;
     if (dusk > 0) { ctx.fillStyle = `rgba(255,120,60,${0.16 * dusk})`; ctx.fillRect(0, 0, W, H); }

@@ -1421,6 +1421,54 @@ export function generateWorld(seed = 7) {
       ['amiral_englouti', 60, 4], ['garde_maudit', 54, 12], ['garde_maudit', 66, 12]]) caveSpawns.push({ mob: m, ...at(fx, fy) });
     return { room: r.id, door: door.id, gates, levers, mouth, chambers: [C(0), C(1), C(2)], y0: dy0 * TILE, y1: (dy0 + DH) * TILE, decor: [[dx0 + 1, dy0 + DH - 2], [dx0 + 21, dy0 + 1], [dx0 + 25, dy0 + 1], [dx0 + 45, dy0 + DH - 2], [dx0 + 49, dy0 + 1], [dx0 + 70, dy0 + 1], [dx0 + 49, dy0 + DH - 2], [dx0 + 70, dy0 + DH - 2]] };
   })();
+  // 1.0 : les fonds marins — trois sites de plongée (cloche de plongée), après toutes les autres pièces ;
+  // l'air manque, les bulles le rendent. Leurs décors (coffres engloutis, coraux…) sont posés à la toute fin.
+  const deepSpot = (cx, cy) => {
+    for (let rr = 6; rr < 70; rr++) for (let a = 0; a < 48; a++) {
+      const x = Math.round(cx + Math.cos(a / 48 * 6.283) * rr), y = Math.round(cy + Math.sin(a / 48 * 6.283) * rr);
+      if (!inMap(x - 3, y - 3) || !inMap(x + 3, y + 3) || y >= OVER_H - 4) continue;
+      let ok = true;
+      for (let dy = -3; dy <= 3 && ok; dy++) for (let dx = -3; dx <= 3; dx++) if (tiles[idx(x + dx, y + dy)] !== T.DEEP) { ok = false; break; }
+      if (ok) return [x, y];
+    }
+    return null;
+  };
+  const SEAS = [
+    { name: 'Les fonds du Léviathan', key: 'leviathan', w: 40, h: 18, floor: T.SAND, at: deepSpot(WR.x - 8, WR.y - 6), lvl: [10, 14],
+      mobs: [['drowned', 6], ['drowned', 12], ['drowned', 24], ['capitaine_noye', 30], ['sirene', 18]] },
+    { name: 'Les Grottes des Abysses', key: 'grottes', w: 44, h: 20, floor: T.CAVE, at: deepSpot(566 - 30, 270 + 10), lvl: [16, 20],
+      mobs: [['sirene', 8], ['sirene', 30], ['crabe_corail', 15], ['crabe_corail', 36], ['naufrageur', 22], ['naufrageur', 12]] },
+    { name: 'Ys-la-Noyée, la cité engloutie', key: 'ys', w: 56, h: 22, floor: T.STONEF, at: deepSpot(206 + 14, 152 + 14), lvl: [24, 28],
+      mobs: [['garde_maudit', 10], ['garde_maudit', 46], ['goule_ecarlate', 20], ['goule_ecarlate', 36], ['naufrageur', 28], ['roi_ys', 28]] },
+  ];
+  const seaRooms = [];
+  for (const S of SEAS) {
+    if (!S.at) throw new Error('pas de site de plongée pour ' + S.name);
+    const [sx0, sy0] = alloc(S.w, S.h), R = mulberry32(S.w * 131 + S.h);
+    for (let y = sy0 - 2; y <= sy0 + S.h; y++) for (let x = sx0 - 1; x <= sx0 + S.w; x++) { const i = idx(x, y); tiles[i] = T.CWALL; zones[i] = Z.CAVE; solid[i] = 1; occ[i] = 0; }
+    for (let y = sy0; y < sy0 + S.h; y++) for (let x = sx0; x < sx0 + S.w; x++) { const i = idx(x, y); tiles[i] = S.floor; solid[i] = 0; occ[i] = 0; }
+    for (let k = 0; k < S.w * S.h / 60; k++) { // des rochers, des pans de mur effondrés
+      const x = sx0 + 2 + Math.floor(R() * (S.w - 4)), y = sy0 + 1 + Math.floor(R() * (S.h - 5));
+      for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) { const i = idx(x + dx, y + dy); tiles[i] = T.CWALL; solid[i] = 1; }
+    }
+    const exx = sx0 + (S.w >> 1), exy = sy0 + S.h;
+    for (let y = exy - 3; y < exy; y++) for (let x = exx - 2; x <= exx + 2; x++) { const i = idx(x, y); tiles[i] = S.floor; solid[i] = 0; }
+    tiles[idx(exx, exy)] = T.EXIT; solid[idx(exx, exy)] = 0;
+    for (let x = exx - 1; x <= exx + 1; x++) occ[idx(x, exy - 1)] = 1;
+    const r = { id: rooms.length, name: S.name, kind: 'underwater', x0: sx0, y0: sy0, w: S.w, h: S.h, sea: S.key, lvl: S.lvl };
+    rooms.push(r);
+    const door = { id: doors.length, room: r.id, name: S.name, kind: 'underwater', secret: true, dive: S.key,
+      ox: S.at[0] * TILE + 8, oy: S.at[1] * TILE + 8, rx: S.at[0] * TILE + 8, ry: S.at[1] * TILE + 8,
+      ix: exx * TILE + 8, iy: (exy - 1) * TILE + 10, ex: exx * TILE + 8, ey: exy * TILE + 8 };
+    doors.push(door);
+    for (const [m, fx] of S.mobs) { // les habitants des fonds, répartis loin de l'ancre
+      for (let tries = 0; tries < 40; tries++) {
+        const x = sx0 + Math.min(S.w - 2, Math.max(1, fx + Math.floor(R() * 5) - 2)), y = sy0 + 1 + Math.floor(R() * (S.h - 6));
+        if (!solid[idx(x, y)]) { caveSpawns.push({ mob: m, x: x * TILE + 8, y: y * TILE + 10 }); break; }
+      }
+    }
+    seaRooms.push({ room: r.id, door: door.id, key: S.key, x0: sx0, y0: sy0, w: S.w, h: S.h, at: S.at, R });
+  }
   if (ay + rowH + 2 > H) throw new Error('bande des intérieurs trop petite (est)');
 
   // ---------- 11c. Cachettes : des coffres oubliés, chacun garde une arme ----------
@@ -1681,6 +1729,17 @@ export function generateWorld(seed = 7) {
   addProp('grotte', dungeon.mouth[0], dungeon.mouth[1], 1);
   for (const l of dungeon.levers) l.prop = addProp('levier', l.tx, l.ty, 0, 0, -2).id;
   for (const [x, y] of dungeon.decor) addProp('brazier', x, y, 0, 0, -2);
+  // 1.0 : les décors des fonds marins — coraux, épaves, coffres engloutis — et les poches d'air
+  const airPockets = [], diveSpots = [];
+  for (const S of seaRooms) {
+    const free = (x, y) => !solid[idx(x, y)] && !occ[idx(x, y)] && tiles[idx(x, y)] !== T.EXIT;
+    const spot = () => { for (let k = 0; k < 60; k++) { const x = S.x0 + 1 + Math.floor(S.R() * (S.w - 2)), y = S.y0 + 1 + Math.floor(S.R() * (S.h - 5)); if (free(x, y)) return [x, y]; } return null; };
+    const deco = S.key === 'ys' ? ['pillar', 'pillar', 'obelisque', 'ruinwall', 'idol', 'corail', 'skull'] : S.key === 'leviathan' ? ['barrel', 'crate', 'anchor', 'bones', 'corail', 'skull', 'cannon'] : ['corail', 'corail', 'cristal', 'rock', 'bones', 'shell'];
+    for (let k = 0; k < S.w * S.h / 26; k++) { const s = spot(); if (s) addProp(deco[k % deco.length], s[0], s[1], k % 3, 0, -2); }
+    for (const tier of S.key === 'ys' ? [3, 3, 4] : S.key === 'grottes' ? [2, 3, 3] : [2, 2, 3]) { const s = spot(); if (s) { const c = addProp('chest', s[0], s[1], tier, 0, -2); c.chest = tier; c.sunken = 1; chests.push(c); } }
+    for (let k = 0; k < Math.max(3, Math.round(S.w / 12)); k++) { const s = spot(); if (s) { occ[idx(s[0], s[1])] = 1; airPockets.push({ room: S.room, x: s[0] * TILE + 8, y: s[1] * TILE + 8 }); } }
+    diveSpots.push({ key: S.key, room: S.room, door: S.door, x: S.at[0] * TILE + 8, y: S.at[1] * TILE + 8, name: rooms[S.room].name });
+  }
   const OUT = {
     block: new Uint8Array(N), // constructions des joueurs : 1 bloque tout, 2 bloque les morts
     islandOf, islands, // 1.0 : chaque case de terre connaît son île
@@ -1695,7 +1754,7 @@ export function generateWorld(seed = 7) {
     libertalia: LB, libFort: LFT, jail: jailRoom.id,
     seed, W, H, tiles, zones, solid, plankDir, waterDist, props, buildings, npcs, spawns, chests,
     spawnPoint, town: TC, lighthouse: LH, ruins: RC, cemetery: CEM, wreck: WR, coastY, dockEnd,
-    dungeon,
+    dungeon, airPockets, diveSpots,
   };
   for (const g of dungeon.gates) for (const i of g) OUT.block[i] = 1; // les grilles du Bastion sont fermées
   return OUT;

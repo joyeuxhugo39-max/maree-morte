@@ -165,8 +165,42 @@ export const ACTE3 = {
   },
 };
 
-// 1.0 : le Bastion Englouti, donjon pour plusieurs pirates (Île de la Quarantaine)
+// 1.0 : le Bastion Englouti, donjon pour plusieurs pirates (Île de la Quarantaine) ; et les fonds marins
 export const DONJONS = {
+  plongee: {
+    name: 'Les cloches d’Ys', giver: 'ysaline', turnin: 'elouan', level: 12, requires: ['traversee'],
+    goals: [
+      { type: 'act', act: 'plonge_leviathan', n: 1, text: 'Plonger sur l’épave du Léviathan (au large de la Crique de l’Épave)' },
+      { type: 'act', act: 'plonge_grottes', n: 1, text: 'Plonger dans les Grottes des Abysses (au large des Brumes)' },
+      { type: 'act', act: 'plonge_ys', n: 1, text: 'Plonger sur Ys-la-Noyée (au sud-est du Gouffre)' },
+    ],
+    rewards: { xp: 6000, gold: 900, items: [['scaphandre', 1]] },
+    offer: "Elouan jure qu'il entend des cloches sonner sous la mer, au large du Gouffre. Une ville entière, engloutie. Moi, je vends des cloches de plongée : je ne vais pas le contredire. Achète-en une, mets ton navire au-dessus des bulles, et descends. Trois sites : l'épave du Léviathan, les grottes des Abysses, et… Ys.",
+    progress: 'Une cloche de plongée (chez Ysaline), votre navire au-dessus des bulles, puis E. Surveillez votre air.',
+    done: "Tu les as entendues ? Les cloches d'Ys ? …Alors je ne suis pas fou. Ou nous le sommes tous les deux.",
+    scene: [
+      ['npc', "Tu as déjà mis la tête sous l'eau, au large ? Pas pour te baigner. Pour regarder."],
+      ['me', "Il n'y a que du noir, là-dessous."],
+      ['npc', "Du noir, et des choses qui brillent. Des épaves, des coffres, des grottes où l'air reste piégé en bulles. Et une ville. Une ville entière, Ys, que la mer a prise il y a cinq cents ans."],
+      { ask: [
+        { q: 'Comment on respire ?', a: [['npc', "On ne respire pas. On retient son souffle, et on cherche les bulles : elles sortent des failles, et on y reprend de l'air. Mon casque de scaphandrier double ta réserve. Je te l'offrirai, si tu reviens."]] },
+        { q: 'Et pour remonter ?', a: [['npc', "La corde de l'ancre. Tu la suis, et ton navire t'attend là-haut. S'il n'a pas coulé entre-temps."]] },
+      ], go: 'Je plonge' },
+    ],
+    sceneDone: [
+      ['npc', "Tu as l'air trempé jusqu'à l'âme. Alors ? Ys ?"],
+      ['me', "Des rues, des colonnes, des statues… et un roi assis sur son trône, qui ne dort pas."],
+      ['npc', "Gradlon. Le roi d'Ys. La légende dit qu'il a ouvert les portes de la mer lui-même. Je savais qu'il était encore là. Garde ce casque : tu en auras besoin, si tu retournes lui rendre visite."],
+    ],
+  },
+  roi_ys: {
+    name: 'Le roi qui dort sous la mer', giver: 'elouan', turnin: 'elouan', level: 25, requires: ['plongee'], ach: 'roi_ys',
+    goals: [{ type: 'kill', mob: 'roi_ys', n: 1, text: 'Gradlon, roi d’Ys-la-Noyée' }],
+    rewards: { xp: 18000, gold: 2600, items: [] },
+    offer: "Gradlon garde Ys, et Ys garde les cloches. Tant qu'il siège, les cloches sonnent, et les marins qui les entendent se jettent à l'eau. Il faut qu'il se taise. Prends des amis, et beaucoup d'air.",
+    progress: 'Ys-la-Noyée, au sud-est du Gouffre : la cloche de plongée, puis le trône au fond de la cité.',
+    done: "Les cloches se sont tues. Pour la première fois depuis que je suis né, la nuit est silencieuse au-dessus du Gouffre.",
+  },
   bastion: {
     name: 'Le Bastion Englouti', giver: 'kerbrat', turnin: 'kerbrat', level: 22, requires: ['freres_cote'], ach: 'bastion',
     goals: [{ type: 'kill', mob: 'amiral_englouti', n: 1, text: 'L’Amiral Englouti, au fond du Bastion (Île de la Quarantaine)' }],
