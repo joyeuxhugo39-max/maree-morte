@@ -144,6 +144,29 @@ mob('frere_rouille', { name: 'Rouille, le cadet des Ferrailleurs', level: 18, hp
 mob('comte_vespere', { name: 'Vespère, Comte des Marées', level: 30, hp: 26000, dmg: 82, speed: 40, aggro: 200, leash: 300, range: 32, atkCd: 1.2, windup: 0.5, xp: 12000, gold: [1350, 2100], r: 14, respawn: 900, elite: 1, big: 1, hard: 1,
   ai: 'vespere', phases: [0.75, 0.5, 0.25], title: 'Seigneur de l’Île des Damnés', weapon: ['bigsaber', 'bone'],
   loot: [['lame_vespere', 0.35, 1, 1], ['tenue_comte', 0.3, 1, 1], ['dent_comte', 0.3, 1, 1]] });
+// 0.8 : l'île de Libertalia — vivants sans foi et morts sans repos
+mob('epouvantail', { name: 'Épouvantail des cannaies', level: 14, hp: 340, dmg: 24, speed: 40, range: 20, xp: 145, gold: [12, 27], night: 1, weapon: ['axe', 'rust'],
+  loot: [['herbes', 0.3, 1, 2], ['chapeau_paille', 0.03, 1, 1]] });
+mob('coupe_jarret', { name: 'Coupe-jarret', level: 16, hp: 380, dmg: 28, speed: 52, range: 18, atkCd: 0.9, windup: 0.3, xp: 180, gold: [18, 42], night: 1, weapon: ['saber', 'steel'],
+  loot: [['crochets', 0.05, 1, 2], ['tenue_contrebandier', 0.004, 1, 1]] });
+mob('contrebandier', { name: 'Contrebandier maudit', level: 17, hp: 420, dmg: 29, speed: 44, range: 130, atkCd: 1.9, windup: 0.5, xp: 200, gold: [21, 45], ranged: { speed: 200, life: 1.0, kind: 'ball' }, keep: 75, weapon: ['pistol', 'steel'],
+  loot: [['tonnelet_contrebande', 0.45, 1, 1], ['rhum_vieux', 0.06, 1, 1], ['tenue_contrebandier', 0.004, 1, 1]] });
+mob('naufrageur', { name: 'Naufrageur', level: 19, hp: 480, dmg: 31, speed: 42, range: 20, xp: 240, gold: [24, 48], weapon: ['saber', 'rust'],
+  loot: [['lanterne_naufrageur', 0.5, 1, 1], ['longue_vue', 0.02, 1, 1]] });
+mob('garde_maudit', { name: 'Garde maudit du Fort', level: 21, hp: 520, dmg: 34, speed: 36, range: 170, atkCd: 2.2, windup: 0.7, xp: 300, gold: [27, 54], night: 1, ranged: { speed: 220, life: 1.1, kind: 'ball' }, keep: 100, weapon: ['musket', 'steel'],
+  loot: [['os_legionnaire', 0.3, 1, 2], ['uniforme_marine', 0.004, 1, 1]] });
+mob('goule_ecarlate', { name: 'Goule écarlate', level: 23, hp: 640, dmg: 40, speed: 60, range: 16, atkCd: 0.85, windup: 0.25, xp: 330, gold: [24, 51], night: 1,
+  loot: [['os_maudit', 0.4, 1, 2], ['collier_vaudou', 0.003, 1, 1]] });
+mob('reine_mangrove', { name: 'La Reine de la Mangrove', level: 22, hp: 3900, dmg: 38, speed: 38, aggro: 170, leash: 260, range: 150, atkCd: 1.7, windup: 0.55, xp: 2100, gold: [260, 420], r: 13, respawn: 600, elite: 1, big: 1, swims: 1,
+  ranged: { speed: 150, life: 1.4, kind: 'curse' }, keep: 90, title: 'Celle qui boit la marée',
+  loot: [['tenue_vaudou', 0.2, 1, 1], ['baton_vaudou', 0.15, 1, 1], ['antidote', 1, 2, 4]] });
+mob('capitaine_naufrageur', { name: 'Grand-Feu, capitaine des naufrageurs', level: 24, hp: 4400, dmg: 42, speed: 40, aggro: 160, leash: 260, range: 30, atkCd: 1.4, windup: 0.55, xp: 2500, gold: [300, 480], r: 13, respawn: 600, elite: 1, big: 1, groan: 1,
+  title: 'Celui qui allume les fausses lumières', weapon: ['bigsaber', 'steel'], burnHit: 0.25,
+  loot: [['tenue_chasseur', 0.2, 1, 1], ['longue_vue', 0.5, 1, 1], ['lanterne_naufrageur', 1, 2, 3]] });
+mob('roi_sans_couronne', { name: 'Le Roi sans Couronne', level: 28, hp: 16000, dmg: 60, speed: 38, aggro: 180, leash: 260, range: 32, atkCd: 1.3, windup: 0.5, xp: 7000, gold: [800, 1300], r: 14, respawn: 900, elite: 1, big: 1,
+  ai: 'general', adds: 'garde_maudit', phases: [0.66, 0.33], title: 'Premier tyran de Libertalia', weapon: ['bigsaber', 'gold'],
+  shouts: { sum: 'Ma garde ! Défendez votre roi !', line: 'À genoux devant votre roi !', charge: 'Libertalia est à MOI !', volley: 'Feu sur les traîtres !' },
+  loot: [['sabre_midas', 0.08, 1, 1], ['habit_gouverneur', 0.2, 1, 1], ['couronne_brisee', 1, 1, 1]] });
 // navires ennemis : ils patrouillent, canonnent les bateaux, et coulent
 mob('brick_noye', { name: 'Brick des Noyés', level: 12, hp: 1000, dmg: 26, speed: 64, aggro: 330, leash: 99999, range: 230, atkCd: 3.2, windup: 0.8, xp: 520, gold: [120, 210], r: 18, respawn: 240, ship: { kind: 'sloop', sail: 'black', guns: 2 },
   loot: [['rhum', 0.5, 1, 2], ['carte_dechiree', 0.25, 1, 1], ['carte_tresor', 0.04, 1, 1], ['tenue_corsaire', 0.03, 1, 1]] });

@@ -4,6 +4,7 @@ import { QUESTS, QUEST_ORDER, questState } from '../shared/data/quests.js';
 import { NPCS } from '../shared/data/npcs.js';
 import { SKILLS, HOTBAR, EMOTES } from '../shared/data/skills.js';
 import { ZONES, Z, SAFE, roomIdAt, zoneAt } from '../shared/world.js';
+import { T } from '../shared/constants.js';
 import { SLOTS, SLOT_NAMES, RARITY, INV_SIZE, MAP_W, OVER_H, TILE, clockString, dayFrac, darkness, weatherAt, isFullMoon } from '../shared/constants.js';
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { UPG_SLOTS, UPG_MAX, upgradeCost, UPG_TEXT } from '../shared/formulas.js';
@@ -25,6 +26,8 @@ const POI = [
   ['Rade-aux-Flibustiers', 408, 50], ['Fort des Deux Clés', 444, 118], ['Forêt des Pendus', 540, 20], ['Lagon des Sirènes', 516, 136],
   ["Îlot de l'Ermite", 352, 136], ['Anse-Tranquille', 150, 246], ['Atoll des Ossements', 70, 300], ['Île de la Quarantaine', 300, 296],
   ['Volcan de Cendrelune', 470, 292], ['Brumes Éternelles', 566, 236], ['Île des Damnés', 590, 370],
+  ['LIBERTALIA', 800, 192], ['Fort des Hauts', 726, 140], ['Les Cannaies', 800, 98], ['Baie des Naufrageurs', 886, 112],
+  ['Mangrove des Contrebandiers', 708, 336], ['Jungle Écarlate', 892, 272], ['Bas-Fonds', 842, 290],
 ];
 
 export class UI {
@@ -523,7 +526,7 @@ export class UI {
     const G = this.G, q = QUESTS[qid], st = (G.quests || {})[qid];
     return q.goals.map((g, i) => {
       if (g.type === 'collect') return [Math.min(g.n, G.countItem(g.item)), g.n];
-      const need = g.type === 'kill' ? g.n : 1;
+      const need = g.n || 1;
       return [Math.min(need, st && st.p ? st.p[i] || 0 : 0), need];
     });
   }
@@ -593,9 +596,11 @@ export class UI {
   }
 
   // ------------------------------------------------------------ dialogues
-  openDialog(npcId) {
+  openDialog(npcId, noScene = false) {
     const G = this.G, N = NPCS[npcId];
     if (!N) return;
+    const pt = G.pendingTalk; if (!noScene) G.pendingTalk = null;
+    if (!noScene && pt && pt.npc === npcId && pt.scenes.length) { this.close(); this.playScenes(npcId, pt.scenes); return; } // 0.8 : une vraie conversation d'abord
     this.close();
     this.dialogNpc = npcId;
     $('dialog').classList.remove('hidden');
@@ -626,17 +631,58 @@ export class UI {
     });
   }
   pickChoice(k) { if (this.choices && this.choices[k] && !$('dialog').classList.contains('hidden')) this.choices[k].go(); }
+  async playScenes(npcId, list) {
+    for (const sc of list) { await this.G.scene.play(npcId, sc, null); if (this.G.scene.aborted) return; }
+    this.openDialog(npcId, true);
+  }
+  // 0.8 : la table de dés de Fortuné (mise, deux dés chacun, le plus haut total gagne ; égalité : la maison gagne)
+  diceMenu(npcId, msg) {
+    const G = this.G, gold = G.me ? G.me.gold : 0;
+    const ch = [10, 50, 100, 250, 500].filter((b) => gold >= b).map((b) => ({ label: `🎲 Miser ${b} doublons`, cls: 'q', go: () => this.diceRoll(b) }));
+    ch.push({ label: 'Arrêter de jouer', go: () => this.dialogMain(npcId) });
+    this.say(msg || 'Faites vos jeux ! Deux dés chacun, le plus haut total gagne. Double six : le triple. Égalité : la maison gagne.', ch);
+  }
+  diceRoll(bet) {
+    const el = $('dlg-text'), F = '⚀⚁⚂⚃⚄⚅', r = () => F[Math.floor(Math.random() * 6)];
+    clearInterval(this.typeT); $('dlg-choices').innerHTML = ''; this.choices = [];
+    this.G.sfx.play('dice'); this.diceT0 = performance.now();
+    this.typeT = setInterval(() => { el.innerHTML = `<span class="dice">${r()} ${r()}</span> contre <span class="dice">${r()} ${r()}</span>`; }, 70);
+    this.G.send({ t: 'dice', bet });
+  }
+  diceResult(m) {
+    if (this.dialogNpc !== 'croupier') return;
+    const F = '⚀⚁⚂⚃⚄⚅', wait = Math.max(0, 700 - (performance.now() - (this.diceT0 || 0)));
+    setTimeout(() => {
+      if (this.dialogNpc !== 'croupier') return;
+      clearInterval(this.typeT);
+      const sa = m.a[0] + m.a[1], sb = m.b[0] + m.b[1];
+      const res = m.gain > 0 ? (sa === 12 ? `DOUBLE SIX ! +${m.gain} doublons !` : `Gagné ! +${m.gain} doublons.`) : sa === sb ? 'Égalité... la maison gagne.' : 'Perdu. La maison vous remercie.';
+      this.diceMenu('croupier', `Vous : ${F[m.a[0] - 1]} ${F[m.a[1] - 1]} (${sa}) — Fortuné : ${F[m.b[0] - 1]} ${F[m.b[1] - 1]} (${sb}). ${res}`);
+      this.G.sfx.play(m.gain > 0 ? 'coin' : 'deny');
+    }, wait);
+  }
   dialogMain(npcId) {
     const G = this.G, N = NPCS[npcId];
     const greet = N.greet[Math.floor(Math.random() * N.greet.length)];
     const ch = [];
     for (const qid of QUEST_ORDER) {
       const q = QUESTS[qid], s = this.questStateOf(qid);
-      if (q.turnin === npcId && s === 'ready') ch.push({ label: `✔ ${q.name}`, cls: 'done', go: () => this.say(q.done, [{ label: 'Recevoir la récompense', cls: 'done', go: () => { G.send({ t: 'qt', q: qid }); this.close(); } }]) });
-      else if (q.giver === npcId && s === 'available') ch.push({ label: `! ${q.name}`, cls: 'q', go: () => this.say(q.offer, [{ label: 'Accepter la quête', cls: 'q', go: () => { G.send({ t: 'qa', q: qid }); this.dialogMain(npcId); } }, { label: 'Plus tard…', go: () => this.dialogMain(npcId) }]) });
+      if (q.turnin === npcId && s === 'ready') ch.push({ label: `✔ ${q.name}`, cls: 'done', go: () => {
+        if (q.sceneDone) { this.close(); G.scene.play(npcId, q.sceneDone, [{ label: 'Recevoir la récompense', cls: 'go', go: () => G.send({ t: 'qt', q: qid }) }]); return; }
+        this.say(q.done, [{ label: 'Recevoir la récompense', cls: 'done', go: () => { G.send({ t: 'qt', q: qid }); this.close(); } }]);
+      } });
+      else if (q.giver === npcId && s === 'available') ch.push({ label: `! ${q.name}`, cls: 'q', go: () => {
+        if (q.scene) { // 0.8 : la proposition se joue en vraie conversation, puis on décide
+          this.close();
+          G.scene.play(npcId, q.scene, [{ label: `Accepter : « ${q.name} »`, cls: 'go', go: () => G.send({ t: 'qa', q: qid }) }, { label: 'Pas maintenant…', go: () => this.openDialog(npcId, true) }]);
+          return;
+        }
+        this.say(q.offer, [{ label: 'Accepter la quête', cls: 'q', go: () => { G.send({ t: 'qa', q: qid }); this.dialogMain(npcId); } }, { label: 'Plus tard…', go: () => this.dialogMain(npcId) }]);
+      } });
       else if ((q.turnin === npcId || q.giver === npcId) && s === 'active') ch.push({ label: `… ${q.name}`, go: () => this.say(q.progress, [{ label: 'Compris.', go: () => this.dialogMain(npcId) }]) });
     }
     if (N.shop) ch.push({ label: '🛒 Voir la marchandise', go: () => this.openShop(npcId) });
+    if (N.dice) ch.push({ label: '🎲 Jouer aux dés', cls: 'q', go: () => this.diceMenu(npcId) });
     if (npcId === 'isa') ch.push({ label: '⚒ Renforcer mon équipement', go: () => { this.close(); this.show('forge'); } });
     for (const t of N.topics || []) ch.push({ label: t.q, go: () => this.say(t.a, [{ label: 'Autre chose…', go: () => this.dialogMain(npcId) }, { label: 'Au revoir.', go: () => this.close() }]) });
     ch.push({ label: 'Au revoir.', go: () => this.close() });
@@ -715,14 +761,14 @@ export class UI {
     const PROG = {
       crabes: [cnt.crab || 0, 50], faucheur: [me.kills || 0, 250], riche: [me.gold || 0, 1000], niveau10: [me.lvl || 1, 10],
       forge: [Math.max(0, ...Object.values(me.upg || {})), 3], naufrageur: [cnt.ships || 0, 10], horde: [cnt.horde || 0, 30],
-      speleo: [G.found ? [...G.found].filter((id) => G.world.doors[id] && G.world.doors[id].secret).length : 0, secrets], fouineur: [me.cch || 0, 3], explorateur: [me.zsn || 0, me.zst || 11],
+      speleo: [G.found ? [...G.found].filter((id) => G.world.doors[id] && G.world.doors[id].secret).length : 0, secrets], fouineur: [me.cch || 0, 3], explorateur: [me.zsn || 0, me.zst || 11], flambeur: [cnt.dice || 0, 10],
     };
     const CATS = [
       ['Premiers pas', ['premier_sang', 'niveau10', 'riche', 'forge', 'proprietaire', 'peche']],
       ['Combat', ['crabes', 'faucheur', 'elite', 'boss', 'invasion', 'horde', 'duel', 'roi_os', 'kraken', 'freres', 'damnes', 'eruption']],
-      ['Mer et voyages', ['navigateur', 'naufrageur', 'rade', 'explorateur', 'espadon']],
-      ['Trésors et secrets', ['tresor', 'speleo', 'fouineur', 'cambrioleur', 'jumeaux']],
-      ['Légendes', ['gardien', 'complice', 'elegance']],
+      ['Mer et voyages', ['navigateur', 'naufrageur', 'rade', 'explorateur', 'espadon', 'citoyen']],
+      ['Trésors et secrets', ['tresor', 'speleo', 'fouineur', 'cambrioleur', 'jumeaux', 'flambeur']],
+      ['Légendes', ['gardien', 'complice', 'elegance', 'libertalia']],
     ];
     const seen = new Set(CATS.flatMap(([, ids]) => ids));
     const rest = Object.keys(ACHIEVEMENTS).filter((k) => !seen.has(k));
@@ -840,13 +886,40 @@ export class UI {
   }
 
   // ------------------------------------------------------------ cartes
+  // 0.8 : la carte façon carte au trésor — mer teintée selon la profondeur, écume, côtes à l'encre, relief ombré, papier
   buildMiniBase() {
-    const W = this.G.world;
+    const W = this.G.world, N = MAP_W * OVER_H, tl = W.tiles;
     const c = document.createElement('canvas'); c.width = MAP_W; c.height = OVER_H;
     const x = c.getContext('2d'), img = x.createImageData(MAP_W, OVER_H), d = new Uint32Array(img.data.buffer);
-    for (let i = 0; i < MAP_W * OVER_H; i++) {
-      let col = MINI_COL[W.tiles[i]] || 0;
-      if (W.solid[i] && W.tiles[i] > 1 && W.tiles[i] !== 10) col = 0x7a4a2a;
+    const isW = (t) => t === T.WATER || t === T.DEEP;
+    const dW = new Uint8Array(N), dL = new Uint8Array(N); // distance (en cases) à la terre pour l'eau, à l'eau pour la terre
+    for (let i = 0; i < N; i++) { const w = isW(tl[i]); dW[i] = w ? 60 : 0; dL[i] = w ? 0 : 60; }
+    const cham = (D) => {
+      for (let y = 0; y < OVER_H; y++) for (let xx = 0; xx < MAP_W; xx++) { const i = y * MAP_W + xx; let v = D[i]; if (!v) continue; if (xx > 0) v = Math.min(v, D[i - 1] + 1); if (y > 0) { v = Math.min(v, D[i - MAP_W] + 1); if (xx > 0) v = Math.min(v, D[i - MAP_W - 1] + 1); if (xx < MAP_W - 1) v = Math.min(v, D[i - MAP_W + 1] + 1); } D[i] = v; }
+      for (let y = OVER_H - 1; y >= 0; y--) for (let xx = MAP_W - 1; xx >= 0; xx--) { const i = y * MAP_W + xx; let v = D[i]; if (!v) continue; if (xx < MAP_W - 1) v = Math.min(v, D[i + 1] + 1); if (y < OVER_H - 1) { v = Math.min(v, D[i + MAP_W] + 1); if (xx < MAP_W - 1) v = Math.min(v, D[i + MAP_W + 1] + 1); if (xx > 0) v = Math.min(v, D[i + MAP_W - 1] + 1); } D[i] = v; }
+    };
+    cham(dW); cham(dL);
+    const mixc = (a, b, k) => { const r = ((a >> 16) & 255) * (1 - k) + ((b >> 16) & 255) * k, g = ((a >> 8) & 255) * (1 - k) + ((b >> 8) & 255) * k, bl = (a & 255) * (1 - k) + (b & 255) * k; return (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(bl); };
+    const mul = (a, f) => (Math.min(255, Math.round(((a >> 16) & 255) * f)) << 16) | (Math.min(255, Math.round(((a >> 8) & 255) * f)) << 8) | Math.min(255, Math.round((a & 255) * f));
+    const SEA = [[1, 0x8fd4cc], [3, 0x55aec0], [6, 0x3486ac], [11, 0x23608e], [18, 0x1b4b78], [60, 0x183f68]];
+    const sea = (dd) => { for (let k = 1; k < SEA.length; k++) if (dd <= SEA[k][0]) return mixc(SEA[k - 1][1], SEA[k][1], (dd - SEA[k - 1][0]) / (SEA[k][0] - SEA[k - 1][0])); return SEA[SEA.length - 1][1]; };
+    const PAPER = 0xe9d8ac, hsh = (i) => { let h = Math.imul(i ^ 0x5bd1e995, 0x27d4eb2d); h ^= h >>> 15; return (h >>> 0) / 4294967296; };
+    for (let i = 0; i < N; i++) {
+      const t = tl[i], px = i % MAP_W, py = (i / MAP_W) | 0;
+      let col;
+      if (isW(t)) {
+        col = sea(dW[i]);
+        if (dW[i] === 1) col = mixc(col, 0xf2fbf6, 0.45); // l'écume
+        else if (dW[i] > 6 && (px * 3 + py * 7) % 23 === 0 && hsh(i) > 0.55) col = mixc(col, 0xbfe0ea, 0.28); // les vagues gravées
+      } else {
+        col = MINI_COL[t] || 0;
+        if (W.solid[i] && t > 1 && t !== 10) col = t === T.COBBLE ? 0x6e6a74 : 0x9a3e2a; // remparts gris, toits rouges
+        const h = (k) => Math.min(14, dL[k] || 0);
+        const a = px > 0 && py > 0 ? h(i - MAP_W - 1) : h(i), b = px < MAP_W - 1 && py < OVER_H - 1 ? h(i + MAP_W + 1) : h(i);
+        col = mul(col, 1 + Math.max(-2, Math.min(2, b - a)) * -0.06 + Math.min(10, dL[i]) * 0.008); // relief : lumière du nord-ouest
+        if (dL[i] === 1) col = mul(col, 0.72); // le trait de côte
+      }
+      col = mixc(col, PAPER, 0.13 + (hsh(i * 7 + 3) - 0.5) * 0.05); // le papier
       d[i] = (0xff000000 | ((col & 255) << 16) | (col & 0xff00) | ((col >> 16) & 255)) >>> 0;
     }
     const V = W.volcano; // le volcan sur la carte : un cône sombre et son cratère rouge
@@ -896,13 +969,56 @@ export class UI {
     x.fillStyle = '#000'; x.fillRect(c.width / 2 - 2, c.height / 2 - 2, 5, 5);
     x.fillStyle = '#fff'; x.fillRect(c.width / 2 - 1, c.height / 2 - 1, 3, 3);
   }
+  mapArt(x, S, w, h) { // 0.8 : l'habillage d'une vraie carte de pirate
+    const ink = '#3a2410';
+    const vg = x.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.72);
+    vg.addColorStop(0, 'rgba(120,80,30,0)'); vg.addColorStop(1, 'rgba(90,55,20,0.42)');
+    x.fillStyle = vg; x.fillRect(0, 0, w, h);
+    // la rose des vents
+    const rose = (cx, cy, r) => {
+      x.save(); x.translate(cx, cy);
+      x.globalAlpha = 0.9; x.strokeStyle = ink; x.lineWidth = 1.5;
+      for (const rr of [r * 0.98, r * 0.86, r * 0.3]) { x.beginPath(); x.arc(0, 0, rr, 0, 6.283); x.stroke(); }
+      for (let k = 0; k < 32; k++) { const a = k / 32 * 6.283, l = k % 8 === 0 ? 0.86 : k % 4 === 0 ? 0.92 : 0.95; x.beginPath(); x.moveTo(Math.cos(a) * r * l, Math.sin(a) * r * l); x.lineTo(Math.cos(a) * r * 0.98, Math.sin(a) * r * 0.98); x.stroke(); }
+      const point = (a, len, wid, c1, c2) => { for (const s of [-1, 1]) { x.beginPath(); x.moveTo(0, 0); x.lineTo(Math.cos(a) * len, Math.sin(a) * len); x.lineTo(Math.cos(a + s * 1.5708) * wid, Math.sin(a + s * 1.5708) * wid); x.closePath(); x.fillStyle = s < 0 ? c1 : c2; x.fill(); x.stroke(); } };
+      for (let k = 0; k < 4; k++) point(k * 1.5708 + 0.7854, r * 0.62, r * 0.1, '#c9a24c', '#7a5420');
+      for (let k = 0; k < 4; k++) point(k * 1.5708 - 1.5708, r * 0.84, r * 0.14, k === 0 ? '#b8322a' : '#e8d6a6', k === 0 ? '#6e1a14' : '#8a6a3a');
+      x.fillStyle = '#c9a24c'; x.beginPath(); x.arc(0, 0, r * 0.07, 0, 6.283); x.fill(); x.stroke();
+      x.font = `700 ${Math.round(r * 0.3)}px "Pirata One", serif`; x.textAlign = 'center'; x.fillStyle = ink;
+      x.fillText('N', 0, -r * 1.06); x.fillText('S', 0, r * 1.26); x.fillText('E', r * 1.16, r * 0.1); x.fillText('O', -r * 1.16, r * 0.1);
+      x.restore();
+    };
+    rose(54 * S, 404 * S, 30 * S);
+    // le cartouche du titre
+    const tx = 330 * S, ty = 13 * S;
+    x.save(); x.fillStyle = 'rgba(240,226,186,0.92)'; x.strokeStyle = ink; x.lineWidth = 2;
+    x.beginPath(); x.moveTo(tx - 150, ty - 18); x.lineTo(tx + 150, ty - 18); x.quadraticCurveTo(tx + 168, ty, tx + 150, ty + 18); x.lineTo(tx - 150, ty + 18); x.quadraticCurveTo(tx - 168, ty, tx - 150, ty - 18); x.closePath(); x.fill(); x.stroke();
+    for (const s of [-1, 1]) { x.beginPath(); x.arc(tx + s * 166, ty, 7, 0, 6.283); x.stroke(); }
+    x.font = '700 24px "Pirata One", serif'; x.textAlign = 'center'; x.fillStyle = '#5a1810'; x.fillText('Archipel de la Marée Morte', tx, ty + 8); x.restore();
+    // les mers, à la plume
+    x.save(); x.font = 'italic 600 19px "Pirata One", serif'; x.textAlign = 'center'; x.fillStyle = 'rgba(24,34,56,0.7)';
+    for (const [n, mx, my] of [['Mer des Noyés', 240, 236], ['Le Grand Large', 360, 252], ['Détroit de Libertalia', 650, 300], ['Mer du Levant', 620, 30]]) x.fillText(n, mx * S, my * S);
+    x.restore();
+    // un serpent de mer et un trois-mâts, pour la tradition
+    x.save(); x.strokeStyle = 'rgba(40,30,20,0.75)'; x.lineWidth = 2.5; x.fillStyle = 'rgba(60,90,70,0.8)';
+    const sx = 214 * S, sy = 318 * S;
+    for (let k = 0; k < 3; k++) { x.beginPath(); x.arc(sx + k * 18, sy, 7, Math.PI, 0); x.stroke(); }
+    x.beginPath(); x.arc(sx - 10, sy - 6, 5, 0, 6.283); x.fill(); x.stroke(); x.beginPath(); x.moveTo(sx + 52, sy); x.quadraticCurveTo(sx + 62, sy - 10, sx + 66, sy - 2); x.stroke();
+    const bx = 590 * S, by = 112 * S;
+    x.fillStyle = 'rgba(70,40,20,0.85)'; x.beginPath(); x.moveTo(bx - 16, by); x.lineTo(bx + 16, by); x.lineTo(bx + 11, by + 7); x.lineTo(bx - 11, by + 7); x.closePath(); x.fill();
+    x.fillStyle = 'rgba(245,235,210,0.95)'; for (const [ox, hh] of [[-7, 14], [3, 18], [11, 11]]) { x.fillRect(bx + ox - 4, by - hh, 8, hh - 3); x.strokeRect(bx + ox - 4, by - hh, 8, hh - 3); }
+    x.restore();
+    // le cadre
+    x.save(); x.strokeStyle = '#4a2c12'; x.lineWidth = 10; x.strokeRect(5, 5, w - 10, h - 10); x.strokeStyle = '#c9a24c'; x.lineWidth = 2; x.strokeRect(13, 13, w - 26, h - 26); x.restore();
+  }
   renderBigMap() {
     const G = this.G;
     const S = 2, c = $('bigmap'); c.width = MAP_W * S; c.height = OVER_H * S;
     const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
     x.drawImage(this.miniBase, 0, 0, c.width, c.height);
-    x.font = '600 15px "Pirata One", serif'; x.textAlign = 'center';
-    for (const [name, tx, ty] of POI) { x.fillStyle = 'rgba(0,0,0,0.6)'; x.fillText(name, tx * S + 1, ty * S + 1); x.fillStyle = '#fff2c8'; x.fillText(name, tx * S, ty * S); }
+    this.mapArt(x, S, c.width, c.height);
+    x.font = '700 17px "Pirata One", serif'; x.textAlign = 'center'; x.lineJoin = 'round';
+    for (const [name, tx, ty] of POI) { x.strokeStyle = 'rgba(244,232,200,0.85)'; x.lineWidth = 4; x.strokeText(name, tx * S, ty * S); x.fillStyle = name === 'LIBERTALIA' ? '#6a1410' : '#2e1c0c'; x.fillText(name, tx * S, ty * S); }
     for (const d of G.world.doors) if (d.secret && G.found.has(d.id)) { const dx = d.ox / TILE * S, dy = d.oy / TILE * S; x.fillStyle = '#1c1426'; x.beginPath(); x.arc(dx, dy, 6, 0, 6.3); x.fill(); x.fillStyle = '#b8a0ff'; x.beginPath(); x.arc(dx, dy, 4, 0, 6.3); x.fill(); x.font = '600 13px "Pixelify Sans", sans-serif'; x.fillStyle = 'rgba(0,0,0,0.6)'; x.fillText(d.name, dx + 1, dy - 9); x.fillStyle = '#e0d4ff'; x.fillText(d.name, dx, dy - 10); }
     for (const n of G.npcs) { const mk = G.npcMarker(n.id); if (!mk) continue; let nx = n.x, ny = n.y; if (ny >= OVER_H * TILE) { const rid = G.world.roomGrid[Math.floor(ny / TILE) * MAP_W + Math.floor(nx / TILE)], d = G.world.doors.find((q) => q.room === rid); if (!d) continue; nx = d.ox; ny = d.oy; } x.fillStyle = '#ffd23a'; x.font = '700 16px "Pixelify Sans", sans-serif'; x.fillText(mk, nx / TILE * S, ny / TILE * S - 6); }
     x.font = '600 12px "Pixelify Sans", sans-serif';

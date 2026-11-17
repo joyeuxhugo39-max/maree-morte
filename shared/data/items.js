@@ -188,6 +188,12 @@ Object.assign(ITEMS, {
   billet_havre: { name: 'Billet pour Havre-des-Brumes', use: { travel: 'havre' }, value: 40, icon: 'ticket', tint: 'teal', desc: 'Utilisez-le dans une ville pour embarquer sur le bateau du passeur.' },
   billet_rade: { name: 'Billet pour la Rade', use: { travel: 'rade' }, value: 60, icon: 'ticket', tint: 'black', desc: 'Utilisez-le dans une ville pour embarquer sur le bateau du passeur.' },
   billet_anse: { name: 'Billet pour Anse-Tranquille', use: { travel: 'anse' }, value: 40, icon: 'ticket', tint: 'green', desc: 'Utilisez-le dans une ville pour embarquer sur le bateau du passeur.' },
+  billet_libertalia: { name: 'Billet pour Libertalia', use: { travel: 'libertalia' }, value: 90, icon: 'ticket', tint: 'purple', desc: 'Utilisez-le dans une ville pour embarquer vers la Cité Libre des Forbans, à l’est.' },
+  // 0.8 : objets de quête et récompense de Libertalia
+  tonnelet_contrebande: { quest: 1, name: 'Tonnelet de contrebande', value: 0, icon: 'barrel', desc: 'Du rhum qui n’a jamais payé la taxe du Conseil. Objet de quête.' },
+  lanterne_naufrageur: { quest: 1, name: 'Lanterne de naufrageur', value: 0, icon: 'lantern', desc: 'Sa flamme verte imite le feu d’un port. Objet de quête.' },
+  couronne_brisee: { quest: 1, name: 'Couronne brisée', value: 0, icon: 'crown', desc: 'La couronne de Malo le Rouge, refondue en secret. Objet de quête.' },
+  sceau_reine: { name: 'Sceau de la Reine des Forbans', slot: 'trinket', atk: 6, def: 6, hp: 40, goldFind: 0.1, value: 2500, rarity: 3, icon: 'r_ring', desc: 'Celui qui le porte parle au nom de Libertalia. +10 % de doublons.' },
   brick: { name: 'Brick de course', boat: { kind: 'brick', speed: 172, cannon: 2 }, value: 4200, rarity: 3, icon: 'brick_i', desc: 'Deux mâts, deux canons par bordée, et la vitesse d’un requin. Le navire des grandes traversées.' },
   // talismans
   bague_freres: { name: 'Bague des Frères de la Côte', slot: 'trinket', atk: 6, hp: 30, crit: 0.05, value: 2400, rarity: 2, icon: 'r_ring', desc: 'Deux mains serrées, gravées dans l’argent. On ne la gagne pas seul.' },

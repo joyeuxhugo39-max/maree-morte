@@ -1,4 +1,4 @@
-// Quêtes. Objectifs : kill {mob,n} | collect {item,n} | talk {npc} | explore {zone}
+// Quêtes. Objectifs : kill {mob,n} | collect {item,n} | talk {npc} | explore {zone} | act {act,n} (0.8 : une action, ex. gagner aux dés)
 // requires : quêtes à terminer avant ; level : niveau minimum conseillé.
 import { Z } from '../world.js';
 
@@ -361,6 +361,327 @@ QUESTS.prime_flibustiers = prime('Prime : flibustiers maudits', 'flibustier', 10
 QUESTS.prime_pestiferes = prime('Prime : pestiférés', 'pestifere', 12, 19, 3200, 700, 'Pestiférés renvoyés au repos');
 QUESTS.prime_calcines = prime('Prime : calcinés', 'calcine', 10, 22, 4400, 900, 'Flibustiers calcinés éteints');
 QUESTS.prime_damnes = prime('Prime : damnés', 'damne', 6, 27, 9000, 1800, 'Damnés abattus');
+// ------------------------------------------------------------------ 0.8 : Libertalia
+// scene / sceneDone : de vraies conversations (répliques alternées, questions au choix). Voir client/scene.js.
+// ['npc', texte] : le PNJ à qui l'on parle ; ['me', texte] : votre pirate ; [idPNJ, texte] : un autre PNJ ; { ask: [{ q, a: [...] }], go } : questions libres.
+Object.assign(QUESTS, {
+  lib_portes: {
+    name: 'Les portes de Libertalia', giver: 'garde_porte', turnin: 'reine', level: 14,
+    goals: [{ type: 'talk', npc: 'reine', text: 'Se présenter à la Reine, au palais' }],
+    rewards: { xp: 1500, gold: 200, items: [] },
+    offer: "La Reine reçoit tous ceux qui débarquent. Son palais est au nord de la place de la Liberté : c'est le seul bâtiment qui a des colonnes.",
+    progress: 'Le palais de la Reine est au nord de la place de la Liberté.',
+    done: "Ainsi, c'est vous. Libertalia a besoin de gens comme vous.",
+    scene: [
+      ['npc', "Halte ! ... Ah, un vivant. Ça change. Bienvenue à Libertalia, la Cité Libre des Forbans."],
+      ['me', "Une cité libre ? Je croyais que les pirates ne savaient pas bâtir de remparts."],
+      ['npc', "Les pirates, non. Les pirates qui ont vu les morts sortir de la mangrove, si. On a appris vite."],
+      { ask: [
+        { q: 'Qui commande ici ?', a: [['npc', "Personne. Enfin, la Reine : Isaure Cœur-de-Sel. Le Conseil des Capitaines l'a élue. Ici, chaque forban a une voix. Même vous."]] },
+        { q: 'Pourquoi tant de gardes ?', a: [['npc', "Parce que la nuit, ça gratte aux remparts. Des gardes morts sur les Hauts, des goules dans la jungle, des contrebandiers qui ne savent pas qu'ils sont morts... Et les vivants ne valent guère mieux."]] },
+        { q: 'Les règles de la cité ?', a: [['npc', "Pas de duel dans l'enceinte. Pas de vol au marché. Et au Velours Écarlate, payez vos verres : Madame Rubis n'oublie jamais une dette."]] },
+      ], go: 'Continuer' },
+      ['npc', "La Reine voudra vous voir. On parle de vous jusqu'ici."],
+      ['me', "En bien, j'espère."],
+      ['npc', "On parle de vous. À Libertalia, c'est déjà beaucoup."],
+    ],
+    sceneDone: [
+      ['npc', "Approchez. Non, plus près. Je ne mords pas. Pas les invités."],
+      ['me', "Votre Majesté."],
+      ['npc', "Pas de « Majesté ». Libertalia n'a pas de rois, elle a une reine élue. Appelez-moi Isaure. Ou Capitaine, si vous tenez aux titres."],
+      ['npc', "Le Kraken, Barbe-Cendre, la Couronne des Marées... Les morts tremblent quand on prononce votre nom, {nom}. Enfin, ce qu'il leur reste pour trembler."],
+      ['me', "Et vous, vous ne tremblez pas."],
+      ['npc', "J'ai une cité entière à faire tenir debout pendant que la Marée Morte réveille tout ce qui dort sur cette île. Je n'ai pas le temps de trembler. Mais j'ai peut-être besoin de vous."],
+    ],
+  },
+  lib_audience: {
+    name: 'Le Conseil des Capitaines', giver: 'reine', turnin: 'reine', level: 14, requires: ['lib_portes'],
+    goals: [
+      { type: 'talk', npc: 'capitaine_brisemer', text: 'Gagner l’oreille du capitaine Brisemer', scene: [
+        ['npc', "La Reine vous envoie ? Hmpf. Elle collectionne les héros comme d'autres les coquillages."],
+        ['me', "Je ne suis pas un héros. Je suis un pirate qui a survécu."],
+        ['npc', "...Bonne réponse. Les héros meurent. Les survivants, je peux m'en servir."],
+        { ask: [
+          { q: 'Que gardez-vous ?', a: [['npc', "La Baie, au nord-est. Trente ans que je la tiens. Et depuis la Marée Morte, des naufrageurs y allument de fausses lumières. Des vivants, eux. Ça me rend malade."]] },
+          { q: 'Que pensez-vous de la Reine ?', a: [['npc', "Isaure ? Elle est honnête. C'est son seul défaut. Dans cette ville, l'honnêteté, c'est une cible peinte sur le dos."]] },
+        ], go: 'Je reviendrai vous voir' },
+      ] },
+      { type: 'talk', npc: 'dame_corail', text: 'Gagner l’oreille de Dame Corail', scene: [
+        ['npc', "Le fameux {nom}. Plus petit que dans les chansons."],
+        ['me', "Les chansons exagèrent. Sauf pour le Kraken. Il était vraiment énorme."],
+        ['npc', "Ha ! De l'esprit. C'est rare chez les gens d'épée. Asseyez-vous."],
+        { ask: [
+          { q: 'Quel est votre rôle ?', a: [['npc', "Je tiens les comptoirs : ce qui entre, ce qui sort, et la part du Conseil. Libertalia vit du commerce. Et un peu de la contrebande, ne soyons pas hypocrites."]] },
+          { q: 'Et Fendlame ?', a: [['npc', "Fendlame veut de l'ordre. Des lois, des gardes, des pendaisons à heure fixe. Il trouve qu'une reine élue, c'est une reine fragile. Il n'a pas tout à fait tort. C'est bien ce qui m'inquiète."]] },
+        ], go: 'Merci, Dame Corail' },
+      ] },
+      { type: 'talk', npc: 'capitaine_fendlame', text: 'Gagner l’oreille du capitaine Fendlame', scene: [
+        ['npc', "Encore une recrue de la Reine. Elle en ramasse sur tous les quais."],
+        ['me', "Vous n'avez pas l'air de l'aimer beaucoup."],
+        ['npc', "J'aime l'ordre. Elle aime le vote. Le vote, c'est le désordre qui prend son temps."],
+        { ask: [
+          { q: 'Que commandez-vous ?', a: [['npc', "Le fort des Hauts, au nord-ouest. Les anciens gardes y montent encore la garde. Morts, mais disciplinés. Ce sont les meilleurs soldats que j'aie jamais eus."]] },
+          { q: 'Et la crypte sous le fort ?', a: [['npc', "...Qui vous a parlé de la crypte ? Personne n'y descend. Personne. Il n'y a rien là-dessous que des os et de vieilles histoires."]] },
+        ], go: 'Bonne journée, capitaine' },
+      ] },
+    ],
+    rewards: { xp: 2500, gold: 300, items: [['rhum_vieux', 2]] },
+    offer: "Le Conseil des Capitaines doit vous accepter. Parlez à Brisemer, à Dame Corail et à Fendlame : ils sont ici, dans la salle du Conseil.",
+    progress: 'Les trois capitaines siègent dans la salle du Conseil, ici même, au palais.',
+    done: "Trois capitaines, trois caractères. Et chacun aura une tâche pour vous.",
+    scene: [
+      ['npc', "Libertalia n'est pas à moi, {nom}. Elle est au Conseil : trois capitaines, et moi pour départager."],
+      ['me', "Et vous voulez que je me présente à eux."],
+      ['npc', "Je veux qu'ils vous voient. Brisemer garde la Baie, Dame Corail tient les comptoirs, Fendlame commande le fort des Hauts. Sans leur accord, je ne peux rien vous confier."],
+      { ask: [
+        { q: 'Pourquoi avez-vous besoin de moi ?', a: [['npc', "Parce que je n'ai plus confiance en personne. Quelqu'un, au Conseil, prépare quelque chose. Je le sens comme on sent l'orage. Vous, vous venez de l'extérieur. Vous ne devez rien à personne."]] },
+        { q: 'Que se passe-t-il sur l’île ?', a: [['npc', "Les champs de canne se lèvent la nuit, les contrebandiers de la mangrove sont morts mais continuent leur commerce, les gardes du vieux fort tirent sur tout ce qui bouge. La Marée Morte a réveillé l'île entière."]] },
+      ], go: 'J’irai les voir' },
+    ],
+    sceneDone: [
+      ['npc', "Alors ? Que pensez-vous de mes capitaines ?"],
+      ['me', "Brisemer grogne, Dame Corail compte, et Fendlame... cache quelque chose."],
+      ['npc', "Vous avez l'œil. Fendlame cache toujours quelque chose : c'est sa manière d'exister. Mais aidez-les tous les trois. Gagnez leur confiance. Et ouvrez bien les oreilles."],
+    ],
+  },
+  lib_baie: {
+    name: 'Les fausses lumières', giver: 'capitaine_brisemer', turnin: 'capitaine_brisemer', level: 18, requires: ['lib_audience'],
+    goals: [{ type: 'kill', mob: 'naufrageur', n: 10, text: 'Naufrageurs abattus' }, { type: 'collect', item: 'lanterne_naufrageur', n: 5, text: 'Lanternes de naufrageur' }],
+    rewards: { xp: 6000, gold: 900, items: [['longue_vue', 1]] },
+    offer: "Les naufrageurs de la Baie allument de fausses lumières sur les rochers. Abattez-en dix, et rapportez-moi cinq de leurs maudites lanternes.",
+    progress: 'La Baie est au nord-est de l’île. Les naufrageurs rôdent près des épaves.',
+    done: "Cinq lanternes. Je les accrocherai à mon mât, pour qu'ils voient ce qui arrive à ceux qui jouent avec la mer.",
+    scene: [
+      ['npc', "Vous voulez m'aider ? Alors écoutez. La nuit dernière, un navire marchand s'est fracassé sur les récifs de la Baie. Quarante hommes."],
+      ['me', "Les morts ?"],
+      ['npc', "Les vivants. Des naufrageurs. Ils allument des lanternes sur les rochers, les capitaines croient voir l'entrée du port, et crac. Ensuite ils pillent. Ils achèvent ceux qui nagent."],
+      { ask: [
+        { q: 'Qui les commande ?', a: [['npc', "Un certain Grand-Feu. Il porte une lanterne à la ceinture et il rit quand les coques se brisent. Un jour, il sera à moi."]] },
+        { q: 'Pourquoi les lanternes ?', a: [['npc', "Sans lanternes, pas de fausses lumières. Et puis je veux les voir de mes yeux. Je veux savoir combien de navires elles ont coulés."]] },
+      ], go: 'J’y vais' },
+      ['npc', "Dix naufrageurs, cinq lanternes. Et ne nagez pas près des récifs."],
+    ],
+  },
+  lib_grand_feu: {
+    name: 'Grand-Feu doit s’éteindre', giver: 'capitaine_brisemer', turnin: 'capitaine_brisemer', level: 23, requires: ['lib_baie'],
+    goals: [{ type: 'kill', mob: 'capitaine_naufrageur', n: 1, text: 'Grand-Feu, capitaine des naufrageurs, abattu' }],
+    rewards: { xp: 9000, gold: 1500, items: [['chapeau_plume', 1]] },
+    offer: "Grand-Feu, leur capitaine. Il hante la Baie, une lanterne à la main. Éteignez-le. Pour de bon.",
+    progress: 'Grand-Feu rôde dans la Baie, au nord-est. C’est un élite : venez bien armé, ou à plusieurs.',
+    done: "Il est mort ? Vraiment mort ? ...Trente ans que j'attendais ça. Prenez ce chapeau. Il était à mon second, le premier que Grand-Feu ait noyé.",
+  },
+  lib_mangrove: {
+    name: 'La part du Conseil', giver: 'dame_corail', turnin: 'dame_corail', level: 17, requires: ['lib_audience'],
+    goals: [{ type: 'kill', mob: 'contrebandier', n: 8, text: 'Contrebandiers maudits abattus' }, { type: 'collect', item: 'tonnelet_contrebande', n: 6, text: 'Tonnelets de contrebande' }],
+    rewards: { xp: 5000, gold: 1000, items: [['tenue_contrebandier', 1]] },
+    offer: "Les contrebandiers de la mangrove ne paient plus la part du Conseil. Récupérez six tonnelets, et faites comprendre à huit d'entre eux que la mort n'excuse pas les dettes.",
+    progress: 'La mangrove est au sud-ouest de l’île, derrière la porte de l’Ouest. Leur camp est sur une butte, au milieu des palétuviers.',
+    done: "Six tonnelets ! La part du Conseil, avec les intérêts. Vous seriez un excellent percepteur. Gardez cette tenue : elle a appartenu à un contrebandier qui n'en a plus l'usage.",
+    scene: [
+      ['npc', "Parlons affaires. Les contrebandiers de la mangrove ont toujours payé leur part : un tonnelet sur dix. C'est la loi du Conseil."],
+      ['me', "Et ils ont arrêté de payer."],
+      ['npc', "Ils ont arrêté de vivre. Mais ils continuent leur commerce ! Des morts qui vendent du rhum à des morts. Et la cité ne touche plus rien."],
+      { ask: [
+        { q: 'Vous n’avez pas peur des morts ?', a: [['npc', "J'ai peur des registres qui ne tombent pas juste. Les morts, c'est votre affaire. Les comptes, c'est la mienne."]] },
+        { q: 'Que dois-je rapporter ?', a: [['npc', "Six tonnelets de leur rhum. Il est excellent, paraît-il : la mort fait vieillir le rhum plus vite. Et huit contrebandiers de moins, pour l'exemple."]] },
+      ], go: 'Marché conclu' },
+      ['npc', "Marché conclu. J'aime travailler avec vous, {nom}. Vous ne négociez pas."],
+    ],
+  },
+  lib_reine_mangrove: {
+    name: 'Celle qui boit la marée', giver: 'dame_corail', turnin: 'dame_corail', level: 22, requires: ['lib_mangrove'],
+    goals: [{ type: 'kill', mob: 'reine_mangrove', n: 1, text: 'La Reine de la Mangrove abattue' }],
+    rewards: { xp: 8500, gold: 1600, items: [['antidote', 5]] },
+    offer: "Les contrebandiers avaient une protectrice : une noyée couronnée de racines. On l'appelle la Reine de la Mangrove. Une seule reine suffit à cette île.",
+    progress: 'La Reine de la Mangrove règne au cœur des marais du sud-ouest. Élite : prudence.',
+    done: "Une reine de moins. Ne le répétez pas à Isaure, elle pourrait mal le prendre. Prenez ces antidotes : vous en aurez besoin si vous retournez là-bas.",
+  },
+  lib_hauts: {
+    name: 'La garde éternelle', giver: 'capitaine_fendlame', turnin: 'capitaine_fendlame', level: 20, requires: ['lib_audience'],
+    goals: [{ type: 'kill', mob: 'garde_maudit', n: 10, text: 'Gardes maudits renvoyés au repos' }],
+    rewards: { xp: 7000, gold: 900, items: [['tonique_fer', 3]] },
+    offer: "Mes anciens gardes tiennent encore le fort des Hauts. Ils tirent sur mes patrouilles. Renvoyez-en dix au repos.",
+    progress: 'Le fort des Hauts est au nord-ouest de la cité. Les gardes maudits tirent de loin : roulez sous leurs balles.',
+    done: "Dix. Bien. Le fort est plus calme. Ne vous en approchez plus, maintenant : les Hauts sont sous ma responsabilité.",
+    scene: [
+      ['npc', "La Reine veut que je vous fasse confiance. Soit. Voyons si vous savez obéir."],
+      ['me', "Je sais me battre. L'obéissance, c'est une autre histoire."],
+      ['npc', "...Les gardes du fort des Hauts sont morts depuis quarante ans. Ils montent encore la garde. Ils tirent sur mes patrouilles."],
+      { ask: [
+        { q: 'Pourquoi sont-ils encore là ?', a: [['npc', "Parce qu'on leur a ordonné de garder le fort jusqu'au retour de leur roi. Des soldats loyaux. On n'en fait plus des comme ça."]] },
+        { q: 'Leur roi ?', a: [['npc', "Malo le Rouge. Le Roi sans Couronne. Une vieille histoire. Une histoire morte et enterrée. Ne vous en mêlez pas."]] },
+      ], go: 'Je m’en charge' },
+      ['npc', "Dix gardes. Puis vous redescendez. Les Hauts, c'est mon affaire."],
+    ],
+  },
+  lib_murmures: {
+    name: 'Des murmures au Velours', giver: 'reine', turnin: 'reine', level: 22, requires: ['lib_baie', 'lib_mangrove', 'lib_hauts'],
+    goals: [
+      { type: 'talk', npc: 'madame_rubis', text: 'Interroger Madame Rubis', scene: [
+        ['npc', "Isaure vous envoie ? Elle sait que je n'aime pas qu'on pose des questions chez moi."],
+        ['me', "Elle dit aussi que rien de ce qui se murmure à Libertalia ne vous échappe."],
+        ['npc', "...Elle sait parler aux femmes, notre reine. Bon. Un capitaine vient ici depuis un mois. Il ne boit pas, il ne danse pas, il ne regarde personne. Il parle tout seul, de couronne et de loyauté."],
+        { ask: [
+          { q: 'Quel capitaine ?', a: [['npc', "Je ne donne jamais de noms, mon cœur. Mauvais pour les affaires. Mais Perle l'a servi, elle. Et Céleste chantait ce soir-là."]] },
+          { q: 'Pourquoi m’aider ?', a: [['npc', "Parce que je préfère une reine qui vient boire chez moi à un roi qui fermerait le Velours. Les tyrans n'aiment pas les maisons où l'on rit."]] },
+        ], go: 'Je vais voir Perle et Céleste' },
+      ] },
+      { type: 'talk', npc: 'perle', text: 'Écouter ce que sait Perle', scene: [
+        ['npc', "Madame vous envoie ? Alors asseyez-vous. Et ne me regardez pas comme ça, je ne fais que parler."],
+        ['me', "Un capitaine vient ici. Il ne boit pas, il parle de couronne."],
+        ['npc', "Fendlame. Il vient chaque nuit après la relève des Hauts. Il garde son manteau, il fixe la bougie, et il murmure : « Il me l'a promis. La cité à ses fidèles. »"],
+        { ask: [
+          { q: '« Il » ?', a: [['npc', "Je lui ai demandé. Il a souri, d'un sourire qui m'a glacé le sang, et il a dit : « Celui qui attend sous le fort. » Puis il a payé le double pour que j'oublie. Je n'ai rien oublié."]] },
+          { q: 'Vous n’avez pas peur ?', a: [['npc', "Si. Mais j'ai encore plus peur d'une ville où les hommes comme lui font la loi. Ici, on choisit qui on écoute. Je voudrais que ça dure."]] },
+        ], go: 'Merci, Perle' },
+      ] },
+      { type: 'talk', npc: 'celeste', text: 'Écouter la chanson de Céleste', scene: [
+        ['npc', "Vous voulez la Ballade de Malo le Rouge ? Personne ne la demande jamais. Sauf un capitaine, depuis un mois. Toujours le dernier couplet."],
+        ['me', "Que dit le dernier couplet ?"],
+        ['npc', "♪ Ils ont fondu sa couronne en canons, ils l'ont couché sous les pierres du fort... Mais rendez-lui l'or de son front, et le Rouge reviendra plus fort. ♪"],
+        { ask: [
+          { q: 'Ce n’est qu’une chanson ?', a: [['npc', "Les chansons, c'est la mémoire de ceux qui ne savent pas lire. Si on dit qu'un roi revient quand on lui rend sa couronne, quelqu'un, un jour, essaiera."]] },
+          { q: 'La couronne a été fondue ?', a: [['npc', "Les fondateurs l'ont fondue pour payer les canons des remparts. Toute la couronne ? Allez demander au Borgne. Il sait où finit l'or de cette île."]] },
+        ], go: 'Je vais voir le Borgne' },
+      ] },
+      { type: 'talk', npc: 'le_borgne', text: 'Faire parler le Borgne', scene: [
+        ['npc', "Je n'ai rien vu. Vous non plus. Qu'est-ce que vous voulez ?"],
+        ['me', "La couronne de Malo le Rouge."],
+        ['npc', "...Fermez la porte. Doucement. Oui, je l'avais. Pas toute : un cercle d'or tordu, refondu à moitié. Un souvenir que les fondateurs n'avaient pas osé détruire."],
+        ['me', "Vous l'aviez ?"],
+        ['npc', "Je l'ai vendue. Il y a deux semaines. À un capitaine au cache-œil, qui a payé trois fois le prix sans discuter. Ceux qui ne discutent pas, je m'en méfie. Mais leur or, je le prends."],
+        { ask: [
+          { q: 'Fendlame ?', a: [['npc', "Je ne donne pas de noms. Mais il n'y a pas trente capitaines borgnes au Conseil. Il n'y en a qu'un. Comme moi. C'est peut-être pour ça qu'il m'a fait confiance."]] },
+          { q: 'Que va-t-il en faire ?', a: [['npc', "On ne paie pas une couronne de mort pour la porter soi-même. On la paie pour la rendre à son propriétaire. Faites-moi plaisir : allez vite voir la Reine."]] },
+        ], go: 'Je cours au palais' },
+      ] },
+    ],
+    rewards: { xp: 8000, gold: 1000, items: [] },
+    offer: "Un traître siège au Conseil. Je le sens. Allez au Velours Écarlate : Madame Rubis entend tout ce qui se murmure à Libertalia. Et suivez chaque fil.",
+    progress: 'Le Velours Écarlate est à l’ouest de la rue du marché. Interrogez Madame Rubis, Perle et Céleste, puis le Borgne, dans les Bas-Fonds.',
+    done: "Fendlame. J'aurais dû le deviner. Il a toujours trouvé que le vote était une faiblesse.",
+    scene: [
+      ['npc', "Merci pour la Baie, la mangrove et le fort. Les trois capitaines vous respectent. Même Fendlame. Surtout Fendlame, peut-être."],
+      ['me', "Vous dites ça comme une mauvaise nouvelle."],
+      ['npc', "Hier, on a trouvé la porte de la crypte des Hauts ouverte. Quarante ans qu'elle était scellée. Et les gardes morts étaient alignés devant, au garde-à-vous. Comme pour accueillir quelqu'un."],
+      { ask: [
+        { q: 'Vous soupçonnez quelqu’un ?', a: [['npc', "Je soupçonne tout le monde, c'est mon métier. Mais je ne peux accuser personne sans preuve. Le Conseil me destituerait, et il aurait raison."]] },
+        { q: 'Pourquoi le Velours ?', a: [['npc', "Parce que les hommes qui préparent un coup d'État ont besoin de parler à quelqu'un. Et ils ne parlent jamais à leur femme. Ils parlent au Velours."]] },
+      ], go: 'Je pars enquêter' },
+    ],
+    sceneDone: [
+      ['me', "Fendlame a acheté la couronne de Malo le Rouge au Borgne. Il descend chaque nuit dans la crypte. Il veut rendre sa couronne au Roi sans Couronne."],
+      ['npc', "...Pour gouverner à travers lui. Un roi mort, un régent vivant. Libertalia à genoux devant un cadavre."],
+      ['npc', "Fendlame a quitté le palais ce matin. Ses quartiers sont vides. On ne l'a vu ni au port, ni aux portes."],
+      ['me', "Il est déjà dans la crypte."],
+      ['npc', "Alors il est peut-être trop tard. Préparez-vous, {nom}. Je n'ai que vous."],
+    ],
+  },
+  lib_crypte: {
+    name: 'Le Roi sans Couronne', giver: 'reine', turnin: 'reine', level: 26, requires: ['lib_murmures'], ach: 'libertalia',
+    goals: [{ type: 'kill', mob: 'roi_sans_couronne', n: 1, text: 'Le Roi sans Couronne renvoyé dans sa tombe' }, { type: 'collect', item: 'couronne_brisee', n: 1, text: 'Rapporter la couronne brisée' }],
+    rewards: { xp: 30000, gold: 4000, items: [['sceau_reine', 1]] },
+    offer: "Descendez dans la crypte, sous le fort des Hauts. Si Malo le Rouge s'est relevé, renvoyez-le dans sa tombe. Et rapportez-moi cette couronne.",
+    progress: 'L’entrée de la Crypte du Roi sans Couronne est au pied du fort des Hauts, au nord-ouest. Boss très puissant : venez à plusieurs.',
+    done: "C'est fini. Libertalia reste libre.",
+    scene: [
+      ['npc', "Les remparts tremblent depuis une heure. Les gardes des Hauts marchent en rang, au son d'un tambour que personne ne bat."],
+      ['me', "Le roi est réveillé."],
+      ['npc', "Le roi est réveillé. Et notre cité n'a jamais su se défendre contre un roi : on l'a fondée pour ne plus en avoir."],
+      { ask: [
+        { q: 'Et Fendlame ?', a: [['npc', "S'il est encore vivant, ramenez-le pour qu'il soit jugé par le Conseil. Ici, même les traîtres ont droit à un vote. C'est ce qui nous différencie d'eux."]] },
+        { q: 'Que faire de la couronne ?', a: [['npc', "Rapportez-la-moi. Cette fois, nous ne la fondrons pas en canons. Nous la jetterons dans la fosse la plus profonde de l'océan."]] },
+        { q: 'Pourquoi moi ?', a: [['npc', "Parce que vous êtes la seule lame de cette ville qui n'a rien à gagner à mettre un roi sur le trône. Et parce que vous avez déjà tué un Kraken. Un roi mort, à côté..."]] },
+      ], go: 'J’y vais' },
+      ['npc', "Bonne chance, {nom}. Libertalia se souviendra de votre nom. Faites qu'elle s'en souvienne vivant."],
+    ],
+    sceneDone: [
+      ['me', "Le Roi sans Couronne est retourné à la poussière. Voici sa couronne."],
+      ['npc', "...Si petite. Tout ce sang pour un cercle d'or tordu. Et Fendlame ?"],
+      ['me', "Je l'ai trouvé dans la crypte, à genoux devant le trône. Le roi qu'il servait l'a tué le premier. Les tyrans ne partagent pas."],
+      ['npc', "Pauvre fou. Il voulait de l'ordre. Il a eu le silence."],
+      ['npc', "Le Conseil s'est réuni pendant votre absence. Pour la première fois en quarante ans, le vote a été unanime : vous êtes nommé Corsaire de la Reine. Prenez ce sceau. Partout dans l'archipel, il parle au nom de Libertalia."],
+      ['me', "Je croyais que Libertalia n'avait pas de maîtres."],
+      ['npc', "Elle n'en a pas. Elle a des amis. Et vous êtes le meilleur."],
+    ],
+  },
+  // histoires de rue
+  lib_cannaies: {
+    name: 'Les champs maudits', giver: 'marchand_rhum', turnin: 'marchand_rhum', level: 14,
+    goals: [{ type: 'kill', mob: 'epouvantail', n: 12, text: 'Épouvantails des cannaies abattus' }],
+    rewards: { xp: 4000, gold: 700, items: [['rhum_vieux', 3]] },
+    offer: "Les épouvantails des Cannaies se sont mis à marcher. Mes coupeurs de canne n'osent plus sortir. Abattez-en douze, et le meilleur rhum de l'île est à vous.",
+    progress: 'Les Cannaies sont au nord de la cité, après les portes du Nord. Les épouvantails sortent surtout la nuit.',
+    done: "Douze ! Mes coupeurs reprennent le travail dès demain. Tenez : du rhum vieux de dix ans. Il a connu des jours meilleurs. Vous aussi, on dirait.",
+    scene: [
+      ['npc', "Vous avez déjà vu un épouvantail marcher ? Moi oui. Trois fois cette semaine."],
+      ['me', "Ils mordent ?"],
+      ['npc', "Ils fauchent. Avec de vraies faux. Mes coupeurs de canne n'osent plus sortir, et sans canne, pas de rhum. Et sans rhum, Libertalia se révolte."],
+      { ask: [{ q: 'D’où viennent-ils ?', a: [['npc', "On enterrait les esclaves morts au bout des champs, autrefois, avant que la cité les libère tous. La Marée Morte réveille les morts... et la paille aussi, faut croire."]] }], go: 'Je vais les faucher' },
+    ],
+  },
+  lib_dette: {
+    name: 'Les dés sont pipés', giver: 'joueur_lib', turnin: 'joueur_lib', level: 14,
+    goals: [{ type: 'act', act: 'dice_win', n: 3, text: 'Parties de dés gagnées contre Fortuné' }],
+    rewards: { xp: 2500, gold: 300, items: [['carte_tresor', 1]] },
+    offer: "Fortuné triche, j'en suis sûr. Gagnez trois parties contre lui, prouvez que la chance peut tourner, et je vous donne mon dernier trésor.",
+    progress: 'Fortuné tient la table de La Bourse aux Dés, sur la rue des tavernes. Parlez-lui pour jouer.',
+    done: "Trois victoires ! Alors les dés ne sont pas pipés... C'est moi qui suis maudit. Prenez cette carte. Je l'ai gagnée il y a dix ans, la seule fois où j'ai gagné.",
+    scene: [
+      ['npc', "Vous avez une tête à avoir de la chance. Moi, j'avais une tête comme ça, avant."],
+      ['me', "Qu'est-ce qui vous est arrivé ?"],
+      ['npc', "Fortuné. La Bourse aux Dés. J'ai perdu mon navire, mon équipage, ma montre et le portrait de ma mère. Il triche. Je ne sais pas comment, mais il triche."],
+      { ask: [
+        { q: 'Et si je gagne ?', a: [['npc', "Gagnez trois parties. Si on peut gagner contre lui, alors ses dés sont honnêtes, et c'est moi qui suis maudit. Dans les deux cas, je saurai. Et je vous donnerai la dernière chose que je possède."]] },
+        { q: 'Vous devriez arrêter de jouer.', a: [['npc', "Arrêter ? Mais la prochaine partie sera la bonne. Elle l'est toujours. ...Bon, d'accord, peut-être pas."]] },
+      ], go: 'Je vais jouer' },
+    ],
+  },
+  lib_fosse: {
+    name: 'Les épreuves de la Fosse', giver: 'maitre_fosse', turnin: 'maitre_fosse', level: 22,
+    goals: [{ type: 'kill', mob: 'goule_ecarlate', n: 8, text: 'Goules écarlates abattues' }, { type: 'kill', mob: 'coupe_jarret', n: 8, text: 'Coupe-jarrets abattus' }, { type: 'kill', mob: 'capitaine_naufrageur', n: 1, text: 'Grand-Feu abattu' }],
+    rewards: { xp: 14000, gold: 2200, items: [['lame_executrice', 1]] },
+    offer: "Trois épreuves pour devenir champion de la Fosse : huit goules de la jungle, huit coupe-jarrets des Bas-Fonds, et la tête de Grand-Feu.",
+    progress: 'Goules dans la Jungle Écarlate (est), coupe-jarrets dans les Bas-Fonds la nuit, Grand-Feu dans la Baie (nord-est).',
+    done: "Champion ! CHAMPION ! La Fosse n'avait pas crié comme ça depuis des années. Prenez la lame de l'exécutrice : elle revient au meilleur.",
+    scene: [
+      ['npc', "Tu regardes la Fosse comme un gamin regarde la mer. Tu veux te battre ?"],
+      ['me', "Je me bats tous les jours. Dehors, sans gradins."],
+      ['npc', "Ha ! Alors prouve-le. Dans la Fosse, on ne devient pas champion en tapant sur des mannequins. On devient champion en ramenant des preuves."],
+      { ask: [{ q: 'Quelles épreuves ?', a: [['npc', "Les goules écarlates de la jungle, les plus rapides de l'île. Les coupe-jarrets des Bas-Fonds, les plus vicieux. Et Grand-Feu, le plus fou. Trois épreuves, un champion."]] }], go: 'J’accepte' },
+    ],
+  },
+  lib_vieux_sou: {
+    name: 'Les yeux du Vieux Sou', giver: 'mendiant', turnin: 'mendiant', level: 14,
+    goals: [{ type: 'collect', item: 'longue_vue', n: 1, text: 'Apporter une longue-vue' }],
+    rewards: { xp: 1500, gold: 500, items: [['fumigene', 5]] },
+    offer: "Une longue-vue. Le capitaine du port en vend. Apportez-m'en une, et je vous dirai pourquoi un aveugle en a besoin.",
+    progress: 'Le capitaine Esteban vend des longues-vues à la Capitainerie, sur le port.',
+    done: "Merci, merci ! ...Avec ça, je vois les navires arriver depuis le toit de la Capitainerie. Prenez ces fumigènes. Quand on disparaît, il faut savoir le faire proprement.",
+    scene: [
+      ['npc', "Une pièce pour un pauvre aveugle ?"],
+      ['me', "Vous regardez ma bourse depuis tout à l'heure."],
+      ['npc', "...Bien vu. Bon. Je ne suis pas aveugle. Je suis les yeux de la Reine dans les rues. Personne ne se méfie d'un mendiant aveugle. Les gens parlent devant moi comme devant un mur."],
+      { ask: [{ q: 'Et vous voulez une longue-vue ?', a: [['npc', "Mes yeux ne sont plus ce qu'ils étaient. Pour surveiller le port, il m'en faut une. Mais si j'en achète une, ma couverture est fichue. Achetez-la pour moi."]] }], go: 'D’accord' },
+    ],
+  },
+  lib_ballade: {
+    name: 'La ballade inachevée', giver: 'celeste', turnin: 'celeste', level: 22, requires: ['lib_murmures'],
+    goals: [{ type: 'explore', zone: Z.ECARLATE, text: 'Trouver le temple de la Jungle Écarlate' }, { type: 'kill', mob: 'goule_ecarlate', n: 6, text: 'Goules écarlates abattues' }],
+    rewards: { xp: 7000, gold: 700, items: [['collier_perles_noires', 1]] },
+    offer: "Il paraît que le dernier vrai couplet de la ballade est gravé dans le temple de la Jungle Écarlate. Allez-y, chassez les goules, et revenez me le chanter. Faux, s'il le faut.",
+    progress: 'La Jungle Écarlate est à l’est de la cité, par la porte de l’Est.',
+    done: "« ...et la cité qui choisit ses chefs ne craindra plus ni roi ni mort. » Il est beau, ce couplet. Je le chanterai ce soir. Prenez ce collier : c'est le cadeau d'un capitaine qui m'aimait. Il est mort. Le collier, non.",
+  },
+});
+const primeLib = (name, mob, n, level, xp, gold, text) => ({ name, giver: 'primes_lib', turnin: 'primes_lib', level, repeat: 600, goals: [{ type: 'kill', mob, n, text }], rewards: { xp, gold, items: [] },
+  offer: `AVIS DU CONSEIL — ${text} : ${n}. Récompense : ${gold} doublons, payés comptant au palais.`, progress: 'Revenez au tableau une fois la prime remplie.', done: 'Le Conseil vous paie votre dû. Un nouvel avis sera cloué dans 10 minutes.' });
+QUESTS.prime_lib_epouvantails = primeLib('Prime : épouvantails', 'epouvantail', 12, 14, 2600, 500, 'Épouvantails des cannaies abattus');
+QUESTS.prime_lib_coupe = primeLib('Prime : coupe-jarrets', 'coupe_jarret', 10, 16, 3000, 600, 'Coupe-jarrets des Bas-Fonds abattus');
+QUESTS.prime_lib_contrebande = primeLib('Prime : contrebandiers', 'contrebandier', 10, 17, 3300, 650, 'Contrebandiers maudits abattus');
+QUESTS.prime_lib_naufrageurs = primeLib('Prime : naufrageurs', 'naufrageur', 10, 19, 3800, 750, 'Naufrageurs abattus');
+QUESTS.prime_lib_gardes = primeLib('Prime : gardes maudits', 'garde_maudit', 10, 21, 4400, 850, 'Gardes maudits du fort abattus');
+QUESTS.prime_lib_goules = primeLib('Prime : goules écarlates', 'goule_ecarlate', 10, 23, 5000, 950, 'Goules écarlates abattues');
 export const QUEST_ORDER = Object.keys(QUESTS);
 
 // état d'une quête pour un joueur : 'locked' | 'available' | 'active' | 'ready' | 'done'
@@ -386,7 +707,7 @@ export function goalsMet(qid, st, countItem) {
   const q = QUESTS[qid];
   return q.goals.every((g, i) => {
     if (g.type === 'collect' && countItem) return countItem(g.item) >= g.n;
-    const need = g.type === 'kill' || g.type === 'collect' ? g.n : 1;
+    const need = g.n || 1; // kill, collect, act : g.n ; talk, explore : 1
     return (st.p[i] || 0) >= need;
   });
 }

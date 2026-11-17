@@ -17,6 +17,7 @@ import { PB } from './pixel.js';
 import { hash2 } from '../../shared/rng.js';
 import { extend06, petSheets, drawTentacle } from './sprites-06.js';
 import { extend07 } from './sprites-07.js';
+import { extend08, citeSprite } from './sprites-cite.js';
 import { volcanoGen, makePuffs, makeSplats } from './sprites-volcan.js';
 import './sprites-08.js';
 import { mountSheet } from './sprites-mounts.js';
@@ -94,7 +95,7 @@ export class Renderer {
     this.water = makeWaterLayers();
     this.env = buildEnvSprites();
     this.structSpr = buildStructSprites(this.env);
-    extend06(this.env, this.structSpr); extend07(this.env); this.pets = petSheets(); this.tentacle = drawTentacle;
+    extend06(this.env, this.structSpr); extend07(this.env); extend08(this.env); this.pets = petSheets(); this.tentacle = drawTentacle;
     // le volcan se peint en tâche de fond, un peu à chaque image (ou d'un coup si l'on arrive devant)
     this.volcJob = world.volcano ? volcanoGen(world.volcano) : null; this.volc = null; this.volcanAlpha = 1;
     this.puffs = world.volcano ? makePuffs() : null; this.plume = [];
@@ -141,7 +142,7 @@ export class Renderer {
       if (p.type === 'comptoir') p.v = p.tx % 3;
       if (p.type === 'grotte') { const d = this.world.doors.find((q) => q.secret && (q.ox >> 4) === p.tx && (q.oy >> 4) === p.ty + 1); p.door = d ? d.id : null; }
       const list = this.env[p.type];
-      const s = list ? list[p.v % list.length] : null;
+      const s = p.type === 'cite' ? citeSprite(p) : list ? list[p.v % list.length] : null;
       p.spr = s;
       p.ground = !!(PROPS[p.type] && PROPS[p.type].ground);
       if (!s) continue;

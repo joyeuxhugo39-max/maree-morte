@@ -688,6 +688,16 @@ export const MOB_LOOKS = {
   frere_fer: { big: 1, skin: 'zombie', undead: 1, hair: 0, hairStyle: 'chauve', beard: 2, top: 'armure', topCol: 'grey', pants: 'black', boots: 'black', hat: 'morion', eyeCol: 0xffe14a, seed: 22 },
   frere_rouille: { big: 1, skin: 'zombie', undead: 1, hair: 2, hairStyle: 'hirsute', beard: 1, top: 'armure', topCol: 'orange', pants: 'brown', boots: 'brown', eyeCol: 0xffe14a, seed: 23 },
   comte_vespere: { big: 1, skin: 'damne', undead: 1, hair: 4, hairStyle: 'long', top: 'capitaine', topCol: 'black', pants: 'black', boots: 'black', hat: 'capitaine', hatCol: 'black', cape: 'purple', eyeCol: 0xff3a6a, beard: 1, beardCol: 4, seed: 24 },
+  // 0.8 : l'île de Libertalia
+  epouvantail: { skin: 'ghoul', undead: 1, hunch: 1, hair: 5, hairStyle: 'hirsute', top: 'haillons', topCol: 'brown', pants: 'brown', boots: 'brown', hat: 'paille', eyeCol: 0xffa030, seed: 25 },
+  coupe_jarret: { skin: 2, hair: 0, hairStyle: 'court', top: 'manteau', topCol: 'grey', pants: 'black', boots: 'black', hat: 'cagoule', hatCol: 'black', eyeCol: 0xffe14a, seed: 26 },
+  contrebandier: { skin: 'zombie', undead: 1, hair: 2, hairStyle: 'queue', top: 'gilet', topCol: 'green', pants: 'brown', boots: 'brown', hat: 'bandana', hatCol: 'green', beard: 1, eyeCol: 0x9dff6a, seed: 27 },
+  naufrageur: { skin: 3, hair: 4, hairStyle: 'hirsute', top: 'vareuse', topCol: 'orange', pants: 'navy', boots: 'black', hat: 'bonnet', hatCol: 'orange', beard: 2, eyeCol: 0xffd24a, seed: 28 },
+  garde_maudit: { skin: 'drowned', undead: 1, hair: 4, hairStyle: 'queue', top: 'manteau', topCol: 'red', pants: 'white', boots: 'black', hat: 'tricorne', hatCol: 'black', eyeCol: 0x9fffe8, seed: 29 },
+  goule_ecarlate: { skin: 'ghoul', undead: 1, hunch: 1, hair: 0, hairStyle: 'hirsute', top: 'haillons', topCol: 'red', pants: 'red', boots: 'red', eyeCol: 0xff3a3a, claws: 1, seed: 30 },
+  reine_mangrove: { big: 1, skin: 'drowned', undead: 1, hair: 4, hairStyle: 'long', top: 'vareuse', topCol: 'green', pants: 'green', boots: 'teal', hat: 'couronne', cape: 'green', eyeCol: 0x9dff6a, seed: 31 },
+  capitaine_naufrageur: { big: 1, skin: 3, hair: 2, hairStyle: 'long', top: 'capitaine', topCol: 'orange', pants: 'black', boots: 'black', hat: 'tricorne', hatCol: 'black', beard: 2, beardCol: 2, eye: 'patch', eyeCol: 0xffb04a, seed: 32 },
+  roi_sans_couronne: { skel: 1, big: 1, bones: [0x5a4a2a, 0x8a7444, 0xb89e62, 0xe0c88a], topCol: 'purple', cape: 'red', eyeCol: 0xffd24a },
 };
 
 export function whiteSheet(s) {

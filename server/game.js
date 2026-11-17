@@ -155,6 +155,7 @@ export class Game {
       case 'sk': return this.onSkill(p, m);
       case 'talk': return this.onTalk(p, String(m.npc));
       case 'qa': return this.acceptQuest(p, String(m.q));
+      case 'dice': return this.playDice(p, +m.bet);
       case 'qt': return this.turnIn(p, String(m.q));
       case 'track': return this.trackQuest(p, String(m.q), !!m.on);
       case 'qab': return this.abandonQuest(p, String(m.q));
@@ -252,7 +253,7 @@ export class Game {
       dead: false, deathAt: 0, moveBudget: 80, lastMoveAt: this.time, invulnUntil: this.time + 2,
       known: new Map(), dirtyMe: true, dirtyInv: false, dirtyQ: false, lastSave: this.time,
       lastHurt: -99, lastChat: -9, zone: Z.TOWN, lookVer: 0, kills: 0,
-      upg: {}, treasure: null, ach: {}, title: null, cnt: { crab: 0, fish: 0, ships: 0, horde: 0 }, zs: new Set(), fishing: null, respawnAt: null,
+      upg: {}, treasure: null, ach: {}, title: null, cnt: { crab: 0, fish: 0, ships: 0, horde: 0, dice: 0 }, zs: new Set(), fishing: null, respawnAt: null,
       found: new Set(), boat: null, room: -1, pk: 0, pvpLog: new Map(), caches: {}, pet: null, burgle: null, thiefUntil: 0, robbed: {},
     };
     if (d) {
@@ -272,7 +273,7 @@ export class Game {
       if (d.treasure && typeof d.treasure.x === 'number') p.treasure = { x: d.treasure.x, y: d.treasure.y };
       if (d.ach && typeof d.ach === 'object') for (const k in d.ach) if (ACHIEVEMENTS[k]) p.ach[k] = d.ach[k];
       if (d.title && p.ach[d.title]) p.title = d.title;
-      if (d.cnt) { p.cnt.crab = d.cnt.crab | 0; p.cnt.fish = d.cnt.fish | 0; p.cnt.ships = d.cnt.ships | 0; }
+      if (d.cnt) { p.cnt.crab = d.cnt.crab | 0; p.cnt.fish = d.cnt.fish | 0; p.cnt.ships = d.cnt.ships | 0; p.cnt.dice = d.cnt.dice | 0; }
       if (d.respawnAt && typeof d.respawnAt.tx === 'number') p.respawnAt = { tx: d.respawnAt.tx | 0, ty: d.respawnAt.ty | 0 };
       if (!this.worldPersist && d.base) p.pendingBase = d.base; // 0.8 : remboursée à la connexion
       if (!this.worldPersist && d.home) p.pendingHome = d.home;
@@ -843,15 +844,16 @@ export class Game {
         break;
       }
       case 'general': { // Le Général d'Os
-        if (ready('sum', 14)) this.summonAdds(m, t, 'legionnaire', 2, 4, 'Légion ! En rang !');
+        const S = m.def.shouts || {}; // 0.8 : le Roi sans Couronne reprend la tactique, avec sa propre garde
+        if (ready('sum', 14)) this.summonAdds(m, t, m.def.adds || 'legionnaire', 2, 4, S.sum || 'Légion ! En rang !');
         else if (ready('line', 7)) {
           const a = Math.atan2(t.y - m.y, t.x - m.x), nx = -Math.sin(a), ny = Math.cos(a);
           for (const o of [-26, 0, 26]) this.lineTele(m.x + nx * o, m.y + ny * o, m.x + nx * o + Math.cos(a) * 200, m.y + ny * o + Math.sin(a) * 200, 18, 1.0, 34, m, 4);
-          this.ev(m.x, m.y, ['shout', m.id, 'Lances, en avant !']);
-        } else if (P >= 1 && ready('charge', 9)) { this.startDash(m, t, 170, 260, 38); this.ev(m.x, m.y, ['shout', m.id, 'Chargez !']); }
+          this.ev(m.x, m.y, ['shout', m.id, S.line || 'Lances, en avant !']);
+        } else if (P >= 1 && ready('charge', 9)) { this.startDash(m, t, 170, 260, 38); this.ev(m.x, m.y, ['shout', m.id, S.charge || 'Chargez !']); }
         else if (P >= 2 && ready('volley', 10)) {
           for (const p of this.bossTargets(m, 300)) for (let k = 0; k < 5; k++) this.tele(p.x + rand(-50, 50), p.y + rand(-38, 38), 18, 1.2 + k * 0.1, 30, m, 4);
-          this.ev(m.x, m.y, ['shout', m.id, 'Archers ! Tirez !']);
+          this.ev(m.x, m.y, ['shout', m.id, S.volley || 'Archers ! Tirez !']);
         }
         break;
       }
@@ -1714,6 +1716,7 @@ export class Game {
     this.questZone(p, z);
     if (z === Z.HAVRE) this.unlock(p, 'navigateur');
     if (z === Z.RADE) this.unlock(p, 'rade');
+    if (z === Z.LIBERTALIA) this.unlock(p, 'citoyen');
     if (FAR_ZONES.includes(z) && !p.zs.has(z)) { p.zs.add(z); if (p.zs.size >= FAR_ZONES.length) this.unlock(p, 'explorateur'); }
     if (ZONES[z] && ZONES[z].hard && !p.hardWarned) { p.hardWarned = 1; this.toast(p, 'Île des Damnés : zone extrême. Ici, même les morts ont peur.', 'warn'); }
   }
@@ -2118,6 +2121,33 @@ export class Game {
         }
       });
     }
+  }
+  questAct(p, act) { // 0.8 : objectifs d'action (gagner aux dés...)
+    for (const qid in p.quests) {
+      const st = p.quests[qid];
+      if (st.s !== 'active') continue;
+      QUESTS[qid].goals.forEach((g, i) => {
+        if (g.type === 'act' && g.act === act && (st.p[i] || 0) < g.n) {
+          st.p[i] = (st.p[i] || 0) + 1; p.dirtyQ = true;
+          if (st.p[i] === g.n) this.toast(p, `Objectif accompli : ${g.text}`, 'quest');
+        }
+      });
+    }
+  }
+  // 0.8 : La Bourse aux Dés — deux dés chacun ; le plus haut total gagne la mise ; double six : le triple ; égalité : la maison gagne
+  playDice(p, bet) {
+    if (p.dead || !this.nearNpc(p, 'croupier', 110)) return;
+    bet = Math.max(10, Math.min(500, Math.floor(bet) || 0));
+    if (this.time - (p.lastDice || 0) < 1.0) return;
+    if (p.gold < bet) return this.toast(p, 'Pas assez de doublons pour cette mise.', 'warn');
+    p.lastDice = this.time;
+    const r = () => 1 + Math.floor(Math.random() * 6);
+    const a = [r(), r()], b = [r(), r()], sa = a[0] + a[1], sb = b[0] + b[1];
+    const gain = sa > sb ? (sa === 12 ? bet * 2 : bet) : -bet;
+    p.gold += gain; p.dirtyMe = true;
+    if (gain > 0) { p.cnt.dice = (p.cnt.dice || 0) + 1; if (p.cnt.dice >= 10) this.unlock(p, 'flambeur'); this.questAct(p, 'dice_win'); }
+    this.flush(p);
+    this.send(p, { t: 'dice', a, b, gain, bet });
   }
   questZone(p, z) {
     for (const qid in p.quests) {

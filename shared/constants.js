@@ -1,7 +1,7 @@
 import { hash2 } from './rng.js';
 
 export const TILE = 16;
-export const MAP_W = 640;
+export const MAP_W = 960; // 0.8 : l'île de Libertalia s'ajoute à l'est
 export const MAP_H = 560;
 export const OVER_H = 448; // hauteur de l'archipel ; en dessous : intérieurs et grottes
 export const TICK_RATE = 20;

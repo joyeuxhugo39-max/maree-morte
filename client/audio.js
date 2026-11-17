@@ -115,6 +115,12 @@ export class Sfx {
     s.connect(fl); fl.connect(g); g.connect(this.sfxBus || this.master);
     s.start(t, Math.random()); s.stop(t + dur + 0.05);
   }
+  voice(base) { // 0.8 : la « voix » des personnages pendant les dialogues (une syllabe)
+    if (!this.ctx || this.muted) return;
+    const f = base * (0.85 + Math.random() * 0.35);
+    this.tone(f, 0.055, { type: 'square', vol: 0.018 * (this.vol ?? 1) });
+    this.tone(f * 1.5, 0.045, { type: 'triangle', vol: 0.016 * (this.vol ?? 1) });
+  }
   play(name, vol = 1) {
     if (!this.ctx || this.muted || !(vol > 0.002)) return; // trop loin pour être entendu
     const v = vol;
@@ -136,6 +142,7 @@ export class Sfx {
         o.connect(lp); lp.connect(g); g.connect(this.master); o.start(t); o.stop(t + 0.85); break; }
       case 'die': this.hiss(0.4, { f: 400, vol: 0.18 * v, slide: 0.3, type: 'lowpass' }); this.tone(200, 0.35, { type: 'triangle', vol: 0.1 * v, slide: 0.3 }); break;
       case 'click': this.tone(880, 0.04, { vol: 0.05 * v }); break;
+      case 'dice': [0, 0.07, 0.13, 0.22, 0.3].forEach((d, i) => this.tone(900 + i * 140 + Math.random() * 200, 0.03, { type: 'square', vol: 0.05 * v, delay: d })); break;
       case 'roll': this.hiss(0.2, { f: 700, q: 0.6, vol: 0.12 * v, slide: 0.5 }); break;
       case 'throw': this.hiss(0.25, { f: 1800, q: 1, vol: 0.08 * v, slide: 0.4 }); break;
       case 'cry': this.tone(196, 0.5, { type: 'sawtooth', vol: 0.08 * v, slide: 1.3 }); this.tone(294, 0.5, { type: 'sawtooth', vol: 0.06 * v, slide: 1.3, delay: 0.05 }); break;

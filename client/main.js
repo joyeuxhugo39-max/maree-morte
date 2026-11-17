@@ -19,6 +19,7 @@ import { WSNet, LocalNet } from './net.js';
 import { RoomNet } from './roomnet.js';
 import { iconURL, iconCanvas } from './render/sprites-items.js';
 import { updateCine, cineLocked, endCine, bossIntro, bossDown, krakenIntro, krakenDown } from './cine.js';
+import { Scene } from './scene.js';
 
 const $ = (id) => document.getElementById(id);
 // page publique (github.io) : multijoueur direct entre navigateurs
@@ -77,7 +78,7 @@ async function boot(hotData = {}) {
   G.renderer.G = G;
   G.allNpcs = G.world.npcs.map((n) => ({ ...n, name: NPCS[n.id].name, look: NPCS[n.id].look, parrot: !!NPCS[n.id].parrot, board: !!NPCS[n.id].board }));
   G.npcs = G.allNpcs.filter((n) => !NPCS[n.id].vis);
-  G.ui = new UI(G);
+  G.ui = new UI(G); G.scene = new Scene(G);
   G.input = new Input($('view'), () => G.ui.typing());
   const resize = () => G.renderer.resize(innerWidth, innerHeight);
   G.ui.applySettings(G.ui.settings());
@@ -254,6 +255,7 @@ function onMsg(m) {
     case 'sold': ui.toast(`Vendu : ${ITEMS[m.id].name} (+${m.price})`, 'loot', iconURL('coins')); G.sfx.play('coin'); break;
     case 'chest': if (m.id > 0) G.chests[m.id] = m.until; ui.toast(`Trésor ! +${m.gold} doublons${m.got.length ? ' · ' + m.got.join(', ') : ''}`, 'quest'); G.sfx.play('chest'); break;
     case 'qdone': { const q = QUESTS[m.q]; ui.toast(`Quête terminée : ${q.name}`, 'quest'); G.sfx.play('quest'); break; }
+    case 'dice': ui.diceResult(m); break;
     case 'dead': ui.showDeath(m.lost, m.by); G.sfx.play('die'); break;
     case 'kick': ui.toast(m.msg, 'warn'); break;
     case 'pong': G.ping = Math.round(performance.now() - m.c); break;
@@ -588,7 +590,12 @@ function useSkill(id) {
 function interact() {
   const t = G.interactTarget;
   if (!t || !G.me || G.me.dead) return;
-  if (t.kind === 'npc') G.send({ t: 'talk', npc: t.id });
+  if (t.kind === 'npc') { // 0.8 : les conversations des objectifs « parler à » se jouent en scène
+    const scenes = [];
+    for (const qid in G.quests || {}) { const st = G.quests[qid]; if (st.s !== 'active' || !QUESTS[qid]) continue; QUESTS[qid].goals.forEach((g, i) => { if (g.type === 'talk' && g.npc === t.id && g.scene && !st.p[i]) scenes.push(g.scene); }); }
+    G.pendingTalk = { npc: t.id, scenes };
+    G.send({ t: 'talk', npc: t.id });
+  }
   else if (t.kind === 'prop') G.send({ t: 'open', id: t.id });
   else if (t.kind === 'drop') G.send({ t: 'pick', id: t.id });
   else if (t.kind === 'harvest') G.send({ t: 'harvest', id: t.id });
@@ -756,7 +763,8 @@ function placeHovered() {
 function unplaceHovered() { const [tx, ty] = hoveredTile(); G.send({ t: 'unplace', tx, ty }); }
 
 // ------------------------------------------------------------ objectif, ambiance, habitants
-const ZONE_CENTER = { [Z.SWAMP]: [44, 96], [Z.JUNGLE]: [110, 48], [Z.BEACH]: [104, 116], [Z.RUINS]: [126, 25], [Z.WRECK]: [36, 36], [Z.PLAINS]: [118, 82], [Z.HAVRE]: [262, 80], [Z.RADE]: [408, 84], [Z.QUARANTAINE]: [298, 326], [Z.VOLCAN]: [470, 340], [Z.DAMNES]: [590, 400], [Z.PENDUS]: [540, 52], [Z.SIRENES]: [516, 166], [Z.OSSEMENTS]: [70, 330], [Z.ANSE]: [150, 266] };
+const ZONE_CENTER = { [Z.SWAMP]: [44, 96], [Z.JUNGLE]: [110, 48], [Z.BEACH]: [104, 116], [Z.RUINS]: [126, 25], [Z.WRECK]: [36, 36], [Z.PLAINS]: [118, 82], [Z.HAVRE]: [262, 80], [Z.RADE]: [408, 84], [Z.QUARANTAINE]: [298, 326], [Z.VOLCAN]: [470, 340], [Z.DAMNES]: [590, 400], [Z.PENDUS]: [540, 52], [Z.SIRENES]: [516, 166], [Z.OSSEMENTS]: [70, 330], [Z.ANSE]: [150, 266],
+  [Z.LIBERTALIA]: [800, 282], [Z.BASFONDS]: [842, 314], [Z.HAUTS]: [726, 166], [Z.CANNAIES]: [800, 118], [Z.BAIE]: [880, 146], [Z.MANGROVE]: [716, 300], [Z.ECARLATE]: [884, 296] };
 // un objectif à l'intérieur d'un bâtiment : on guide vers sa porte (jamais vers une grotte encore secrète)
 function outside(o) {
   if (!o) return null;
@@ -766,7 +774,8 @@ function outside(o) {
   if (!d || (d.secret && !G.found.has(d.id))) return null;
   return Object.assign({}, o, { x: d.ox, y: d.oy, npc: 0, h: 22 });
 }
-const DROPPED_BY = { lame_rouillee: 'buccaneer', voile_dechiree: 'zsailor', os_maudit: 'zsailor', dent_zombie: 'buccaneer', algue_noire: 'drowned', poudre_noire: 'skelgun', pince_crabe: 'crab', encre_noire: 'drowned', ecaille_sirene: 'sirene', soie_pendu: 'pendu', plume_corbeau: 'medecin_peste', os_legionnaire: 'legionnaire', coeur_golem: 'golem_lave', braise: 'calcine', herbes: 'medecin_peste', cuir_molosse: 'chien_mort' };
+const DROPPED_BY = { lame_rouillee: 'buccaneer', voile_dechiree: 'zsailor', os_maudit: 'zsailor', dent_zombie: 'buccaneer', algue_noire: 'drowned', poudre_noire: 'skelgun', pince_crabe: 'crab', encre_noire: 'drowned', ecaille_sirene: 'sirene', soie_pendu: 'pendu', plume_corbeau: 'medecin_peste', os_legionnaire: 'legionnaire', coeur_golem: 'golem_lave', braise: 'calcine', herbes: 'medecin_peste', cuir_molosse: 'chien_mort',
+  tonnelet_contrebande: 'contrebandier', lanterne_naufrageur: 'naufrageur', couronne_brisee: 'roi_sans_couronne' };
 function computeObjective() { return outside(computeObjective0()); }
 function computeObjective0() {
   const p = G.player;
@@ -788,6 +797,12 @@ function computeObjective0() {
       if (g.type === 'talk') { const n = npcAt(g.npc); return { x: n.x, y: n.y, label: NPCS[g.npc].name, npc: 1 }; }
       if (g.type === 'explore') { const c = ZONE_CENTER[g.zone]; if (!c) continue; return { x: c[0] * TILE, y: c[1] * TILE, label: ZONES[g.zone].name }; }
       if (g.type === 'kill') { const sp = near(g.mob); if (sp) return { x: sp.x, y: sp.y, label: MOBS[g.mob].name, h: 24 }; }
+      if (g.type === 'act' && g.act === 'dice_win') { const n = npcAt('croupier'); return { x: n.x, y: n.y, label: NPCS.croupier.name, npc: 1 }; }
+      if (g.type === 'collect' && !DROPPED_BY[g.item] && !ITEMS[g.item].quest) { // un objet qui s'achète : chez le marchand le plus proche
+        const sellers = Object.keys(NPCS).filter((id) => (NPCS[id].shop || []).includes(g.item)).map(npcAt).filter(Boolean);
+        let best = null, bd = 1e9; for (const n of sellers) { const d = Math.hypot(n.x - p.x, n.y - p.y); if (d < bd) { bd = d; best = n; } }
+        if (best) return { x: best.x, y: best.y, label: NPCS[best.id] ? NPCS[best.id].name : ITEMS[g.item].name, npc: 1 };
+      }
       if (g.type === 'collect') {
         if (g.item === 'tonnelet') { const pr = G.world.props.find((o) => o.type === 'tonnelet'); return { x: pr.x, y: pr.y, label: 'Tonnelet', h: 16 }; }
         if (g.item === 'eclat_cristal') { if (G.room < 0) continue; let best = null, bd = 1e9; for (const pr of G.world.props) if (pr.type === 'cristal' && roomIdAt(G.world, pr.x, pr.y) === G.room) { const d = Math.hypot(pr.x - p.x, pr.y - p.y); if (d < bd) { bd = d; best = pr; } } if (best) return { x: best.x, y: best.y, label: 'Cristal', h: 22 }; continue; }
@@ -809,6 +824,8 @@ function ambience(now) {
   let theme = G.night ? 'night' : 'day';
   if (G.zone === Z.SWAMP || G.zone === Z.WRECK || G.zone === Z.CAVE || G.zone === Z.PENDUS || G.zone === Z.QUARANTAINE || G.zone === Z.DAMNES || G.zone === Z.VOLCAN || G.zone === Z.OSSEMENTS) theme = 'swamp';
   if (G.zone === Z.INTERIOR) theme = 'day';
+  if (G.zone === Z.LIBERTALIA || (G.zone === Z.BASFONDS && !G.night)) theme = 'cite'; // 0.8 : la cité ne dort jamais
+  if (G.zone === Z.INTERIOR && G.room >= 0) { const d = G.world.doors.find((q) => q.room === G.room); if (d && zoneAt(G.world, d.ox, d.oy) === Z.LIBERTALIA) theme = 'cite'; }
   if (p.boat) theme = now < G.seaFight ? 'naval' : 'sea';
   if (G.evt && G.evt.state === 'on' && Math.hypot(G.evt.x - p.x, G.evt.y - p.y) < 420) theme = 'boss';
   for (const e of G.ents.values()) if (e.k === 'm' && !e.dyingT && MOBS[e.type] && MOBS[e.type].ai && !MOBS[e.type].sea && Math.hypot(e.x - p.x, e.y - p.y) < 280) G.epicUntil = now + 6;
@@ -840,6 +857,19 @@ function initFolk() {
     G.folk.push({ k: 'f', id: -100 - i, x, y, tx: x, ty: y, dir: 0, moving: false, walk: 0, wait: rng() * 4, look, lookKey: JSON.stringify(look), weapon: null });
   }
   for (const col of ['orange', 'black', 'white']) { const [x, y] = pick(cobble); G.cats.push({ col, x, y, tx: x, ty: y, dir: 2, moving: false, wait: rng() * 5 }); }
+  // 0.8 : la foule de Libertalia — marins, marchandes, forbans de tous les pavillons
+  const L = W.libertalia;
+  if (L) {
+    const libC = [];
+    for (let y = L.y - 50; y <= L.y + 56; y++) for (let x = L.x - 58; x <= L.x + 58; x++) { const i = y * W.W + x; if (W.tiles[i] === T.COBBLE && !W.solid[i] && W.zones[i] === Z.LIBERTALIA) libC.push([x * TILE + 8, y * TILE + 10]); }
+    cobble.push(...libC);
+    for (let i = 0; i < 26 && libC.length; i++) {
+      const [x, y] = pick(libC);
+      const look = { skin: Math.floor(rng() * 4), hair: Math.floor(rng() * 7), hairStyle: pick(['court', 'long', 'queue', 'chauve', 'hirsute']), top: pick(['chemise', 'rayee', 'gilet', 'manteau', 'vareuse', 'tablier']), topCol: pick(CLOTH_KEYS), pants: pick(['brown', 'navy', 'black', 'white']), boots: pick(['brown', 'black']), hat: pick([null, 'tricorne', 'bandana', 'foulard', 'paille', 'bonnet', null]), hatCol: pick(['red', 'black', 'navy', 'green', 'purple', 'yellow']), beard: rng() < 0.35 ? 1 + Math.floor(rng() * 2) : 0, eye: rng() < 0.1 ? 'patch' : undefined };
+      G.folk.push({ k: 'f', id: -200 - i, x, y, tx: x, ty: y, dir: 0, moving: false, walk: 0, wait: rng() * 4, look, lookKey: JSON.stringify(look), weapon: null });
+    }
+    for (const col of ['orange', 'black', 'white', 'orange']) { const [x, y] = pick(libC); G.cats.push({ col, x, y, tx: x, ty: y, dir: 2, moving: false, wait: rng() * 5 }); }
+  }
 }
 function updateFolk(dt) {
   const wander = (f, speed, rest) => {
@@ -879,7 +909,7 @@ function frame(now, dt) {
   const mw = R.toWorld(G.input.mouse.x, G.input.mouse.y);
   G.mouseWorld = mw;
   G.aim = Math.atan2(mw.y - (p.y - 9), mw.x - p.x);
-  G.locked = cineLocked(G, now) || !!G.ui.lp || !!G.ui.cf;
+  G.locked = cineLocked(G, now) || !!G.ui.lp || !!G.ui.cf || G.scene.on;
   handleKeys(now);
   G.ui.lockpickTick(dt);
   if (G.locked) { /* on regarde */ }
@@ -923,7 +953,7 @@ function frame(now, dt) {
   updatePets(now, dt);
   R.petOut = p.pet || '';
   G.ui.ink(now < G.inkUntil);
-  G.camTarget = updateCine(G, now) || { x: p.x, y: p.y - 12 };
+  G.camTarget = updateCine(G, now) || G.scene.update() || { x: p.x, y: p.y - 12 };
   R.render(G, now, dt);
   G.ui.update(now);
 }
@@ -934,6 +964,7 @@ function handleKeys(now) {
     if (ui.cf) { if (k.key === 'e' || k.code === 'Enter') ui.confirmEnd(true); else if (k.code === 'Escape') ui.confirmEnd(false); continue; }
     if (ui.lp) { if (k.key === 'e' || k.code === 'Space' || k.code === 'MouseLeft') ui.lockpickPress(); else if (k.code === 'Escape') ui.lockpickEnd(null); continue; }
     if (cineLocked(G, now)) { if (k.code === 'Escape' && G.cine.skippable) endCine(G); continue; }
+    if (G.scene.on) { G.scene.key(k.code); continue; }
     if (!$('dialog').classList.contains('hidden') && /^Digit[1-9]$/.test(k.code)) { ui.pickChoice(+k.code.slice(5) - 1); continue; }
     if (k.code === 'Escape') { if (G.build && !ui.open) stopBuild(); else ui.close(); continue; }
     if (k.key === 'i' || k.code === 'Tab') { ui.toggle('inventory'); continue; }

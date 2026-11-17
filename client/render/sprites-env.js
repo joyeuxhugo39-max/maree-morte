@@ -513,7 +513,7 @@ function tonnelet() {
 
 // ---------------- bâtiments ----------------
 function roofFill(pb, kind, x0, y0, x1, y1) {
-  const R = kind === 'thatch' ? THATCH : kind === 'red' ? RTILE : kind === 'blue' ? BTILE : kind === 'green' ? GTILE : SLATE;
+  const R = Array.isArray(kind) ? kind : kind === 'thatch' ? THATCH : kind === 'red' ? RTILE : kind === 'blue' ? BTILE : kind === 'green' ? GTILE : SLATE;
   const W = x1 - x0;
   const put = (x, y, k) => {
     const cx = x - x0, cy = y - y0;
@@ -561,7 +561,7 @@ function roofFill(pb, kind, x0, y0, x1, y1) {
   }
   for (let x = x0; x < x1; x++) { pb.set(x, y1 - 1, shade(R[0], 0.8)); pb.set(x, y1 - 2, R[1]); }
 }
-function wallFill(pb, kind, x0, y0, x1, y1) {
+function wallFill(pb, kind, x0, y0, x1, y1, pal = PLASTER) {
   for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
     let c;
     if (kind === 'wood') {
@@ -571,7 +571,7 @@ function wallFill(pb, kind, x0, y0, x1, y1) {
       if ((x + row * 11) % 37 === 0) k = 1;
       c = WOOD[k];
     } else if (kind === 'plaster') {
-      c = PLASTER[2 + (rnd(x >> 1, y >> 1, 3) > 0.7 ? 1 : 0) - (rnd(x, y, 4) > 0.95 ? 1 : 0)];
+      c = pal[2 + (rnd(x >> 1, y >> 1, 3) > 0.7 ? 1 : 0) - (rnd(x, y, 4) > 0.95 ? 1 : 0)];
     } else {
       const row = Math.floor((y - y0) / 5), off = (row % 2) * 5, bx = (x - x0 + off) % 10;
       let k = 2 + (rnd(Math.floor((x - x0 + off) / 10), row, 3) > 0.6 ? 1 : 0);
@@ -632,6 +632,27 @@ function hangingSign(pb, x, y, icon) {
     pb.line(ix, iy + 4, ix + 3, iy + 6, IRON[3]); pb.line(ix + 6, iy + 4, ix + 3, iy + 6, IRON[3]); pb.set(ix, iy + 3, IRON[4]); pb.set(ix + 6, iy + 3, IRON[4]);
   } else if (icon === 'anvil') {
     pb.rect(ix - 1, iy + 1, 8, 2, IRON[3]); pb.rect(ix + 1, iy + 3, 4, 2, IRON[2]); pb.set(ix - 2, iy + 1, IRON[3]); pb.set(ix + 5, iy - 0, 0xffd84a); pb.set(ix + 6, iy - 1 >= y + 4 ? iy - 1 : iy, 0xffa030);
+  } else if (icon === 'dice') { // 0.8 : enseignes de Libertalia
+    pb.rect(ix - 1, iy + 1, 4, 4, 0xf3f0e2); pb.set(ix, iy + 2, 0x1a1418); pb.set(ix + 1, iy + 3, 0x1a1418);
+    pb.rect(ix + 3, iy, 4, 4, 0xe25d55); pb.set(ix + 4, iy + 1, 0xffffff); pb.set(ix + 5, iy + 2, 0xffffff);
+  } else if (icon === 'swords') {
+    pb.line(ix - 1, iy, ix + 6, iy + 6, IRON[5]); pb.line(ix + 6, iy, ix - 1, iy + 6, IRON[4]);
+    pb.set(ix, iy + 5, GOLD[3]); pb.set(ix + 5, iy + 5, GOLD[3]); pb.set(ix - 1, iy + 6, GOLD[2]); pb.set(ix + 6, iy + 6, GOLD[2]);
+  } else if (icon === 'scissors') {
+    pb.line(ix, iy, ix + 5, iy + 4, IRON[5]); pb.line(ix + 5, iy, ix, iy + 4, IRON[4]);
+    pb.disc(ix, iy + 5.5, 1.2, GOLD[3]); pb.disc(ix + 5.5, iy + 5.5, 1.2, GOLD[3]);
+  } else if (icon === 'flask') {
+    pb.vl(ix + 3, iy - 1, 2, 0xd8e8f0); pb.disc(ix + 3, iy + 3.5, 2.6, 0xd8e8f0); pb.disc(ix + 3, iy + 4, 1.8, 0x3a8a2a); pb.set(ix + 2, iy + 2, 0xffffff);
+  } else if (icon === 'horseshoe') {
+    for (let a = 0.3; a < 2.9; a += 0.25) pb.set(ix + 3 + Math.cos(a + Math.PI) * 3, iy + 3 - Math.sin(a + Math.PI) * 3, IRON[4]);
+    pb.set(ix, iy + 4, IRON[5]); pb.set(ix + 6, iy + 4, IRON[5]);
+  } else if (icon === 'heart') {
+    pb.disc(ix + 1.5, iy + 2, 1.7, 0xe0304a); pb.disc(ix + 4.5, iy + 2, 1.7, 0xe0304a);
+    for (let j = 0; j < 4; j++) pb.hl(ix + j * 0.5 - 0.2, iy + 3 + j, 6 - j, 0xc01a36); pb.set(ix + 1, iy + 1, 0xff9aa8);
+  } else if (icon === 'skull') {
+    pb.rect(ix, iy, 6, 4, BONE[3]); pb.rect(ix + 1, iy + 4, 4, 2, BONE[2]); pb.set(ix + 1, iy + 2, 0x1a1418); pb.set(ix + 4, iy + 2, 0x1a1418); pb.set(ix + 2, iy + 5, 0x1a1418);
+  } else if (icon === 'crown') {
+    pb.rect(ix, iy + 3, 7, 3, GOLD[3]); for (const k of [0, 3, 6]) pb.vl(ix + k, iy, 3, GOLD[3]); pb.set(ix + 3, iy + 4, 0xe0304a); pb.hl(ix, iy + 5, 7, GOLD[1]);
   }
 }
 function chimneyAt(pb, x, y, h) {
@@ -647,7 +668,7 @@ function building(o) {
   const wallH = o.floors === 2 ? 46 : 31;
   const wallTop = H - wallH;
   const roofBottom = wallTop + 5;
-  wallFill(pb, o.wall, 4, wallTop, W - 4, H);
+  wallFill(pb, o.wall, 4, wallTop, W - 4, H, o.plaster);
   const wins = [];
   const doorX = 4 + o.door * 16 + 1;
   doorAt(pb, doorX, H - 22);

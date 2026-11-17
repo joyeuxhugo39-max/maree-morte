@@ -25,6 +25,39 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Nouveautés de la version 0.8 : Libertalia
+
+- **Libertalia, la Cité Libre des Forbans** : une île gigantesque à l'est (la carte passe de 640 à 960 cases de large) et, à son pied, une immense ville pirate ceinte d'un rempart à bastions, avec des tours et des portes. On y trouve le palais de la Reine et ses jardins, la place de la Liberté (statue du fondateur, fontaine) et le marché. Il y a quatre tavernes, le tripot de La Bourse aux Dés, Le Velours Écarlate (le salon de Madame Rubis), le marché noir du Borgne et La Fosse, une arène. S'y ajoutent des écuries, une armurerie, un tailleur, un apothicaire, un chantier naval, la capitainerie, des entrepôts, un cimetière, un verger, les Bas-Fonds et dix maisons à acheter. La ville compte 31 habitants, une foule qui flâne, des chats, et sa propre musique de taverne.
+- Autour de la cité :
+  - les Hauts et leur fort (gardes maudits) ;
+  - les Cannaies (épouvantails) ;
+  - la Baie des Naufrageurs et ses fausses lumières ;
+  - la Mangrove des Contrebandiers ;
+  - la Jungle Écarlate et son temple ;
+  - la Crypte du Roi sans Couronne.
+
+  Neuf nouveaux monstres y vivent, dont deux élites et un boss.
+- **De vraies conversations** : les quêtes de Libertalia se jouent en scènes cinématiques. Des bandes noires encadrent l'écran, la caméra se pose entre les deux personnages et leurs portraits se font face. Les répliques alternent, avec leurs voix, et votre pirate parle aussi. Vous posez vos questions dans l'ordre que vous voulez, puis vous décidez. Espace fait avancer, 1 à 9 choisit une question, Échap quitte.
+- La grande quête **Le Roi sans Couronne** compte sept chapitres : le Conseil des Capitaines, une enquête au Velours, un traître et une crypte. S'y ajoutent six histoires de rue et six primes répétables au tableau de la place.
+- **La Bourse aux Dés** : misez de 10 à 500 doublons contre Fortuné, le croupier.
+- **Plus d'artisanat ni de matériaux** : tout s'achète. Les anciens matériaux, outils et constructions ont été remboursés en doublons. Chaque maison achetée contient un coffre de rangement gratuit de 48 places.
+- **Beaucoup d'objets nouveaux** :
+  - sept montures (touche C) : âne, cheval, tortue géante, crabe géant, autruche, pur-sang, destrier squelette ;
+  - trois navires : radeau, goélette, galion ;
+  - des objets de voyage : conque de rappel, longue-vue, fumigène ;
+  - des potions : célérité, force, fer, antidote ;
+  - des talismans et des tenues ;
+  - 17 armes aux effets inédits : ralentir, geler, empoisonner, étourdir, effrayer, foudre en chaîne, ricochet, boomerang, grappin, balle chercheuse, or de Midas…
+- Les élites et les boss réapparaissent beaucoup plus lentement.
+- **Barre d'émotes** : les touches 2 à 5 font danser, saluer, faire un doigt d'honneur ou un salto.
+- **Un jeu mieux organisé** :
+  - on choisit les quêtes suivies (jusqu'à quatre) ;
+  - le journal est rangé par onglets et les hauts faits par catégories ;
+  - le sac se trie et se filtre, et gère les quantités ;
+  - on peut lâcher ses objets.
+- **La carte redessinée** : une vraie carte au trésor, avec profondeurs, écume, relief ombré, rose des vents et cartouche. De nouveaux îlots jalonnent le Détroit de Libertalia, et des bricks noyés croisent autour de l'île.
+- Nouveaux hauts faits : **Cité Libre**, **Corsaire de la Reine** et **Flambeur**.
+
 ## Nouveautés de la version 0.7.1 : le Volcan de Cendrelune
 
 - **Un volcan immense** domine désormais l'île de Cendrelune : une montagne de plus de 800 pixels de large, peinte pixel par pixel à partir d'un relief (arêtes, ravines, cratère et lac de lave), avec quatre coulées qui descendent jusqu'à l'île et rejoignent ses rivières de lave. Un panache de fumée monte du cratère, qui rougeoie la nuit. Quand on passe derrière la montagne, elle devient transparente.
@@ -159,11 +192,13 @@ les garder. Le `Dockerfile` permet aussi un déploiement sur n'importe quel serv
 | ZQSD / WASD / flèches | se déplacer |
 | Clic gauche | coup de sabre vers le curseur |
 | Clic droit ou 1 | tirer |
-| 2 à 5 | compétences |
+| 2 à 5 | émotes : danse, salut, doigt d'honneur, salto |
 | Espace | roulade |
-| E | parler, ouvrir, ramasser, creuser, récolter, entrer, mettre à l'eau, accoster |
+| E | parler, ouvrir, ramasser, creuser, fouiller, entrer, mettre à l'eau, accoster |
 | Molette | zoomer, dézoomer |
-| C / B | artisanat, construction |
+| C | monter sur sa monture, en descendre |
+| B | meubler sa maison |
+| Espace, 1 à 9, Échap | en conversation : réplique suivante, choisir une question, quitter |
 | R | pêcher, puis ferrer |
 | F | manger le meilleur soin |
 | I / J / M / K / H | inventaire, quêtes, carte, hauts faits, aide |
@@ -176,7 +211,7 @@ shared/            code commun au serveur et au client
   world.js         génération déterministe de l'île, collisions
   constants.js     constantes, cycle jour/nuit
   formulas.js      statistiques, expérience, apparence
-  data/            objets, monstres, quêtes, PNJ, compétences, artisanat (craft.js)
+  data/            objets, monstres, quêtes (et leurs scènes), PNJ, compétences, mobilier (craft.js), anciens objets remboursés (legacy.js)
 server/
   game.js          simulation autoritaire (IA, combat, butin, quêtes, boutiques, chat)
   db.js            comptes et sauvegardes
@@ -186,8 +221,10 @@ client/
   net.js           transports WebSocket et solo
   roomnet.js       multijoueur dans la page claude.ai (élection d'hôte)
   peernet.js       multijoueur direct entre navigateurs (page GitHub Pages)
-  ui.js            interface HTML
-  render/          moteur de rendu et pixel art procédural (sprites-volcan.js : la montagne)
+  ui.js            interface HTML, carte au trésor
+  scene.js         dialogues cinématiques (portraits, répliques, questions au choix)
+  cine.js          cinématiques des boss
+  render/          moteur de rendu et pixel art procédural (sprites-volcan.js : la montagne ; sprites-cite.js : Libertalia)
 scripts/
   build-artifact.mjs  assemble la page unique : claude.ai (dist/) ou GitHub Pages (--pages, docs/)
 docs/              page publique GitHub Pages (générée)

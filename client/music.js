@@ -57,6 +57,9 @@ export const STYLES = {
     leads: ['brass', 'choir'], comps: ['war'], perc: 'war', intro: 1, rest: null, sig: SIG.epic, sigForm: ['S', 'B', 'S', 'C'], sigChance: 0.35, level: 1 },
   boss: { meter: 16, step: [0.108, 0.118], modes: ['minor'], mroots: [57, 59, 62, 55], forms: [['A', 'B', 'A', 'C'], ['A', 'A', 'B', 'C']], rhyA: R16.A, rhyB: R16.B, rhyRun: R16.run,
     leads: ['brass', 'fiddle'], comps: ['war'], perc: 'siege', intro: 1, rest: null, sig: null, level: 1.1 },
+  // 0.8 : Libertalia — gigues de taverne, violons et cuivres, la cité ne dort jamais
+  cite: { meter: 6, step: [0.15, 0.172], modes: ['major', 'mixo', 'dorian'], mroots: [62, 60, 65, 67, 64], forms: [['A', 'A', 'B', 'A'], ['A', 'B', 'A', 'C'], ['A', 'A', 'B', 'B']], rhyA: R6.liveA, rhyB: R6.liveB, rhyRun: R6.run,
+    leads: ['fiddle', 'whistle', 'pluck', 'brass'], comps: ['oompah', 'strum'], perc: 'jig', intro: 2, rest: [25, 60], sig: SIG.sea, sigForm: ['S', 'B', 'A'], sigChance: 0.25, level: 0.85 },
   // nappes d'ambiance : la nuit et les marais ne chantent pas, ils respirent
   night: { ambient: 'night', play: [45, 80], rest: [30, 70] },
   swamp: { ambient: 'swamp', play: [40, 70], rest: [25, 60] },

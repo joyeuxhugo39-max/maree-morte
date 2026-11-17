@@ -4,8 +4,9 @@ import { TILE, MAP_W as W, MAP_H as H, OVER_H, T } from './constants.js';
 import { mulberry32, hash2, valueNoise, fbm, shuffle } from './rng.js';
 
 export const Z = { SEA: 0, TOWN: 1, BEACH: 2, PLAINS: 3, JUNGLE: 4, RUINS: 5, SWAMP: 6, WRECK: 7, HAVRE: 8, CRANE: 9, ILOT: 10, INTERIOR: 11, CAVE: 12, GOUFFRE: 13,
-  RADE: 14, COLLINES: 15, PENDUS: 16, SIRENES: 17, ANSE: 18, OSSEMENTS: 19, QUARANTAINE: 20, VOLCAN: 21, DAMNES: 22, BRUMES: 23, ERMITE: 24 };
-export const SAFE = new Set([1, 8, 11, 14, 18]);
+  RADE: 14, COLLINES: 15, PENDUS: 16, SIRENES: 17, ANSE: 18, OSSEMENTS: 19, QUARANTAINE: 20, VOLCAN: 21, DAMNES: 22, BRUMES: 23, ERMITE: 24,
+  LIBERTALIA: 25, BASFONDS: 26, HAUTS: 27, CANNAIES: 28, BAIE: 29, MANGROVE: 30, ECARLATE: 31 };
+export const SAFE = new Set([1, 8, 11, 14, 18, 25]);
 export const ZONES = [
   { name: 'Haute mer', lvl: 'Eaux profondes' },
   { name: 'Port-Lanterne', lvl: 'Zone sûre', safe: true },
@@ -32,6 +33,14 @@ export const ZONES = [
   { name: 'Île des Damnés', lvl: 'Niveaux 26-30 · Extrême', hard: true },
   { name: 'Brumes Éternelles', lvl: 'Niveaux 20-28 · Mer hantée' },
   { name: "Îlot de l'Ermite", lvl: 'Niveaux 8-12' },
+  // 0.8 : l'île de Libertalia
+  { name: 'Libertalia', lvl: 'Zone sûre · la Cité des forbans', safe: true },
+  { name: 'Les Bas-Fonds', lvl: 'Niveaux 15-18 · Coupe-gorge la nuit' },
+  { name: 'Hauts de Libertalia', lvl: 'Niveaux 20-24' },
+  { name: 'Les Cannaies', lvl: 'Niveaux 13-16' },
+  { name: 'Baie des Naufrageurs', lvl: 'Niveaux 18-24' },
+  { name: 'Mangrove des Contrebandiers', lvl: 'Niveaux 16-22' },
+  { name: 'Jungle Écarlate', lvl: 'Niveaux 22-26' },
 ];
 
 // Propriétés partagées des décors. solid = bloque le déplacement (sur sa tuile de base).
@@ -54,6 +63,9 @@ export const PROPS = {
   volcan: { solid: 1 }, gibet: { solid: 1 }, corail: { solid: 1 }, obelisque: { solid: 1 }, fumerolle: { ground: 1 }, tente: { solid: 1 }, barreaux: { solid: 1 },
   mannequin: { solid: 1 }, lavarock: { solid: 1 }, cage: { solid: 1 }, fort: { solid: 1 }, ruine: { solid: 1 }, totem: { solid: 1 },
   ship: { solid: 1 }, wreck: { solid: 1 }, boat: { solid: 1 },
+  // 0.8 : Libertalia
+  cite: { solid: 1 }, rempart: { solid: 1 }, tour: { solid: 1 }, porte_cite: {}, fontaine: { solid: 1 }, statue: { solid: 1 }, linge: {}, drapeau: { solid: 1 }, canne: {}, jtree_r: { solid: 1 }, paletuvier: { solid: 1 },
+  divan: { solid: 1 }, rideau: { solid: 1 }, table_jeu: { solid: 1 }, stalle: { solid: 1 }, trone: { solid: 1 }, banniere: { solid: 1 }, gradin: { solid: 1 }, lanterne_r: { solid: 1 },
 };
 
 const idx = (x, y) => y * W + x;
@@ -87,7 +99,23 @@ export function generateWorld(seed = 7) {
     [470, 330, 48, 38], [438, 354, 15, 10], [503, 302, 12, 9], // Volcan de Cendrelune : une île taillée pour une montagne
     [590, 402, 34, 26], [560, 420, 14, 10], // Île des Damnés
     [402, 204, 7, 5], [244, 262, 6, 5], [522, 252, 6, 5], [384, 402, 8, 6], [204, 404, 9, 7], [114, 414, 6, 5], // îlots
+    // 0.8 : Libertalia, l'île gigantesque, et sa grande cité au sud
+    [800, 236, 90, 112], [724, 152, 40, 36], [800, 116, 52, 26], [878, 148, 38, 34], [718, 312, 36, 32], [884, 316, 32, 36],
+    // îlots du Détroit de Libertalia : ils équilibrent la mer de l'est et jalonnent la route
+    [664, 92, 9, 7], [660, 232, 7, 5], [670, 392, 11, 8], [738, 416, 6, 5], [926, 54, 10, 7], [930, 398, 9, 7], [858, 414, 7, 5], [716, 34, 8, 6],
   ];
+  const LB = { x: 800, y: 282 }; // place de la Liberté
+  const LIB = { x0: 744, y0: 206, x1: 856, y1: 338 }; // le cœur de la cité (ses rues et ses maisons)
+  // l'enceinte : un rempart polygonal à bastions, ouvert sur le port
+  const CITY = [[740, 339], [736, 300], [737, 262], [741, 228], [752, 210], [772, 202], [800, 199], [828, 202], [848, 210], [859, 228], [863, 262], [862, 300], [859, 339]];
+  const cityIn = new Uint8Array(W * OVER_H);
+  for (let y = 190; y <= 339; y++) {
+    const xs = [], yy = y + 0.5;
+    for (let k = 0; k < CITY.length; k++) { const [ax, ay] = CITY[k], [bx, by] = CITY[(k + 1) % CITY.length]; if ((ay <= yy) !== (by <= yy)) xs.push(ax + ((yy - ay) / (by - ay)) * (bx - ax)); }
+    xs.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < xs.length; k += 2) for (let x = Math.ceil(xs[k] - 0.5); x <= Math.floor(xs[k + 1] - 0.5); x++) if (x >= 0 && x < W) cityIn[y * W + x] = 1;
+  }
+  const inLib = (x, y) => x >= 0 && y >= 0 && x < W && y < OVER_H && cityIn[y * W + x] === 1;
   const RD = { x: 408, y: 84 }, AT = { x: 150, y: 266 }, EM = { x: 352, y: 150 }, VC = { x: 470, y: 328 }, VF = { rx: 25, ry: 15 }, QC = { x: 298, y: 326 }, AO = { x: 70, y: 330 }, DM = { x: 590, y: 400 }, LG = { x: 516, y: 166 };
   const HC = { x: 262, y: 78 }; // Havre-des-Brumes
   const BC = 16, bcw = Math.ceil(W / BC), blobCells = [];
@@ -129,6 +157,12 @@ export function generateWorld(seed = 7) {
       const d = Math.sqrt(dx * dx + dy * dy);
       if (d < 13) v = Math.max(v, 0.3 * (1 - d / 13) + 0.1);
     }
+    if (inLib(x, y)) v = Math.max(v, 0.32); // la cité repose sur la terre ferme
+    { // la rade de Libertalia : une baie profonde au pied de la ville
+      const dx = (x - 800) / 46, dy = (y - 358) / 18;
+      const d = 1 - Math.sqrt(dx * dx + dy * dy);
+      if (d > 0 && y > LIB.y1) v -= d * 1.8;
+    }
     const e = Math.min(x, y, W - 1 - x, OVER_H - 1 - y);
     if (e < 12) v -= (12 - e) * 0.07;
     return v;
@@ -156,6 +190,9 @@ export function generateWorld(seed = 7) {
     [Z.QUARANTAINE, 300, 330, 1.5], [Z.QUARANTAINE, 332, 352, 0.9],
     [Z.VOLCAN, 470, 330, 2.4], [Z.DAMNES, 590, 402, 1.5], [Z.DAMNES, 560, 420, 0.9],
     [Z.ILOT, 402, 204, 0.5], [Z.ILOT, 244, 262, 0.5], [Z.ILOT, 522, 252, 0.5], [Z.ILOT, 384, 402, 0.5], [Z.ILOT, 204, 404, 0.5], [Z.ILOT, 114, 414, 0.5],
+    [Z.HAUTS, 724, 160, 1.5], [Z.HAUTS, 758, 198, 1.0], [Z.CANNAIES, 800, 122, 1.6], [Z.CANNAIES, 842, 178, 1.0], [Z.BAIE, 882, 146, 1.4],
+    [Z.MANGROVE, 714, 302, 1.5], [Z.MANGROVE, 732, 252, 0.9], [Z.ECARLATE, 886, 300, 1.5], [Z.ECARLATE, 866, 248, 1.0], [Z.ECARLATE, 870, 214, 0.7],
+    [Z.ILOT, 664, 92, 0.45], [Z.ILOT, 660, 232, 0.4], [Z.ILOT, 670, 392, 0.5], [Z.ILOT, 738, 416, 0.4], [Z.ILOT, 926, 54, 0.45], [Z.ILOT, 930, 398, 0.45], [Z.ILOT, 858, 414, 0.4], [Z.ILOT, 716, 34, 0.4],
   ];
   const RC8 = 8, rcw = Math.ceil(W / RC8), regCells = [];
   for (let cy = 0; cy * RC8 < OVER_H; cy++) for (let cx = 0; cx < rcw; cx++) {
@@ -179,6 +216,7 @@ export function generateWorld(seed = 7) {
     if (Math.sqrt(tdx * tdx + tdy * tdy) < 17 + (fbm(x / 6, y / 6, seed + 1, 2) - 0.5) * 6) bz = Z.TOWN;
     if (Math.hypot(x - HC.x, (y - HC.y) * 1.2) < 14 + (fbm(x / 6, y / 6, seed + 2, 2) - 0.5) * 5) bz = Z.HAVRE;
     if (Math.hypot(x - RD.x, (y - RD.y) * 1.2) < 16 + (fbm(x / 6, y / 6, seed + 3, 2) - 0.5) * 5 || (x >= 392 && x <= 426 && y >= 58 && y <= 72)) bz = Z.RADE;
+    if (inLib(x, y)) bz = x >= 828 && y >= 292 ? Z.BASFONDS : Z.LIBERTALIA;
     zones[i] = bz;
   }
 
@@ -217,9 +255,16 @@ export function generateWorld(seed = 7) {
         break;
       }
       case Z.DAMNES: t = v < 0.06 ? T.ASH : (n > 0.58 ? T.ASH : T.DGRASS); break;
+      case Z.LIBERTALIA: t = n < 0.42 ? T.DIRT : T.GRASS; break;
+      case Z.BASFONDS: t = n > 0.55 ? T.MUD : T.DIRT; break;
+      case Z.HAUTS: t = v < 0.08 ? T.SAND : T.GRASS; break;
+      case Z.CANNAIES: t = v < 0.08 ? T.SAND : (n > 0.62 ? T.DIRT : T.GRASS); break;
+      case Z.BAIE: t = v < 0.2 + (n - 0.5) * 0.2 ? T.SAND : T.GRASS; break;
+      case Z.MANGROVE: { const p = fbm(x / 7, y / 7, seed + 41, 3); t = v < 0.05 ? T.MUD : p > 0.6 ? T.SWAMP : p > 0.5 ? T.MUD : T.MARSH; break; }
+      case Z.ECARLATE: t = v < 0.06 ? T.SAND : T.JUNGLE; break;
     }
     const r = fbm(x / 8, y / 8, seed + 21, 3);
-    if ((z === Z.JUNGLE || z === Z.PLAINS || z === Z.WRECK || z === Z.CRANE || z === Z.COLLINES || z === Z.DAMNES || z === Z.PENDUS) && r > 0.69 && v > 0.12) t = T.ROCK;
+    if ((z === Z.JUNGLE || z === Z.PLAINS || z === Z.WRECK || z === Z.CRANE || z === Z.COLLINES || z === Z.DAMNES || z === Z.PENDUS || z === Z.HAUTS || z === Z.BAIE || z === Z.ECARLATE) && r > 0.69 && v > 0.12) t = T.ROCK;
     if (z === Z.VOLCAN && r > 0.7 && v > 0.12 && t === T.ASH && ((x - VC.x) / VF.rx) ** 2 + ((y - VC.y) / VF.ry) ** 2 > 1.2) t = T.ROCK; // pas de rochers cachés sous les pentes
     tiles[i] = t;
   }
@@ -592,7 +637,7 @@ export function generateWorld(seed = 7) {
       if (y < b.y + b.h && x >= b.x && x < b.x + b.w && y >= b.y) solid[i] = 1;
     }
     stampPath([[b.x + b.door, b.y + b.h], [b.x + b.door, b.y + b.h + 1]], 0.9, T.COBBLE);
-    props.push({ id: pid++, type: b.type, v: b.v || 0, x: (b.x + b.w / 2) * TILE, y: (b.y + b.h) * TILE, tx: b.x, ty: b.y, w: b.w, h: b.h, door: b.door, name: b.name, plot: b.plot });
+    props.push({ id: pid++, type: b.type, v: b.v || 0, x: (b.x + b.w / 2) * TILE, y: (b.y + b.h) * TILE, tx: b.x, ty: b.y, w: b.w, h: b.h, door: b.door, name: b.name, plot: b.plot, style: b.style });
     if (list) list.push(b);
     return b;
   };
@@ -772,7 +817,172 @@ export function generateWorld(seed = 7) {
     { x: 432, y: 62, tier: 2 }, { x: 560, y: 36, tier: 3 }, { x: 590, y: 82, tier: 2 }, { x: 526, y: 150, tier: 3 }, { x: 352, y: 156, tier: 1 },
     { x: 52, y: 352, tier: 3 }, { x: 90, y: 318, tier: 2 }, { x: 318, y: 348, tier: 3 }, { x: 280, y: 312, tier: 2 }, { x: 490, y: 344, tier: 3 },
     { x: 452, y: 316, tier: 3 }, { x: 572, y: 418, tier: 4 }, { x: 606, y: 392, tier: 4 }, { x: 402, y: 204, tier: 2 }, { x: 204, y: 404, tier: 3 }, { x: 114, y: 414, tier: 2 },
+    { x: 926, y: 54, tier: 3 }, { x: 930, y: 398, tier: 3 }, { x: 670, y: 392, tier: 2 },
   ]) { const s = findFree(c.x, c.y); if (s) { const p = addProp('chest', s.x, s.y, Math.min(3, c.tier)); p.chest = c.tier; chests.push(p); } }
+
+  // ---------- 6f. Libertalia, la Cité Libre des Forbans (0.8) ----------
+  const buildings3 = [], plots3 = [], libNpcs = [];
+  const PLOT0 = 19; // les maisons de 0.6 et 0.7 gardent leurs numéros
+  const LZ = (x, y) => (x >= 828 && y >= 292 ? Z.BASFONDS : Z.LIBERTALIA);
+  const libMark = (x0, y0, x1, y1) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (inMap(x, y)) occ[idx(x, y)] = 1; };
+  // rues pavées : quatre grandes rues est-ouest, trois nord-sud, le quai, la place et le marché
+  for (const y of [234, 258, 282, 306]) stampPath([[LIB.x0 + 1, y], [LIB.x1 - 1, y]], 1.1, T.COBBLE);
+  stampPath([[LIB.x0 + 1, 336], [LIB.x1 - 1, 336]], 1.6, T.COBBLE);
+  for (const x of [772, 828]) stampPath([[x, LIB.y0 + 1], [x, 336]], 1.0, T.COBBLE);
+  stampPath([[800, 234], [800, 336]], 1.5, T.COBBLE);
+  disc(LB.x, LB.y, 7.6, T.COBBLE);
+  for (let y = 290; y <= 303; y++) for (let x = 776; x <= 796; x++) { setT(x, y, T.COBBLE); path[idx(x, y)] = 1; }
+  // routes vers l'intérieur de l'île
+  stampPath([[772, LIB.y0 + 1], [764, 196], [748, 178], [734, 168]], 1.0, T.DIRT); // les Hauts et le fort
+  stampPath([[828, LIB.y0 + 1], [836, 192], [852, 170], [872, 156]], 1.0, T.DIRT); // la Baie
+  stampPath([[LIB.x0 + 1, 282], [734, 286], [718, 296]], 1.0, T.DIRT); // la Mangrove
+  stampPath([[LIB.x1 - 1, 258], [866, 254], [880, 266]], 1.0, T.DIRT); // la Jungle Écarlate
+  stampPath([[764, 196], [784, 172], [800, 140], [800, 124]], 1.0, T.DIRT); // les Cannaies
+  let bk = 0;
+  const H8 = (k) => hash2(k, 77, seed + 801);
+  const cite = (S, x, w, h, door, extra = {}, list = null) => facade(Object.assign({ type: 'cite', v: bk++, x, y: S - 1 - h, w, h, door, ground: T.DIRT }, extra), LZ(x, S - 2), list);
+  const shop = (S, x, w, h, door, name, kind, npc, style) => cite(S, x, w, h, door, { name, kind, npc, style }, buildings3);
+  const fill = (S, x0, x1, hmax = 5, style) => { // maisons serrées de x0 à x1 (au nord de la rue S)
+    let x = x0;
+    while (x1 - x + 1 >= 4) {
+      const k = bk;
+      let wd = 4 + Math.floor(H8(k * 3) * 4);
+      if (x1 - x + 1 - wd < 4) wd = Math.min(9, x1 - x + 1);
+      const h = 3 + Math.floor(H8(k * 3 + 1) * Math.max(1, hmax - 2));
+      cite(S, x, wd, h, wd >> 1, { style: style || (S >= 292 && x >= 828 ? 'masure' : undefined) });
+      x += wd + 1 + (H8(k * 3 + 2) > 0.7 ? 1 : 0);
+    }
+  };
+  const plot = (S, x, k) => { const b = facade({ type: 'home', v: k % 3, x, y: S - 5, w: 5, h: 4, door: 2, name: `Maison de Libertalia n° ${k + 1}`, plot: PLOT0 + k, ground: T.DIRT }, LZ(x, S - 2), null); plots3.push(b); };
+  // rangée du palais (rue 234)
+  shop(234, 746, 12, 5, 6, 'Écuries de la Porte du Nord', 'ecurie', 'palefrenier', 'ecurie');
+  fill(234, 760, 770); fill(234, 774, 789);
+  shop(234, 791, 18, 7, 9, 'Palais de la Reine des Forbans', 'palais', 'reine', 'palais');
+  fill(234, 810, 826);
+  plot(234, 830, 0); plot(234, 836, 1); plot(234, 842, 2); fill(234, 848, 855);
+  // rangée des artisans et des capitaines (rue 258)
+  shop(258, 746, 10, 5, 4, 'Armurerie du Sabre Courbe', 'armurerie', 'armurier', 'armurerie');
+  shop(258, 757, 9, 4, 4, 'Tailleur des Gentilshommes', 'couture', 'tailleur_lib', 'tailleur');
+  fill(258, 767, 770, 4);
+  shop(258, 774, 8, 4, 3, 'Apothicairerie Borgnefiole', 'apothicaire', 'apothicaire', 'apothicaire');
+  fill(258, 783, 797);
+  plot(258, 802, 3); plot(258, 808, 4); plot(258, 814, 5); fill(258, 820, 826, 4);
+  plot(258, 830, 6); plot(258, 836, 7); plot(258, 842, 8); fill(258, 848, 855);
+  // rangée des tavernes (rue 282) : la place reste dégagée
+  shop(282, 746, 11, 5, 5, 'Le Rhum Borgne', 'tavern', 'tav_rhum', 'taverne');
+  shop(282, 758, 11, 5, 5, 'La Sirène Ivre', 'tavern', 'tav_sirene', 'taverne');
+  shop(282, 774, 12, 5, 6, 'La Bourse aux Dés', 'tripot', 'croupier', 'tripot');
+  fill(282, 787, 790, 4); fill(282, 811, 826);
+  plot(282, 830, 9); fill(282, 836, 855);
+  // rangée du marché et du Velours (rue 306) ; à l'est, les Bas-Fonds
+  shop(306, 746, 15, 6, 7, 'Le Velours Écarlate', 'velours', 'madame_rubis', 'velours');
+  fill(306, 762, 770, 4); fill(306, 802, 826);
+  shop(306, 830, 9, 4, 4, 'Chez le Borgne', 'marche_noir', 'le_borgne', 'masure');
+  fill(306, 840, 855, 3, 'masure');
+  // le quai (rue 336)
+  shop(336, 746, 14, 6, 7, 'Chantier naval de Libertalia', 'chantier', 'charpentier_lib', 'chantier');
+  shop(336, 761, 10, 5, 5, 'Le Kraken Saoul', 'tavern', 'tav_kraken', 'taverne');
+  shop(336, 774, 11, 5, 5, 'Capitainerie du port', 'capitainerie', 'capitaine_port', 'capitainerie');
+  cite(336, 786, 12, 5, 6, { style: 'entrepot', name: 'Entrepôt' }); cite(336, 802, 12, 5, 6, { style: 'entrepot', name: 'Entrepôt' }); fill(336, 815, 826);
+  shop(336, 830, 14, 6, 7, 'La Fosse', 'fosse', 'maitre_fosse', 'fosse');
+  shop(336, 845, 10, 5, 5, 'La Cale Sèche', 'tavern', 'tav_cale', 'masure');
+  // ruelles : une seconde rangée de maisons au milieu des pâtés
+  for (const [ya, x0, x1] of [[246, 774, 797], [246, 802, 826], [270, 746, 770], [270, 802, 826], [320, 746, 770], [320, 802, 826], [320, 830, 855]]) {
+    stampPath([[x0, ya], [x1, ya]], 0.5, T.DIRT);
+    fill(ya, x0, x1, 4, ya >= 292 && x0 >= 828 ? 'masure' : undefined);
+  }
+  // la place de la Liberté : la statue du fondateur, la fontaine, des bancs, le tableau des primes
+  addProp('statue', LB.x - 4, LB.y - 4, 0); addProp('fontaine', LB.x + 4, LB.y + 3, 0);
+  for (const [x, y] of [[LB.x - 6, LB.y + 2], [LB.x + 6, LB.y - 3]]) addProp('bench', x, y, 0);
+  for (const [x, y] of [[LB.x - 7, LB.y - 6], [LB.x + 7, LB.y - 6], [LB.x - 7, LB.y + 6], [LB.x + 7, LB.y + 6]]) addProp('lamp', x, y, 0);
+  addProp('drapeau', 800, 224, 0); addProp('drapeau', 790, 230, 1); addProp('drapeau', 809, 230, 1);
+  // le marché : étals, tonneaux, un puits
+  for (let k = 0; k < 6; k++) addProp('stall', 778 + (k % 3) * 7, 292 + Math.floor(k / 3) * 7, k % 3);
+  addProp('well', 786, 298); for (const [x, y] of [[777, 302], [795, 291], [793, 302]]) addProp(H8(x) > 0.5 ? 'barrel' : 'crate', x, y, (x * 7) % 3);
+  // réverbères le long des rues
+  for (const y of [234, 258, 282, 306]) for (let x = 750; x <= 852; x += 10) { const ty = y - 2; if (inMap(x, ty) && !solid[idx(x, ty)] && !occ[idx(x, ty)] && !path[idx(x, ty)] && tiles[idx(x, ty)] !== T.COBBLE) addProp('lamp', x, ty, 0); }
+  for (let x = 750; x <= 852; x += 9) if (!solid[idx(x, 334)] && !occ[idx(x, 334)]) addProp(x % 2 ? 'lamp' : 'cannon', x, 334, 0);
+  // linge tendu dans les ruelles, et le gibet des Bas-Fonds
+  for (let k = 0; k < 14; k++) { const x = 748 + Math.floor(H8(900 + k) * 106), y = 236 + Math.floor(H8(950 + k) * 98); if (!solid[idx(x, y)] && !occ[idx(x, y)] && !path[idx(x, y)] && tiles[idx(x, y)] !== T.COBBLE) addProp('linge', x, y, k % 3); }
+  addProp('gibet', 842, 314, 1); addProp('cage', 846, 314, 0);
+  for (let k = 0; k < 16; k++) { const x = 830 + Math.floor(H8(1000 + k) * 25), y = 294 + Math.floor(H8(1100 + k) * 40); if (!solid[idx(x, y)] && !occ[idx(x, y)] && !path[idx(x, y)]) addProp(k % 4 === 0 ? 'skull' : k % 4 === 1 ? 'barrel' : k % 4 === 2 ? 'crate' : 'bones', x, y, k % 3); }
+  // le port : pontons, navires amarrés, ancres et filets
+  const libPiers = [];
+  for (const x of [758, 786, 800, 814, 842]) { const [, cy] = toCoast(x, 337, 0, 1); libPiers.push(pier(x, Math.max(337, cy - 1), 0, 1, x === 800 ? 9 : 7, Z.LIBERTALIA)); }
+  docks.libertalia = libPiers[2];
+  for (const [x, k] of [[766, 0], [834, 1]]) { const [, cy] = toCoast(x, 337, 0, 1); props.push({ id: pid++, type: 'ship', v: k, x: x * TILE + 8, y: (cy + 6) * TILE + 8, tx: x, ty: cy + 6 }); }
+  for (const x of [776, 822]) { const [, cy] = toCoast(x, 337, 0, 1); addProp('boat', x, cy + 2, x % 2); }
+  for (const [x, t] of [[752, 'anchor'], [796, 'nets'], [808, 'crate'], [826, 'barrel'], [850, 'anchor']]) addProp(t, x, 338, 0);
+  // le fort des Hauts et l'entrée de la Crypte du Roi sans Couronne
+  const LFT = { x: 726, y: 154 };
+  forceLand(LFT.x - 7, LFT.y - 4, LFT.x + 7, LFT.y + 6, T.DIRT, Z.HAUTS);
+  for (let y = LFT.y - 3; y <= LFT.y; y++) for (let x = LFT.x - 3; x <= LFT.x + 3; x++) solid[idx(x, y)] = 1;
+  libMark(LFT.x - 7, LFT.y - 4, LFT.x + 7, LFT.y + 6);
+  props.push({ id: pid++, type: 'fort', v: 1, x: LFT.x * TILE + 8, y: LFT.y * TILE + 14, tx: LFT.x, ty: LFT.y });
+  for (const dx of [-6, 6]) addProp('cannon', LFT.x + dx, LFT.y + 2, 0);
+  addProp('drapeau', LFT.x, LFT.y - 5, 1);
+  const mouthCrypte = (() => { const x = LFT.x + 12, y = LFT.y + 10; forceLand(x - 2, y - 1, x + 2, y + 3, T.DIRT, Z.HAUTS); libMark(x - 2, y - 1, x + 2, y + 3); return addProp('grotte', x, y, 1); })();
+  // distilleries en ruine dans les Cannaies, camp de contrebandiers dans la mangrove, temple dans la jungle, épaves dans la baie
+  for (const [x, y] of [[788, 112], [814, 126], [800, 100]]) { forceLand(x - 3, y - 2, x + 3, y + 2, T.DIRT, Z.CANNAIES); addProp('ruine', x, y, 0); addProp('barrel', x + 2, y + 2, 0); libMark(x - 3, y - 2, x + 3, y + 2); }
+  { const x = 716, y = 300; forceLand(x - 4, y - 3, x + 4, y + 3, T.DIRT, Z.MANGROVE); addProp('tente', x - 2, y - 1, 1); addProp('tente', x + 2, y - 1, 0); addProp('brazier', x, y + 1); addProp('crate', x - 3, y + 2, 1); addProp('barrel', x + 3, y + 2, 0); libMark(x - 4, y - 3, x + 4, y + 3); }
+  { const x = 884, y = 296; forceLand(x - 5, y - 4, x + 5, y + 4, T.DIRT, Z.ECARLATE); for (const [dx, dy] of [[-4, -3], [4, -3], [-4, 3], [4, 3]]) addProp('pillar', x + dx, y + dy, 1); addProp('idol', x, y - 1, 0); addProp('totem', x - 2, y + 2, 0); addProp('totem', x + 2, y + 2, 1); libMark(x - 5, y - 4, x + 5, y + 4); }
+  for (const [x, y] of [[892, 128], [866, 118], [906, 160]]) { const [cx2, cy2] = toCoast(x, y, 1, 0, 30); if (inMap(cx2 - 2, cy2)) props.push({ id: pid++, type: 'wreck', v: (x + y) % 2, x: (cx2 - 2) * TILE + 8, y: cy2 * TILE + 8, tx: cx2 - 2, ty: cy2 }); }
+  for (const [x, y] of [[872, 136], [888, 152], [878, 170]]) addProp('lamp', x, y, 0); // les fausses lumières des naufrageurs
+  // les jardins du palais, le cimetière des Forbans et le verger, entre le rempart nord et la première rue
+  {
+    const gx0 = 782, gx1 = 818, gy0 = 209, gy1 = 223;
+    for (let y = gy0; y <= gy1; y++) for (let x = gx0; x <= gx1; x++) { const i = idx(x, y); if (!occ[i] && !path[i]) tiles[i] = T.GRASS; }
+    stampPath([[800, gy0], [800, gy1 + 1]], 0.6, T.SAND); stampPath([[gx0 + 2, 216], [gx1 - 2, 216]], 0.6, T.SAND);
+    addProp('fontaine', 800, 216, 0);
+    for (const [x, y] of [[gx0 + 1, gy0 + 1], [gx1 - 1, gy0 + 1], [gx0 + 1, gy1 - 1], [gx1 - 1, gy1 - 1], [792, 212], [808, 212], [792, 220], [808, 220]]) addProp('palm', x, y, (x + y) % 4);
+    for (let x = gx0 + 3; x <= gx1 - 3; x += 2) { if (Math.abs(x - 800) < 3 || Math.abs(x - 792) < 1 || Math.abs(x - 808) < 1) continue; addProp('bush', x, gy0 + 1, x % 6); addProp('bush', x, gy1 - 1, (x + 3) % 6); }
+    for (const [x, y] of [[788, 213], [812, 213], [788, 219], [812, 219], [785, 216], [815, 216], [796, 214], [804, 218]]) addProp('flower', x, y, (x * 3 + y) % 6);
+    libMark(gx0, gy0, gx1, gy1);
+    for (let y = 212; y <= 223; y++) for (let x = 752; x <= 767; x++) { const i = idx(x, y); if (inLib(x, y) && !occ[i] && !path[i]) tiles[i] = T.DGRASS; }
+    for (let y = 214; y <= 222; y += 3) for (let x = 755; x <= 766; x += 3) { const k = Math.floor(H8(x * 13 + y) * 10); if (inLib(x, y)) addProp(k < 6 ? 'grave' : 'cross', x, y, k % 3); }
+    addProp('deadtree', 753, 220, 1); addProp('lamp', 760, 224, 0);
+    libMark(752, 212, 767, 223);
+    for (let y = 214; y <= 222; y += 4) for (let x = 835; x <= 847; x += 4) if (inLib(x, y)) addProp(H8(x + y * 7) > 0.45 ? 'palm' : 'tree', x, y, (x + y) % 4);
+    addProp('well', 841, 224); addProp('barrel', 834, 224, 1);
+    libMark(834, 213, 848, 224);
+  }
+  // l'enceinte : chemin de ronde, tours aux angles et de part et d'autre des portes, arches au nord
+  {
+    const wallSet = new Set(), ring = [];
+    const line4 = (x0, y0, x1, y1) => {
+      const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      let px = x0, py = y0; ring.push([px, py]);
+      for (let k = 1; k <= n; k++) {
+        const x = Math.round(x0 + ((x1 - x0) * k) / n), y = Math.round(y0 + ((y1 - y0) * k) / n);
+        if (x !== px && y !== py) ring.push([x, py]);
+        ring.push([x, y]); px = x; py = y;
+      }
+    };
+    for (let k = 0; k + 1 < CITY.length; k++) line4(CITY[k][0], Math.min(337, CITY[k][1]), CITY[k + 1][0], Math.min(337, CITY[k + 1][1]));
+    const kind = ring.map(([x, y]) => { if (!inMap(x, y)) return 0; const i = idx(x, y); if (tiles[i] === T.DEEP || tiles[i] === T.WATER) return 0; return path[i] ? 2 : 1; }); // 0 mer, 1 rempart, 2 porte
+    const towers = new Set(), gates = [];
+    for (const [vx, vy] of CITY) towers.add(`${vx},${Math.min(337, vy)}`);
+    for (let k = 1; k < ring.length; k++) {
+      if (kind[k] === 2 && kind[k - 1] === 1) towers.add(ring[k - 1].join(','));
+      if (kind[k] === 1 && kind[k - 1] === 2) towers.add(ring[k].join(','));
+      if (kind[k] === 2 && kind[k - 1] !== 2) { let e = k; while (e + 1 < ring.length && kind[e + 1] === 2) e++; gates.push(ring[(k + e) >> 1]); }
+    }
+    const walls = [];
+    for (let k = 0; k < ring.length; k++) {
+      if (kind[k] !== 1) continue;
+      const [x, y] = ring[k], i = idx(x, y);
+      if (wallSet.has(i)) continue;
+      wallSet.add(i); tiles[i] = T.COBBLE; path[i] = 1; occ[i] = 1; solid[i] = 1;
+      const p = { id: pid++, type: towers.has(`${x},${y}`) ? 'tour' : 'rempart', v: 0, x: x * TILE + 8, y: y * TILE + 15, tx: x, ty: y };
+      props.push(p); walls.push(p);
+    }
+    for (const p of walls) if (p.type === 'rempart') { const i = idx(p.tx, p.ty); p.v = (wallSet.has(i - W) ? 1 : 0) | (wallSet.has(i + 1) ? 2 : 0) | (wallSet.has(i + W) ? 4 : 0) | (wallSet.has(i - 1) ? 8 : 0); }
+    else p.v = p.tx % 2;
+    for (const [x, y] of gates) if (y < 215) props.push({ id: pid++, type: 'porte_cite', v: 0, x: x * TILE + 8, y: y * TILE + 15, tx: x, ty: y });
+  }
+  // personnages du dehors : passeur, marchands du marché, crieur, garde, mendiant, musicien, tableau des primes
+  for (const [id, x, y] of [['passeur_lib', 803, 340], ['marchande_fruits', 779, 294], ['poissonnier_lib', 786, 294], ['marchand_curios', 793, 294], ['marchand_rhum', 779, 301],
+    ['crieur', LB.x + 2, LB.y - 6], ['primes_lib', LB.x - 9, LB.y], ['garde_porte', 774, LIB.y0 + 3], ['mendiant', 836, 300], ['musicien', 768, 284]]) libNpcs.push([id, x, y]);
 
   // ---------- 11. Végétation et décors ----------
   const clear = (x, y, r) => {
@@ -783,7 +993,7 @@ export function generateWorld(seed = 7) {
     }
     return true;
   };
-  const nearTown = (x, y) => Math.hypot(x - TC.x, (y - TC.y) * 1.2) < 15 || Math.hypot(x - HC.x, (y - HC.y) * 1.2) < 12 || Math.hypot(x - RD.x, (y - RD.y) * 1.2) < 18 || zones[idx(x, y)] === Z.ANSE;
+  const nearTown = (x, y) => Math.hypot(x - TC.x, (y - TC.y) * 1.2) < 15 || Math.hypot(x - HC.x, (y - HC.y) * 1.2) < 12 || Math.hypot(x - RD.x, (y - RD.y) * 1.2) < 18 || zones[idx(x, y)] === Z.ANSE || inLib(x, y) || (y > 330 && y < 352 && x > 734 && x < 866);
   for (let y = 2; y < OVER_H - 2; y++) for (let x = 2; x < W - 2; x++) {
     const i = idx(x, y);
     if (occ[i] || path[i] || solid[i]) continue;
@@ -794,6 +1004,13 @@ export function generateWorld(seed = 7) {
     const v = (hash2(x, y, seed + 7) * 4) | 0;
     const ox = ((hash2(x, y, seed + 8) - 0.5) * 8) | 0, oy = ((hash2(x, y, seed + 6) - 0.5) * 4) | 0;
     const town = nearTown(x, y);
+    if (z === Z.LIBERTALIA || z === Z.BASFONDS) { // la cité : quelques fleurs et buissons dans les jardins
+      if (t === T.GRASS && r < 0.05 && clear(x, y, 0)) addProp(r < 0.035 ? 'flower' : 'bush', x, y, v, ox, oy);
+      continue;
+    }
+    if (z === Z.CANNAIES && t === T.GRASS && dens > 0.5 && y % 3 !== 0 && r < 0.42 && clear(x, y, 0)) { addProp('canne', x, y, v, ox, 0); continue; } // champs de canne
+    if (z === Z.ECARLATE && t === T.JUNGLE && dens > 0.38 && r < 0.2 && clear(x, y, 1)) { addProp('jtree_r', x, y, v, ox, 0); continue; } // arbres écarlates
+    if (z === Z.MANGROVE && (t === T.MARSH || t === T.MUD) && r < 0.08 && clear(x, y, 1)) { addProp('paletuvier', x, y, v, ox, 0); continue; } // palétuviers
     if (t === T.SAND && z === Z.OSSEMENTS) { // désert d'os : peu de palmiers, beaucoup de restes
       if (r < 0.006 && clear(x, y, 1)) addProp('palm', x, y, v, ox, 0);
       else if (r < 0.05) addProp(r < 0.035 ? 'bones' : 'skull', x, y, v, ox, oy);
@@ -856,9 +1073,9 @@ export function generateWorld(seed = 7) {
   // ---------- 11b. Intérieurs et grottes, dans la bande sous l'archipel ----------
   const rooms = [], doors = [], caveSpawns = [], innerNpcs = [];
   for (let y = OVER_H; y < H; y++) for (let x = 0; x < W; x++) { const i = idx(x, y); tiles[i] = T.VOID; zones[i] = Z.INTERIOR; solid[i] = 1; occ[i] = 1; }
-  let ax = 3, ay = OVER_H + 3, rowH = 0;
+  let ax = 3, ay = OVER_H + 3, rowH = 0, allocX0 = 3, wrapW = 640; // 0.8 : les anciennes pièces gardent leur place (la bande s'arrêtait à 640)
   const alloc = (w, h) => {
-    if (ax + w + 4 > W - 2) { ax = 3; ay += rowH + 3; rowH = 0; }
+    if (ax + w + 4 > wrapW - 2) { ax = allocX0; ay += rowH + 3; rowH = 0; }
     const x0 = ax + 1, y0 = ay + 2;
     ax += w + 5; rowH = Math.max(rowH, h + 3);
     return [x0, y0];
@@ -898,7 +1115,7 @@ export function generateWorld(seed = 7) {
     } else if (kind === 'couture') {
       for (const x of [x0 + 1, x0 + 3, x0 + 5]) put('mannequin', x, y0, (x - x0) % 3);
       put('etagere', x0 + w - 1, y0, 1); put('table', x0 + 3, y0 + 3); put('tapis_deco', x0 + 1, y0 + 3);
-      innerNpcs.push({ id: 'madame_soie', x: (x0 + 6) * TILE + 8, y: (y0 + 2) * TILE + 12, dir: 0 });
+      innerNpcs.push({ id: r.npc || 'madame_soie', x: (x0 + 6) * TILE + 8, y: (y0 + 2) * TILE + 12, dir: 0 });
     } else if (kind === 'receleur') {
       put('etagere', x0, y0, 0); put('etagere', x0 + 1, y0, 1); put('comptoir', x0 + 3, y0 + 2); put('comptoir', x0 + 4, y0 + 2); put('comptoir', x0 + 5, y0 + 2);
       put('crate', x0 + w - 1, y0, 2); put('tonneau_d', x0 + w - 1, y0 + h - 1);
@@ -913,7 +1130,59 @@ export function generateWorld(seed = 7) {
       put('ratelier', x0 + 1, y0, 0); put('etagere', x0 + 3, y0, 1); put('etagere', x0 + 4, y0, 0);
       addProp('boat', x0 + 6, y0 + 3, 0, 0, -2); occ[idx(x0 + 5, y0 + 3)] = 1; occ[idx(x0 + 7, y0 + 3)] = 1;
       put('nets', x0 + 1, y0 + 4); put('crate', x0 + w - 1, y0 + h - 1, 0); put('crate', x0 + w - 2, y0 + h - 1, 2); put('tonneau_d', x0, y0 + h - 1);
-      innerNpcs.push({ id: 'ysaline', x: (x0 + 2) * TILE + 8, y: (y0 + 2) * TILE + 12, dir: 0 });
+      innerNpcs.push({ id: r.npc || 'ysaline', x: (x0 + 2) * TILE + 8, y: (y0 + 2) * TILE + 12, dir: 0 });
+    } else if (kind === 'palais') { // le trône, les bannières, la table du Conseil des capitaines
+      const cx = x0 + (w >> 1);
+      put('trone', cx, y0); put('banniere', cx - 3, y0, 0); put('banniere', cx + 3, y0, 1); put('banniere', x0 + 1, y0, 1); put('banniere', x0 + w - 2, y0, 0);
+      for (let k = -4; k <= 4; k += 2) { put('table', cx + k, y0 + 5); put('chaise', cx + k, y0 + 4, 0); put('chaise', cx + k, y0 + 6, 1); }
+      for (const x of [x0, x0 + w - 1]) for (const y of [y0 + 2, y0 + 7]) put('pillar', x, y, 1);
+      put('tapis_deco', cx - 1, y0 + 2); put('brazier', x0 + 2, y0 + h - 2); put('brazier', x0 + w - 3, y0 + h - 2);
+      innerNpcs.push({ id: 'reine', x: cx * TILE + 8, y: (y0 + 2) * TILE + 6, dir: 0 });
+      innerNpcs.push({ id: 'capitaine_brisemer', x: (cx - 5) * TILE + 8, y: (y0 + 5) * TILE + 10, dir: 2 });
+      innerNpcs.push({ id: 'dame_corail', x: (cx + 5) * TILE + 8, y: (y0 + 5) * TILE + 10, dir: 1 });
+      innerNpcs.push({ id: 'capitaine_fendlame', x: (cx + 1) * TILE + 8, y: (y0 + 8) * TILE + 10, dir: 3 });
+    } else if (kind === 'velours') { // le Velours Écarlate : tentures, divans, lanternes rouges
+      for (let x = x0; x < x0 + w; x += 2) put('rideau', x, y0, (x >> 1) % 2);
+      for (const [x, y] of [[x0 + 1, y0 + 3], [x0 + 5, y0 + 3], [x0 + w - 6, y0 + 3], [x0 + w - 2, y0 + 3], [x0 + 2, y0 + 6], [x0 + w - 3, y0 + 6]]) put('divan', x, y, x % 2);
+      for (const [x, y] of [[x0, y0 + 1], [x0 + w - 1, y0 + 1], [x0, y0 + h - 1], [x0 + w - 1, y0 + h - 1]]) put('lanterne_r', x, y, 0);
+      for (let x = x0 + (w >> 1) - 2; x <= x0 + (w >> 1) + 2; x++) put('comptoir', x, y0 + 2);
+      put('tapis_deco', x0 + (w >> 1) - 1, y0 + 5); put('plante', x0 + 3, y0 + h - 1); put('plante', x0 + w - 4, y0 + h - 1);
+      innerNpcs.push({ id: r.npc || 'madame_rubis', x: (x0 + (w >> 1)) * TILE + 8, y: (y0 + 1) * TILE + 12, dir: 0 });
+      innerNpcs.push({ id: 'perle', x: (x0 + 2) * TILE + 8, y: (y0 + 4) * TILE + 12, dir: 2 });
+      innerNpcs.push({ id: 'celeste', x: (x0 + w - 3) * TILE + 8, y: (y0 + 4) * TILE + 12, dir: 1 });
+    } else if (kind === 'tripot') { // la Bourse aux Dés : tables de jeu
+      for (const [x, y] of [[x0 + 3, y0 + 3], [x0 + 8, y0 + 3], [x0 + 3, y0 + 6], [x0 + 9, y0 + 6]]) { put('table_jeu', x, y, (x + y) % 2); put('chaise', x - 1, y, 0); put('chaise', x + 1, y, 1); }
+      for (let x = x0 + w - 4; x < x0 + w; x++) put('comptoir', x, y0 + 1);
+      put('etagere', x0, y0, 0); put('lanterne_r', x0 + w - 1, y0 + h - 1, 0); put('tonneau_d', x0, y0 + h - 1);
+      innerNpcs.push({ id: r.npc || 'croupier', x: (x0 + 8) * TILE + 8, y: (y0 + 2) * TILE + 12, dir: 0 });
+      innerNpcs.push({ id: 'joueur_lib', x: (x0 + 2) * TILE + 8, y: (y0 + 6) * TILE + 12, dir: 2 });
+    } else if (kind === 'marche_noir') { // l'arrière-boutique du Borgne
+      put('etagere', x0, y0, 0); put('etagere', x0 + 1, y0, 1); put('etagere', x0 + w - 1, y0, 0);
+      for (let x = x0 + 3; x <= x0 + 6; x++) put('comptoir', x, y0 + 2);
+      put('cage', x0 + w - 2, y0 + 3, 1); put('crate', x0, y0 + h - 1, 2); put('crate', x0 + 1, y0 + h - 1, 0); put('lanterne_r', x0 + w - 1, y0 + h - 1, 0);
+      innerNpcs.push({ id: r.npc || 'le_borgne', x: (x0 + 4) * TILE + 8, y: (y0 + 1) * TILE + 12, dir: 0 });
+    } else if (kind === 'fosse') { // la Fosse : gradins, braseros et cages
+      for (let x = x0; x < x0 + w; x++) if (x % 3) put('gradin', x, y0, x % 2);
+      for (const y of [y0 + 3, y0 + 7]) { put('gradin', x0, y, 0); put('gradin', x0 + w - 1, y, 1); }
+      put('brazier', x0 + 2, y0 + 2); put('brazier', x0 + w - 3, y0 + 2); put('brazier', x0 + 2, y0 + h - 3); put('brazier', x0 + w - 3, y0 + h - 3);
+      put('cage', x0 + 1, y0 + h - 1, 0); put('cage', x0 + w - 2, y0 + h - 1, 1);
+      innerNpcs.push({ id: r.npc || 'maitre_fosse', x: (x0 + (w >> 1)) * TILE + 8, y: (y0 + 1) * TILE + 14, dir: 0 });
+    } else if (kind === 'armurerie') {
+      for (const x of [x0 + 1, x0 + 3, x0 + 5, x0 + 7]) put('ratelier', x, y0, x % 2);
+      put('fourneau', x0 + w - 2, y0); put('anvil', x0 + w - 3, y0 + 3); put('crate', x0, y0 + h - 1, 1); put('tonneau_d', x0 + w - 1, y0 + h - 1);
+      innerNpcs.push({ id: r.npc || 'armurier', x: (x0 + 4) * TILE + 8, y: (y0 + 2) * TILE + 12, dir: 0 });
+    } else if (kind === 'apothicaire') {
+      for (const x of [x0, x0 + 1, x0 + 2, x0 + w - 1]) put('etagere', x, y0, x % 2);
+      put('fourneau', x0 + w - 3, y0); put('table', x0 + 4, y0 + 3); put('plante', x0, y0 + h - 1); put('plante', x0 + w - 1, y0 + h - 1);
+      innerNpcs.push({ id: r.npc || 'apothicaire', x: (x0 + 5) * TILE + 8, y: (y0 + 1) * TILE + 12, dir: 0 });
+    } else if (kind === 'ecurie') { // les box des chevaux
+      for (const x of [x0 + 1, x0 + 4, x0 + 7, x0 + 10, x0 + 13]) if (x < x0 + w - 1) put('stalle', x, y0, ((x - x0) / 3 | 0) % 4);
+      put('tonneau_d', x0, y0 + h - 1); put('crate', x0 + w - 1, y0 + h - 1, 0); put('crate', x0 + w - 2, y0 + h - 1, 1);
+      innerNpcs.push({ id: r.npc || 'palefrenier', x: (x0 + 3) * TILE + 8, y: (y0 + 4) * TILE + 12, dir: 0 });
+    } else if (kind === 'capitainerie') {
+      put('table', x0 + 3, y0 + 2); put('table', x0 + 4, y0 + 2); put('etagere', x0, y0, 1); put('etagere', x0 + w - 1, y0, 0);
+      put('chaise', x0 + 3, y0 + 3, 0); put('tapis_deco', x0 + 5, y0 + 3); put('plante', x0 + w - 1, y0 + h - 1);
+      innerNpcs.push({ id: r.npc || 'capitaine_port', x: (x0 + 6) * TILE + 8, y: (y0 + 1) * TILE + 12, dir: 0 });
     } else {
       put('lit_deco', x0, y0); put('cheminee', x0 + 3, y0); put('etagere', x0 + w - 1, y0, (r.id) % 2);
       put('table', x0 + 4, y0 + 3); put('chaise', x0 + 3, y0 + 3, 0); put('chaise', x0 + 5, y0 + 3, 1);
@@ -1050,6 +1319,24 @@ export function generateWorld(seed = 7) {
   if (mouthBrasier) { const r = cave('Forge du Brasier', 34, 22, mouthBrasier, 1618, [['calcine', 7], ['golem_lave', 4]]); bossIn(r, 'brasier'); caves2.push([r, 'marteau_brasier']); }
   if (mouthComte) { const r = cave('Crypte du Comte', 38, 22, mouthComte, 6626, [['damne', 8], ['arquebusier_damne', 5], ['molosse_damne', 3]]); bossIn(r, 'comte_vespere'); caves2.push([r, 'lame_vespere']); }
   if (ay + rowH + 2 > H) throw new Error('bande des intérieurs trop petite');
+  // ---------- 11f. Les pièces de Libertalia (0.8), dans la partie est de la bande ----------
+  ax = allocX0 = 646; ay = OVER_H + 3; rowH = 0; wrapW = W;
+  const ROOM8 = { palais: [26, 12, T.STONEF], tavern: [15, 8, T.FLOOR], velours: [17, 9, T.FLOOR], tripot: [14, 8, T.FLOOR], marche_noir: [11, 7, T.STONEF], fosse: [22, 13, T.STONEF],
+    armurerie: [12, 7, T.STONEF], couture: [9, 6, T.FLOOR], apothicaire: [10, 6, T.FLOOR], ecurie: [16, 8, T.FLOOR], chantier: [14, 8, T.FLOOR], capitainerie: [11, 6, T.FLOOR] };
+  for (const b of buildings3) {
+    const [rw, rh, fl] = ROOM8[b.kind];
+    const r = room(b.name, b.kind, rw, rh, fl, { x: b.x + b.door, y: b.y + b.h });
+    r.npc = b.npc;
+    furnish(r);
+    if (b.kind === 'fosse') { for (let y = r.y0 - 2; y <= r.y0 + r.h; y++) for (let x = r.x0 - 1; x <= r.x0 + r.w; x++) zones[idx(x, y)] = Z.CAVE; doors[doors.length - 1].fosse = 1; } // on s'y bat pour de vrai
+  }
+  for (const b of plots3) {
+    const r = room(b.name, 'home', 10, 7, T.FLOOR, { x: b.x + b.door, y: b.y + b.h });
+    b.room = r.id; b.doorId = doors.length - 1; doors[b.doorId].plot = b.plot;
+    plots.push(b);
+  }
+  if (mouthCrypte) { const r = cave('Crypte du Roi sans Couronne', 38, 22, mouthCrypte, 9191, [['garde_maudit', 7], ['coupe_jarret', 4], ['skelgun', 3]]); bossIn(r, 'roi_sans_couronne'); caves2.push([r, 'mousquet_vaudou']); }
+  if (ay + rowH + 2 > H) throw new Error('bande des intérieurs trop petite (est)');
 
   // ---------- 11c. Cachettes : des coffres oubliés, chacun garde une arme ----------
   const cacheAt = (cx, cy, r, item) => {
@@ -1090,6 +1377,8 @@ export function generateWorld(seed = 7) {
   cacheAt(LG.x + 10, LG.y - 18, 6, 'trident_sirene');
   cacheAt(EM.x, EM.y + 6, 5, 'tromblon_ermite');
   cacheAt(QC.x - 10, QC.y + 8, 6, 'scalpel_corbeau');
+  cacheAt(LFT.x - 10, LFT.y - 8, 6, 'lance_cavalerie'); // 0.8 : deux cachettes sur l'île de Libertalia
+  cacheAt(898, 286, 6, 'baton_vaudou');
 
   // ---------- 11d. Le Gouffre du Kraken : eau profonde entre l'archipel et l'Île au Crâne ----------
   let KR = { x: 206, y: 152 };
@@ -1149,6 +1438,8 @@ export function generateWorld(seed = 7) {
     at('agathe', camp.x, camp.y + 1);
     at('vif_camp', camp.x + 3, camp.y + 2);
     at('tailleur_rade', RD.x - 6, RD.y + 2);
+    for (const [id, x, y] of libNpcs) if (id !== 'passeur_lib') at(id, x, y); // 0.8 : Libertalia
+    if (docks.libertalia) at('passeur_lib', ...dockTile(docks.libertalia));
   }
 
   // ---------- 13. Points d'apparition des monstres ----------
@@ -1169,11 +1460,18 @@ export function generateWorld(seed = 7) {
     [Z.QUARANTAINE, 'pestifere', 30], [Z.QUARANTAINE, 'medecin_peste', 9], [Z.QUARANTAINE, 'docteur_corbeau', 1],
     [Z.VOLCAN, 'calcine', 20], [Z.VOLCAN, 'golem_lave', 9],
     [Z.DAMNES, 'damne', 22], [Z.DAMNES, 'arquebusier_damne', 11], [Z.DAMNES, 'molosse_damne', 9],
+    // 0.8 : l'île de Libertalia
+    [Z.HAUTS, 'garde_maudit', 18], [Z.HAUTS, 'chien_mort', 8],
+    [Z.CANNAIES, 'epouvantail', 20], [Z.CANNAIES, 'pendu', 5],
+    [Z.BAIE, 'naufrageur', 18], [Z.BAIE, 'crabe_corail', 8], [Z.BAIE, 'capitaine_naufrageur', 1],
+    [Z.MANGROVE, 'contrebandier', 18], [Z.MANGROVE, 'drowned', 8], [Z.MANGROVE, 'reine_mangrove', 1],
+    [Z.ECARLATE, 'goule_ecarlate', 18], [Z.ECARLATE, 'sorciere', 7], [Z.ECARLATE, 'legionnaire', 6],
+    [Z.BASFONDS, 'coupe_jarret', 9],
   ];
   const candidates = {};
   for (let y = 2; y < H - 2; y++) for (let x = 2; x < W - 2; x++) {
     const i = idx(x, y), z = zones[i];
-    if (z === Z.SEA || z === Z.TOWN || z === Z.HAVRE || z === Z.RADE || z === Z.ANSE || z === Z.BRUMES || z === Z.GOUFFRE || z === Z.INTERIOR || z === Z.CAVE || y >= OVER_H || solid[i] || path[i]) continue;
+    if (z === Z.SEA || z === Z.TOWN || z === Z.HAVRE || z === Z.RADE || z === Z.ANSE || z === Z.BRUMES || z === Z.GOUFFRE || z === Z.INTERIOR || z === Z.CAVE || z === Z.LIBERTALIA || y >= OVER_H || solid[i] || path[i]) continue;
     const t = tiles[i];
     if (t === T.DEEP || t === T.ROCK || t === T.LAVA || t === T.PLANK || t === T.COBBLE && z !== Z.RUINS && z !== Z.QUARANTAINE) continue;
     if (Math.hypot(x - RD.x, (y - RD.y) * 1.2) < 24 || Math.hypot(x - FT.x, y - FT.y) < 7 || Math.hypot(x - camp.x, y - camp.y) < 7) continue;
@@ -1181,7 +1479,7 @@ export function generateWorld(seed = 7) {
     if (x > 123 && x < 179 && y > 61 && y < 91) continue; // pas de morts aux portes du Quartier des Corsaires
     (candidates[z] = candidates[z] || []).push([x, y]);
   }
-  for (const z in candidates) shuffle(candidates[z], rng);
+  for (const z in candidates) shuffle(candidates[z], mulberry32(seed * 131 + (z | 0) * 7 + 1)); // 0.8 : un tirage par zone (une île de plus ne déplace pas les autres)
   const spawns = [];
   const taken = [];
   for (const [z, mob, count] of spawnPlan) {
@@ -1247,6 +1545,8 @@ export function generateWorld(seed = 7) {
       { ship: 'fregate_maudite', n: 1, pts: [[380, 220], [460, 230], [440, 290], [390, 290]] },
       { ship: 'galion_fantome', n: 1, pts: [[520, 230], [620, 240], [620, 320], [540, 350], [510, 290]] },
       { ship: 'fregate_maudite', n: 1, pts: [[600, 150], [630, 200], [560, 220], [580, 140]] },
+      // 0.8 : des bricks noyés croisent autour de Libertalia (loin du port)
+      { ship: 'brick_noye', n: 2, pts: [[690, 60], [900, 26], [944, 150], [940, 300], [900, 430], [700, 440], [650, 300], [656, 160]] },
     ];
     for (const L of loops) {
       const pts = L.pts.map(snap).filter(Boolean);
@@ -1284,6 +1584,7 @@ export function generateWorld(seed = 7) {
       { id: 'freres', plates: fortPlates, door: doors.findIndex((d) => d.seal === 'freres'), room: arena.id, open: 120 },
     ],
     docks, lavaLights, seaRoutes, volcano, rade: RD, anse: AT, ermite: EM, volcan: VC, quarantaine: QC, ossements: AO, damnes: DM, lagon: LG, pendus: FP, fort: FT, brumes: BR,
+    libertalia: LB, libFort: LFT,
     seed, W, H, tiles, zones, solid, plankDir, waterDist, props, buildings, npcs, spawns, chests,
     spawnPoint, town: TC, lighthouse: LH, ruins: RC, cemetery: CEM, wreck: WR, coastY, dockEnd,
   };
