@@ -165,7 +165,12 @@ export class UI {
       if (me.cry > 0) buffs.push(`⚔ Abordage ${Math.ceil(me.cry - (now - G.meAt))}s`);
       if (me.drunk > 0) buffs.push(`🍾 Ivre ${Math.max(0, Math.ceil(me.drunk - (now - G.meAt)))}s`);
       if (G.zone === Z.TOWN) buffs.push('🔥 Flamme Bénite');
-      if (G.player && G.player.boat) buffs.push(G.player.boat === 'sloop' ? '⛵ Sloop' : '⛵ Barque');
+      if (G.player && G.player.boat) buffs.push('⛵ ' + ((ITEMS[G.player.boat] && ITEMS[G.player.boat].name) || 'Barque'));
+      if (me.ride) buffs.push('🐎 En selle (C pour descendre)');
+      const BN = { spd: '💨 Célérité', atk: '💪 Force du taureau', def: '🛡 Tonique de fer' };
+      for (const [k, s] of me.bf || []) { const left = Math.max(0, Math.ceil(s - (now - G.meAt))); if (left > 0) buffs.push(`${BN[k] || k} ${left}s`); }
+      if (me.rc > 0) buffs.push(`🐚 Rappel… ${Math.max(0, me.rc - (now - G.meAt)).toFixed(1)}s`);
+      if (now < (G.spyUntil || 0)) buffs.push(`🔭 Longue-vue ${Math.ceil(G.spyUntil - now)}s`);
       if (G.night) buffs.push(isFullMoon(G.worldTime) ? '🌕 Pleine lune : la Horde rôde' : '☾ Nuit');
       else if (isFullMoon(G.worldTime + 120)) buffs.push('🌕 Pleine lune ce soir');
       if (ZONES[G.zone] && ZONES[G.zone].hard) buffs.push('☠ Zone extrême');

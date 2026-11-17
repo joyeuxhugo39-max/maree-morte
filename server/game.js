@@ -174,6 +174,7 @@ export class Game {
       case 'upg': return this.upgrade(p, String(m.s));
       case 'title': return this.setTitle(p, m.id == null ? null : String(m.id));
       case 'harvest': return this.questPick(p, m.id | 0);
+      case 'ride': return this.toggleRide(p);
       case 'place': return this.place(p, m.slot | 0, m.tx | 0, m.ty | 0);
       case 'unplace': return this.unplace(p, m.tx | 0, m.ty | 0);
       case 'sint': return this.structInteract(p, m.tx | 0, m.ty | 0);
@@ -312,11 +313,48 @@ export class Game {
   saveAll() { for (const p of this.players.values()) this.save(p); if (this.worldPersist) Promise.resolve(this.storage.saveWorld(this.exportWorld())).catch(() => {}); }
 
   recalc(p) {
-    p.stats = computeStats(p.level, p.eq, p.upg);
+    p.stats = computeStats(p.level, p.eq, p.upg, !!p.riding, this.activeBuffs(p));
     const L = displayLook(p.base, p.eq);
     if (JSON.stringify(L) !== JSON.stringify(p.look)) { p.look = L; p.lookVer++; }
     if (p.hp > p.stats.maxHp) p.hp = p.stats.maxHp;
     p.dirtyMe = true;
+  }
+  activeBuffs(p) {
+    if (!p.buffs) return null;
+    const b = {};
+    for (const [k, v] of Object.entries(p.buffs)) if (v.until > this.time) b[k] = v.v;
+    return b;
+  }
+  updateBuffs(p) {
+    if (p.buffs) for (const [k, v] of Object.entries(p.buffs)) if (v.until <= this.time) { delete p.buffs[k]; this.recalc(p); }
+    if (p.recallAt && this.time >= p.recallAt && !p.dead) { // la conque a parlé : à la maison, ou en ville
+      p.recallAt = 0;
+      if (this.countItem(p, p.recallSlot || 'conque_rappel') < 1) return;
+      this.removeItem(p, p.recallSlot || 'conque_rappel', 1);
+      const h = this.homeOf(p.key), d = h ? this.world.doors[this.world.plots[h.k].door] : null;
+      const [x, y] = d ? [d.ox, d.oy + 14] : [this.world.spawnPoint.x, this.world.spawnPoint.y];
+      if (p.riding) this.dismount(p);
+      this.teleport(p, x, y, { travel: 'recall' });
+      this.toast(p, d ? 'Vous voilà devant chez vous.' : 'Vous voilà à Port-Lanterne.', 'quest');
+    }
+  }
+  // ------------------------------------------------------------ montures (touche C)
+  toggleRide(p) {
+    if (p.riding) return this.dismount(p);
+    const it = p.eq.mount && ITEMS[p.eq.mount];
+    if (!it || !it.mount || p.dead) return this.toast(p, 'Équipez d’abord une monture (emplacement Monture), puis appuyez sur C.', 'warn');
+    if (p.boat) return this.toast(p, 'Pas en mer !', 'warn');
+    if (p.room !== -1) return this.toast(p, 'Pas à l’intérieur !', 'warn');
+    if (this.time - p.lastHurt < 1.5) return this.toast(p, 'Pas en plein combat !', 'warn');
+    p.riding = true; p.lookVer++;
+    this.recalc(p); p.dirtyMe = true;
+    this.ev(p.x, p.y, ['ride', p.id, 1, it.mount.kind]);
+  }
+  dismount(p) {
+    if (!p.riding) return;
+    p.riding = false; p.lookVer++;
+    this.recalc(p); p.dirtyMe = true;
+    this.ev(p.x, p.y, ['ride', p.id, 0]);
   }
   meState(p) {
     return {
@@ -325,6 +363,7 @@ export class Game {
       st: { atk: p.stats.atk, gun: p.stats.gun, def: p.stats.def, crit: Math.round(p.stats.crit * 100), speed: p.stats.speed, regen: +p.stats.regen.toFixed(1) },
       cry: Math.max(0, +(p.cry - this.time).toFixed(1)), drunk: Math.max(0, +(p.drunkUntil - this.time).toFixed(1)),
       dead: p.dead, kills: p.kills, upg: p.upg, title: p.title, boat: p.boat, room: p.room, pk: p.pk, pet: p.pet || '', vo: this.time < p.thiefUntil ? 1 : 0,
+      ride: p.riding && p.eq.mount ? ITEMS[p.eq.mount].mount.kind : '', bf: p.buffs ? Object.entries(p.buffs).filter(([, v]) => v.until > this.time).map(([k, v]) => [k, Math.ceil(v.until - this.time)]) : [], rc: p.recallAt ? +(p.recallAt - this.time).toFixed(1) : 0,
     };
   }
   toast(p, msg, kind = 'info') { this.send(p, { t: 'toast', msg, kind }); }
@@ -476,7 +515,7 @@ export class Game {
     if (m.def.elite && this.players.size) this.broadcastChat(null, `☠ ${m.def.name} rôde à nouveau : ${m.room >= 0 ? this.world.rooms[m.room].name : ZONES[zoneAt(this.world, m.x, m.y)].name}.`, 'night');
   }
   // un mort ne poursuit pas un pirate en zone sûre, dans une autre pièce, ou en mer (sauf s'il tire)
-  mobCanTarget(m, p) { return !p.dead && !SAFE.has(p.zone) && p.room === m.room && (!p.boat || !!m.def.ranged); }
+  mobCanTarget(m, p) { return !p.dead && !SAFE.has(p.zone) && p.room === m.room && (!p.boat || !!m.def.ranged) && !(this.time < (p.smokeUntil || 0) && !m.def.ai); }
   nearestTarget(m, range) {
     let best = null, bd = range;
     for (const p of this.players.values()) {
@@ -520,7 +559,9 @@ export class Game {
       if (!awake) { if (m.state !== 'idle') { m.x = m.sx; m.y = m.sy; m.hp = m.maxHp; m.state = 'idle'; m.target = 0; } m.moving = false; continue; }
       active.push(m);
       const def = m.def;
-      const speed = def.speed * spdMul * (m.boss && m.hp < m.maxHp * 0.25 ? 1.25 : 1) * (m.frenzy ? 1.3 : 1);
+      const speed = def.speed * spdMul * (m.boss && m.hp < m.maxHp * 0.25 ? 1.25 : 1) * (m.frenzy ? 1.3 : 1) * (m.slowUntil > this.time ? m.slowMul : 1);
+      if (m.stunUntil > this.time) { m.moving = false; continue; } // étourdi
+      if (m.fearUntil > this.time) { this.stepMob(m, m.x + (m.x - m.fearX) * 4, m.y + (m.y - m.fearY) * 4, speed * 1.15); continue; } // il s'enfuit
       if (m.state === 'idle') {
         const t = this.nearestTarget(m, def.aggro);
         if (t) { m.state = 'chase'; m.target = t.id; if (def.groan) this.ev(m.x, m.y, ['groan', m.id]); if (def.ai) this.bossIntro(m); }
@@ -552,7 +593,7 @@ export class Game {
           m.moving = false;
           if (this.time >= m.windup) {
             m.windup = 0;
-            m.nextAtk = this.time + def.atkCd * (m.boss && m.hp < m.maxHp * 0.25 ? 0.7 : 1) * (m.frenzy ? 0.6 : 1);
+            m.nextAtk = this.time + def.atkCd * (m.boss && m.hp < m.maxHp * 0.25 ? 0.7 : 1) * (m.frenzy ? 0.6 : 1) * (m.frostUntil > this.time ? 1.6 : 1);
             this.resolveMobAttack(m, t, night);
           }
         } else if (def.ranged) {
@@ -1132,6 +1173,7 @@ export class Game {
       return;
     }
     if (m.shieldUntil > this.time) amount = Math.max(1, Math.round(amount * 0.3));
+    if (m.curseUntil > this.time) amount = Math.round(amount * m.curseMul);
     if (m.grab) m.grab.dmg += amount;
     m.hp -= amount;
     m.tags.set(p.id, (m.tags.get(p.id) || 0) + amount);
@@ -1201,7 +1243,8 @@ export class Game {
     if (m.event || m.horde) { if (Math.random() < 0.5) this.spawnDrop(m.x, m.y, 'or', Math.round(rand(def.gold[0], def.gold[1]) / 2), top.id); if (!def.elite) return; }
     // butin
     const [g0, g1] = def.gold;
-    const gold = Math.round(rand(g0, g1));
+    const midas = top && top.eq && ITEMS[top.eq.weapon] && ITEMS[top.eq.weapon].midas ? 0.5 : 0;
+    const gold = Math.round(rand(g0, g1) * (1 + (top && top.stats ? top.stats.goldFind || 0 : 0) + midas));
     if (gold > 0) this.spawnDrop(m.x, m.y, 'or', gold, top.id);
     for (const [item, ch, a, b] of def.loot) {
       if (!ITEMS[item]) continue;
@@ -1224,15 +1267,51 @@ export class Game {
     return Math.max(0, need - this.countItem(p, item));
   }
   // ---- effets des armes : saignement (b), brûlure (f), vol de vie
-  addDot(t, kind, total, src, dur = 3) {
+  addDot(t, kind, total, src, dur = 3, stack = 1) {
     if (!t || total < 1 || t.dead || t.state === 'dead') return;
-    t.dots = (t.dots || []).filter((d) => !(d.kind === kind && d.src === src.id));
+    const same = (t.dots || []).filter((d) => d.kind === kind && d.src === src.id);
+    const drop = same.slice(0, Math.max(0, same.length - stack + 1));
+    t.dots = (t.dots || []).filter((d) => !drop.includes(d));
     t.dots.push({ kind, left: total, dps: total / dur, src: src.id });
   }
-  hitEffects(p, t, v, fx) {
+  hitEffects(p, t, v, fx, chained = false) {
     if (fx.bleed) this.addDot(t, 'b', v * fx.bleed, p);
     if (fx.burn) this.addDot(t, 'f', v * fx.burn, p);
-    if (fx.leech && !p.dead) { const h = Math.min(p.stats.maxHp - p.hp, v * fx.leech); if (h >= 1) { p.hp += h; p.dirtyMe = true; } }
+    if (fx.poison) this.addDot(t, 'p', v * fx.poison, p, 4, 3); // le poison se cumule (trois doses)
+    const leech = (fx.leech || 0) + (p.stats.leech || 0);
+    if (leech && !p.dead) { const h = Math.min(p.stats.maxHp - p.hp, v * leech); if (h >= 1) { p.hp += h; p.dirtyMe = true; } }
+    if (!t.def || t.state === 'dead') return; // les effets qui suivent ne touchent que les morts
+    const T = this.time, big = !!(t.boss || t.def.ai || t.def.elite);
+    if (fx.slow) { t.slowUntil = T + fx.slow[1]; t.slowMul = Math.max(big ? 0.75 : 0, 1 - fx.slow[0]); this.ev(t.x, t.y, ['cc', t.id, 's', fx.slow[1]]); }
+    if (fx.frost) { t.slowUntil = t.frostUntil = T + fx.frost[1]; t.slowMul = Math.max(big ? 0.7 : 0, 1 - fx.frost[0]); this.ev(t.x, t.y, ['cc', t.id, 'g', fx.frost[1]]); }
+    if (fx.stun && !big && Math.random() < fx.stun[0]) { t.stunUntil = T + fx.stun[1]; t.windup = 0; this.ev(t.x, t.y, ['cc', t.id, 'e', fx.stun[1]]); }
+    if (fx.fear && !big && Math.random() < fx.fear[0]) { t.fearUntil = T + fx.fear[1]; t.fearX = p.x; t.fearY = p.y; t.windup = 0; this.ev(t.x, t.y, ['cc', t.id, 'f', fx.fear[1]]); }
+    const curse = fx.curse || (p.stats.curseOnHit && Math.random() < p.stats.curseOnHit ? [3, 0.2] : null);
+    if (curse) { t.curseUntil = T + curse[0]; t.curseMul = 1 + curse[1]; this.ev(t.x, t.y, ['cc', t.id, 'm', curse[0]]); }
+    if (fx.midas && Math.random() < fx.midas) this.spawnDrop(t.x, t.y, 'or', Math.max(1, Math.round(v / 4)), p.id);
+    if (fx.chain && !chained) this.chainZap(p, t, v, fx.chain[0], fx.chain[1]);
+    if (fx.pull && !big) this.pullMob(p, t);
+  }
+  // la foudre saute d'un mort à l'autre
+  chainZap(p, t, v, jumps, part) {
+    let from = t; const hit = new Set([t.id]);
+    for (let k = 0; k < jumps; k++) {
+      let best = null, bd = 80;
+      for (const m of this.mobs) { if (m.state === 'dead' || hit.has(m.id) || m.room !== from.room || m.under) continue; const d = Math.hypot(m.x - from.x, m.y - from.y); if (d < bd) { bd = d; best = m; } }
+      if (!best) break;
+      hit.add(best.id);
+      this.ev(from.x, from.y, ['zap', Math.round(from.x), Math.round(from.y - 10), Math.round(best.x), Math.round(best.y - 10)]);
+      this.damageMob(best, Math.max(1, Math.round(v * part)), p, false, 0, 0);
+      from = best;
+    }
+  }
+  // le grappin ramène la cible jusqu'à vous
+  pullMob(p, t) {
+    const a = Math.atan2(p.y - t.y, p.x - t.x), d = Math.hypot(p.x - t.x, p.y - t.y);
+    if (d < 30) return;
+    const [nx, ny] = moveWithCollision(this.world, t.x, t.y, Math.cos(a) * (d - 22), Math.sin(a) * (d - 22), true);
+    this.ev(t.x, t.y, ['hookfx', Math.round(p.x), Math.round(p.y - 9), Math.round(t.x), Math.round(t.y - 9)]);
+    t.x = nx; t.y = ny; t.stunUntil = Math.max(t.stunUntil || 0, this.time + 0.5); t.windup = 0;
   }
   updateDots() {
     const tick = (t, isMob) => {
@@ -1275,11 +1354,14 @@ export class Game {
     if (this.time < p.invulnUntil && !dot) { this.ev(p.x, p.y, ['dodge', p.id]); return; }
     const dmg = dot ? Math.max(1, Math.round(raw)) : mitigate(raw, p.stats.def);
     p.hp -= dmg; p.lastHurt = this.time; p.dirtyMe = true;
+    if (p.recallAt && !dot) { p.recallAt = 0; this.toast(p, 'Rappel interrompu !', 'warn'); }
     if (src && src.key) { p.lastPvp = this.time; src.lastPvp = this.time; }
     this.ev(p.x, p.y, dot ? ['dmg', p.id, dmg, 0, src ? src.id : 0, dot] : ['dmg', p.id, dmg, crit ? 1 : 0, src ? src.id : 0]);
     if (p.hp <= 0) this.killPlayer(p, src);
   }
   killPlayer(p, src) {
+    if (p.riding) this.dismount(p);
+    p.recallAt = 0;
     p.hp = 0; p.dead = true; p.deathAt = this.time; p.moving = false;
     if (p.boat) { p.boat = null; p.lookVer++; }
     p.fishing = null;
@@ -1340,16 +1422,52 @@ export class Game {
     this.ev(x, y, ['proj', pr.id, Math.round(x), Math.round(y), +a.toFixed(3), speed, Math.round(range), kind, owner]);
     return pr;
   }
+  // ---- trajectoires vivantes : le client suit grâce aux événements « pv »
+  ricochet(pr, from) {
+    let best = null, bd = 130;
+    for (const m of this.mobs) { if (m.state === 'dead' || pr.hit.has(m.id) || m.under || m.room !== from.room) continue; const d = Math.hypot(m.x - from.x, m.y - from.y); if (d < bd) { bd = d; best = m; } }
+    if (!best) return false;
+    pr.rico = (pr.rico || 0) + 1;
+    const a = Math.atan2(best.y - 8 - pr.y, best.x - pr.x), sp = Math.hypot(pr.vx, pr.vy);
+    pr.vx = Math.cos(a) * sp; pr.vy = Math.sin(a) * sp; pr.left = Math.max(pr.left, bd + 30);
+    this.ev(pr.x, pr.y, ['pv', pr.id, Math.round(pr.x), Math.round(pr.y), +a.toFixed(3), Math.round(pr.left)]);
+    return true;
+  }
+  turnBack(pr) { // le boomerang fait demi-tour, et peut frapper de nouveau
+    pr.back = true; pr.hit.clear(); pr.left = 600; pr.nextPv = 0;
+    this.steerProj(pr, true);
+  }
+  steerProj(pr, force = false) {
+    const sp = Math.hypot(pr.vx, pr.vy);
+    let tx = null, ty = null;
+    if (pr.back) { const o = this.players.get(pr.owner); if (!o) return; tx = o.x; ty = o.y - 9; }
+    else { // balle chercheuse : le mort le plus proche, devant elle
+      let bd = 190; const a0 = Math.atan2(pr.vy, pr.vx);
+      for (const m of this.mobs) {
+        if (m.state === 'dead' || m.under || pr.hit.has(m.id)) continue;
+        const d = Math.hypot(m.x - pr.x, m.y - 8 - pr.y);
+        if (d < bd && angDiff(Math.atan2(m.y - 8 - pr.y, m.x - pr.x), a0) < 1.3) { bd = d; tx = m.x; ty = m.y - 8; }
+      }
+    }
+    if (tx === null) return;
+    const a0 = Math.atan2(pr.vy, pr.vx), want = Math.atan2(ty - pr.y, tx - pr.x);
+    let da = want - a0; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+    const turn = pr.back ? 9 : 4.5, a = force ? want : a0 + Math.max(-turn * DT, Math.min(turn * DT, da));
+    pr.vx = Math.cos(a) * sp; pr.vy = Math.sin(a) * sp;
+    if (force || this.time >= (pr.nextPv || 0)) { pr.nextPv = this.time + 0.12; this.ev(pr.x, pr.y, ['pv', pr.id, Math.round(pr.x), Math.round(pr.y), +a.toFixed(3), Math.round(pr.left)]); }
+  }
   updateProjs() {
     for (let i = this.projs.length - 1; i >= 0; i--) {
       const pr = this.projs[i];
+      if (pr.fx && (pr.fx.homing || pr.back)) this.steerProj(pr);
       const sp = Math.hypot(pr.vx, pr.vy) * DT;
       const steps = Math.max(1, Math.ceil(sp / 4));
       let dead = false;
       for (let s = 0; s < steps && !dead; s++) {
         pr.x += pr.vx * DT / steps; pr.y += pr.vy * DT / steps; pr.left -= sp / steps;
-        if (pr.left <= 0) { dead = true; break; }
-        if (blocksShot(this.world, pr.x, pr.y + 8)) { dead = true; this.ev(pr.x, pr.y, ['ph', pr.id, Math.round(pr.x), Math.round(pr.y)]); break; }
+        if (pr.left <= 0) { if (pr.fx && pr.fx.boomer && !pr.back) { this.turnBack(pr); continue; } dead = true; break; }
+        if (blocksShot(this.world, pr.x, pr.y + 8)) { if (pr.fx && pr.fx.boomer && !pr.back) { this.turnBack(pr); continue; } dead = true; this.ev(pr.x, pr.y, ['ph', pr.id, Math.round(pr.x), Math.round(pr.y)]); break; }
+        if (pr.back) { const o = this.players.get(pr.owner); if (!o || Math.hypot(o.x - pr.x, o.y - 9 - pr.y) < 14) { dead = true; this.ev(pr.x, pr.y, ['pd', pr.id]); break; } }
         if (pr.team === 'p') {
           const owner = this.players.get(pr.owner), fx = pr.fx || {};
           const kb = 3 * (fx.kb || 1);
@@ -1358,6 +1476,7 @@ export class Game {
             if (Math.hypot(m.x - pr.x, m.y - 8 - pr.y) < m.def.r + 4) {
               pr.hit.add(m.id);
               if (owner) { const n = Math.hypot(pr.vx, pr.vy); this.damageMob(m, pr.dmg, owner, pr.crit, pr.vx / n * kb, pr.vy / n * kb); this.hitEffects(owner, m, pr.dmg, fx); }
+              if (fx.ricochet && (pr.rico || 0) < fx.ricochet && this.ricochet(pr, m)) break; // la balle rebondit vers un autre mort
               if (pr.pierce > 0 && !fx.explode) pr.pierce--; else { dead = true; this.ev(pr.x, pr.y, ['ph', pr.id, Math.round(pr.x), Math.round(pr.y)]); break; }
             }
           }
@@ -1432,6 +1551,10 @@ export class Game {
     const cd = p.stats.atkSpeed;
     if ((p.cds.slash || 0) > this.time + 0.04) return;
     p.cds.slash = this.time + cd;
+    const Wp = ITEMS[p.eq.weapon] || {};
+    const mounted = p.riding && Wp.charge; // la lance de cavalerie se manie en selle
+    if (p.riding && !mounted) this.dismount(p);
+    if (Wp.charge) p.moveBudget += Wp.charge + 14; // l'élan de la lance : le client fait la ruée, on l'autorise
     p.dir = dirOf(Math.cos(a), Math.sin(a));
     this.ev(p.x, p.y, ['atk', p.id, +a.toFixed(2), 0]);
     const W = ITEMS[p.eq.weapon] || {};
@@ -1442,7 +1565,9 @@ export class Game {
       const d = Math.hypot(dx, dy);
       if (d > range + m.def.r) continue;
       if (d > 8 && angDiff(Math.atan2(dy, dx), a) > arc) continue;
-      const [v, crit] = this.rollDamage(p, p.stats.atk);
+      let [v, crit] = this.rollDamage(p, p.stats.atk);
+      if (W.execute && m.hp < m.maxHp * W.execute[0]) v = Math.round(v * (1 + W.execute[1])); // l'exécuteur achève
+      if (mounted) v = Math.round(v * 1.5);
       this.damageMob(m, v, p, crit, Math.cos(a) * kb, Math.sin(a) * kb);
       this.hitEffects(p, m, v, W);
     }
@@ -1459,6 +1584,7 @@ export class Game {
   onSkill(p, m) {
     const id = String(m.s), sk = SKILLS[id];
     if (!sk || p.dead) return;
+    if (p.riding) this.dismount(p);
     if (p.level < sk.lvl) return this.toast(p, `${sk.name} : niveau ${sk.lvl} requis.`, 'warn');
     const cannon = id === 'shot' && p.boat && ITEMS[p.boat].boat.cannon;
     if (p.boat && (id === 'whirl' || id === 'roll')) return;
@@ -1484,7 +1610,8 @@ export class Game {
         }
         const gun = ITEMS[p.eq.gun];
         const s = gun.shot;
-        const fx = s.explode || s.burn || s.bleed || s.kb ? { explode: s.explode, burn: s.burn, bleed: s.bleed, kb: s.kb } : null;
+        const fx = s.explode || s.burn || s.bleed || s.kb || s.poison || s.frost || s.stun || s.chain || s.pull || s.curse || s.ricochet || s.boomer || s.homing
+          ? { explode: s.explode, burn: s.burn, bleed: s.bleed, kb: s.kb, poison: s.poison, frost: s.frost, stun: s.stun, chain: s.chain, pull: s.pull, curse: s.curse, ricochet: s.ricochet, boomer: s.boomer, homing: s.homing } : null;
         const fire = (aa) => {
           this.ev(p.x, p.y, ['atk', p.id, +aa.toFixed(2), 1]);
           for (let k = 0; k < s.n; k++) {
@@ -1596,6 +1723,7 @@ export class Game {
     if (this.secretDoors.every((s) => p.found.has(s.id))) this.unlock(p, 'speleo');
   }
   onDoor(p, id, out) {
+    if (p.riding) this.dismount(p);
     const d = this.world.doors[id];
     if (!d || p.dead || p.boat || (p.cds.door || 0) > this.time) return;
     if (out) {
@@ -1624,6 +1752,7 @@ export class Game {
     return best;
   }
   board(p, a, slot = -1) {
+    if (p.riding) this.dismount(p);
     if (p.dead || p.boat || p.room !== -1) return;
     const id = this.boatSlot(p, slot);
     if (!id) return this.toast(p, 'Il vous faut une barque (Corentin, sur le quai, en vend).', 'warn');
@@ -1753,9 +1882,37 @@ export class Game {
       if (Math.random() < 0.3) this.giveOrDrop(p, 'carte_dechiree', 1);
       return this.toast(p, `${MSG[Math.floor(Math.random() * MSG.length)]} (+${gold} doublons)`, 'quest');
     }
+    if (it.use.recall) {
+      if (p.boat) return this.toast(p, 'Accostez d’abord.', 'warn');
+      if (p.recallAt) return;
+      p.recallAt = this.time + 3; p.recallSlot = s.id; p.dirtyMe = true;
+      this.ev(p.x, p.y, ['fx', 'recall', p.x, p.y, p.id]);
+      return this.toast(p, 'La conque résonne… ne bougez pas trop, et ne vous faites pas frapper.', 'info');
+    }
+    if (it.use.spy) {
+      if ((p.cds.spy || 0) > this.time) return;
+      p.cds.spy = this.time + 18;
+      return this.send(p, { t: 'spy', dur: 15 });
+    }
+    if (it.use.smoke) {
+      p.smokeUntil = this.time + it.use.smoke;
+      for (const m of this.mobs) if (m.target === p.id && !m.def.ai) { m.target = 0; m.state = 'return'; m.windup = 0; }
+      this.ev(p.x, p.y, ['fx', 'smoke', p.x, p.y, p.id]);
+      s.n--; if (s.n <= 0) p.inv[i] = null; p.dirtyInv = true;
+      return;
+    }
+    if (it.use.buff) {
+      p.buffs = p.buffs || {};
+      p.buffs[it.use.buff] = { v: it.use.v, until: this.time + it.use.dur };
+      this.recalc(p);
+      this.ev(p.x, p.y, ['fx', 'buff', p.x, p.y, p.id, it.use.buff]);
+      s.n--; if (s.n <= 0) p.inv[i] = null; p.dirtyInv = true; p.dirtyMe = true;
+      return;
+    }
     if ((p.cds.food || 0) > this.time) return;
     p.cds.food = this.time + 0.8;
     const u = it.use;
+    if (u.cleanse && p.dots) p.dots.length = 0;
     if (u.heal) { const before = p.hp; p.hp = Math.min(p.stats.maxHp, p.hp + u.heal); this.ev(p.x, p.y, ['heal', p.id, Math.round(p.hp - before)]); }
     if (u.en) p.en = Math.min(p.stats.maxEn, p.en + u.en);
     if (u.drunk) p.drunkUntil = this.time + u.drunk;
@@ -1788,6 +1945,7 @@ export class Game {
     if (it.slot === 'outfit') { this.toast(p, `Vous enfilez : ${it.name}.`, 'info'); if ((it.rarity || 0) >= 3) this.unlock(p, 'elegance'); }
   }
   unequip(p, slot) {
+    if (slot === 'mount' && p.riding) this.dismount(p);
     if (!SLOTS.includes(slot) || !p.eq[slot]) return;
     const free = p.inv.findIndex((s) => !s);
     if (free < 0) return this.toast(p, 'Inventaire plein !', 'warn');
@@ -2514,6 +2672,7 @@ export class Game {
     if (this.tickCount % 10 === 0) { this.updateDots(); this.updateClouds(); }
     if (this.tickCount % 5 === 0) { this.updateSeals(); this.updateBurglars(); }
     if (this.tickCount % 10 === 0) this.updateKraken();
+    if (this.tickCount % 5 === 0) for (const p of this.players.values()) this.updateBuffs(p);
     if (this.tickCount % 5 === 0) this.updateVolcano();
     if (this.tickCount % 40 === 0 && this.players.size > 1) { // les autres pirates sur la carte
       const pl = [...this.players.values()].map((q) => [q.id, q.name, Math.round(q.x), Math.round(q.y), q.room, q.dead ? 1 : 0]);
@@ -2533,7 +2692,7 @@ export class Game {
     if (p.dirtyQ) { p.dirtyQ = false; this.send(p, { t: 'q', q: p.quests }); }
   }
   entMeta(e, kind) {
-    if (kind === 'p') return { id: e.id, k: 'p', name: e.name, look: e.look, lvl: e.level, x: Math.round(e.x), y: Math.round(e.y), w: e.eq.weapon, g: e.eq.gun, dead: e.dead, ti: e.title ? ACHIEVEMENTS[e.title].title : '', bt: e.boat ? ITEMS[e.boat].boat.kind : '', pt: e.pet || '', vo: this.time < e.thiefUntil ? 1 : 0 };
+    if (kind === 'p') return { id: e.id, k: 'p', name: e.name, look: e.look, lvl: e.level, x: Math.round(e.x), y: Math.round(e.y), w: e.eq.weapon, g: e.eq.gun, dead: e.dead, ti: e.title ? ACHIEVEMENTS[e.title].title : '', bt: e.boat ? ITEMS[e.boat].boat.kind : '', pt: e.pet || '', vo: this.time < e.thiefUntil ? 1 : 0, rd: e.riding && e.eq.mount ? ITEMS[e.eq.mount].mount.kind : '' };
     if (kind === 'm') return { id: e.id, k: 'm', type: e.type, x: Math.round(e.x), y: Math.round(e.y), hp: Math.ceil(e.hp), mhp: e.maxHp, sun: e.def.night && e.sunproof && !e.horde ? 1 : 0, hd: e.horde ? 1 : 0 };
     return { id: e.id, k: 'd', item: e.item, n: e.n, x: Math.round(e.x), y: Math.round(e.y), own: e.owner, ou: Math.max(0, +(e.ownUntil - this.time).toFixed(1)) };
   }

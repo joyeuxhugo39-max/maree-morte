@@ -4,13 +4,16 @@ import { PLAYER_SPEED, SLOTS } from './constants.js';
 export const MAX_LEVEL = 30;
 export function xpToNext(level) { return Math.round(50 * Math.pow(level, 1.6) + 30); }
 
-export function computeStats(level, eq, upg = {}) {
+// riding : la monture équipée n'apporte ses bonus qu'en selle ; buffs : potions en cours { spd, atk, def }
+export function computeStats(level, eq, upg = {}, riding = false, buffs = null) {
   let maxHp = 90 + (level - 1) * 18, maxEn = 60 + (level - 1) * 4;
-  let atk = 0, gun = 0, def = 0, spd = 0, crit = 0.05, regen = 0.4 + level * 0.05;
-  let atkSpeed = 0.55, gunCd = 1;
+  let atk = 0, gun = 0, def = 0, spd = 0, crit = 0.05, regen = 0.4 + level * 0.05, leech = 0, goldFind = 0, curseOnHit = 0;
+  let atkSpeed = 0.55, gunCd = 1, mountSpeed = 1;
   for (const s of SLOTS) {
     const it = eq && eq[s] ? ITEMS[eq[s]] : null;
     if (!it) continue;
+    if (s === 'mount') { if (riding && it.mount) { def += it.mount.def || 0; regen += it.mount.regen || 0; mountSpeed = it.mount.speed || 1; } continue; }
+    leech += it.leech && s !== 'weapon' ? it.leech : 0; goldFind += it.goldFind || 0; curseOnHit += it.curseOnHit || 0;
     atk += it.atk || 0; gun += it.gun || 0; def += it.def || 0; spd += it.spd || 0;
     crit += it.crit || 0; maxHp += it.hp || 0; regen += it.regen || 0;
     if (s === 'weapon') atkSpeed = it.speed || 0.5;
@@ -19,13 +22,14 @@ export function computeStats(level, eq, upg = {}) {
   const mul = 1 + 0.07 * (level - 1);
   const uw = upg.weapon || 0, ug = upg.gun || 0, ub = upg.body || 0;
   maxHp += ub * 5;
+  const B = buffs || {};
   return {
     maxHp, maxEn,
-    atk: Math.round((atk || 3) * mul * (1 + 0.1 * uw)),
-    gun: Math.round(gun * mul * (1 + 0.1 * ug)),
-    def: Math.round(def * (1 + 0.12 * ub)) + ub, crit: Math.min(0.6, crit), regen,
-    speed: Math.round(PLAYER_SPEED * (1 + spd)),
-    atkSpeed, gunCd,
+    atk: Math.round((atk || 3) * mul * (1 + 0.1 * uw) * (1 + (B.atk || 0))),
+    gun: Math.round(gun * mul * (1 + 0.1 * ug) * (1 + (B.atk || 0))),
+    def: Math.round((Math.round(def * (1 + 0.12 * ub)) + ub) * (1 + (B.def || 0))), crit: Math.min(0.6, crit), regen,
+    speed: Math.round(PLAYER_SPEED * (1 + spd + (B.spd || 0)) * mountSpeed),
+    atkSpeed, gunCd, leech, goldFind, curseOnHit, mountSpeed,
   };
 }
 // dégâts reçus après armure

@@ -23,6 +23,10 @@ export const MAT = {
   walnut: [0x22120a, 0x3c2012, 0x5a321e, 0x7a482c, 0x9a6240],
   ebony: [0x100c10, 0x1e161c, 0x2e2228, 0x463640, 0x604c56],
   leather: [0x28140c, 0x44241a, 0x623826, 0x824e36, 0xa06848],
+  // 0.8
+  ice: [0x2a4a6a, 0x4a7ab0, 0x8ac0ec, 0xc8ecff, 0xffffff],
+  venom: [0x14300c, 0x2a5a18, 0x4a922a, 0x8ad04a, 0xd8ff9a],
+  storm: [0x1a1840, 0x34349a, 0x6474ea, 0xa8c4ff, 0xffffff],
 };
 const OUT = 0x140c12;
 const R = (k) => MAT[k] || MAT.steel;
@@ -181,8 +185,43 @@ function iconGun(pb, f) {
   }
   if (f.glow) { const g = { cold: 0xbfefff, green: 0xc8ff9a, purple: 0xe8c8ff, red: 0xffb0a0 }[f.glow]; pb.set(mx, by, g); pb.set(bx0 + 2, by, g); }
 }
+// ---- 0.8 : fouet, bâton du houngan, marteau de pont, sarbacane, boomerang
+function iconWhip(pb, f) {
+  const B = R(f.bl || 'leather'), H = R(f.hi || 'wood');
+  for (let x = 1; x <= 4; x++) { diag(pb, x, 0, H[3]); diag(pb, x, 1, H[1]); }
+  for (let i = 0; i <= 26; i++) { const t = i / 26, a = t * Math.PI * 2.2, r = 5.2 * (1 - t * 0.55); const x = Math.round(9.5 + Math.cos(a) * r), y = Math.round(6 + Math.sin(a) * r * 0.8 - t * 1.5); pb.set(x, y, i % 3 ? B[3] : B[2]); }
+  pb.set(5, 10, B[2]); pb.set(6, 9, B[3]);
+}
+function iconStaff(pb, f) {
+  const B = R(f.bl || 'bone'), H = R(f.hi || 'ebony');
+  for (let x = 0; x <= 10; x++) { diag(pb, x, 0, x % 3 ? H[3] : H[4]); diag(pb, x, 1, H[1]); }
+  pb.disc(12.2, 3.2, 2.6, B[3]); pb.set(11, 3, 0x0a0606); pb.set(13, 3, 0x0a0606); pb.hl(11, 5, 3, B[1]); pb.set(12, 1, B[4]);
+  for (const [x, y, c] of [[9, 2, 0xd03a3a], [8, 3, 0x3a8ad0], [10, 7, 0xf2c14a]]) { pb.set(x, y, c); pb.set(x - 1, y + 1, c); }
+}
+function iconHammer(pb, f) {
+  const B = R(f.bl || 'iron'), H = R(f.hi || 'wood');
+  for (let x = 1; x <= 10; x++) { diag(pb, x, 0, (x % 2) ? H[3] : H[2]); diag(pb, x, 1, H[1]); }
+  for (let j = -3; j <= 3; j++) for (let k = 0; k <= 2; k++) pb.set(10 + j + k, 3 + j - k + 2, j === -3 ? B[4] : j === 3 ? B[1] : B[k === 0 ? 3 : 2]);
+}
+function iconTube(pb, f) {
+  const W = R(f.wood || 'wood'), M = R(f.metal || 'bronze');
+  for (let x = 1; x <= 15; x++) { diag(pb, x, 0, x % 4 === 0 ? W[1] : W[3]); diag(pb, x, 1, W[2]); }
+  for (const x of [5, 10]) { diag(pb, x, 0, M[3]); diag(pb, x, 1, M[2]); }
+  pb.set(14, 0, 0x8ad04a); pb.set(15, 1, 0xd8ff9a);
+}
+function iconBoomer(pb, f) {
+  const W = R(f.wood || 'walnut');
+  for (let i = 0; i <= 12; i++) { const t = i / 12, x = Math.round(2 + t * 6), y = Math.round(13 - t * 9); pb.set(x, y, W[3]); pb.set(x + 1, y, W[2]); pb.set(x + 1, y + 1, W[1]); }
+  for (let i = 0; i <= 12; i++) { const t = i / 12, x = Math.round(8 + t * 6), y = Math.round(4 + t * 9); pb.set(x, y, W[3]); pb.set(x - 1, y, W[2]); pb.set(x, y + 1, W[1]); }
+  for (const [x, y] of [[5, 9], [11, 9]]) pb.set(x, y, 0xd03a3a);
+}
 export function drawWeaponIcon(pb, f) {
   if (!f) return;
+  if (f.k === 'whip') return iconWhip(pb, f);
+  if (f.k === 'staff') { iconStaff(pb, f); if (f.glow) { pb.set(12, 0, 0xf0d8ff); pb.set(14, 2, 0xf0d8ff); } return; }
+  if (f.k === 'blunt' && f.head === 'hammer') return iconHammer(pb, f);
+  if (f.k === 'gun' && f.type === 'tube') return iconTube(pb, f);
+  if (f.k === 'gun' && f.type === 'boomer') return iconBoomer(pb, f);
   if (f.k === 'gun') iconGun(pb, f);
   else if (f.k === 'axe') iconAxe(pb, f);
   else if (f.k === 'spear') iconSpear(pb, f);
@@ -301,6 +340,38 @@ function heldPole(f) {
   }
   return { pb, gx: Math.round(len * 0.35), gy: cy };
 }
+function heldWhip(f) { // manche court, lanière enroulée qui pend
+  const B = R(f.bl || 'leather'), H = R(f.hi || 'wood'), pb = new PB(22, 14), cy = 5;
+  heldShaft(pb, f, 0, 5, cy);
+  for (let i = 0; i <= 22; i++) { const t = i / 22, x = Math.round(6 + t * 14), y = Math.round(cy + Math.sin(t * Math.PI * 1.5) * 4 * t); pb.set(x, y, i % 3 ? B[3] : B[2]); }
+  return { pb, gx: 2, gy: cy };
+}
+function heldStaff(f) {
+  const B = R(f.bl || 'bone'), H = R(f.hi || 'ebony'), len = f.len || 15, pb = new PB(len + 6, 13), cy = 7;
+  heldShaft(pb, { hi: f.hi || 'ebony' }, 0, len, cy);
+  pb.disc(len + 2.5, cy - 0.5, 2.6, B[3]); pb.set(len + 2, cy - 1, 0x0a0606); pb.set(len + 4, cy - 1, 0x0a0606); pb.hl(len + 1, cy + 1, 3, B[1]);
+  for (const [dx, dy, c] of [[-1, 3, 0xd03a3a], [0, 4, 0x3a8ad0], [-2, 4, 0xf2c14a]]) pb.set(len + dx, cy + dy, c);
+  return { pb, gx: Math.round(len * 0.4), gy: cy };
+}
+function heldHammer(f) {
+  const B = R(f.bl || 'iron'), len = f.len || 12, pb = new PB(len + 5, 14), cy = 7;
+  heldShaft(pb, f, 0, len - 1, cy);
+  for (let x = len - 1; x <= len + 3; x++) for (let y = cy - 5; y <= cy + 6; y++) pb.set(x, y, y === cy - 5 ? B[4] : y === cy + 6 ? B[1] : x === len - 1 ? B[2] : B[3]);
+  return { pb, gx: 2, gy: cy };
+}
+function heldTube(f) {
+  const W = R(f.wood || 'wood'), M = R(f.metal || 'bronze'), len = f.len || 13, pb = new PB(len + 2, 6), by = 2;
+  for (let x = 0; x < len; x++) { pb.set(x, by, x % 5 === 0 ? W[1] : W[3]); pb.set(x, by + 1, W[2]); }
+  for (const x of [3, Math.round(len * 0.6)]) { pb.set(x, by, M[3]); pb.set(x, by + 1, M[2]); }
+  return { pb, gx: 3, gy: by + 1 };
+}
+function heldBoomer(f) {
+  const W = R(f.wood || 'walnut'), pb = new PB(12, 12);
+  for (let i = 0; i <= 8; i++) { pb.set(2 + i, 6 - (i >> 1), W[3]); pb.set(2 + i, 7 - (i >> 1), W[2]); }
+  for (let i = 0; i <= 6; i++) { pb.set(2 + (i >> 1), 7 + i, W[3]); pb.set(3 + (i >> 1), 7 + i, W[1]); }
+  pb.set(6, 4, 0xd03a3a);
+  return { pb, gx: 3, gy: 7 };
+}
 function heldGun(f) {
   const M = R(f.metal || 'steel'), W = R(f.wood || 'wood'), BR = R('brass');
   const rifle = f.type === 'rifle', len = f.len || 8;
@@ -343,7 +414,12 @@ export function heldWeapon(f, key) {
   let s = heldCache.get(k);
   if (s) return s;
   let r;
-  if (f.k === 'gun') r = heldGun(f);
+  if (f.k === 'whip') r = heldWhip(f);
+  else if (f.k === 'staff') r = heldStaff(f);
+  else if (f.k === 'blunt' && f.head === 'hammer') r = heldHammer(f);
+  else if (f.k === 'gun' && f.type === 'tube') r = heldTube(f);
+  else if (f.k === 'gun' && f.type === 'boomer') r = heldBoomer(f);
+  else if (f.k === 'gun') r = heldGun(f);
   else if (f.k === 'blade' || !f.k) r = heldBlade(f);
   else r = heldPole(f);
   r.pb.outline('auto');

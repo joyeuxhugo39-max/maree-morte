@@ -142,6 +142,10 @@ kbd { font-family: var(--ui); font-size: 11px; background: #2a1a10; color: var(-
 .paperdoll .eslot[data-slot=trinket] { grid-column: 3; grid-row: 3; }
 .paperdoll .eslot[data-slot=boots] { grid-column: 2; grid-row: 4; }
 .paperdoll .eslot[data-slot=outfit] { grid-column: 3; grid-row: 4; background-image: var(--slot-gold); }
+.paperdoll .eslot[data-slot=mount] { grid-column: 1; grid-row: 4; background-image: var(--slot-gold); }
+/* 0.8 : la longue-vue, un cercle de lumière dans le noir */
+body.spy #view { -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0 40%, rgba(0,0,0,0.6) 43%, transparent 58%); mask-image: radial-gradient(circle at 50% 50%, #000 0 40%, rgba(0,0,0,0.6) 43%, transparent 58%); }
+body.spy { background: #050308; }
 .paperdoll { grid-template-rows: 52px 52px 52px 52px; }
 .slot, .eslot { position: relative; width: 48px; height: 48px; background: #2a1a10 var(--slot) no-repeat; background-size: 48px 48px; image-rendering: pixelated; cursor: pointer; }
 .slot img, .eslot img { position: absolute; left: 8px; top: 8px; width: 32px; height: 32px; image-rendering: pixelated; pointer-events: none; }

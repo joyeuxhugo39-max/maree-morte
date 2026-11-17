@@ -18,6 +18,8 @@ import { hash2 } from '../../shared/rng.js';
 import { extend06, petSheets, drawTentacle } from './sprites-06.js';
 import { extend07 } from './sprites-07.js';
 import { volcanoGen, makePuffs, makeSplats } from './sprites-volcan.js';
+import './sprites-08.js';
+import { mountSheet } from './sprites-mounts.js';
 
 const TAU = Math.PI * 2;
 const TREES = new Set(['tree', 'jtree', 'palm', 'deadtree']);
@@ -157,7 +159,7 @@ export class Renderer {
   resize(w, h) {
     this.lastW = w; this.lastH = h;
     this.baseScale = this.zoom > 0 ? this.zoom : Math.max(1, Math.round(Math.min(w, h) / 400));
-    const scale = this.baseScale + (this.boost || 0);
+    const scale = Math.max(0.5, (this.baseScale + (this.boost || 0)) * (this.spy ? 0.5 : 1));
     this.scale = scale;
     this.W = Math.ceil(w / scale); this.H = Math.ceil(h / scale);
     this.cv.width = this.W; this.cv.height = this.H;
@@ -526,6 +528,7 @@ export class Renderer {
     ctx.beginPath(); ctx.ellipse(Math.round(e.x - camX), Math.round(e.y - camY) + 1, fr.cv.width * 0.42, fr.cv.height * 0.32, 0, 0, TAU); ctx.fill();
     ctx.drawImage(fr.cv, x0, y0);
     if (fr.sail) ctx.drawImage(fr.sail.cv, x0 + fr.sail.x, y0 + fr.sail.y);
+    if (fr.sails) for (const s of fr.sails) ctx.drawImage(s.cv, x0 + s.x, y0 + s.y);
     if (!(e.dyingT && now - e.dyingT > 0.4)) ctx.drawImage(sh.cv, 0, dir * sh.fh, sh.fw, 21, x0 + fr.seat[0] - sh.ax, y0 + fr.seat[1] - 19, sh.fw, 21);
     // remous et sillage
     const len = (dir === 1 || dir === 2 ? fr.cv.width : fr.cv.height) * 0.42;
@@ -719,6 +722,8 @@ export class Renderer {
     if (!sh) return;
     const boat = e === G.player ? (G.player.boat && ITEMS[G.player.boat] && ITEMS[G.player.boat].boat ? ITEMS[G.player.boat].boat.kind : null) : ((e.flags & 16) && e.bt ? e.bt : null);
     if (boat && e.k === 'p') return this.drawBoat(ctx, e, boat, sh, camX, camY, now);
+    const ride = e.k === 'p' && !e.dyingT ? (e === G.player ? (G.me && G.me.ride) : e.rd) : null;
+    if (ride && !(e.rollT && now - e.rollT < 0.3)) return this.drawRider(ctx, e, ride, sh, camX, camY, now, G);
     let dir = e.dir & 3, frame = 0;
     const atk = now - (e.atkT || -9);
     if (atk < 0.28) dir = dirFromAngle(e.atkA);
@@ -779,6 +784,7 @@ export class Renderer {
       ctx.beginPath(); ctx.ellipse(cx, cy, sh.fw * 0.48, sh.fh * 0.42, 0, 0, TAU); ctx.stroke();
       ctx.fillStyle = 'rgba(255,225,120,0.14)'; ctx.beginPath(); ctx.ellipse(cx, cy, sh.fw * 0.48, sh.fh * 0.42, 0, 0, TAU); ctx.fill();
     }
+    if (e.k === 'm' && e.cc) this.drawCC(ctx, e, sh, camX, camY, now);
     if (water) {
       ctx.strokeStyle = 'rgba(220,250,255,0.6)';
       ctx.lineWidth = 1;
@@ -788,6 +794,47 @@ export class Renderer {
     } else if (e.moving && rnd() < 0.06) {
       const t = tileAt(this.world, e.x, e.y);
       if (t === T.SAND || t === T.DIRT || t === T.MUD) this.burst(e.x, e.y, 1, { z: 1, col: t === T.SAND ? ['#f2dca6', '#d8b77b'] : ['#9c744a', '#b48b5c'], up: 12, speed: 10, life: 0.4, g: 60 });
+    }
+  }
+  drawCC(ctx, e, sh, camX, camY, now) {
+    const c = e.cc, x = Math.round(e.x - camX), head = Math.round(e.y - camY - sh.ay + 2), feet = Math.round(e.y - camY);
+    if ((c.g || 0) > now) { // gel : givre au sol et éclats de glace
+      ctx.fillStyle = 'rgba(190,235,255,0.35)'; ctx.beginPath(); ctx.ellipse(x, feet, 9, 3, 0, 0, TAU); ctx.fill();
+      if (rnd() < 0.3) this.burst(e.x + (rnd() - 0.5) * 12, e.y, 1, { z: 4 + rnd() * 16, col: ['#ffffff', '#bfefff', '#8ac0ec'], up: 4, speed: 4, life: 0.6, g: 10 });
+    } else if ((c.s || 0) > now && rnd() < 0.15) this.burst(e.x + (rnd() - 0.5) * 8, e.y, 1, { z: 14, col: ['#6aa0ea', '#bfefff'], up: -4, speed: 2, life: 0.5, g: 60 });
+    if ((c.e || 0) > now) { // étourdi : des étoiles qui tournent
+      for (let k = 0; k < 3; k++) { const a = now * 6 + k * TAU / 3, sx = x + Math.round(Math.cos(a) * 6), sy = head - 3 + Math.round(Math.sin(a) * 2); ctx.fillStyle = '#ffe14a'; ctx.fillRect(sx - 1, sy, 3, 1); ctx.fillRect(sx, sy - 1, 1, 3); }
+    }
+    if ((c.f || 0) > now) { // peur : un point d'exclamation violet qui tremble
+      const j = Math.round(Math.sin(now * 30)); ctx.fillStyle = '#1c0a24'; ctx.fillRect(x - 2 + j, head - 12, 4, 8); ctx.fillStyle = '#c86aff'; ctx.fillRect(x - 1 + j, head - 11, 2, 4); ctx.fillRect(x - 1 + j, head - 6, 2, 1);
+    }
+    if ((c.m || 0) > now) { // malédiction : un petit crâne violet qui flotte
+      const fy = head - 6 - Math.round(Math.sin(now * 4) * 1.5) - ((c.f || 0) > now ? 9 : 0);
+      ctx.globalAlpha = 0.85; ctx.fillStyle = '#2a0e3a'; ctx.fillRect(x - 3, fy - 3, 7, 6); ctx.fillStyle = '#d8a8ff'; ctx.fillRect(x - 2, fy - 2, 5, 3); ctx.fillRect(x - 1, fy + 1, 3, 1); ctx.fillStyle = '#2a0e3a'; ctx.fillRect(x - 1, fy - 1, 1, 1); ctx.fillRect(x + 1, fy - 1, 1, 1); ctx.globalAlpha = 1;
+    }
+    if ((c.p || 0) > now && rnd() < 0.2) this.burst(e.x + (rnd() - 0.5) * 10, e.y, 1, { z: 6 + rnd() * 10, col: ['#8ad04a', '#d8ff9a', '#4a922a'], up: 12, speed: 3, life: 0.7, g: -12 });
+  }
+  // un pirate en selle : la bête, le cavalier (sans les jambes), puis la tête de la bête quand elle nous fait face
+  drawRider(ctx, e, kind, sh, camX, camY, now, G) {
+    const m = mountSheet(kind);
+    let dir = e.dir & 3;
+    if (now - (e.atkT || -9) < 0.28) dir = dirFromAngle(e.atkA);
+    const frame = e.moving ? Math.floor((e.walk || 0) * 7) % 4 : 0, bob = e.moving && frame % 2 ? 1 : 0;
+    const ox = Math.round(e.x - camX), oy = Math.round(e.y - camY);
+    ctx.save();
+    if (e.flags & 4 && Math.floor(now * 16) % 2 === 0) ctx.globalAlpha *= 0.55;
+    ctx.fillStyle = 'rgba(20,12,34,0.26)'; ctx.beginPath(); ctx.ellipse(ox, oy, kind === 'tortue' || kind === 'crabe' ? 14 : 11, 3.5, 0, 0, TAU); ctx.fill();
+    ctx.drawImage(m.back, frame * m.fw, dir * m.fh, m.fw, m.fh, ox - m.ax, oy - m.ay, m.fw, m.fh);
+    const st = m.seat[dir], rx = ox + st.x - sh.ax, ry = oy + st.y - sh.ay - bob;
+    const hw = now - (e.hitT || -9) < 0.09;
+    if (dir === 3) this.drawWeapon(ctx, e, sh, sh.meta[dir][0], rx, ry, now, dir);
+    ctx.drawImage(hw ? whiteSheet(sh) : sh.cv, 0, dir * sh.fh, sh.fw, sh.fh - st.cut, rx, ry, sh.fw, sh.fh - st.cut);
+    if (dir !== 3) this.drawWeapon(ctx, e, sh, sh.meta[dir][0], rx, ry, now, dir);
+    ctx.drawImage(m.front, frame * m.fw, dir * m.fh, m.fw, m.fh, ox - m.ax, oy - m.ay, m.fw, m.fh);
+    ctx.restore();
+    if (e.moving && rnd() < (kind === 'autruche' || kind === 'pursang' || kind === 'squelette' ? 0.5 : 0.25)) {
+      const t = tileAt(this.world, e.x, e.y);
+      this.burst(e.x + (rnd() - 0.5) * 10, e.y, 1, { z: 1, col: kind === 'squelette' ? ['#7aff8a', '#2a6a3a'] : t === T.SAND ? ['#f2dca6', '#d8b77b'] : ['#9c744a', '#b48b5c', '#c8b898'], up: 10, speed: 12, life: 0.45, g: 50 });
     }
   }
   drawWeapon(ctx, e, sh, meta, x, y, now, dir) {
@@ -892,6 +939,16 @@ export class Renderer {
         ctx.beginPath(); ctx.ellipse(x, y - 8, 30, 22, 0, a, a + 4.2); ctx.stroke();
         ctx.strokeStyle = `rgba(160,220,255,${0.6 * (1 - k)})`; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.ellipse(x, y - 8, 24, 17, 0, a + 1, a + 5); ctx.stroke();
+      } else if (f.kind === 'zap') { // éclair : une ligne brisée qui scintille
+        if (!f.pts) { f.pts = []; for (let k = 0; k <= 6; k++) f.pts.push([(rnd() - 0.5) * 7, (rnd() - 0.5) * 7]); }
+        const x0 = f.x0 - camX, y0 = f.y0 - camY, x1 = f.x1 - camX, y1 = f.y1 - camY;
+        for (const [w, col] of [[3, `rgba(110,140,255,${(1 - k) * 0.6})`], [1, `rgba(255,255,255,${1 - k})`]]) {
+          ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath();
+          for (let s = 0; s <= 6; s++) { const t = s / 6, j = s === 0 || s === 6 ? [0, 0] : f.pts[s]; const px = x0 + (x1 - x0) * t + j[0], py = y0 + (y1 - y0) * t + j[1]; if (s) ctx.lineTo(px, py); else ctx.moveTo(px, py); }
+          ctx.stroke();
+        }
+      } else if (f.kind === 'chain') {
+        ctx.strokeStyle = `rgba(70,70,84,${1 - k})`; ctx.setLineDash([2, 1]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(f.x0 - camX, f.y0 - camY); ctx.lineTo(f.x1 - camX, f.y1 - camY); ctx.stroke(); ctx.setLineDash([]);
       } else if (f.kind === 'ring') {
         ctx.strokeStyle = f.col.replace('A', (1 - k).toFixed(2)); ctx.lineWidth = f.w || 2;
         ctx.beginPath(); ctx.ellipse(x, y - (f.dy || 0), f.r * k + 2, (f.r * k + 2) * 0.65, 0, 0, TAU); ctx.stroke();
@@ -947,6 +1004,31 @@ export class Renderer {
         ctx.fillStyle = '#ff6a1e'; ctx.fillRect(Math.round(x - dx * 3), Math.round(y - dy * 3), 2, 2);
         ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.6; ctx.drawImage(this.glows.warm, x - 8, y - 8, 16, 16); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
         if (rnd() < 0.5) this.burst(p.x, p.y + 9, 1, { z: 9, col: ['#ffd24a', '#ff8a2a', '#ff5a1a'], up: 10, speed: 8, life: 0.35, g: -20 });
+        continue;
+      }
+      if (p.kind === 'dart') { // fléchette empoisonnée
+        ctx.strokeStyle = '#d8c8a0'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - dx * 5, y - dy * 5); ctx.lineTo(x, y); ctx.stroke();
+        ctx.fillStyle = '#8ad04a'; ctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, 2, 2);
+        continue;
+      }
+      if (p.kind === 'boomer') { // boomerang qui tournoie
+        const a = p.t * 18, c = Math.cos(a), s = Math.sin(a);
+        ctx.strokeStyle = '#3a2010'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - c * 4, y - s * 4); ctx.lineTo(x, y); ctx.lineTo(x - s * 4, y + c * 4); ctx.stroke();
+        ctx.strokeStyle = '#a06a3a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - c * 4, y - s * 4); ctx.lineTo(x, y); ctx.lineTo(x - s * 4, y + c * 4); ctx.stroke();
+        continue;
+      }
+      if (p.kind === 'hook') { // grappin au bout de sa chaîne
+        const o = this.G && p.owner ? (p.owner === this.G.myId ? this.G.player : this.G.ents.get(p.owner)) : null;
+        if (o) { ctx.strokeStyle = 'rgba(60,60,72,0.9)'; ctx.setLineDash([2, 1]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(o.x - camX, o.y - 9 - camY); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]); }
+        ctx.fillStyle = '#2a2a34'; ctx.fillRect(Math.round(x) - 2, Math.round(y) - 2, 4, 4); ctx.fillStyle = '#a4a4b4'; ctx.fillRect(Math.round(x + dx * 2) - 1, Math.round(y + dy * 2) - 1, 2, 2);
+        continue;
+      }
+      if (p.kind === 'frost' || p.kind === 'zap' || p.kind === 'wisp') {
+        const g = p.kind === 'frost' ? this.glows.cold : p.kind === 'zap' ? this.glows.cold : this.glows.purple;
+        ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.75; ctx.drawImage(g, x - 9, y - 9, 18, 18); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+        if (p.kind === 'frost') { ctx.fillStyle = '#ffffff'; ctx.fillRect(Math.round(x) - 1, Math.round(y) - 2, 2, 4); ctx.fillRect(Math.round(x) - 2, Math.round(y) - 1, 4, 2); ctx.fillStyle = '#8ac0ec'; ctx.fillRect(Math.round(x - dx * 3), Math.round(y - dy * 3), 1, 1); }
+        else if (p.kind === 'zap') { ctx.fillStyle = '#ffffff'; ctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, 3, 3); for (let k = 0; k < 2; k++) { ctx.fillStyle = '#a8c4ff'; ctx.fillRect(Math.round(x + (rnd() - 0.5) * 8), Math.round(y + (rnd() - 0.5) * 8), 1, 1); } }
+        else { ctx.fillStyle = '#e8c8ff'; ctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, 3, 3); if (rnd() < 0.7) this.burst(p.x, p.y + 9, 1, { z: 9, col: ['#b06aff', '#e8c8ff', '#6a2aa0'], up: 4, speed: 4, life: 0.5, g: -6 }); }
         continue;
       }
       if (p.kind === 'curse' || p.kind === 'note') {
@@ -1335,7 +1417,8 @@ export class Renderer {
       }
       if (e.type === 'tentacule') { if (e.hp < 100) this.hpBar(ctx, x, Math.round(e.y - camY) - 58, 18, e.hp / 100, '#e04a3a'); continue; }
       const sh = e.sheet;
-      const top = Math.round(e.y - camY - (sh ? sh.ay : 26) + (e.type === 'boss' ? 4 : 2) + (e.k === 'p' && (e === G.player ? G.player.boat : (e.flags & 16)) ? 5 : 0));
+      const riding = e.k === 'p' && (e === G.player ? G.me && G.me.ride : e.rd);
+      const top = Math.round(e.y - camY - (sh ? sh.ay : 26) + (e.type === 'boss' ? 4 : 2) + (e.k === 'p' && (e === G.player ? G.player.boat : (e.flags & 16)) ? 5 : 0) - (riding ? 12 : 0));
       if (e.k === 'p') {
         const me = e === G.player;
         const pvp = !me && G.player && G.zone >= 0 && !SAFE.has(G.zone) && !SAFE.has(zoneAt(this.world, e.x, e.y));

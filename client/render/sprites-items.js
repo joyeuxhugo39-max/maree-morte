@@ -2,6 +2,7 @@
 import { PB, shade, mix } from './pixel.js';
 import { ITEMS } from '../../shared/data/items.js';
 import { drawWeaponIcon } from './weapons.js';
+import { mountIcon } from './sprites-mounts.js';
 
 const GOLD = [0x7a4a12, 0xa86e1c, 0xd49a2a, 0xf2c14a, 0xffe58a];
 const IRON = [0x1d1c24, 0x2c2b36, 0x403f4e, 0x5a596b, 0x7c7b8f, 0xa2a1b2];
@@ -378,6 +379,8 @@ const P = {
 };
 
 const cache = new Map();
+// 0.8 : d'autres modules ajoutent leurs icônes
+export function registerIcons(map) { Object.assign(P, map); }
 export function iconCanvas(icon, tint, scale = 1) {
   const key = icon + '|' + (tint || '') + '|' + scale;
   let c = cache.get(key);
@@ -386,6 +389,7 @@ export function iconCanvas(icon, tint, scale = 1) {
   const fn = P[icon] || P.map;
   if (icon && icon.startsWith('w:')) drawWeaponIcon(pb, ITEMS[icon.slice(2)] && ITEMS[icon.slice(2)].form);
   else if (icon && icon.startsWith('o:')) P.outfit(pb, (ITEMS[icon.slice(2)] && ITEMS[icon.slice(2)].outfit) || {});
+  else if (icon && icon.startsWith('m:')) mountIcon(pb, (ITEMS[icon.slice(2)] && ITEMS[icon.slice(2)].mount && ITEMS[icon.slice(2)].mount.kind) || 'cheval');
   else if (icon === 'tricorne_big') P.tricorne(pb, true);
   else if (icon === 'shirt_striped') P.shirt(pb, 'white', true);
   else if (icon === 'vest') P.shirt(pb, 'white', false, true);

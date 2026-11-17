@@ -25,9 +25,9 @@ export const T = {
 
 export const SPEED_MUL = { [T.WATER]: 0.62, [T.SWAMP]: 0.55, [T.MUD]: 0.86, [T.ASH]: 0.94 };
 
-export const SLOTS = ['weapon', 'gun', 'hat', 'body', 'boots', 'trinket', 'outfit'];
+export const SLOTS = ['weapon', 'gun', 'hat', 'body', 'boots', 'trinket', 'outfit', 'mount'];
 export const SLOT_NAMES = {
-  weapon: 'Arme', gun: 'Pistolet', hat: 'Chapeau', body: 'Torse', boots: 'Bottes', trinket: 'Talisman', outfit: 'Tenue',
+  weapon: 'Arme', gun: 'Pistolet', hat: 'Chapeau', body: 'Torse', boots: 'Bottes', trinket: 'Talisman', outfit: 'Tenue', mount: 'Monture',
 };
 export const RARITY = [
   { name: 'Commun', color: '#efe6d2' },

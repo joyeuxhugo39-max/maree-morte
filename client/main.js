@@ -74,6 +74,7 @@ window.MM_OUTFITS = Object.entries(ITEMS).filter(([, it]) => it.slot === 'outfit
 async function boot(hotData = {}) {
   G.world = generateWorld(7);
   G.renderer = new Renderer($('view'), G.world);
+  G.renderer.G = G;
   G.allNpcs = G.world.npcs.map((n) => ({ ...n, name: NPCS[n.id].name, look: NPCS[n.id].look, parrot: !!NPCS[n.id].parrot, board: !!NPCS[n.id].board }));
   G.npcs = G.allNpcs.filter((n) => !NPCS[n.id].vis);
   G.ui = new UI(G);
@@ -192,6 +193,7 @@ function onMsg(m) {
     }
     case 'q': G.quests = m.q; G.refreshNpcs(); ui.renderTracker(); break;
     case 'map': G.mapPlayers = m.pl; break;
+    case 'spy': G.spyUntil = now + m.dur; G.renderer.spy = true; G.renderer.resize(G.renderer.lastW, G.renderer.lastH); document.body.classList.add('spy'); G.sfx.play('pickup'); break;
     case 'erupt': { // le volcan se réveille
       G.eruptUntil = now + m.dur; G.quakeAt = now + 0.6;
       G.renderer.shake(6, 1.6); G.sfx.play('rumble'); G.sfx.play('boom', 0.9); setTimeout(() => G.sfx.play('roar', 0.5), 500);
@@ -349,6 +351,7 @@ function onEvent(ev, t) {
       const mine = id === me;
       if ((mine || by === me) && G.player && G.player.boat) G.seaFight = now + 9;
       if (dot === 'g') { R.text(e.x, e.y - 6, v, '#c86aff'); if (mine) { G.ui.hurtFlash(); G.sfx.play('hurt'); } break; }
+      if (dot === 'p') { e.cc = e.cc || {}; e.cc.p = now + 1.2; R.text(e.x, e.y - 6, v, '#8ad04a'); if (mine) G.ui.hurtFlash(); break; }
       if (dot) { R.text(e.x, e.y - 6, v, dot === 'f' ? '#ffa040' : '#d83a3a'); R.burst(e.x, e.y - 6, 3, { z: 10, col: dot === 'f' ? ['#ffd24a', '#ff8a2a'] : ['#a01818', '#d83a3a'], speed: 20, up: dot === 'f' ? 30 : 10, life: 0.4, g: dot === 'f' ? -20 : 120 }); break; }
       e.hitT = now;
       R.text(e.x, e.y - (e.type === 'boss' ? 24 : 0), v, mine ? '#ff6a5a' : crit ? '#ffd23a' : '#ffffff', !!crit);
@@ -374,7 +377,7 @@ function onEvent(ev, t) {
     }
     case 'proj': {
       const [, pid, x, y, a, sp, range, kind, owner] = ev;
-      R.projs.set(pid, { x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, speed: sp, left: range, kind, t: 0 });
+      R.projs.set(pid, { x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, speed: sp, left: range, kind, t: 0, owner });
       R.addFx({ kind: 'flash', x: x + Math.cos(a) * 4, y: y + Math.sin(a) * 4, r: kind === 'ball' ? 5 : 4, dur: 0.08 });
       R.smoke(x + Math.cos(a) * 5, y + 9, 3, 'rgba(220,220,220,0.5)', { z: 9, size: 2, life: 0.6 });
       if (owner !== me && kind !== 'ball') G.sfx.play('shot', vol(x, y) * 0.6);
@@ -392,6 +395,17 @@ function onEvent(ev, t) {
       break;
     }
     case 'tele': R.teles.push({ x: ev[1], y: ev[2], r: ev[3], dur: ev[4], t0: now, style: ev[5] || 0 }); break;
+    // 0.8 : trajectoires vivantes (ricochet, boomerang, balle chercheuse), états, éclairs, grappin, montures
+    case 'pv': { const p = R.projs.get(ev[1]); if (p) { p.x = ev[2]; p.y = ev[3]; p.vx = Math.cos(ev[4]) * p.speed; p.vy = Math.sin(ev[4]) * p.speed; p.left = ev[5]; } break; }
+    case 'pd': R.projs.delete(ev[1]); break;
+    case 'cc': if (e) { e.cc = e.cc || {}; e.cc[ev[2]] = now + ev[3]; if (ev[2] === 'e') G.sfx.play('hit', vol(e.x, e.y) * 0.5); if (ev[2] === 'g') R.burst(e.x, e.y - 8, 10, { z: 10, col: ['#ffffff', '#bfefff', '#8ac0ec'], up: 30, speed: 25, life: 0.5 }); } break;
+    case 'zap': R.addFx({ kind: 'zap', x0: ev[1], y0: ev[2], x1: ev[3], y1: ev[4], dur: 0.28 }); if (Math.random() < 0.5) G.sfx.play('crit', vol(ev[3], ev[4]) * 0.6); break;
+    case 'hookfx': R.addFx({ kind: 'chain', x0: ev[1], y0: ev[2], x1: ev[3], y1: ev[4], dur: 0.35 }); G.sfx.play('roll', vol(ev[3], ev[4]) * 0.6); break;
+    case 'ride': if (e) {
+      R.smoke(e.x, e.y, 8, 'rgba(220,200,160,0.5)', { size: 2, life: 0.6 });
+      if (ev[1] !== me) e.rd = ev[2] ? ev[3] : '';
+      G.sfx.play(ev[2] ? 'roll' : 'pickup', vol(e.x, e.y) * 0.7);
+    } break;
     case 'lavabomb': { // une bombe jaillit du cratère et retombe sur son cercle
       const V = G.world.volcano, v = R.volc, x0 = v ? v.wx : V.cx, y0 = v ? v.wy : V.cy - V.h + 44;
       R.lavaBombs.push({ x0: x0 + (Math.random() - 0.5) * 40, y0, x1: ev[1], y1: ev[2], t0: now, dur: ev[3], arc: 140 + Math.random() * 120 });
@@ -470,6 +484,9 @@ function onEvent(ev, t) {
       const [, k, x, y, id] = ev;
       if (k === 'spawn' || k === 'summon') { R.smoke(x, y, 8, k === 'summon' ? 'rgba(120,255,140,0.5)' : 'rgba(150,200,140,0.4)', { size: 3 }); if (k === 'summon') G.sfx.play('summon', vol(x, y)); }
       else if (k === 'respawn') R.burst(x, y, 20, { col: ['#ffffff', '#bfe8ff'], up: 60, speed: 30, life: 0.8 });
+      else if (k === 'recall') { R.addFx({ kind: 'ring', x, y, r: 40, dur: 3, col: 'rgba(255,170,220,A)', w: 2 }); G.sfx.play('conch', vol(x, y) * 0.7); }
+      else if (k === 'smoke') { R.smoke(x, y, 30, 'rgba(40,34,44,0.7)', { size: 4, life: 1.6, spread: 30 }); G.sfx.play('boom', vol(x, y) * 0.3); }
+      else if (k === 'buff') { const col = { spd: ['#f2d85a', '#fff2a0'], atk: ['#e85a4a', '#ffb0a0'], def: ['#9aa0b4', '#ffffff'] }[ev[5]] || ['#ffffff']; R.burst(x, y, 18, { z: 8, col, up: 50, speed: 20, life: 0.9, g: -20 }); G.sfx.play('level', vol(x, y) * 0.4); }
       else if (k === 'rum' || k === 'drink' || k === 'eat') { R.burst(x, y, 10, { col: k === 'eat' ? ['#ffe14a', '#fff'] : ['#7aff8a', '#c8ffd0'], up: 40, speed: 15, life: 0.7, g: -10 }); if (id === me) G.sfx.play(k === 'eat' ? 'pickup' : 'drink'); }
       else if (k === 'chest') R.burst(x, y - 6, 24, { col: ['#ffd23a', '#fff2a0', '#ffffff'], up: 70, speed: 35, life: 0.9 });
       else if (k === 'dig') { R.burst(x, y, 30, { col: ['#8a623f', '#a0774d', '#6a4830'], up: 60, speed: 40, life: 0.8, size: 2 }); R.burst(x, y - 4, 30, { col: ['#ffd23a', '#fff2a0'], up: 90, speed: 30, life: 1.1 }); R.addFx({ kind: 'ring', x, y, r: 40, dur: 0.7, col: 'rgba(255,220,100,A)', w: 2 }); G.sfx.play('dig', vol(x, y)); setTimeout(() => G.sfx.play('chest', vol(x, y)), 700); }
@@ -878,6 +895,7 @@ function frame(now, dt) {
   G.renderer.drunk = G.me && G.me.drunk > 0 ? Math.max(0, 1 - (now - G.meAt) / G.me.drunk) * 1 : 0;
   updateFolk(dt);
   if (now - (G.ambAt || 0) > 0.4) { G.ambAt = now; ambience(now); G.objective = computeObjective(); }
+  if (G.renderer.spy && (now > (G.spyUntil || 0) || G.room >= 0)) { G.renderer.spy = false; G.renderer.resize(G.renderer.lastW, G.renderer.lastH); document.body.classList.remove('spy'); }
   if (now < (G.eruptUntil || 0) && G.zone === Z.VOLCAN && now > (G.quakeAt || 0)) { // la terre tremble tant que dure l'éruption
     G.quakeAt = now + 0.7 + Math.random() * 0.8; G.renderer.shake(1.6, 0.35);
     if (Math.random() < 0.22) G.sfx.play('rumble', 0.45);
@@ -900,6 +918,7 @@ function handleKeys(now) {
     if (k.code === 'Escape') { if (G.build && !ui.open) stopBuild(); else ui.close(); continue; }
     if (k.key === 'i' || k.code === 'Tab') { ui.toggle('inventory'); continue; }
     if (k.key === 'b') { if (G.build) stopBuild(); else startBuild(null); continue; }
+    if (k.key === 'c') { G.send({ t: 'ride' }); continue; }
     if (k.key === 'x' && G.build) { unplaceHovered(); continue; }
     if (k.code === 'MouseRight' && G.build) { unplaceHovered(); continue; }
     if (k.key === 'j' || k.key === 'l') { ui.toggle('quests'); continue; }

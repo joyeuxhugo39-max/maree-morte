@@ -14,6 +14,9 @@ const PAL = {
   brick: { rim: 0xe0c08a, rimD: 0x9a6a3a, plank: 0x8a5a30, plankD: 0x6a4224, side: 0x6a1418, keel: 0x1a0a0c },
   noir: { rim: 0x5a4a3a, rimD: 0x3a2e24, plank: 0x3a2e24, plankD: 0x2a2018, side: 0x141418, keel: 0x08080a },
   ghost: { rim: 0xc8f0d8, rimD: 0x7ab09a, plank: 0x6a9a86, plankD: 0x4a7a68, side: 0x2a4a44, keel: 0x10201c },
+  // 0.8 : goélette (coque bleu canard), galion (rouge sombre et or)
+  goelette: { rim: 0xe8d0a0, rimD: 0xa8885a, plank: 0x9a7048, plankD: 0x7a5434, side: 0x1a4a52, keel: 0x0a1e22 },
+  galion: { rim: 0xf2c14a, rimD: 0xa86e1c, plank: 0x7a4a2a, plankD: 0x5a341c, side: 0x5a1418, keel: 0x1a0a0a },
 };
 const SAILS = {
   white: SAIL,
@@ -161,6 +164,61 @@ function sloop(dir, P = PAL.sloop, sails = SAIL) {
   return { cv: pb.toCanvas(), ax, ay, seat, sail };
 }
 
+// ---- 0.8 : le radeau, et les grands navires à plusieurs mâts
+function radeau(dir) {
+  const side = dir === 1 || dir === 2, w = side ? 30 : 22, h = side ? 20 : 28, pb = new PB(w, h);
+  const LOG = [0x2a1a0c, 0x4a3018, 0x6a4626, 0x8a5c34, 0xa87444];
+  if (side) {
+    for (let k = 0; k < 4; k++) { const y = 6 + k * 3; for (let x = 2; x < 28; x++) { pb.set(x, y, LOG[3 - (x % 7 === 0 ? 1 : 0)]); pb.set(x, y + 1, LOG[2]); pb.set(x, y + 2, LOG[1]); } pb.set(1, y + 1, LOG[3]); pb.set(28, y + 1, LOG[3]); }
+    for (const x of [6, 22]) for (let y = 5; y <= 16; y++) pb.set(x, y, 0xc8b078);
+    pb.vl(15, 0, 8, LOG[1]); pb.set(16, 1, 0xd03a3a); pb.set(17, 1, 0xd03a3a); pb.set(16, 2, 0xd03a3a);
+  } else {
+    for (let k = 0; k < 5; k++) { const x = 2 + k * 4; for (let y = 3; y < 26; y++) { pb.set(x, y, LOG[3 - (y % 6 === 0 ? 1 : 0)]); pb.set(x + 1, y, LOG[2]); pb.set(x + 2, y, LOG[1]); } }
+    for (const y of [7, 21]) for (let x = 1; x <= 21; x++) pb.set(x, y, 0xc8b078);
+  }
+  pb.outline('auto');
+  const out = dir === 1 ? pb.mirror() : pb;
+  return { cv: out.toCanvas(), ax: w >> 1, ay: side ? 13 : 16, seat: [w >> 1, side ? 11 : 15] };
+}
+// navire à plusieurs mâts : coque plus longue, une voile par mât
+function bigShip(dir, P, sails, L, maxW, masts) {
+  SP = sails;
+  let pb, seat, ax, ay;
+  const list = [];
+  if (dir === 1 || dir === 2) {
+    const W = L + 6, H = Math.round(maxW * 2 + 12);
+    pb = new PB(W, H);
+    const cy = Math.round(maxW + 4);
+    hullH(pb, 2, L + 2, cy, maxW, 0.8, 3, P, true);
+    for (let x = 6; x < L - 4; x += 7) pb.vl(x, cy - Math.round(maxW * 0.6), Math.round(maxW * 1.3), WOOD[3]);
+    pb.rect(Math.round(L * 0.08), cy - 4, 9, 8, WOOD[2]); pb.hl(Math.round(L * 0.08), cy - 4, 9, WOOD[4]); // dunette
+    for (const y of [cy - Math.round(maxW) - 1, cy + Math.round(maxW)]) for (let k = 0; k < masts.length + 1; k++) { const x = Math.round(L * (0.25 + k * 0.17)); pb.rect(x, y, 4, 2, IRON[3]); pb.set(x + 4, y, IRON[1]); }
+    pb.hl(L + 2, cy, 4, WOOD[3]);
+    for (const t of masts) pb.disc(Math.round(2 + L * t), cy, 1.8, WOOD[0]);
+    pb.outline('auto');
+    for (const t of masts) { const s = sloopSailSide(true); list.push({ cv: s.cv, x: Math.round(2 + L * t) + 4 + s.dx, y: cy + s.dy }); }
+    seat = [Math.round(L * 0.16), cy]; ax = Math.round(L / 2); ay = cy + 2;
+    if (dir === 1) {
+      pb = pb.mirror(); seat = [W - seat[0], cy]; ax = W - ax;
+      list.length = 0;
+      for (const t of masts) { const s = sloopSailSide(false); list.push({ cv: s.cv, x: W - (Math.round(2 + L * t) + 4) + s.dx, y: cy + s.dy }); }
+    }
+  } else {
+    const down = dir === 0, H = L + 6, W = Math.round(maxW * 2 + 12);
+    pb = new PB(W, H);
+    const cx = Math.round(W / 2);
+    hullV(pb, 2, L + 2, cx, maxW, 0.8, 3, P, down);
+    for (let y = 6; y < L - 2; y += 7) pb.hl(cx - Math.round(maxW * 0.6), y, Math.round(maxW * 1.3), WOOD[3]);
+    for (const t of masts) pb.disc(cx, Math.round(2 + L * (down ? t : 1 - t)), 1.8, WOOD[0]);
+    pb.rect(cx - 4, down ? Math.round(L * 0.8) : Math.round(L * 0.1), 8, 6, WOOD[2]);
+    pb.outline('auto');
+    const order = down ? [...masts].sort((a, b) => a - b) : [...masts].sort((a, b) => b - a);
+    for (const t of order) { const s = sloopSailFront(down); const my = Math.round(2 + L * (down ? t : 1 - t)); list.push({ cv: s.cv, x: cx + s.dx, y: my + s.dy }); }
+    seat = [cx, down ? Math.round(L * 0.82) : Math.round(L * 0.2)]; ax = cx; ay = Math.round(L * 0.55);
+  }
+  return { cv: pb.toCanvas(), ax, ay, seat, sails: list };
+}
+
 let cache = null;
 export function boatSprites() {
   if (cache) return cache;
@@ -170,6 +228,9 @@ export function boatSprites() {
     const s = sloop(d);
     cache.sloop[d] = [s, s];
     for (const [k, P, S] of [['brick', PAL.brick, SAILS.red], ['noir', PAL.noir, SAILS.black], ['ghost', PAL.ghost, SAILS.ghost]]) { const v = sloop(d, P, S); cache[k][d] = [v, v]; }
+    const r = radeau(d); (cache.radeau = cache.radeau || [])[d] = [r, r];
+    const g = bigShip(d, PAL.goelette, SAILS.white, 62, 8, [0.38, 0.62]); (cache.goelette = cache.goelette || [])[d] = [g, g];
+    const gl = bigShip(d, PAL.galion, SAILS.white, 82, 11.5, [0.28, 0.5, 0.72]); (cache.galion = cache.galion || [])[d] = [gl, gl];
   }
   SP = SAIL;
   return cache;
