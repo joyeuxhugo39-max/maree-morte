@@ -20,6 +20,7 @@ import { RoomNet } from './roomnet.js';
 import { iconURL, iconCanvas } from './render/sprites-items.js';
 import { updateCine, cineLocked, endCine, bossIntro, bossDown, krakenIntro, krakenDown } from './cine.js';
 import { Scene } from './scene.js';
+import { Townsfolk } from './townsfolk.js';
 import { applyTheme } from './render/ui-art.js';
 applyTheme(); // 0.8.1 : parchemin, cadres de bois ferré, fleurons — avant même l'écran d'accueil
 
@@ -229,6 +230,14 @@ function onMsg(m) {
     case 'seen': ui.addSeen(m.c); break;
     case 'codex': G.codex = m; if (ui.open === 'codex') ui.renderCodex(); break;
     case 'soc': ui.setSoc(m); break; // 1.0 : amis, groupe, équipage
+    case 'wevt': { // 1.0 : une invasion annoncée
+      const was = G.wevt;
+      G.wevt = m.end ? null : { ...m, at0: now };
+      if (m.end) break;
+      if (!was) { ui.banner('Flotte maudite !', `Elle fait voile vers ${m.name} — la marque rouge sur la carte`); G.sfx.play('level'); }
+      else if (m.wave && m.wave !== was.wave) ui.banner(m.wave === 3 ? 'Le capitaine débarque !' : `Vague ${m.wave} sur 3`, `Devant ${m.name}`);
+      break;
+    }
     case 'grp': ui.grp(m); break;
     case 'ask': ui.ask(m); break;
     case 'trade': ui.trade(m); break;
@@ -861,63 +870,21 @@ function ambience(now) {
   for (const e of G.ents.values()) if (e.k === 'm' && !e.dyingT && MOBS[e.type] && MOBS[e.type].ship && Math.hypot(e.x - p.x, e.y - p.y) < 420) G.seaFight = Math.max(G.seaFight || 0, now + 6);
   if (p.boat && now < G.seaFight) theme = 'naval';
   if (now < (G.eruptUntil || 0) && G.zone === Z.VOLCAN) G.epicUntil = Math.max(G.epicUntil || 0, now + 4); // l'éruption : musique de bataille
+  if (G.wevt && G.wevt.wave && G.player && Math.hypot(G.wevt.x - G.player.x, G.wevt.y - G.player.y) < 520) G.epicUntil = Math.max(G.epicUntil || 0, now + 4); // l'invasion : musique de bataille
   if (now < (G.epicUntil || 0)) theme = 'epic';
   if (G.kraken && Math.hypot(G.world.kraken.x - p.x, G.world.kraken.y - p.y) < 560) theme = 'naval';
   if (G.cine && G.cine.theme) theme = G.cine.theme;
   G.sfx.setTheme(theme);
+  if (G.me && G.me.songs && !G.me.songs.includes(theme) && !(G.songAsked || (G.songAsked = new Set())).has(theme)) { G.songAsked.add(theme); G.send({ t: 'song', k: theme }); } // 1.0 : le carnet d'airs
   const w = weatherAt(G.worldTime);
   G.sfx.rain(G.room >= 0 ? 0 : w.rain);
   const k = Math.floor(G.worldTime / WEATHER_PERIOD);
   if (G.weatherK != null && k !== G.weatherK && w.kind) G.ui.toast(w.kind === 2 ? 'Un orage éclate ! Les espadons mordent par gros temps.' : 'Il commence à pleuvoir.', 'info');
   G.weatherK = k;
 }
-let cobble = [];
-function initFolk() {
-  const W = G.world, tc = W.town, rng = mulberry32(4242);
-  for (let y = tc.y - 13; y <= tc.y + 14; y++) for (let x = tc.x - 18; x <= tc.x + 16; x++) {
-    const i = y * W.W + x;
-    if (W.tiles[i] === T.COBBLE && !W.solid[i]) cobble.push([x * TILE + 8, y * TILE + 10]);
-  }
-  const pick = (a) => a[Math.floor(rng() * a.length)];
-  for (let i = 0; i < 6; i++) {
-    const [x, y] = pick(cobble);
-    const look = { skin: Math.floor(rng() * 4), hair: Math.floor(rng() * 6), hairStyle: pick(['court', 'long', 'queue', 'chauve', 'court']), top: pick(['chemise', 'rayee', 'gilet', 'tablier', 'vareuse']), topCol: pick(CLOTH_KEYS), pants: pick(['brown', 'navy', 'black']), boots: 'brown', hat: pick([null, 'paille', 'bandana', 'bonnet', null, null]), hatCol: pick(['red', 'navy', 'green']), beard: rng() < 0.3 ? 1 : 0 };
-    G.folk.push({ k: 'f', id: -100 - i, x, y, tx: x, ty: y, dir: 0, moving: false, walk: 0, wait: rng() * 4, look, lookKey: JSON.stringify(look), weapon: null });
-  }
-  for (const col of ['orange', 'black', 'white']) { const [x, y] = pick(cobble); G.cats.push({ col, x, y, tx: x, ty: y, dir: 2, moving: false, wait: rng() * 5 }); }
-  // 0.8 : la foule de Libertalia — marins, marchandes, forbans de tous les pavillons
-  const L = W.libertalia;
-  if (L) {
-    const libC = [];
-    for (let y = L.y - 50; y <= L.y + 56; y++) for (let x = L.x - 58; x <= L.x + 58; x++) { const i = y * W.W + x; if (W.tiles[i] === T.COBBLE && !W.solid[i] && W.zones[i] === Z.LIBERTALIA) libC.push([x * TILE + 8, y * TILE + 10]); }
-    cobble.push(...libC);
-    for (let i = 0; i < 26 && libC.length; i++) {
-      const [x, y] = pick(libC);
-      const look = { skin: Math.floor(rng() * 4), hair: Math.floor(rng() * 7), hairStyle: pick(['court', 'long', 'queue', 'chauve', 'hirsute']), top: pick(['chemise', 'rayee', 'gilet', 'manteau', 'vareuse', 'tablier']), topCol: pick(CLOTH_KEYS), pants: pick(['brown', 'navy', 'black', 'white']), boots: pick(['brown', 'black']), hat: pick([null, 'tricorne', 'bandana', 'foulard', 'paille', 'bonnet', null]), hatCol: pick(['red', 'black', 'navy', 'green', 'purple', 'yellow']), beard: rng() < 0.35 ? 1 + Math.floor(rng() * 2) : 0, eye: rng() < 0.1 ? 'patch' : undefined };
-      G.folk.push({ k: 'f', id: -200 - i, x, y, tx: x, ty: y, dir: 0, moving: false, walk: 0, wait: rng() * 4, look, lookKey: JSON.stringify(look), weapon: null });
-    }
-    for (const col of ['orange', 'black', 'white', 'orange']) { const [x, y] = pick(libC); G.cats.push({ col, x, y, tx: x, ty: y, dir: 2, moving: false, wait: rng() * 5 }); }
-  }
-}
-function updateFolk(dt) {
-  const wander = (f, speed, rest) => {
-    if (f.wait > 0) { f.wait -= dt; f.moving = false; return; }
-    const dx = f.tx - f.x, dy = f.ty - f.y, d = Math.hypot(dx, dy);
-    if (d < 2) {
-      f.wait = rest[0] + Math.random() * rest[1];
-      const opts = cobble.filter(([x, y]) => Math.abs(x - f.x) < 140 && Math.abs(y - f.y) < 100);
-      const [nx, ny] = opts[Math.floor(Math.random() * opts.length)] || [f.x, f.y];
-      f.tx = nx; f.ty = ny; return;
-    }
-    const st = speed * dt;
-    const [nx, ny] = moveWithCollision(G.world, f.x, f.y, dx / d * st, dy / d * st);
-    if (Math.hypot(nx - f.x, ny - f.y) < st * 0.2) { f.tx = f.x; f.ty = f.y; }
-    f.x = nx; f.y = ny; f.moving = true; f.walk = (f.walk || 0) + dt;
-    f.dir = f.k === 'f' ? dirOf(dx, dy) : (dx < 0 ? 1 : 2);
-  };
-  for (const f of G.folk) wander(f, 22, [2, 6]);
-  for (const c of G.cats) wander(c, 30, [3, 10]);
-}
+// 1.0 : les habitants et leur journée (voir townsfolk.js)
+function initFolk() { G.town = new Townsfolk(G); }
+function updateFolk(dt) { if (G.town) G.town.update(dt, performance.now() / 1000); }
 const TITLE_PATH = [[150, 104], [124, 112], [100, 118], [96, 86], [108, 54], [126, 26], [80, 60], [44, 92], [33, 72], [30, 32], [60, 40], [112, 80], [150, 96]];
 // 1.0 : le tutoriel — les gestes de base, un par un, puis des conseils qui n'arrivent qu'au bon moment
 const TUTO = [

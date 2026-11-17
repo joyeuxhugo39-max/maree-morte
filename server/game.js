@@ -21,11 +21,13 @@ export function migrateSave(d) {
   return d;
 }
 // les champs qu'écrit serialize() : tout autre champ d'une sauvegarde est conservé à part
-const SAVE_KEYS = new Set(['inf', 'jail', 'hon', 'pvph', 'glory', 'gxp', 'friends', 'blocked', 'tradeLog', 'seen', 'st', 'kc', 'met', 'col', 'tut', 'name', 'look', 'level', 'xp', 'gold', 'hp', 'inv', 'eq', 'quests', 'track', 'chests', 'x', 'y', 'kills', 'upg', 'treasure', 'ach', 'title', 'cnt', 'respawnAt', 'found', 'boat', 'pk', 'caches', 'zs', 'pet', 'home', 'base', 'saved', 'sv', 'held']);
+const SAVE_KEYS = new Set(['songs', 'rep', 'inf', 'jail', 'hon', 'pvph', 'glory', 'gxp', 'friends', 'blocked', 'tradeLog', 'seen', 'st', 'kc', 'met', 'col', 'tut', 'name', 'look', 'level', 'xp', 'gold', 'hp', 'inv', 'eq', 'quests', 'track', 'chests', 'x', 'y', 'kills', 'upg', 'treasure', 'ach', 'title', 'cnt', 'respawnAt', 'found', 'boat', 'pk', 'caches', 'zs', 'pet', 'home', 'base', 'saved', 'sv', 'held']);
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { STRUCTS, PLANTER_GROW, HOME_OK, HOME_MAX, HOME_PRICE, QUEST_PICK, PROPERTY, HOME_LIMIT, RESALE, plotCategory } from '../shared/data/craft.js';
 import { social } from './social.js';
 import { justice, SHIELD_AFTER_DEATH } from './justice.js';
+import { events } from './events.js';
+import { repLevel, buyPrice, sellPrice } from '../shared/data/places.js';
 import { LEGACY_VALUE, LEGACY_STRUCT, QUEST_ITEM_OLD_VALUE } from '../shared/data/legacy.js';
 import { generateWorld, canStand, moveWithCollision, moveBoat, zoneAt, tileAt, blocksShot, canSail, roomIdAt, Z, ZONES, SAFE } from '../shared/world.js';
 import { ITEMS, STACK_MAX, isStackable } from '../shared/data/items.js';
@@ -60,7 +62,8 @@ const FAR_ZONES = [Z.RADE, Z.COLLINES, Z.PENDUS, Z.SIRENES, Z.ANSE, Z.OSSEMENTS,
 const BURGLE_RARE = [['montre_gousset', 30], ['bague_capitaine', 25], ['coffret_bijoux', 25], ['collier_perles_noires', 12], ['tableau_maitre', 8]];
 const HOME_STORE = 48; // le coffre de la maison (0.8 : il remplace les coffres des bases)
 // 1.0 : la boîte à musique (les airs de l'archipel) et les pages des bibliothèques
-const HOUSE_MUSIC = [['', 'silence'], ['day', 'Airs de Port-Lanterne'], ['sea', 'Chant du grand large'], ['cite', 'Gigue de Libertalia'], ['night', 'Nocturne des Brumes'], ['naval', 'Bordée de combat']];
+const HOUSE_MUSIC = [['', 'silence'], ['day', 'Airs de Port-Lanterne'], ['sea', 'Chant du grand large'], ['cite', 'Gigue de Libertalia'], ['night', 'Nocturne des Brumes'], ['naval', 'Bordée de combat'], ['swamp', 'Souffle des marais'], ['epic', 'Charge de la pleine lune'], ['boss', 'Duel des capitaines']];
+// 1.0 : la collection d'airs — chaque musique entendue pour la première fois est notée dans le carnet du pirate
 const LORE_PAGES = [
   '« Journal d’un mousse » : Le capitaine dit que la mer ne garde pas ses morts depuis que le Cœur de Corail a disparu. Moi, j’ai vu ma mère sur la plage, cette nuit. Elle ne m’a pas reconnu.',
   '« Traité des marées » : Les anciens parlaient d’une cité sous la mer, au large du Gouffre. On n’y entrait qu’avec de l’air enfermé dans une cloche de bronze.',
@@ -105,6 +108,7 @@ export class Game {
     this.version = GAME_VERSION;
     this.socialInit();
     this.justiceInit();
+    this.eventsInit();
     this.seenW = Math.ceil(this.world.W / SEEN_CELL); this.seenH = Math.ceil(this.world.OVER_H / SEEN_CELL); this.seenBytes = Math.ceil(this.seenW * this.seenH / 8);
     this.usedTokens = new Set(); this.fails = new Map(); this.bans = {}; this.reports = []; this.maintenance = null; // 1.0
     if (storage && storage.loadMeta) { Promise.resolve(storage.loadMeta('bans')).then((b) => { if (b) this.bans = b; }).catch(() => {}); Promise.resolve(storage.loadMeta('reports')).then((r) => { if (Array.isArray(r)) this.reports = r; }).catch(() => {}); }
@@ -211,6 +215,7 @@ export class Game {
       case 'crew': return this.crewAction(p, String(m.a), m);
       case 'trade': return this.tradeAction(p, String(m.a), m);
       case 'bail': return this.bail(p);
+      case 'song': { const k = String(m.k), s = HOUSE_MUSIC.find(([x]) => x && x === k); if (!s || p.songs.has(k)) return; p.songs.add(k); p.dirtyMe = true; const n = HOUSE_MUSIC.length - 1; if (p.songs.size >= n) this.unlock(p, 'melomane'); return this.toast(p, `♪ Nouvel air noté dans votre carnet : « ${s[1]} » (${p.songs.size}/${n}). La boîte à musique de votre maison saura le jouer.`, 'quest'); }
       case 'ladder': return this.send(p, { t: 'ladder', top: this.ladderTop(), hist: p.pvpHist, me: [p.honor | 0, Math.floor(p.infamy || 0)] });
       case 'respawn': return this.respawn(p);
       case 'ping': return this.send(p, { t: 'pong', c: m.c });
@@ -297,6 +302,7 @@ export class Game {
     this.broadcastChat(null, `${p.name} accoste à Port-Lanterne.`, 'sys');
     this.socialLogin(p);
     this.justiceLogin(p);
+    if (this.wevt) this.pushEvent(p);
     if (!res.data) this.toast(p, 'Bienvenue ! Parlez à la Capitaine Morgane, près des quais (touche E).', 'quest');
     this.log(`[jeu] ${p.name} connecté (${this.players.size} en ligne)`);
   }
@@ -373,7 +379,7 @@ export class Game {
         this.broadcastAll({ t: 'maint', m: this.maintenance });
         return { ok: true, maintenance: this.maintenance };
       }
-      case 'event': return this.startWorldEvent ? this.startWorldEvent(String(a.kind || ''), true) : { err: 'aucun événement' };
+      case 'event': return this.startWorldEvent(String(a.kind || ''), a.now ? 'now' : true);
       case 'save': return Promise.resolve(this.saveAll()).then(() => ({ ok: true }));
       case 'mute': { const key = String(a.name || '').toLowerCase(); this.mutes[key] = Date.now() + (+a.minutes || 30) * 60000; if (this.storage.saveMeta) Promise.resolve(this.storage.saveMeta('mutes', this.mutes)).catch(() => {}); const q = findP(key); if (q) this.toast(q, 'Un administrateur vous a réduit au silence.', 'warn'); return { ok: true }; }
       default: return { err: 'commande inconnue' };
@@ -412,6 +418,7 @@ export class Game {
     p.tut = d ? (d.tut == null ? 99 : d.tut | 0) : 0; // tutoriel : les anciens pirates le connaissent déjà
     this.socialLoad(p, d);
     this.justiceLoad(p, d);
+    p.songs = new Set(['day', ...(d && Array.isArray(d.songs) ? d.songs.filter((k) => HOUSE_MUSIC.some(([x]) => x && x === k)) : [])]);
     if (d) {
       for (const k in d) if (!SAVE_KEYS.has(k)) p.heldF[k] = d[k];
       if (Array.isArray(d.held)) for (const it of d.held) if (it && typeof it.id === 'string') p.held.push({ id: it.id, n: Math.max(1, it.n | 0) });
@@ -480,7 +487,7 @@ export class Game {
     this.applyRefund(p);
   }
   serialize(p) {
-    return { ...(p.heldF || {}), ...this.socialSave(p), ...this.justiceSave(p), sv: SAVE_VERSION, held: p.held || [], seen: p.seen ? b64(p.seen) : undefined, st: p.st, kc: p.kc, met: p.met ? [...p.met] : [], col: p.col ? [...p.col] : [], tut: p.tut, name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: { ...(p.heldQ || {}), ...p.quests }, track: p.track || [], chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: { ...(p.heldA || {}), ...p.ach }, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
+    return { ...(p.heldF || {}), ...this.socialSave(p), ...this.justiceSave(p), songs: [...(p.songs || [])], sv: SAVE_VERSION, held: p.held || [], seen: p.seen ? b64(p.seen) : undefined, st: p.st, kc: p.kc, met: p.met ? [...p.met] : [], col: p.col ? [...p.col] : [], tut: p.tut, name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: { ...(p.heldQ || {}), ...p.quests }, track: p.track || [], chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: { ...(p.heldA || {}), ...p.ach }, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
   }
   save(p) {
     p.lastSave = this.time;
@@ -545,7 +552,7 @@ export class Game {
       st: { atk: p.stats.atk, gun: p.stats.gun, def: p.stats.def, crit: Math.round(p.stats.crit * 100), speed: p.stats.speed, regen: +p.stats.regen.toFixed(1) },
       cry: Math.max(0, +(p.cry - this.time).toFixed(1)), drunk: Math.max(0, +(p.drunkUntil - this.time).toFixed(1)),
       dead: p.dead, kills: p.kills, upg: p.upg, title: p.title, boat: p.boat, room: p.room, pk: p.pk, pet: p.pet || '', vo: this.time < p.thiefUntil ? 1 : 0,
-      ...this.justiceMe(p), gxpNext: GLORY_XP,
+      ...this.justiceMe(p), gxpNext: GLORY_XP, songs: [...(p.songs || [])],
       ride: p.riding && p.eq.mount ? ITEMS[p.eq.mount].mount.kind : '', cnt: p.cnt, zsn: p.zs.size, zst: FAR_ZONES.length, cch: Object.keys(p.caches).length, bf: p.buffs ? Object.entries(p.buffs).filter(([, v]) => v.until > this.time).map(([k, v]) => [k, Math.ceil(v.until - this.time)]) : [], rc: p.recallAt ? +(p.recallAt - this.time).toFixed(1) : 0,
     };
   }
@@ -1433,6 +1440,7 @@ export class Game {
       if (p.kills >= 250) this.unlock(p, 'faucheur');
       if (def.elite) this.unlock(p, 'elite');
       if (m.horde && ++p.cnt.horde >= 30) this.unlock(p, 'horde');
+      if (def.level >= p.level - 5) this.addRep(p, this.placeAt(m.x, m.y), m.boss || def.elite ? 10 : 1); // 1.0 : la région vous en sait gré
       if (def.ship && ++p.cnt.ships >= 10) this.unlock(p, 'naufrageur');
       if (m.boss) this.unlock(p, 'boss');
     }
@@ -2261,23 +2269,26 @@ export class Game {
   buy(p, npc, item) {
     const N = NPCS[npc];
     if (!N || !N.shop || !N.shop.includes(item) || !this.nearNpc(p, npc, 90)) return;
-    const it = ITEMS[item], price = it.value;
+    const np = this.npcPos.get(npc), place = np ? this.placeAt(np.x, np.y) : null;
+    const it = ITEMS[item], price = buyPrice(it.value, repLevel(p.rep[place] || 0)); // 1.0 : remise de réputation
     if (p.gold < price) return this.toast(p, 'Pas assez de doublons !', 'warn');
     const left = this.addItem(p, item, 1);
     if (left) return this.toast(p, 'Inventaire plein !', 'warn');
     p.gold -= price; p.dirtyMe = true;
     this.audit('achat', { who: p.key, item, price, npc, gold: p.gold });
+    this.addRep(p, place, price / 100);
     this.send(p, { t: 'loot', id: item, n: 1, buy: price });
   }
   sell(p, i) {
     const s = p.inv[i];
     if (!s) return;
-    const near = Object.keys(NPCS).some((id) => NPCS[id].shop && this.nearNpc(p, id, 90));
+    const near = Object.keys(NPCS).find((id) => NPCS[id].shop && this.nearNpc(p, id, 90));
     if (!near) return this.toast(p, 'Il faut être près d’un marchand pour vendre.', 'warn');
+    const np = this.npcPos.get(near), place = np ? this.placeAt(np.x, np.y) : null;
     const it = ITEMS[s.id];
     if (it.quest) return this.toast(p, 'Un objet de quête ne se vend pas.', 'warn');
     if (this.boatInUse(p, s.id)) return this.toast(p, 'Vous êtes à bord !', 'warn');
-    const price = Math.max(1, Math.floor(it.value * 0.35));
+    const price = sellPrice(it.value, place, repLevel(p.rep[place] || 0)); // 1.0 : la ville prélève sa taxe
     s.n--; if (!s.n) p.inv[i] = null;
     p.gold += price; p.dirtyMe = true; p.dirtyInv = true; p.dirtyQ = true;
     this.audit('vente', { who: p.key, item: s.id, price, gold: p.gold });
@@ -2348,6 +2359,7 @@ export class Game {
     p.gold += q.rewards.gold || 0;
     for (const [id, n] of q.rewards.items || []) this.giveOrDrop(p, id, n);
     this.giveXp(p, q.rewards.xp || 0);
+    const np = this.npcPos.get(q.turnin); if (np) this.addRep(p, this.placeAt(np.x, np.y), 30);
     p.dirtyQ = true; p.dirtyMe = true;
     this.send(p, { t: 'qdone', q: qid });
     this.ev(p.x, p.y, ['fx', 'quest', p.x, p.y, p.id]);
@@ -2877,9 +2889,10 @@ export class Game {
     if (STRUCTS[st.type].music && st.home != null) {
       const h = this.homes.get(st.home); if (!h) return;
       if (!mine) return this.toast(p, 'La boîte à musique n’obéit qu’à son propriétaire.', 'info');
-      const i = HOUSE_MUSIC.findIndex(([k]) => k === (h.music || '')); const nx = HOUSE_MUSIC[(i + 1) % HOUSE_MUSIC.length];
+      const known = HOUSE_MUSIC.filter(([k]) => !k || p.songs.has(k)); // seulement les airs notés dans le carnet
+      const i = known.findIndex(([k]) => k === (h.music || '')); const nx = known[(i + 1) % known.length];
       h.music = nx[0]; this.worldDirty = true; this.broadcastHomes();
-      return this.toast(p, `Boîte à musique : ${nx[1]}.`, 'info');
+      return this.toast(p, `Boîte à musique : ${nx[1]}.${known.length < HOUSE_MUSIC.length ? ` (${known.length - 1}/${HOUSE_MUSIC.length - 1} airs dans votre carnet : écoutez le monde pour en noter d’autres)` : ''}`, 'info');
     }
     if (STRUCTS[st.type].pet) {
       if (!mine) return this.toast(p, 'Il vous regarde de travers.', 'info');
@@ -3027,7 +3040,7 @@ export class Game {
     if (this.tickCount % 10 === 0) this.updateKraken();
     if (this.tickCount % 5 === 0) for (const p of this.players.values()) this.updateBuffs(p);
     if (this.tickCount % 5 === 0) this.updateVolcano();
-    if (this.tickCount % 20 === 0) this.justiceGlobalTick();
+    if (this.tickCount % 20 === 0) { this.justiceGlobalTick(); this.eventTick(); }
     if (this.tickCount % 40 === 0 && this.players.size > 1) { // les autres pirates sur la carte
       const pl = [...this.players.values()].map((q) => [q.id, q.name, Math.round(q.x), Math.round(q.y), q.room, q.dead ? 1 : 0, this.isWanted(q) ? 1 : 0]);
       for (const p of this.players.values()) this.send(p, { t: 'map', pl });
@@ -3097,3 +3110,4 @@ export class Game {
 // 1.0 : discussions, groupes, équipages et échanges (server/social.js)
 Object.assign(Game.prototype, social);
 Object.assign(Game.prototype, justice); // 1.0 : protection, infamie, primes, honneur, Geôle
+Object.assign(Game.prototype, events); // 1.0 : les invasions rares et annoncées

@@ -4,6 +4,7 @@
 import { ITEMS } from '../shared/data/items.js';
 import { INV_SIZE } from '../shared/constants.js';
 import { iconURL } from './render/sprites-items.js';
+import { PLACES, PLACE_ORDER, REP_LEVELS, repLevel, discountOf, taxOf } from '../shared/data/places.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -337,6 +338,11 @@ export const social = {
     const HOW = { prime: 'prime touchée', defense: 'légitime défense', meurtre: 'sans provocation' };
     let h = `<div class="hon-head"><div><span>Honneur</span><b>${me.hon || 0}</b></div><div><span>Infamie</span><b>${Math.floor(me.inf || 0)} / 3</b></div><div><span>Statut</span>${status}</div><div><span>Duels gagnés</span><b>${me.pk || 0}</b></div></div>`;
     h += `<p class="soc-help">Hors des villes, on peut se battre entre pirates — sauf les moins de niveau 10, ceux qui reviennent d’une défaite (pavillon blanc, deux minutes), les membres d’un même groupe ou équipage, et ceux qui ont plus de dix niveaux d’écart. Abattre un pirate qui ne vous avait pas frappé vaut un point d’infamie (deux s’il est bien plus faible) ; à trois, vous êtes <b>recherché</b> : la garde vous arrête en ville et toute mort vous mène à la Geôle. L’infamie s’efface d’un point par quart d’heure. Abattre un forban recherché rapporte sa prime et de l’honneur. On ne perd jamais plus de 10 % de son or en duel, et rien si le même pirate s’acharne.</p>`;
+    h += '<h4 class="soc-h">Réputation des villes</h4><div class="rep-list">' + PLACE_ORDER.map((k) => { // 1.0
+      const pts = Math.floor((me.rep || {})[k] || 0), l = repLevel(pts), next = REP_LEVELS[l + 1];
+      const pct = next ? Math.max(0, Math.min(100, (pts - REP_LEVELS[l][0]) / (next[0] - REP_LEVELS[l][0]) * 100)) : 100;
+      return `<div class="rep-row"><span class="rn">${esc(PLACES[k].name)}</span><span class="rl lv${l}">${REP_LEVELS[l][1]}</span><span class="rb"><i style="width:${pct}%"></i></span><span class="rx">${discountOf(l) ? `−${Math.round(discountOf(l) * 100)} % · ` : ''}taxe ${String(Math.round(taxOf(k, l) * 1000) / 10).replace('.', ',')} %</span></div>`;
+    }).join('') + '</div><p class="soc-help">On gagne la réputation d’une ville en abattant les morts de sa région, en y rendant des quêtes et en commerçant chez ses marchands ; un meurtre ou une arrestation la font chuter.</p>';
     h += '<h4 class="soc-h">Vos derniers combats</h4>';
     const hist = this.honHist || L.hist || [];
     h += hist.length ? [...hist].reverse().map((x) => `<div class="soc-log ${x.k === 'tue' ? 'win' : 'loss'}"><div>${x.k === 'tue' ? '⚔ Vous avez abattu' : '☠ Abattu par'} <b>${esc(x.who)}</b> (niv. ${x.lvl}) <span>${esc(x.where || '')} · ${new Date(x.at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></div><div class="how-${x.how}">${HOW[x.how] || ''}${x.lost ? ` · ${x.lost} doublons perdus` : ''}</div></div>`).join('') : '<p class="soc-empty">Aucun duel pour l’instant.</p>';

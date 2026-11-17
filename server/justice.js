@@ -1,8 +1,9 @@
 // 1.0 : la justice des Sept Mers — protection des nouveaux pirates et des vaincus, infamie, primes,
 // honneur et classement, historique des combats, pertes limitées, arrestations et Geôle de Port-Lanterne.
 // Ces méthodes sont ajoutées au prototype de Game (voir la fin de game.js) : `this` est la partie.
-import { SAFE, ZONES, canStand } from '../shared/world.js';
+import { SAFE, ZONES, canStand, zoneAt } from '../shared/world.js';
 import { TILE } from '../shared/constants.js';
+import { PLACES, REP_LEVELS, repLevel, placeOf, discountOf, taxOf } from '../shared/data/places.js';
 
 export const PVP_MIN_LEVEL = 10; // en dessous, le pavillon blanc protège (et empêche d'attaquer)
 export const LEVEL_GAP = 10; // on ne s'en prend pas à plus faible que soi de dix niveaux (sauf un forban recherché)
@@ -17,6 +18,8 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 export const justice = {
   justiceInit() {
     this.ladder = {}; this.ladderDirty = false; this.ladderSavedAt = 0;
+    // les intérieurs d'une ville (tavernes, boutiques, maisons) : la garde y entre aussi
+    this.townRooms = new Set(this.world.doors.filter((d) => !d.jail && SAFE.has(zoneAt(this.world, d.ox, d.oy))).map((d) => d.room));
     if (this.storage && this.storage.loadMeta) Promise.resolve(this.storage.loadMeta('ladder')).then((l) => { if (l && typeof l === 'object') this.ladder = l; }).catch(() => {});
   },
   justiceLoad(p, d) {
@@ -27,8 +30,20 @@ export const justice = {
     p.glory = d ? Math.max(0, Math.min(50, d.glory | 0)) : 0;
     p.gxp = d ? Math.max(0, d.gxp | 0) : 0;
     p.aggro = new Map(); p.shieldUntil = 0; p.arrestT = 0;
+    p.rep = {}; if (d && d.rep && typeof d.rep === 'object') for (const k in PLACES) if (+d.rep[k]) p.rep[k] = Math.max(-500, Math.min(5000, +d.rep[k]));
   },
-  justiceSave(p) { return { inf: +(p.infamy || 0).toFixed(3), jail: p.jail | 0, hon: p.honor | 0, pvph: p.pvpHist || [], glory: p.glory | 0, gxp: p.gxp | 0 }; },
+  // 1.0 : la réputation des lieux — les marchands font des remises, la ville taxe moins vos ventes
+  addRep(p, place, n) {
+    if (!place || !PLACES[place] || !n) return;
+    const before = repLevel(p.rep[place] || 0);
+    p.rep[place] = Math.max(-500, Math.min(5000, (p.rep[place] || 0) + n));
+    const after = repLevel(p.rep[place]);
+    if (after > before) this.toast(p, `Réputation à ${PLACES[place].name} : ${REP_LEVELS[after][1]}${discountOf(after) ? ` — ses marchands vous font ${Math.round(discountOf(after) * 100)} % de remise` : ''}, taxe sur vos ventes : ${Math.round(taxOf(place, after) * 1000) / 10} %.`, 'level');
+    else if (after < before) this.toast(p, `Votre réputation baisse à ${PLACES[place].name} : ${REP_LEVELS[after][1]}.`, 'warn');
+    p.dirtyMe = true;
+  },
+  placeAt(x, y) { return placeOf(this.world, x, y); },
+  justiceSave(p) { return { rep: p.rep, inf: +(p.infamy || 0).toFixed(3), jail: p.jail | 0, hon: p.honor | 0, pvph: p.pvpHist || [], glory: p.glory | 0, gxp: p.gxp | 0 }; },
   isWanted(p) { return (p.infamy || 0) >= WANTED_AT; },
   isProtected(p) { return p.level < PVP_MIN_LEVEL || (p.shieldUntil || 0) > this.time; },
   jailRoomId() { return this.world.jail; },
@@ -36,7 +51,7 @@ export const justice = {
     return {
       inf: +(p.infamy || 0).toFixed(1), wd: this.isWanted(p) ? 1 : 0, hon: p.honor | 0, jail: p.jail | 0, bail: this.bailOf(p),
       prot: p.level < PVP_MIN_LEVEL ? -1 : Math.max(0, Math.ceil((p.shieldUntil || 0) - this.time)), arrest: p.arrestT || 0,
-      glory: p.glory | 0, gxp: p.gxp | 0,
+      glory: p.glory | 0, gxp: p.gxp | 0, rep: p.rep,
     };
   },
   // peut-on se battre ? (en plus des zones : canPvp dans game.js)
@@ -63,7 +78,7 @@ export const justice = {
     const wanted = this.isWanted(p), provoked = (p.aggro.get(pk.key) || -1e9) > this.time - PROVOKED;
     const where = p.room >= 0 ? this.world.rooms[p.room].name : ZONES[p.zone] ? ZONES[p.zone].name : '';
     let how;
-    if (wanted) { how = 'prime'; pk.honor += 20 + 5 * Math.floor(p.infamy); this.unlock(pk, 'chasseur'); this.broadcastChat(null, `⚖ ${pk.name} a abattu le forban recherché ${p.name}${lost ? ` et touche sa prime : ${lost} doublons` : ''} !`, 'pvp'); }
+    if (wanted) { how = 'prime'; pk.honor += 20 + 5 * Math.floor(p.infamy); this.unlock(pk, 'chasseur'); this.addRep(pk, this.placeAt(pk.x, pk.y), 20); this.broadcastChat(null, `⚖ ${pk.name} a abattu le forban recherché ${p.name}${lost ? ` et touche sa prime : ${lost} doublons` : ''} !`, 'pvp'); }
     else if (provoked) { how = 'defense'; pk.honor += 8; }
     else {
       how = 'meurtre';
@@ -71,6 +86,7 @@ export const justice = {
       const before = this.isWanted(pk);
       pk.infamy = Math.min(20, (pk.infamy || 0) + (bully ? 2 : 1));
       pk.honor = Math.max(0, pk.honor - 10);
+      this.addRep(pk, this.placeAt(p.x, p.y), -25);
       if (!before && this.isWanted(pk)) { pk.lookVer++; this.toast(pk, `Vous êtes RECHERCHÉ : votre tête est mise à prix. En ville, la garde vous arrêtera. Toute mort vous mène à la Geôle.`, 'warn'); this.broadcastChat(null, `⚖ La Capitainerie met à prix la tête de ${pk.name}.`, 'pvp'); }
       else this.toast(pk, `Infamie ${Math.floor(pk.infamy)}/${WANTED_AT} : ${p.name} ne vous avait rien fait.`, 'warn');
     }
@@ -145,10 +161,10 @@ export const justice = {
       p.infamy = Math.max(0, p.infamy - INFAMY_DECAY);
       if (was && !this.isWanted(p)) { p.lookVer++; p.dirtyMe = true; this.toast(p, 'On vous a oublié : vous n’êtes plus recherché.', 'quest'); }
     }
-    if (this.isWanted(p) && SAFE.has(p.zone) && p.room < 0) {
+    if (this.isWanted(p) && (p.room < 0 ? SAFE.has(p.zone) : this.townRooms.has(p.room))) {
       p.arrestT = (p.arrestT || 0) + 1; p.dirtyMe = true;
       if (p.arrestT === 1) this.toast(p, `La garde vous a reconnu ! Quittez la ville avant ${ARREST_AFTER} secondes, ou c’est la Geôle.`, 'warn');
-      if (p.arrestT >= ARREST_AFTER) { this.imprison(p, this.sentenceOf(p, false), 'La garde vous a arrêté.'); this.broadcastChat(null, `⛓ La garde a arrêté ${p.name}, forban recherché.`, 'pvp'); }
+      if (p.arrestT >= ARREST_AFTER) { this.addRep(p, this.placeAt(p.x, p.y), -40); this.imprison(p, this.sentenceOf(p, false), 'La garde vous a arrêté.'); this.broadcastChat(null, `⛓ La garde a arrêté ${p.name}, forban recherché.`, 'pvp'); }
     } else if (p.arrestT) { p.arrestT = 0; p.dirtyMe = true; }
     if (p.dirtyHon) { p.dirtyHon = false; this.send(p, { t: 'hon', hist: p.pvpHist }); }
   },

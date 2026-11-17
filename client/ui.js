@@ -15,6 +15,7 @@ import { slotFrameURL, plankURL, mouseURL, lockURL } from './render/ui-art.js';
 import { humanSheet, SKINS, HAIRS, CLOTH, CLOTH_KEYS, FW, FH, mobSheet, portraitOf } from './render/sprites-chars.js';
 import { MINI_COL } from './render/terrain.js';
 import { social } from './social-ui.js';
+import { PLACES, REP_LEVELS, repLevel, placeOf, buyPrice, sellPrice, taxOf, discountOf } from '../shared/data/places.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -193,6 +194,8 @@ export class UI {
       else if (isFullMoon(G.worldTime + 120)) buffs.push('🌕 Pleine lune ce soir');
       if (ZONES[G.zone] && ZONES[G.zone].hard) buffs.push('☠ Zone extrême');
       const dt = now - G.meAt, jb = []; // 1.0 : la justice
+      const ev = G.wevt; // 1.0 : une invasion annoncée
+      if (ev) jb.push(['wanted', ev.wave ? `☠ ${ev.name} : vague ${ev.wave}/3 — ${ev.left} morts` : `☠ Flotte maudite → ${ev.name} : ${this.mmss(Math.max(0, ev.in - (now - ev.at0)))}`]);
       if (me.jail > 0) jb.push(['jail', `⛓ Geôle ${this.mmss(Math.max(0, me.jail - dt))} · caution ${me.bail}`]);
       else if (me.wd) jb.push(['wanted', `☠ RECHERCHÉ${me.arrest ? ` — la garde ! ${Math.max(0, 10 - me.arrest)} s` : ''}`]);
       else if (me.inf >= 1) jb.push(['infamy', `Infamie ${Math.floor(me.inf)}/3`]);
@@ -453,8 +456,9 @@ export class UI {
       if (a !== b) cmp = `<div class="${a > b ? 'better' : 'worse'}">${a > b ? '▲' : '▼'} ${Math.abs(a - b)} par rapport à l'équipement actuel</div>`;
     }
     const type = it.slot ? SLOT_NAMES[it.slot] : it.boat ? 'Bateau' : it.tool ? 'Outil' : it.use ? 'Consommable' : it.quest ? 'Objet de quête' : it.place ? 'Mobilier' : 'Objet de valeur';
-    const sell = it.quest ? 'Ne se vend pas' : `Revente : ${Math.max(1, Math.floor(it.value * 0.35))} doublons`;
-    return `<div class="tn" style="color:${r.color}">${esc(it.name)}${up ? ' +' + up : ''}${n > 1 ? ' ×' + n : ''}</div><div class="tt">${type} · ${r.name}</div>${lines.join('')}${cmp}<div class="td">${esc(it.desc || '')}</div><div class="tv">${ctx === 'shop' ? 'Prix : ' + it.value + ' doublons' : sell}</div>`;
+    const place = this.shopNpc ? this.shopPlace() : null, rl = repLevel(((this.G.me && this.G.me.rep) || {})[place] || 0);
+    const sell = it.quest ? 'Ne se vend pas' : `Revente : ${place ? sellPrice(it.value, place, rl) : Math.max(1, Math.floor(it.value * 0.35))} doublons${place ? ' (taxe comprise)' : ''}`;
+    return `<div class="tn" style="color:${r.color}">${esc(it.name)}${up ? ' +' + up : ''}${n > 1 ? ' ×' + n : ''}</div><div class="tt">${type} · ${r.name}</div>${lines.join('')}${cmp}<div class="td">${esc(it.desc || '')}</div><div class="tv">${ctx === 'shop' ? 'Prix : ' + buyPrice(it.value, rl) + ' doublons' : sell}</div>`;
   }
 
   // ------------------------------------------------------------ inventaire
@@ -746,19 +750,22 @@ export class UI {
     const close = this.close.bind(this);
     this.close = () => { $('panel-inventory').classList.add('hidden'); $('panel-inventory').style.transform = ''; $('panel-shop').style.transform = ''; this.close = close; close(); };
   }
+  shopPlace() { const n = (this.G.npcs || []).find((q) => q.id === this.shopNpc); return n ? placeOf(this.G.world, n.x, n.y) : null; }
   renderShop() {
     const G = this.G, N = NPCS[this.shopNpc];
     if (!N) return;
     $('shop-gold').textContent = G.me.gold;
+    const place = this.shopPlace(), lvl = repLevel(((G.me && G.me.rep) || {})[place] || 0); // 1.0 : réputation et taxe de la ville
+    $('shop-rep').innerHTML = place ? `${esc(PLACES[place].name)} · réputation <b>${REP_LEVELS[lvl][1]}</b>${discountOf(lvl) ? ` · remise ${Math.round(discountOf(lvl) * 100)} %` : ''} · taxe sur vos ventes ${String(Math.round(taxOf(place, lvl) * 1000) / 10).replace('.', ',')} %` : '';
     const list = $('shop-list');
     list.innerHTML = '';
     for (const id of N.shop) {
       const it = ITEMS[id];
       const row = document.createElement('div'); row.className = 'shop-row';
       const stats = [it.atk && `+${it.atk} att.`, it.gun && `+${it.gun} tir`, it.def && `+${it.def} déf.`, it.hp && `+${it.hp} PV`, it.use && it.use.heal && `+${it.use.heal} PV`, it.use && it.use.en && `+${it.use.en} énergie`, it.spd && `+${Math.round(it.spd * 100)} % vitesse`].filter(Boolean).join(' · ');
-      row.innerHTML = `<img src="${iconURL(it.icon, it.tint)}"><div class="nm" style="color:${it.rarity ? RARITY[it.rarity].color.replace('#efe6d2', '#2b1d14') : ''}">${esc(it.name)}<small>${esc(stats)}</small></div><div class="pr"><i class="coin"></i>${it.value}</div>`;
+      row.innerHTML = `<img src="${iconURL(it.icon, it.tint)}"><div class="nm" style="color:${it.rarity ? RARITY[it.rarity].color.replace('#efe6d2', '#2b1d14') : ''}">${esc(it.name)}<small>${esc(stats)}</small></div><div class="pr"><i class="coin"></i>${buyPrice(it.value, lvl) < it.value ? `<s>${it.value}</s> ` : ''}${buyPrice(it.value, lvl)}</div>`;
       const b = document.createElement('button'); b.className = 'btn'; b.textContent = 'Acheter';
-      b.disabled = G.me.gold < it.value;
+      b.disabled = G.me.gold < buyPrice(it.value, lvl);
       b.onclick = () => G.send({ t: 'buy', npc: this.shopNpc, item: id });
       row.appendChild(b);
       row.onmouseenter = (e) => this.tip(e, this.itemTip(id, 1, 'shop'));
@@ -806,10 +813,10 @@ export class UI {
     };
     const CATS = [
       ['Premiers pas', ['premier_sang', 'niveau10', 'riche', 'forge', 'proprietaire', 'peche']],
-      ['Combat', ['crabes', 'faucheur', 'elite', 'boss', 'invasion', 'horde', 'duel', 'chasseur', 'roi_os', 'kraken', 'freres', 'damnes', 'eruption']],
+      ['Combat', ['crabes', 'faucheur', 'elite', 'boss', 'invasion', 'defenseur', 'horde', 'duel', 'chasseur', 'roi_os', 'kraken', 'freres', 'damnes', 'eruption']],
       ['Mer et voyages', ['navigateur', 'naufrageur', 'rade', 'explorateur', 'espadon', 'citoyen']],
       ['Trésors et secrets', ['tresor', 'speleo', 'fouineur', 'cambrioleur', 'jumeaux', 'flambeur']],
-      ['Légendes', ['gardien', 'complice', 'elegance', 'libertalia', 'gloire', 'gloire_max', 'potence']],
+      ['Légendes', ['gardien', 'complice', 'elegance', 'libertalia', 'gloire', 'gloire_max', 'potence', 'melomane']],
     ];
     const seen = new Set(CATS.flatMap(([, ids]) => ids));
     const rest = Object.keys(ACHIEVEMENTS).filter((k) => !seen.has(k));
@@ -1090,6 +1097,7 @@ export class UI {
       dot(px, py, '#1c1426', 5); dot(px, py, dead ? '#8a8a9a' : this.inGroup(id) ? '#7aff8a' : wd ? '#ff4a3a' : '#7ae0ff', 3);
     }
     for (const d of G.world.doors) if (d.secret && G.found.has(d.id)) { dot(d.ox, d.oy, '#1c1426', 5); dot(d.ox, d.oy, '#b8a0ff', 3); }
+    if (G.wevt && !inside) { dot(G.wevt.x, G.wevt.y, '#1c1426', 8); dot(G.wevt.x, G.wevt.y, Math.floor(performance.now() / 300) % 2 ? '#ff3a2a' : '#ffb03a', 6); } // 1.0 : l'invasion
     for (const n of G.npcs) { if (n.y >= OVER_H * TILE) continue; const mk = G.npcMarker(n.id); dot(n.x, n.y, mk ? '#ffd23a' : '#e8d8b0', mk ? 3 : 2); }
     if (G.objective) dot(G.objective.x, G.objective.y, '#ffd23a', 4);
     if (G.treasure) { dot(G.treasure.x, G.treasure.y, '#ff2a2a', 4); }
@@ -1160,6 +1168,7 @@ export class UI {
       x.fillStyle = '#1c1426'; x.fillRect(sx - 4, sy - 4, 8, 8); x.fillStyle = dead ? '#8a8a9a' : gm ? '#7aff8a' : wd ? '#ff4a3a' : '#7ae0ff'; x.fillRect(sx - 3, sy - 3, 6, 6);
       x.fillStyle = 'rgba(0,0,0,0.65)'; x.fillText(name, sx + 1, sy - 6); x.fillStyle = gm ? '#c8ffd0' : wd ? '#ffb0a0' : '#c8f4ff'; x.fillText(name, sx, sy - 7);
     }
+    if (G.wevt) { const ex = G.wevt.x / TILE * S, ey = G.wevt.y / TILE * S; x.fillStyle = '#1c1426'; x.beginPath(); x.arc(ex, ey, 9, 0, Math.PI * 2); x.fill(); x.fillStyle = '#ff3a2a'; x.beginPath(); x.arc(ex, ey, 6, 0, Math.PI * 2); x.fill(); x.fillStyle = '#fff'; x.font = '700 12px "Pixelify Sans", sans-serif'; x.fillText('☠ Invasion', ex + 10, ey + 4); } // 1.0
     if (G.treasure) { const tx = G.treasure.x / TILE * S, ty = G.treasure.y / TILE * S; x.strokeStyle = '#d82a2a'; x.lineWidth = 3; x.beginPath(); x.moveTo(tx - 6, ty - 6); x.lineTo(tx + 6, ty + 6); x.moveTo(tx + 6, ty - 6); x.lineTo(tx - 6, ty + 6); x.stroke(); }
     if (G.objective) { x.fillStyle = '#ffd23a'; x.beginPath(); x.arc(G.objective.x / TILE * S, G.objective.y / TILE * S, 5, 0, 6.3); x.fill(); x.strokeStyle = '#1c1426'; x.lineWidth = 2; x.stroke(); }
     const at = this.mapPos();

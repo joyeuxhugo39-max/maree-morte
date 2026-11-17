@@ -9,6 +9,8 @@ export const ACHIEVEMENTS = {
   gloire: { name: 'Légende vivante', desc: 'Passé le niveau 30, atteindre la Gloire 10.', title: 'Légende vivante' }, // 1.0
   gloire_max: { name: 'Immortel', desc: 'Atteindre la Gloire 50, la plus haute.', title: 'Immortel des Sept Mers' },
   chasseur: { name: 'Chasseur de primes', desc: 'Abattre un forban recherché par la Capitainerie.', title: 'Chasseur de primes' },
+  defenseur: { name: 'Rempart des vivants', desc: 'Repousser une flotte maudite venue envahir une ville.', title: 'Rempart des vivants' },
+  melomane: { name: 'Mélomane', desc: 'Noter dans son carnet les huit airs de l’archipel (la boîte à musique les joue).', title: 'Mélomane des tavernes' },
   potence: { name: 'Gibier de potence', desc: 'Purger une peine à la Geôle de Port-Lanterne.', title: 'Gibier de potence' },
   elite: { name: 'Tueur de géants', desc: 'Vaincre une créature d’élite.', title: 'Tueur de géants' },
   boss: { name: 'Briseur de malédiction', desc: 'Vaincre le Capitaine Barbe-Cendre.', title: 'Briseur de malédiction' },

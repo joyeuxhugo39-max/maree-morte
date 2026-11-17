@@ -130,7 +130,7 @@ export class Renderer {
   }
   indexProps() {
     this.buckets = new Map();
-    this.lights = [];
+    this.lights = []; this.cityLamps = []; this.garlands = [];
     this.smokers = [];
     for (const l of this.world.lavaLights || []) this.lights.push({ x: l.x, y: l.y, r: 46, c: 'warm', flicker: 1 });
     this.giants = [];
@@ -147,7 +147,11 @@ export class Renderer {
       p.ground = !!(PROPS[p.type] && PROPS[p.type].ground);
       if (!s) continue;
       const ox = p.x - s.ax, oy = p.y - s.ay;
-      if (s.light) this.lights.push({ x: ox + s.light[0], y: oy + s.light[1], r: 58, c: 'warm', flicker: 1 });
+      if (s.light) { // 1.0 : les réverbères des villes éclairent plus large ; on y tend des guirlandes
+        const town = p.y < OVER_H * TILE && SAFE.has(zoneAt(this.world, p.x, p.y));
+        const l = { x: ox + s.light[0], y: oy + s.light[1], r: town ? 70 : 58, c: 'warm', flicker: 1, city: town ? 1 : 0, by: p.y };
+        this.lights.push(l); if (town) this.cityLamps.push(l);
+      }
       if (s.flame) this.lights.push({ x: ox + s.flame[0], y: oy + s.flame[1], r: s.blue ? 130 : 66, c: s.blue ? 'cold' : 'warm', flicker: 1, flame: s.blue ? 'big' : 'small', fx: ox + s.flame[0], fy: oy + s.flame[1] });
       if (s.windows) for (const w of s.windows) this.lights.push({ x: ox + w.x + w.w / 2, y: oy + w.y + w.h + 6, r: 34, c: 'warm', win: { x: ox + w.x, y: oy + w.y, w: w.w, h: w.h } });
       if (s.smoke) this.smokers.push({ x: ox + s.smoke.x, y: oy + s.smoke.y, t: 0 });
@@ -156,6 +160,7 @@ export class Renderer {
       if (p.type === 'forge') this.lights.push({ x: ox + s.w - 28, y: oy + s.h - 8, r: 60, c: 'warm', flicker: 1 });
       if (p.type === 'lighthouse') { this.lighthouse = { x: ox + s.light[0], y: oy + s.light[1] }; }
     }
+    this.buildGarlands();
   }
   resize(w, h) {
     this.lastW = w; this.lastH = h;
@@ -282,7 +287,7 @@ export class Renderer {
     if (G.player) draw.push({ y: G.player.y, e: G.player });
     if (G.player && G.player.petObj && !G.player.petObj.hidden) draw.push({ y: G.player.petObj.y, pet: G.player.petObj });
     for (const e of G.ents.values()) if (e.k === 'p' && e.petObj && !e.petObj.hidden) draw.push({ y: e.petObj.y, pet: e.petObj });
-    for (const f of G.folk || []) if (f.x > camX - 30 && f.x < camX + W + 30 && f.y > camY - 30 && f.y < camY + H + 40) draw.push({ y: f.y, e: f });
+    for (const f of G.folk || []) if (!f.hidden && f.x > camX - 30 && f.x < camX + W + 30 && f.y > camY - 30 && f.y < camY + H + 40) draw.push({ y: f.y, e: f });
     for (const c of G.cats || []) if (c.x > camX - 20 && c.x < camX + W + 20 && c.y > camY - 20 && c.y < camY + H + 20) draw.push({ y: c.y, c });
     draw.sort((a, b) => a.y - b.y);
     // ombres
@@ -335,6 +340,7 @@ export class Renderer {
       ctx.fillStyle = '#fff0a0'; ctx.fillRect(X - 1 + sp, Y - 2, 2, 1);
     }
     this.drawParticles(ctx, camX, camY, dt);
+    if (!room) this.drawGarlands(ctx, camX, camY, now, dark, false);
     if (!room) {
       this.updateCritters(G, camX, camY, now, dt, dark);
       this.drawCritters(ctx, camX, camY, now, dark, false);
@@ -509,9 +515,48 @@ export class Renderer {
       return;
     }
     const sh = humanSheet(n.look);
-    const f = 0;
-    const bob = Math.floor(now * 1.6 + n.x) % 2;
-    ctx.drawImage(sh.cv, f * FW, n.dir * FH, FW, FH - (bob ? 0 : 0), Math.round(n.x - sh.ax - camX), Math.round(n.y - sh.ay - camY) + (bob ? 0 : 0), FW, FH);
+    this.drawBody(ctx, sh.cv, sh, 0, n.dir, Math.round(n.x - sh.ax - camX), Math.round(n.y - sh.ay - camY), 0, this.breath(n.x + n.y, now));
+  }
+  // 1.0 : des guirlandes de lanternes entre les réverbères voisins des villes, au-dessus des rues dégagées
+  buildGarlands() {
+    const GARL = ['#ffd24a', '#ff5a4a', '#7ae07a', '#6ab8ff', '#ff9a3a', '#e88aff'], used = new Set(), W = this.world;
+    const clear = (a, b) => { for (let k = 1; k < 6; k++) { const t = k / 6, x = a.x + (b.x - a.x) * t, y = a.by + (b.by - a.by) * t, i = Math.floor(y / TILE) * W.W + Math.floor(x / TILE); if (W.solid[i]) return false; } return true; };
+    for (const a of this.cityLamps) {
+      const near = this.cityLamps.filter((b) => b !== a && Math.abs(b.x - a.x) > 36 && Math.abs(b.x - a.x) < 480 && Math.abs(b.y - a.y) < Math.abs(b.x - a.x) * 0.3 + 16 && clear(a, b))
+        .sort((p, q) => Math.hypot(p.x - a.x, p.y - a.y) - Math.hypot(q.x - a.x, q.y - a.y));
+      for (const b of near.slice(0, 1)) {
+        const key = [a, b].map((l) => l.x + ',' + l.y).sort().join('|'); if (used.has(key)) continue; used.add(key);
+        const len = Math.hypot(b.x - a.x, b.y - a.y), n = Math.max(4, Math.round(len / 13)), sag = 5 + len * 0.06, pts = [];
+        for (let i = 0; i <= n; i++) { const t = i / n; pts.push([a.x + (b.x - a.x) * t, a.y - 1 + (b.y - a.y) * t + Math.sin(t * Math.PI) * sag]); }
+        this.garlands.push({ pts, cols: pts.map((_, i) => GARL[(i + Math.floor(a.x / 7)) % GARL.length]), x0: Math.min(a.x, b.x), x1: Math.max(a.x, b.x), y0: Math.min(a.y, b.y), y1: Math.max(a.y, b.y) + sag });
+      }
+    }
+  }
+  drawGarlands(ctx, camX, camY, now, dark, glow) {
+    for (const g of this.garlands) {
+      if (g.x1 < camX - 10 || g.x0 > camX + this.W + 10 || g.y1 < camY - 10 || g.y0 > camY + this.H + 10) continue;
+      if (!glow) {
+        ctx.strokeStyle = 'rgba(40,24,14,0.85)'; ctx.lineWidth = 1; ctx.beginPath();
+        g.pts.forEach(([x, y], i) => (i ? ctx.lineTo(Math.round(x - camX) + 0.5, Math.round(y - camY) + 0.5) : ctx.moveTo(Math.round(x - camX) + 0.5, Math.round(y - camY) + 0.5)));
+        ctx.stroke();
+      }
+      for (let i = 1; i < g.pts.length - 1; i++) {
+        const [x, y] = g.pts[i], X = Math.round(x - camX), Y = Math.round(y - camY) + 1;
+        if (glow) { // la nuit : chaque lanterne luit et scintille un peu
+          const tw = 0.75 + 0.25 * Math.sin(now * 3 + i * 1.7 + x);
+          if (i % 2) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.6 * dark * tw; ctx.drawImage(this.glows.warm, X - 9, Y - 8, 18, 18); ctx.globalCompositeOperation = 'source-over'; }
+          ctx.globalAlpha = 1; ctx.fillStyle = g.cols[i]; ctx.fillRect(X - 1, Y, 2, 3); ctx.fillStyle = '#fff6d8'; ctx.fillRect(X - 1, Y, 1, 1);
+        } else { ctx.fillStyle = '#3a2414'; ctx.fillRect(X - 1, Y - 1, 3, 1); ctx.fillStyle = g.cols[i]; ctx.globalAlpha = 0.75; ctx.fillRect(X - 1, Y, 2, 3); ctx.globalAlpha = 1; }
+      }
+    }
+  }
+  // 1.0 : respiration au repos — la tête et les épaules descendent d'un pixel, à intervalles réguliers
+  breath(seed, now) { return ((now * 0.55 + ((seed * 0.37) % 1 + 1) % 1) % 1) < 0.42 ? 1 : 0; }
+  drawBody(ctx, src, sh, frame, dir, x, y, cut, b) {
+    const S = 15;
+    if (!b || sh.fh !== FH) { ctx.drawImage(src, frame * sh.fw, dir * sh.fh, sh.fw, sh.fh - cut, x, y, sh.fw, sh.fh - cut); return; }
+    ctx.drawImage(src, frame * sh.fw, dir * sh.fh + S, sh.fw, sh.fh - cut - S, x, y + S, sh.fw, sh.fh - cut - S);
+    ctx.drawImage(src, frame * sh.fw, dir * sh.fh, sh.fw, S, x, y + b, sh.fw, S);
   }
   sheetOf(e) {
     if (isSea(e)) return null;
@@ -736,6 +781,13 @@ export class Renderer {
       if (rnd() < 0.06) this.burst(e.x, e.y, 1, { z: 26, col: ['#ffd23a', '#ff93b8', '#9fd8ff'], up: 26, speed: 12, life: 0.9, g: -12, size: 2 });
     } else if (e.sitUntil && now < e.sitUntil && !e.moving) { sit = 4; frame = 0; }
     let x = Math.round(e.x - sh.ax - camX), y = Math.round(e.y - sh.ay - camY) + sit;
+    const human = e.k === 'p' || e.k === 'f';
+    if (human && atk < 0.2 && e.atkA != null) { const k = atk < 0.05 ? -1 : atk < 0.15 ? 2 : 1; x += Math.round(Math.cos(e.atkA) * k); y += Math.round(Math.sin(e.atkA) * k * 0.7); } // élan du coup
+    if (now - (e.hitT || -9) < 0.12) x += Math.floor(now * 50) % 2 ? 1 : -1; // le choc
+    if (human && e.moving && frame !== e.lastFrame) { // la poussière des pas
+      e.lastFrame = frame;
+      if ((frame === 1 || frame === 3) && !this.inWater(e.x, e.y) && !this.room && rnd() < 0.7) this.smoke(e.x + (rnd() - 0.5) * 4, e.y - 1, 1, 'rgba(196,176,140,0.4)', { size: 1.5, life: 0.4 });
+    }
     const dying = e.dyingT ? now - e.dyingT : -1;
     if (dying > 0.75) return;
     if (e.k === 'm') {
@@ -777,7 +829,8 @@ export class Renderer {
     // pas de la marche : petit rebond déjà dans la feuille
     const hw = now - (e.hitT || -9) < 0.09;
     const src = hw ? whiteSheet(sh) : sh.cv;
-    ctx.drawImage(src, frame * sh.fw, dir * sh.fh, sh.fw, sh.fh - cut, x, y, sh.fw, sh.fh - cut);
+    this.drawBody(ctx, src, sh, frame, dir, x, y, cut, human && !e.moving && !sit && atk > 0.3 && dying < 0 ? this.breath(e.id || 0, now) : 0);
+    if (e.k === 'f' && e.lantern) { const hx = x + (meta && meta.hand ? meta.hand[0] : 14), hy = y + (meta && meta.hand ? meta.hand[1] : 16); ctx.fillStyle = '#2a1a0e'; ctx.fillRect(hx - 1, hy - 1, 4, 6); ctx.fillStyle = '#ffd24a'; ctx.fillRect(hx, hy + 1, 2, 3); ctx.fillStyle = '#fff6c0'; ctx.fillRect(hx, hy + 1, 1, 1); } // la lanterne du guet
     if (e.windT && now - e.windT < e.windDur) {
       const k = (now - e.windT) / e.windDur;
       ctx.globalAlpha = 0.25 + 0.35 * k;
@@ -1262,12 +1315,28 @@ export class Renderer {
     // ombres de nuages
     if (dark < 0.9) {
       ctx.globalAlpha = 0.16 * (1 - dark);
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 40; i++) { // 1.0 : un ciel chargé de nuages sur tout l'archipel
         const span = MAP_W * TILE + 600;
         const x = ((hash2(i, 1, 5) * span + now * (6 + i)) % span) - 300, y = hash2(i, 2, 5) * MAP_H * TILE;
         const s = 200 + hash2(i, 3, 5) * 220;
         if (x + s < camX || x - s > camX + W || y + s < camY || y - s > camY + H) continue;
         ctx.drawImage(this.cloud, x - s - camX, y - s * 0.6 - camY, s * 2, s * 1.2);
+      }
+      ctx.globalAlpha = 1;
+    }
+    // 1.0 : des voiles au loin, sur la haute mer — le monde est vaste, on n'y est pas seul
+    if (dark < 0.85) {
+      const span = MAP_W * TILE;
+      for (let i = 0; i < 60; i++) {
+        const dirx = hash2(i, 7, 9) < 0.5 ? -1 : 1, sp = 4 + hash2(i, 8, 9) * 5;
+        const x = ((hash2(i, 4, 9) * span + dirx * now * sp) % span + span) % span, y = 40 + hash2(i, 5, 9) * (OVER_H * TILE - 80);
+        if (x < camX - 20 || x > camX + W + 20 || y < camY - 20 || y > camY + H + 20) continue;
+        if (tileAt(this.world, x, y) !== T.DEEP || tileAt(this.world, x + 14, y) !== T.DEEP || tileAt(this.world, x - 14, y) !== T.DEEP) continue;
+        const X = Math.round(x - camX), Y = Math.round(y - camY + Math.sin(now * 1.3 + i) * 0.6), a = 0.42 * (1 - dark);
+        ctx.globalAlpha = a; ctx.fillStyle = '#1c2a3a';
+        ctx.fillRect(X - 4, Y, 9, 2); ctx.fillRect(X - 3, Y + 2, 7, 1); ctx.fillRect(X, Y - 7, 1, 7);
+        ctx.fillStyle = hash2(i, 6, 9) < 0.25 ? '#3a1a1a' : '#e8e4d8'; ctx.fillRect(X - 3 + (dirx > 0 ? 1 : 0), Y - 6, 3, 4); ctx.fillRect(X + 1, Y - 5, 2, 3);
+        ctx.fillStyle = '#ffffff'; ctx.globalAlpha = a * 0.6; ctx.fillRect(X - dirx * 8, Y + 2, 3, 1); ctx.fillRect(X - dirx * 13, Y + 1, 2, 1);
       }
       ctx.globalAlpha = 1;
     }
@@ -1321,7 +1390,8 @@ export class Renderer {
     const z = G.player ? zoneAt(this.world, G.player.x, G.player.y) : Z.TOWN;
     const gloom = room ? (cave ? 1 : 0.6) : (z === Z.SWAMP || z === Z.WRECK) ? 0.2 : 0;
     const wx = this.weather || { rain: 0, storm: 0 };
-    const a = room ? (cave ? 0.74 : 0.36) : Math.min(0.82, dark * 0.72 + gloom * (1 - dark * 0.55) + wx.rain * 0.12 * (1 - dark * 0.5) + wx.storm * 0.14 * (1 - dark * 0.5));
+    const town = !room && SAFE.has(z); // 1.0 : les villes luisent la nuit
+    const a = (town ? 0.9 : 1) * (room ? (cave ? 0.74 : 0.36) : Math.min(0.82, dark * 0.72 + gloom * (1 - dark * 0.55) + wx.rain * 0.12 * (1 - dark * 0.5) + wx.storm * 0.14 * (1 - dark * 0.5)));
     if (a < 0.02) return;
     const L = this.lctx;
     L.globalCompositeOperation = 'source-over';
@@ -1350,6 +1420,8 @@ export class Renderer {
       vis.push([{ x, y, r: def.light, c: 'warm', flicker: 1 }, fl]);
     }
     for (const e of G.ents.values()) if (e.k === 'p') cut(e.x, e.y - 10, 44, 0.6);
+    if (!room) for (const fo of G.folk || []) if (fo.lantern && !fo.hidden && fo.x > camX - 80 && fo.x < camX + W + 80 && fo.y > camY - 80 && fo.y < camY + H + 80) { cut(fo.x + 5, fo.y - 12, 56, 1); vis.push([{ x: fo.x + 5, y: fo.y - 12, r: 50, c: 'warm', flicker: 1 }, 1 + Math.sin(now * 8 + fo.x) * 0.05]); }
+    if (!room && dark > 0.2) for (const g of this.garlands) if (g.x1 > camX && g.x0 < camX + W && g.y1 > camY && g.y0 < camY + H) cut((g.x0 + g.x1) / 2, (g.y0 + g.y1) / 2 + 4, (g.x1 - g.x0) * 0.55, 0.45);
     for (const p of this.projs.values()) cut(p.x, p.y, 16, 0.8);
     for (const fx of this.fx) if (fx.kind === 'boom' || fx.kind === 'flash') cut(fx.x, fx.y, (fx.r || 30) * 2.2, Math.max(0, 1 - (now - fx.t0) / fx.dur));
     // faisceau du phare
@@ -1384,6 +1456,7 @@ export class Renderer {
     }
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
+    if (!room && dark > 0.2) this.drawGarlands(ctx, camX, camY, now, dark, true);
     // fenêtres allumées
     if (dark > 0.25 && !room) {
       ctx.fillStyle = `rgba(255,214,110,${Math.min(1, (dark - 0.25) * 2)})`;
