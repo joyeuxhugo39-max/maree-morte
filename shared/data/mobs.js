@@ -1,3 +1,4 @@
+import { TROPHIES } from './craft.js';
 // Bestiaire. Vitesses en px/s, portées en px, temps en secondes.
 // loot : [objet, chance, min, max]
 export const MOBS = {
@@ -175,3 +176,5 @@ mob('fregate_maudite', { name: 'Frégate maudite', level: 20, hp: 2600, dmg: 40,
 mob('galion_fantome', { name: 'Le Galion Fantôme', level: 28, hp: 14000, dmg: 58, speed: 58, aggro: 420, leash: 99999, range: 280, atkCd: 2.6, windup: 0.8, xp: 6000, gold: [900, 1500], r: 26, respawn: 900, elite: 1, hard: 1, ship: { kind: 'brick', sail: 'ghost', guns: 4, scale: 1.5 },
   ai: 'galion', phases: [0.5], title: 'Vaisseau du Comte Vespère',
   loot: [['canon_damne', 0.25, 1, 1], ['tenue_comte', 0.1, 1, 1], ['carte_tresor', 0.5, 1, 1]] });
+// 1.0 : chaque boss laisse parfois son trophée (un objet de collection à exposer chez soi)
+for (const [boss, [id]] of Object.entries(TROPHIES)) if (MOBS[boss]) (MOBS[boss].loot = MOBS[boss].loot || []).push([id, 0.3, 1, 1]);

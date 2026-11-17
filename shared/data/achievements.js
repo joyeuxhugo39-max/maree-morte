@@ -31,6 +31,7 @@ export const ACHIEVEMENTS = {
   gardien: { name: 'Gardien des marées', desc: 'Rendre la Couronne des Marées à Morgane.', title: 'Gardien des marées' },
   complice: { name: 'Complice du Fanfaron', desc: 'Laisser la Couronne à Ambroise Vif-Argent.', title: 'Fanfaron' },
   explorateur: { name: 'Grand Large', desc: 'Poser le pied sur toutes les îles du Grand Large.', title: 'Explorateur' },
+  notable: { name: 'Notable', desc: 'Posséder deux propriétés à la fois.', title: 'Notable de l’archipel' },
   citoyen: { name: 'Cité Libre', desc: 'Franchir les portes de Libertalia.', title: 'Citoyen de Libertalia' },
   libertalia: { name: 'Corsaire de la Reine', desc: 'Renvoyer le Roi sans Couronne dans sa tombe.', title: 'Corsaire de la Reine' },
   flambeur: { name: 'Flambeur', desc: 'Gagner 10 parties de dés à La Bourse aux Dés.', title: 'Flambeur' },

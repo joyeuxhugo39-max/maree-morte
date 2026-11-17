@@ -223,7 +223,8 @@ function onMsg(m) {
     case 'dep': G.depleted.set(m.id, now + m.s); break;
     case 'gather': for (const [id, n] of m.got) ui.feed(`+${n} ${ITEMS[id].name}`, iconURL(ITEMS[id].icon, ITEMS[id].tint)); if (!m.got.length) ui.feed('Rien cette fois…'); if (ui.open === 'craft') ui.renderCraft(); break;
     case 'st': applyBuild(m, now); break;
-    case 'stor': ui.openStorage(m.items); break;
+    case 'stor': ui.openStorage(m.items, m.cap, m.vault); break;
+    case 'deed': ui.openDeed(m); break;
     case 'treasure': G.treasure = m.x == null ? null : { x: m.x, y: m.y }; ui.renderTracker(); break;
     case 'ach': {
       G.ach = m.ach || G.ach;
@@ -269,7 +270,7 @@ function onMsg(m) {
     case 'dead': ui.showDeath(m.lost, m.by); G.sfx.play('die'); break;
     case 'kick': G.kicked = true; ui.toast(m.msg, 'warn'); try { sessionStorage.removeItem('mm_resume'); } catch (e) { /* */ } break;
     case 'pong': G.ping = Math.round(performance.now() - m.c); break;
-    case 'homes': G.homes = new Map(m.list.map(([k, name, lock]) => [k, { name, lock: lock || 0 }])); break;
+    case 'homes': G.homes = new Map(m.list.map(([k, name, lock, music]) => [k, { name, lock: lock || 0, music: music || '' }])); break;
     case 'seal': { G.seals[m.id] = now + m.open; if (m.id === 'jumeaux') G.sealUntil = now + m.open; const S = G.world.seals.find((q) => q.id === m.id), d = S && G.world.doors[S.door]; if (d && G.player && Math.hypot(G.player.x - d.ox, G.player.y - d.oy) < 400) { G.sfx.play('seal'); G.renderer.shake(3, 0.8); } break; }
     case 'lock': ui.toast(m.msg, m.ok ? 'quest' : 'warn'); G.sfx.play(m.ok ? 'unlock' : 'crack'); if (m.ok) G.burgleUntil = now + 40; break;
     case 'cine': if (m.id === 'kraken' && G.player) krakenIntro(G, m, now); break;
@@ -287,7 +288,7 @@ function start(m, now) {
   G.myKey = String(m.name).toLowerCase(); G.room = m.room == null ? -1 : m.room; G.lastRoom = -99; G.found = new Set(m.found || []); G.track = m.tr || [];
   if (m.build) applyBuild({ a: m.build.s, af: m.build.f, b: m.build.b }, now);
   G.depleted.clear(); for (const [id, sec] of m.dep || []) G.depleted.set(id, now + sec);
-  G.homes = new Map((m.homes || []).map(([k, name, lock]) => [k, { name, lock: lock || 0 }]));
+  G.homes = new Map((m.homes || []).map(([k, name, lock, music]) => [k, { name, lock: lock || 0, music: music || '' }]));
   G.seals = {}; for (const k in m.seals || {}) G.seals[k] = now + m.seals[k]; G.sealUntil = G.seals.jumeaux || 0; G.kraken = !!m.kr; G.burgleUntil = 0; G.inkUntil = 0; G.pull = null; G.grabUntil = 0; G.seaFight = 0;
   if (G.cine) endCine(G);
   G.player = { title: m.me.title && ACHIEVEMENTS[m.me.title] ? ACHIEVEMENTS[m.me.title].title : '', id: m.id, k: 'p', name: m.name, x: m.x, y: m.y, dir: 0, moving: false, look: m.look, lookKey: JSON.stringify(m.look), lvl: m.me.lvl, weapon: m.eq.weapon, gun: m.eq.gun, hp: 100, flags: 0, walk: 0, buf: [], boat: m.boat || null, bvx: 0, bvy: 0, pet: m.pet || '' };
@@ -612,7 +613,7 @@ function interact() {
   else if (t.kind === 'struct') G.send({ t: 'sint', tx: t.tx, ty: t.ty });
   else if (t.kind === 'dig') { G.send({ t: 'dig' }); G.renderer.smoke(G.player.x, G.player.y, 6, 'rgba(160,120,80,0.6)', { size: 2 }); }
   else if (t.kind === 'door') useDoor(t.d, false, performance.now() / 1000);
-  else if (t.kind === 'homebuy') G.ui.confirm(`Acheter la <b>${t.d.name}</b> pour <b>${HOME_PRICE} doublons</b> ?<br><small>Votre nom sera sur la porte. Meublez-la (touche B), rangez-y votre butin… et méfiez-vous des crocheteurs.</small>`, () => G.send({ t: 'home', a: 'buy', k: t.d.plot }));
+  else if (t.kind === 'homebuy' || t.kind === 'deed') G.send({ t: 'home', a: 'info', k: t.d.plot }); // 1.0 : le titre de propriété (visiter, acheter, gérer, revendre)
   else if (t.kind === 'lockpick') {
     if (!(G.inv || []).some((s) => s && s.id === 'crochets')) { G.ui.toast(`Maison de ${t.h0.name} : fermée à clé. Il faudrait des crochets de serrurier…`, 'info'); return; }
     G.ui.lockpick(t.h0.name, t.h0.lock, (ok) => { if (ok !== null) G.send({ t: 'lock', k: t.d.plot, ok: ok ? 1 : 0 }); });
@@ -654,8 +655,8 @@ function findInteract() {
         bd = dd; best = { kind: 'door', d, x: d.ox, y: d.oy - 6, h: 22, verb: d.name };
         if (d.plot != null) {
           const h = G.homes.get(d.plot);
-          if (!h) best = { kind: 'homebuy', d, x: d.ox, y: d.oy - 6, h: 22, verb: `Acheter (${HOME_PRICE} doublons)` };
-          else if (h.name === p.name) best.verb = 'Entrer chez vous';
+          if (!h) best = { kind: 'homebuy', d, x: d.ox, y: d.oy - 6, h: 22, verb: 'À vendre : visiter ou acheter' };
+          else if (h.name === p.name) best = { kind: 'deed', d, x: d.ox, y: d.oy - 6, h: 22, verb: 'Chez vous (E : titre de propriété)' };
           else if (performance.now() / 1000 < G.burgleUntil) best.verb = 'Entrer (cambriolage)';
           else best = { kind: 'lockpick', d, h0: h, x: d.ox, y: d.oy - 6, h: 22, verb: (G.inv || []).some((s) => s && s.id === 'crochets') ? `Crocheter la porte de ${h.name}` : `Maison de ${h.name}` };
         } else if (d.seal && !((G.seals || {})[d.seal] > performance.now() / 1000)) best.verb = d.seal === 'freres' ? 'Porte du fort : deux dalles, deux pirates' : 'Porte scellée';
@@ -673,6 +674,7 @@ function findInteract() {
     if (!STRUCTS[st.type]) continue;
     if (STRUCTS[st.type].pet) { if (st.mine) { bd = d; best = { kind: 'struct', tx: st.tx, ty: st.ty, x, y, h: 14, verb: p.pet === STRUCTS[st.type].pet ? 'Laisser à la maison' : 'Emmener avec vous' }; } }
     else if (!st.mine && st.type === 'coffre' && G.room >= 0 && nowT < G.burgleUntil) { bd = d; best = { kind: 'struct', tx: st.tx, ty: st.ty, x, y, h: 20, verb: 'Fouiller le coffre' }; }
+    else if (st.type === 'chaise_h' || st.type === 'biblio_h' || (st.mine && st.type === 'boite_musique')) { bd = d; best = { kind: 'struct', tx: st.tx, ty: st.ty, x, y, h: 18, verb: st.type === 'chaise_h' ? 'S’asseoir' : st.type === 'biblio_h' ? 'Lire un livre' : 'Changer la musique' }; }
     else if (st.mine && (st.type === 'coffre' || st.type === 'lit' || st.type === 'jardiniere')) { bd = d; best = { kind: 'struct', tx: st.tx, ty: st.ty, x, y, h: 20, verb: st.type === 'coffre' ? 'Ouvrir' : st.type === 'lit' ? 'Dormir' : ((st.age0 || 0) + nowT - st.seen >= PLANTER_GROW ? 'Récolter' : 'Ça pousse') }; }
   }
   if (best) return best;
@@ -835,6 +837,7 @@ function ambience(now) {
   if (G.zone === Z.INTERIOR) theme = 'day';
   if (G.zone === Z.LIBERTALIA || (G.zone === Z.BASFONDS && !G.night)) theme = 'cite'; // 0.8 : la cité ne dort jamais
   if (G.zone === Z.INTERIOR && G.room >= 0) { const d = G.world.doors.find((q) => q.room === G.room); if (d && zoneAt(G.world, d.ox, d.oy) === Z.LIBERTALIA) theme = 'cite'; }
+  if (G.room >= 0) { const pl = G.world.plots.find((q) => q.room === G.room), h = pl && G.homes.get(pl.k); if (h && h.music) theme = h.music; } // la boîte à musique de la maison
   if (p.boat) theme = now < G.seaFight ? 'naval' : 'sea';
   for (const e of G.ents.values()) if (e.k === 'm' && !e.dyingT && MOBS[e.type] && MOBS[e.type].ai && !MOBS[e.type].sea && Math.hypot(e.x - p.x, e.y - p.y) < 280) G.epicUntil = now + 6;
   if (G.night && isFullMoon(G.worldTime)) for (const e of G.ents.values()) if (e.horde && !e.dyingT && Math.hypot(e.x - p.x, e.y - p.y) < 300) { G.epicUntil = now + 8; break; }

@@ -20,7 +20,7 @@ export function migrateSave(d) {
 // les champs qu'écrit serialize() : tout autre champ d'une sauvegarde est conservé à part
 const SAVE_KEYS = new Set(['name', 'look', 'level', 'xp', 'gold', 'hp', 'inv', 'eq', 'quests', 'track', 'chests', 'x', 'y', 'kills', 'upg', 'treasure', 'ach', 'title', 'cnt', 'respawnAt', 'found', 'boat', 'pk', 'caches', 'zs', 'pet', 'home', 'base', 'saved', 'sv', 'held']);
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
-import { STRUCTS, PLANTER_GROW, HOME_OK, HOME_MAX, HOME_PRICE, QUEST_PICK } from '../shared/data/craft.js';
+import { STRUCTS, PLANTER_GROW, HOME_OK, HOME_MAX, HOME_PRICE, QUEST_PICK, PROPERTY, HOME_LIMIT, RESALE, plotCategory } from '../shared/data/craft.js';
 import { LEGACY_VALUE, LEGACY_STRUCT, QUEST_ITEM_OLD_VALUE } from '../shared/data/legacy.js';
 import { generateWorld, canStand, moveWithCollision, moveBoat, zoneAt, tileAt, blocksShot, canSail, roomIdAt, Z, ZONES, SAFE } from '../shared/world.js';
 import { ITEMS, STACK_MAX, isStackable } from '../shared/data/items.js';
@@ -54,6 +54,18 @@ const FAR_ZONES = [Z.RADE, Z.COLLINES, Z.PENDUS, Z.SIRENES, Z.ANSE, Z.OSSEMENTS,
 // cambriolage : les objets très rares qu'on ne trouve que chez les autres
 const BURGLE_RARE = [['montre_gousset', 30], ['bague_capitaine', 25], ['coffret_bijoux', 25], ['collier_perles_noires', 12], ['tableau_maitre', 8]];
 const HOME_STORE = 48; // le coffre de la maison (0.8 : il remplace les coffres des bases)
+// 1.0 : la boîte à musique (les airs de l'archipel) et les pages des bibliothèques
+const HOUSE_MUSIC = [['', 'silence'], ['day', 'Airs de Port-Lanterne'], ['sea', 'Chant du grand large'], ['cite', 'Gigue de Libertalia'], ['night', 'Nocturne des Brumes'], ['naval', 'Bordée de combat']];
+const LORE_PAGES = [
+  '« Journal d’un mousse » : Le capitaine dit que la mer ne garde pas ses morts depuis que le Cœur de Corail a disparu. Moi, j’ai vu ma mère sur la plage, cette nuit. Elle ne m’a pas reconnu.',
+  '« Traité des marées » : Les anciens parlaient d’une cité sous la mer, au large du Gouffre. On n’y entrait qu’avec de l’air enfermé dans une cloche de bronze.',
+  '« Registre de Libertalia, an I » : Ni roi, ni maître. Le premier qui posera une couronne sur sa tête sera jeté à la mer. — Aubin Sans-Maître.',
+  '« Lettre non envoyée » : Vespère, mon frère, tu as échangé ton âme contre la marée. Je prie pour que quelqu’un te rende ce que tu as perdu. Ou qu’on te l’arrache.',
+  '« Carnet de Barbe-Cendre » (page brûlée) : …le Cœur ne m’appartient pas. Je le sais. Mais quelqu’un, en dessous, me l’a demandé. Quelqu’un qui chante…',
+  '« Manuel du canonnier » : Bâbord à gauche, tribord à droite, et le capitaine au milieu qui hurle. Un bon équipage tire ensemble, ou coule ensemble.',
+  '« Herbier de la Quarantaine » : La peste n’est pas venue par les rats. Elle est venue par un médecin qui portait un masque d’oiseau et ne dormait jamais.',
+  '« Légende des îlots » : Certains îlots n’apparaissent sur aucune carte. On dit que la brume les cache à ceux qui ne les cherchent pas.',
+];
 // répliques des boss quand ils changent de phase
 const BOSS_LINES = {
   cendre: [null, 'Vous allez goûter à ma bordée !', 'Brûlez avec moi, chiens de terre !'],
@@ -1874,7 +1886,7 @@ export class Game {
       if (d.seal && (this.seals[d.seal] || 0) < this.time) { p.cds.door = this.time + 1.5; return this.toast(p, 'La porte est scellée. Deux dalles, deux pirates…', 'warn'); }
       if (d.plot != null) {
         const h = this.homes.get(d.plot);
-        if (!h) { p.cds.door = this.time + 1.5; return this.toast(p, `Maison à vendre : ${HOME_PRICE} doublons (E devant la porte pour l'acheter).`, 'info'); }
+        if (!h) { p.cds.door = this.time + 1.5; const C = this.catOf(d.plot); return this.toast(p, `${C.name} à vendre : ${C.price} doublons (E devant la porte : visiter ou acheter).`, 'info'); }
         const thief = p.burgle && p.burgle.k === d.plot && this.time < p.burgle.until;
         if (h.key !== p.key && !thief) { p.cds.door = this.time + 1.5; return this.toast(p, `Maison de ${h.name} : fermée à clé.`, 'warn'); }
       }
@@ -1996,8 +2008,8 @@ export class Game {
       return this.toast(p, `X marque l’emplacement : ${ZONES[zoneAt(this.world, x, y)].name}. Une flèche vous guide.`, 'quest');
     }
     if (it.use.lock) {
-      const h = this.homeOf(p.key);
-      if (!h || p.room !== this.world.plots[h.k].room) return this.toast(p, 'Utilisez-la chez vous, dans votre maison.', 'warn');
+      const h = this.homeAt(p);
+      if (!h) return this.toast(p, 'Utilisez-la chez vous, dans votre maison.', 'warn');
       if (h.lock >= 2) return this.toast(p, 'Votre porte a déjà la meilleure serrure.', 'warn');
       h.lock++; s.n--; if (s.n <= 0) p.inv[i] = null; p.dirtyInv = true; this.worldDirty = true; this.broadcastHomes();
       return this.toast(p, `Serrure renforcée posée (niveau ${h.lock}/2).`, 'quest');
@@ -2454,9 +2466,9 @@ export class Game {
     if (!s || p.dead || p.boat) return;
     const it = ITEMS[s.id];
     if (!it.place) return;
-    const myHome = this.homeOf(p.key);
-    if (myHome && p.room >= 0 && p.room === this.world.plots[myHome.k].room) return this.placeHome(p, slot, tx, ty, myHome);
-    return this.toast(p, myHome ? 'Le mobilier s’installe chez vous : entrez dans votre maison.' : 'Le mobilier s’installe dans une maison : achetez-en une.', 'warn');
+    const here = this.homeAt(p);
+    if (here) return this.placeHome(p, slot, tx, ty, here);
+    return this.toast(p, this.homeOf(p.key) ? 'Le mobilier s’installe chez vous : entrez dans une de vos propriétés.' : 'Le mobilier s’installe dans une maison : achetez-en une.', 'warn');
   }
   placeHome(p, slot, tx, ty, h) {
     const s = p.inv[slot], it = ITEMS[s.id], type = it.place, def = STRUCTS[type], W = this.world;
@@ -2466,7 +2478,8 @@ export class Game {
     const exx = r.x0 + (r.w >> 1);
     if (ty === r.y0 + r.h - 1 && Math.abs(tx - exx) <= 1) return this.toast(p, 'Laissez l’entrée libre.', 'warn');
     if (W.tiles[ty * W.W + tx] !== T.FLOOR) return this.toast(p, 'Impossible ici.', 'warn');
-    if (h.count >= HOME_MAX) return this.toast(p, 'Votre maison est pleine.', 'warn');
+    if (h.count >= this.catOf(h.k).furniture) return this.toast(p, `${this.catOf(h.k).name} : ${this.catOf(h.k).furniture} meubles au plus.`, 'warn');
+    if (type === 'coffre' && [...this.structs.values()].filter((st) => st.home === h.k && st.type === 'coffre' && !(st.data && st.data.free)).length >= this.catOf(h.k).extra) return this.toast(p, `Pas plus de ${this.catOf(h.k).extra} coffre(s) supplémentaire(s) ici.`, 'warn');
     if (!def.floor) for (const q of this.players.values()) if (q.room === p.room && Math.abs(q.x - (tx * TILE + 8)) < 12 && Math.abs(q.y - (ty * TILE + 10)) < 12) return this.toast(p, 'Quelqu’un se tient là.', 'warn');
     if (!this.addStruct(p.key, type, tx, ty, def.planter ? { t: Date.now() } : {}, true, h.k)) return this.toast(p, 'Emplacement occupé.', 'warn');
     s.n--; if (s.n <= 0) p.inv[slot] = null;
@@ -2474,34 +2487,69 @@ export class Game {
     this.ev(tx * TILE + 8, ty * TILE + 10, ['fx', 'build', tx * TILE + 8, ty * TILE + 12]);
   }
   // ------------------------------------------------------------ maisons
-  homeOf(key) { for (const h of this.homes.values()) if (h.key === key) return h; return null; }
-  homesList() { return [...this.homes.values()].map((h) => [h.k, h.name, h.lock]); }
+  // 1.0 : jusqu'à deux propriétés par pirate, de huit catégories
+  homesOf(key) { return [...this.homes.values()].filter((h) => h.key === key).sort((a, b) => (a.bought || 0) - (b.bought || 0)); }
+  homeOf(key) { return this.homesOf(key)[0] || null; } // la première achetée : la conque de rappel y ramène
+  homeAt(p) { for (const h of this.homes.values()) if (h.key === p.key && p.room >= 0 && this.world.plots[h.k].room === p.room) return h; return null; }
+  catOf(k) { return PROPERTY[plotCategory(this.world.plots[k])] || PROPERTY.ville; }
+  storeMax(k) { const c = this.catOf(k); return c.store + 16 * c.extra; }
+  // places utilisables : celles de la catégorie, plus 16 par coffre supplémentaire installé (dans la limite de la catégorie)
+  homeCap(h) { const c = this.catOf(h.k); const extra = [...this.structs.values()].filter((st) => st.home === h.k && st.type === 'coffre' && !(st.data && st.data.free)).length; return c.store + 16 * Math.min(extra, c.extra); }
+  homeTraps(k) { return [...this.structs.values()].filter((st) => st.home === k && STRUCTS[st.type] && STRUCTS[st.type].trap); }
+  homeVault(k) { return [...this.structs.values()].some((st) => st.home === k && STRUCTS[st.type] && STRUCTS[st.type].vault); }
+  burgleChance(h) { // la chance qu'a un crocheteur adroit d'ouvrir la porte
+    const dog = [...this.structs.values()].some((st) => st.home === h.k && st.type === 'pet_chien');
+    return Math.max(0.08, 0.85 - 0.22 * h.lock - (dog ? 0.2 : 0) - 0.06 * Math.min(3, this.homeTraps(h.k).length) - this.catOf(h.k).guard);
+  }
+  deed(p, k) { // le titre de propriété : de quoi décider avant d'acheter, et de quoi gérer après
+    const pl = this.world.plots[k]; if (!pl) return;
+    const cat = plotCategory(pl), C = PROPERTY[cat], h = this.homes.get(k);
+    const mine = h && h.key === p.key;
+    const info = { t: 'deed', k, cat, name: pl.name, price: C.price, resale: Math.floor(((h && h.paid) || C.price) * RESALE), owner: h ? h.name : null, mine, owned: this.homesOf(p.key).length, limit: HOME_LIMIT,
+      furniture: C.furniture, store: C.store, extra: C.extra, perk: C.perk };
+    if (mine) Object.assign(info, { used: h.count, cap: this.homeCap(h), lock: h.lock, traps: this.homeTraps(k).length, vault: this.homeVault(k), risk: Math.round(this.burgleChance(h) * 100), items: h.storage.filter(Boolean).length });
+    else if (!h) info.risk = Math.round(Math.max(0.08, 0.85 - C.guard) * 100);
+    this.send(p, info);
+  }
+  homesList() { return [...this.homes.values()].map((h) => [h.k, h.name, h.lock, h.music || '']); }
   broadcastHomes() { this.broadcastAll({ t: 'homes', list: this.homesList() }); }
   homeAction(p, a, k) {
     const pl = this.world.plots[k];
     if (!pl || p.dead) return;
     const d = this.world.doors[pl.door];
+    const C = this.catOf(k);
+    if (a === 'info') return this.deed(p, k);
     if (a === 'buy') {
       if (p.room !== -1 || Math.hypot(p.x - d.ox, p.y - d.oy) > 40) return;
-      if (this.homes.has(k)) return this.toast(p, 'Cette maison a déjà un propriétaire.', 'warn');
-      if (this.homeOf(p.key)) return this.toast(p, 'Vous avez déjà une maison.', 'warn');
-      if (p.gold < HOME_PRICE) return this.toast(p, `Il vous faut ${HOME_PRICE} doublons.`, 'warn');
-      p.gold -= HOME_PRICE; p.dirtyMe = true;
-      this.homes.set(k, { k, key: p.key, name: p.name, storage: new Array(HOME_STORE).fill(null), lock: 0, count: 0, burgledAt: 0 });
+      if (this.homes.has(k)) return this.toast(p, 'Cette propriété a déjà un propriétaire.', 'warn');
+      if (this.homesOf(p.key).length >= HOME_LIMIT) return this.toast(p, `Vous possédez déjà ${HOME_LIMIT} propriétés : revendez-en une d'abord.`, 'warn');
+      if (p.gold < C.price) return this.toast(p, `Il vous faut ${C.price} doublons.`, 'warn');
+      p.gold -= C.price; p.dirtyMe = true;
+      this.homes.set(k, { k, key: p.key, name: p.name, storage: new Array(this.storeMax(k)).fill(null), lock: 0, count: 0, burgledAt: 0, bought: Date.now(), paid: C.price });
       this.freeChest(k);
       this.broadcastHomes(); this.worldDirty = true;
+      this.audit('propriete-achat', { who: p.key, k, cat: plotCategory(pl), price: C.price, gold: p.gold });
       this.unlock(p, 'proprietaire');
-      this.toast(p, `Vous voilà propriétaire ! Un coffre vous attend à l'intérieur (${HOME_STORE} places). Meublez la maison avec la touche B.`, 'quest');
+      if (this.homesOf(p.key).length >= 2) this.unlock(p, 'notable');
+      this.toast(p, `Vous voilà propriétaire : ${C.name} ! Un coffre vous attend à l'intérieur (${C.store} places). Meublez avec la touche B.`, 'quest');
       this.ev(d.ox, d.oy, ['fx', 'quest', d.ox, d.oy, p.id]);
+    } else if (a === 'visit') { // aperçu avant achat : on entre visiter une propriété libre
+      if (this.homes.has(k) || p.room !== -1 || p.boat || Math.hypot(p.x - d.ox, p.y - d.oy) > 40) return;
+      p.cds.door = 0; p.visit = k;
+      this.teleport(p, d.ix, d.iy, { door: d.id });
+      this.toast(p, `Visite libre : ${C.name}. ${C.furniture} meubles, coffre de ${C.store} places. Sortez par la porte.`, 'info');
     } else if (a === 'sell') {
       const h = this.homes.get(k);
       if (!h || h.key !== p.key) return;
       if (h.storage.some(Boolean)) return this.toast(p, 'Videz d’abord vos coffres.', 'warn');
       for (const [i, st] of [...this.structs]) if (st.home === k) { this.removeStruct(i, false); if (!(st.data && st.data.free)) this.giveOrDrop(p, STRUCTS[st.type].item, 1); }
       for (const [i, f] of [...this.floors]) if (f.home === k) { this.removeStruct(i, true); this.giveOrDrop(p, STRUCTS[f.type].item, 1); }
-      this.homes.delete(k); p.gold += Math.floor(HOME_PRICE / 2); p.dirtyMe = true;
+      const back = Math.floor((h.paid || C.price) * RESALE);
+      this.homes.delete(k); p.gold += back; p.dirtyMe = true;
+      for (const q of this.players.values()) if (q.room === pl.room) this.teleport(q, d.rx, d.ry + 2, { door: d.id, out: 1 });
       this.broadcastHomes(); this.worldDirty = true;
-      this.toast(p, `Maison vendue : +${Math.floor(HOME_PRICE / 2)} doublons.`, 'info');
+      this.audit('propriete-vente', { who: p.key, k, back, gold: p.gold });
+      this.toast(p, `${C.name} revendue : +${back} doublons. Votre mobilier est revenu dans votre sac.`, 'info');
     }
   }
   // le coffre offert avec la maison : contre le mur du fond, il ne se démonte pas
@@ -2543,27 +2591,28 @@ export class Game {
     p.gold += gold; p.dirtyMe = true; p.dirtyInv = true;
     this.send(p, { t: 'chat', from: null, lvl: 0, m: `⚓ Les bases et l’artisanat ont disparu de l’archipel : vos constructions et vos matériaux ont été revendus (+${gold} doublons)${r.items.length ? ', le contenu de votre coffre vous est rendu' : ''}.`, kind: 'sys', pid: 0 });
   }
-  exportHome(key) {
-    const h = this.homeOf(key);
-    if (!h) return null;
+  exportHome(key) { const all = this.homesOf(key).map((h) => this.exportHomeData(h)); return all.length ? all : null; }
+  exportHomeData(h) {
     const r = this.world.rooms[this.world.plots[h.k].room];
     return {
-      k: h.k, storage: h.storage, lock: h.lock,
+      k: h.k, storage: h.storage, lock: h.lock, bought: h.bought || 0, paid: h.paid || 0,
       s: [...this.structs.values()].filter((st) => st.home === h.k).map((st) => [st.type, st.tx - r.x0, st.ty - r.y0, st.data && st.data.t ? st.data.t : 0]),
       f: [...this.floors.values()].filter((f) => f.home === h.k).map((f) => [f.type, f.tx - r.x0, f.ty - r.y0]),
     };
   }
   importHome(key, name, d) {
-    if (!d || this.homeOf(key)) return;
+    if (Array.isArray(d)) { for (const one of d) this.importHome(key, name, one); return; } // 1.0 : plusieurs propriétés
+    if (!d || this.homesOf(key).length >= HOME_LIMIT) return;
+    if (typeof d.k === 'number' && this.homes.has(d.k) && this.homes.get(d.k).key === key) return; // déjà chargée
     let k = typeof d.k === 'number' && this.world.plots[d.k] && !this.homes.has(d.k) ? d.k : -1;
-    if (k < 0) k = this.world.plots.findIndex((pl) => !this.homes.has(pl.k));
+    if (k < 0) k = this.world.plots.findIndex((pl) => !this.homes.has(pl.k) && plotCategory(pl) === 'ville');
     if (k < 0) return;
-    const storage = new Array(HOME_STORE).fill(null);
+    const storage = new Array(Math.max(this.storeMax(k), Array.isArray(d.storage) ? d.storage.length : 0)).fill(null);
     let refund = 0;
-    if (Array.isArray(d.storage)) d.storage.slice(0, HOME_STORE).forEach((c, j) => { if (!c) return; if (ITEMS[c.id] && !ITEMS[c.id].quest) storage[j] = { id: c.id, n: Math.max(1, Math.min(STACK_MAX, c.n | 0)) }; else refund += (LEGACY_VALUE[c.id] || QUEST_ITEM_OLD_VALUE[c.id] || 0) * (c.n | 0); });
+    if (Array.isArray(d.storage)) d.storage.forEach((c, j) => { if (!c) return; if (ITEMS[c.id] && !ITEMS[c.id].quest) storage[j] = { id: c.id, n: Math.max(1, Math.min(STACK_MAX, c.n | 0)) }; else refund += (LEGACY_VALUE[c.id] || QUEST_ITEM_OLD_VALUE[c.id] || 0) * (c.n | 0); });
     for (const [type] of [...(d.s || []), ...(d.f || [])]) if (!STRUCTS[type] && LEGACY_STRUCT[type]) refund += LEGACY_VALUE[LEGACY_STRUCT[type]] || 0;
     if (refund) this.addRefund(key, refund);
-    this.homes.set(k, { k, key, name, storage, lock: Math.max(0, Math.min(2, d.lock | 0)), count: 0, burgledAt: 0 });
+    this.homes.set(k, { k, key, name, storage, lock: Math.max(0, Math.min(2, d.lock | 0)), count: 0, burgledAt: 0, bought: +d.bought || Date.now() - 1e9 + k, paid: +d.paid || 0 });
     const r = this.world.rooms[this.world.plots[k].room];
     const add = [], addf = [];
     for (const [type, dx, dy, t] of d.s || []) { const def = STRUCTS[type]; if (!def || def.floor) continue; const tx = r.x0 + (dx | 0), ty = r.y0 + (dy | 0); if (tx < r.x0 || ty < r.y0 || tx >= r.x0 + r.w || ty >= r.y0 + r.h) continue; if (this.addStruct(key, type, tx, ty, def.planter ? { t: t || Date.now() } : {}, false, k)) add.push(this.structEntry(this.structs.get(ty * this.world.W + tx))); }
@@ -2573,8 +2622,13 @@ export class Game {
     this.broadcastHomes();
   }
   removeHome(key) {
-    const h = this.homeOf(key);
+    const all = this.homesOf(key);
+    if (all.length > 1) { for (const one of all) this.removeHomeK(one); return; }
+    const h = all[0];
     if (!h) return;
+    this.removeHomeK(h);
+  }
+  removeHomeK(h) {
     const r = [];
     for (const [i, st] of [...this.structs]) if (st.home === h.k) { this.structs.delete(i); this.world.block[i] = 0; this.world.doorOwner.delete(i); r.push([st.tx, st.ty, 0]); }
     for (const [i, f] of [...this.floors]) if (f.home === h.k) { this.floors.delete(i); r.push([f.tx, f.ty, 1]); }
@@ -2598,7 +2652,7 @@ export class Game {
     if (Date.now() - (p.robbed[k] || 0) < 30 * 60000) return this.toast(p, 'Vous avez déjà cambriolé cette maison. Faites-vous oublier.', 'warn');
     const owner = [...this.players.values()].find((q) => q.key === h.key);
     const dog = [...this.structs.values()].some((st) => st.home === k && st.type === 'pet_chien');
-    const chance = ok ? Math.max(0.15, 0.85 - 0.22 * h.lock - (dog ? 0.2 : 0)) : 0;
+    const chance = ok ? this.burgleChance(h) : 0;
     if (Math.random() >= chance) {
       this.removeItem(p, 'crochets', 1);
       if (dog) { this.ev(d.ox, d.oy, ['shout', 0, 'Ouaf ! Ouaf !']); if (owner) this.toast(owner, `Votre chien aboie : ${p.name} rôde autour de votre maison !`, 'warn'); }
@@ -2611,6 +2665,16 @@ export class Game {
     if (owner) this.toast(owner, `⚠ ${p.name} a crocheté la porte de votre maison !`, 'warn');
     p.cds.door = 0;
     this.teleport(p, d.ix, d.iy, { door: d.id });
+    const traps = this.homeTraps(k); // un piège sur le passage : blessé, immobilisé, et le propriétaire prévenu
+    if (traps.length && Math.random() < 0.25 + 0.15 * Math.min(3, traps.length)) {
+      const tr = traps[Math.floor(Math.random() * traps.length)];
+      this.teleport(p, tr.x, tr.y);
+      p.grabbedUntil = this.time + 3;
+      this.damagePlayer(p, Math.round(p.stats.maxHp * 0.3), null, false, 1); // les mâchoires ne se trompent pas (ni esquive ni armure)
+      this.ev(tr.x, tr.y, ['shout', 0, 'CLAC !']);
+      this.toast(p, 'Un piège à loup se referme sur votre cheville !', 'warn');
+      if (owner) this.toast(owner, `Votre piège a attrapé ${p.name} chez vous !`, 'quest');
+    }
   }
   burgleChest(p, st) {
     const h = this.homes.get(st.home);
@@ -2618,7 +2682,8 @@ export class Game {
     if (p.burgle.looted) return this.toast(p, 'Vous avez déjà fouillé. Filez !', 'warn');
     p.burgle.looted = true; p.robbed[st.home] = Date.now(); h.burgledAt = Date.now();
     const got = [];
-    const full = h.storage.map((c, j) => [c, j]).filter(([c]) => c);
+    const guarded = this.homeVault(st.home) ? 12 : 0; // le coffre-fort protège les 12 premières places ; les objets irremplaçables ne se volent jamais
+    const full = h.storage.map((c, j) => [c, j]).filter(([c, j]) => c && j >= guarded && ITEMS[c.id] && !ITEMS[c.id].unique && (ITEMS[c.id].rarity || 0) < 3);
     if (full.length) {
       const [c, j] = full[Math.floor(Math.random() * full.length)];
       const n = Math.max(1, Math.ceil(c.n / 2));
@@ -2684,6 +2749,16 @@ export class Game {
     if (!st || p.dead || Math.hypot(st.x - p.x, st.y - p.y) > 40) return;
     const mine = st.owner === p.key;
     if (st.home != null && !mine && st.type === 'coffre') return this.burgleChest(p, st);
+    // 1.0 : on s'assoit, on lit, on choisit la musique de la maison
+    if (st.type === 'chaise_h') { this.ev(p.x, p.y, ['emote', p.id, 'assis']); return; }
+    if (st.type === 'biblio_h') { const L = LORE_PAGES[Math.floor(Math.random() * LORE_PAGES.length)]; return this.send(p, { t: 'chat', from: null, kind: 'sys', m: `📖 ${L}` }); }
+    if (STRUCTS[st.type].music && st.home != null) {
+      const h = this.homes.get(st.home); if (!h) return;
+      if (!mine) return this.toast(p, 'La boîte à musique n’obéit qu’à son propriétaire.', 'info');
+      const i = HOUSE_MUSIC.findIndex(([k]) => k === (h.music || '')); const nx = HOUSE_MUSIC[(i + 1) % HOUSE_MUSIC.length];
+      h.music = nx[0]; this.worldDirty = true; this.broadcastHomes();
+      return this.toast(p, `Boîte à musique : ${nx[1]}.`, 'info');
+    }
     if (STRUCTS[st.type].pet) {
       if (!mine) return this.toast(p, 'Il vous regarde de travers.', 'info');
       p.pet = p.pet === STRUCTS[st.type].pet ? null : STRUCTS[st.type].pet; p.lookVer++; p.dirtyMe = true;
@@ -2715,13 +2790,14 @@ export class Game {
     let near = false;
     for (const st of this.structs.values()) if (st.type === 'coffre' && st.owner === p.key && (st.home ?? null) === homeK && Math.hypot(st.x - p.x, st.y - p.y) < 48) near = true;
     if (!near) return;
-    const S = h.storage;
+    const S = h.storage, cap = this.homeCap(h);
+    while (S.length < this.storeMax(h.k)) S.push(null);
     if (a === 'put') {
       const it = p.inv[slot];
       if (!it || ITEMS[it.id].quest || this.boatInUse(p, it.id)) return;
       let n = it.n;
-      if (isStackable(it.id)) for (const c of S) if (c && c.id === it.id && c.n < STACK_MAX) { const k = Math.min(n, STACK_MAX - c.n); c.n += k; n -= k; if (!n) break; }
-      if (n > 0) { const free = S.findIndex((c) => !c); if (free < 0) { it.n = n; p.dirtyInv = true; return this.toast(p, 'Le coffre est plein.', 'warn'); } S[free] = { id: it.id, n }; }
+      if (isStackable(it.id)) for (let j = 0; j < cap && n; j++) { const c = S[j]; if (c && c.id === it.id && c.n < STACK_MAX) { const k = Math.min(n, STACK_MAX - c.n); c.n += k; n -= k; } }
+      if (n > 0) { let free = -1; for (let j = 0; j < cap; j++) if (!S[j]) { free = j; break; } if (free < 0) { it.n = n; p.dirtyInv = true; return this.toast(p, 'Le coffre est plein. Un coffre supplémentaire ajoute 16 places.', 'warn'); } S[free] = { id: it.id, n }; }
       p.inv[slot] = null; p.dirtyInv = true; p.dirtyQ = true;
     } else if (a === 'take') {
       const c = S[slot];
@@ -2730,7 +2806,7 @@ export class Game {
       if (left) { c.n = left; this.toast(p, 'Inventaire plein !', 'warn'); } else S[slot] = null;
     }
     this.worldDirty = true;
-    this.send(p, { t: 'stor', items: S });
+    this.send(p, { t: 'stor', items: S, cap, vault: this.homeVault(h.k) ? 12 : 0 });
   }
   updateTurrets() {
     for (const st of this.structs.values()) {
@@ -2766,7 +2842,7 @@ export class Game {
     this.bases.delete(key);
     this.broadcastAll({ t: 'st', r, rb: [b.name] });
   }
-  exportWorld() { return { v: 2, sv: SAVE_VERSION, bases: [], homes: [...this.homes.values()].map((h) => ({ ...this.exportHome(h.key), key: h.key, name: h.name })), refunds: [...this.refunds].map(([key, r]) => [key, r.gold, r.items]) }; }
+  exportWorld() { return { v: 2, sv: SAVE_VERSION, bases: [], homes: [...this.homes.values()].map((h) => ({ ...this.exportHomeData(h), key: h.key, name: h.name })), refunds: [...this.refunds].map(([key, r]) => [key, r.gold, r.items]) }; }
   importWorld(w) {
     if (!w) return;
     if ((w.sv | 0) > SAVE_VERSION) { this.worldFrozen = true; this.log(`[monde] sauvegarde du monde v${w.sv} plus récente que le serveur : chargée en lecture seule, jamais écrasée`); }

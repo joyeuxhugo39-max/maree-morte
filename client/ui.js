@@ -800,7 +800,31 @@ export class UI {
   }
 
   // ------------------------------------------------------------ coffre de la base
-  openStorage(items) {
+  // 1.0 : le titre de propriété — avant l'achat (visite, prix, capacités, risque), après (gestion, revente)
+  openDeed(d) {
+    const G = this.G;
+    this.close(); this.open = 'deed'; this.deedK = d.k;
+    $('panel-deed').classList.remove('hidden');
+    $('deed-title').textContent = d.name;
+    const row = (k, v) => `<div><span>${k}</span><b>${v}</b></div>`;
+    const riskTxt = (r) => `${r < 30 ? 'faible' : r < 55 ? 'moyen' : 'élevé'} (${r} %)`;
+    let html = `<div class="deed-cat">${esc(this.propName(d.cat))}</div><p class="deed-perk">${esc(d.perk)}</p><div class="deed-grid">`;
+    html += row('Mobilier', d.mine ? `${d.used} / ${d.furniture}` : `${d.furniture} objets`) + row('Coffre', d.mine ? `${d.cap} places` : `${d.store} places`) + row('Coffres en plus', `${d.extra} × 16 places`);
+    if (d.mine) html += row('Serrure', ['simple', 'renforcée', 'de coffre-fort'][d.lock] || 'simple') + row('Pièges', d.traps || 'aucun') + row('Coffre-fort', d.vault ? '12 places protégées' : 'non') + row('Risque de cambriolage', riskTxt(d.risk));
+    else html += row('Prix', `${d.price} doublons`) + row('Risque de cambriolage', riskTxt(d.risk)) + row('Vos propriétés', `${d.owned} / ${d.limit}`);
+    html += '</div><div class="deed-btns">';
+    if (d.mine) html += `<button class="btn alt" id="deed-sell">Revendre (${d.resale} doublons)</button>`;
+    else if (!d.owner) html += `<button class="btn" id="deed-buy" ${d.owned >= d.limit ? 'disabled' : ''}>Acheter (${d.price} doublons)</button><button class="btn alt" id="deed-visit">Visiter</button>`;
+    html += '</div>';
+    if (d.mine) html += '<p class="hint">Revendre rend 60 % du prix payé ; videz d’abord le coffre, votre mobilier revient dans votre sac. Améliorez la sécurité avec une serrure renforcée, des pièges à loup, un chien de garde ou un coffre-fort.</p>';
+    else if (d.owned >= d.limit) html += '<p class="hint">Deux propriétés au plus : revendez-en une pour acheter celle-ci.</p>';
+    $('deed-body').innerHTML = html;
+    const sb = $('deed-sell'); if (sb) sb.onclick = () => this.confirm(`Revendre <b>${esc(d.name)}</b> pour <b>${d.resale} doublons</b> ?<br><small>Votre mobilier revient dans votre sac.</small>`, () => G.send({ t: 'home', a: 'sell', k: d.k }));
+    const bb = $('deed-buy'); if (bb) bb.onclick = () => this.confirm(`Acheter <b>${esc(d.name)}</b> (${esc(this.propName(d.cat))}) pour <b>${d.price} doublons</b> ?<br><small>Votre nom sera sur la porte. Meublez-la avec la touche B.</small>`, () => G.send({ t: 'home', a: 'buy', k: d.k }));
+    const vb = $('deed-visit'); if (vb) vb.onclick = () => { this.close(); G.send({ t: 'home', a: 'visit', k: d.k }); };
+  }
+  propName(cat) { return ({ cabane: 'Petite cabane', ville: 'Maison de ville', villa: 'Villa de planteur', manoir: 'Manoir', phare: 'Phare', refuge: 'Refuge dans la jungle', marais: 'Cabane dans les marais', fortin: 'Fortin sur un îlot' })[cat] || 'Maison'; }
+  openStorage(items, cap = items.length, vault = 0) {
     if (this.open !== 'storage') {
       this.close();
       this.open = 'storage'; this.storageOpen = true;
@@ -812,8 +836,10 @@ export class UI {
     }
     const grid = $('stor-grid');
     grid.innerHTML = '';
+    $('stor-cap').textContent = `${items.filter(Boolean).length} / ${cap} places${vault ? ` · coffre-fort : les ${vault} premières sont protégées` : ''}${cap < items.length ? ' · un coffre supplémentaire ajoute 16 places' : ''}`;
     items.forEach((it, k) => {
-      const el = document.createElement('div'); el.className = 'slot' + (it && ITEMS[it.id].rarity ? ' r' + ITEMS[it.id].rarity : '');
+      if (k >= cap && !it) { if (k < cap + 16 && k < items.length) { const el = document.createElement('div'); el.className = 'slot locked'; el.title = 'Installez un coffre supplémentaire pour ouvrir ces places'; grid.appendChild(el); } return; }
+      const el = document.createElement('div'); el.className = 'slot' + (it && ITEMS[it.id].rarity ? ' r' + ITEMS[it.id].rarity : '') + (k < vault ? ' vault' : '');
       el.innerHTML = it ? `<img src="${iconURL(ITEMS[it.id].icon, ITEMS[it.id].tint)}">${it.n > 1 ? `<span class="n">${it.n}</span>` : ''}` : '';
       el.onclick = () => it && this.G.send({ t: 'stor', a: 'take', slot: k });
       el.oncontextmenu = (e) => { e.preventDefault(); if (it) this.G.send({ t: 'stor', a: 'take', slot: k }); };

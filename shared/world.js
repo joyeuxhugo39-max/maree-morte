@@ -64,7 +64,7 @@ export const PROPS = {
   mannequin: { solid: 1 }, lavarock: { solid: 1 }, cage: { solid: 1 }, fort: { solid: 1 }, ruine: { solid: 1 }, totem: { solid: 1 },
   ship: { solid: 1 }, wreck: { solid: 1 }, boat: { solid: 1 },
   // 0.8 : Libertalia
-  cite: { solid: 1 }, rempart: { solid: 1 }, tour: { solid: 1 }, porte_cite: {}, fontaine: { solid: 1 }, statue: { solid: 1 }, linge: {}, drapeau: { solid: 1 }, canne: {}, jtree_r: { solid: 1 }, paletuvier: { solid: 1 },
+  cite: { solid: 1 }, propriete: { solid: 1 }, rempart: { solid: 1 }, tour: { solid: 1 }, porte_cite: {}, fontaine: { solid: 1 }, statue: { solid: 1 }, linge: {}, drapeau: { solid: 1 }, canne: {}, jtree_r: { solid: 1 }, paletuvier: { solid: 1 },
   divan: { solid: 1 }, rideau: { solid: 1 }, table_jeu: { solid: 1 }, stalle: { solid: 1 }, trone: { solid: 1 }, banniere: { solid: 1 }, gradin: { solid: 1 }, lanterne_r: { solid: 1 },
 };
 
@@ -102,7 +102,7 @@ export function generateWorld(seed = 7) {
     // 0.8 : Libertalia, l'île gigantesque, et sa grande cité au sud
     [800, 236, 90, 112], [724, 152, 40, 36], [800, 116, 52, 26], [878, 148, 38, 34], [718, 312, 36, 32], [884, 316, 32, 36],
     // îlots du Détroit de Libertalia : ils équilibrent la mer de l'est et jalonnent la route
-    [664, 92, 9, 7], [660, 232, 7, 5], [670, 392, 11, 8], [738, 416, 6, 5], [926, 54, 10, 7], [930, 398, 9, 7], [858, 414, 7, 5], [716, 34, 8, 6],
+    [664, 92, 9, 7], [660, 232, 7, 5], [670, 392, 11, 8], [738, 416, 6, 5], [926, 56, 15, 10], [930, 400, 14, 10], [858, 416, 11, 8], [716, 34, 8, 6],
   ];
   const LB = { x: 800, y: 282 }; // place de la Liberté
   const LIB = { x0: 744, y0: 206, x1: 856, y1: 338 }; // le cœur de la cité (ses rues et ses maisons)
@@ -192,7 +192,7 @@ export function generateWorld(seed = 7) {
     [Z.ILOT, 402, 204, 0.5], [Z.ILOT, 244, 262, 0.5], [Z.ILOT, 522, 252, 0.5], [Z.ILOT, 384, 402, 0.5], [Z.ILOT, 204, 404, 0.5], [Z.ILOT, 114, 414, 0.5],
     [Z.HAUTS, 724, 160, 1.5], [Z.HAUTS, 758, 198, 1.0], [Z.CANNAIES, 800, 122, 1.6], [Z.CANNAIES, 842, 178, 1.0], [Z.BAIE, 882, 146, 1.4],
     [Z.MANGROVE, 714, 302, 1.5], [Z.MANGROVE, 732, 252, 0.9], [Z.ECARLATE, 886, 300, 1.5], [Z.ECARLATE, 866, 248, 1.0], [Z.ECARLATE, 870, 214, 0.7],
-    [Z.ILOT, 664, 92, 0.45], [Z.ILOT, 660, 232, 0.4], [Z.ILOT, 670, 392, 0.5], [Z.ILOT, 738, 416, 0.4], [Z.ILOT, 926, 54, 0.45], [Z.ILOT, 930, 398, 0.45], [Z.ILOT, 858, 414, 0.4], [Z.ILOT, 716, 34, 0.4],
+    [Z.ILOT, 664, 92, 0.45], [Z.ILOT, 660, 232, 0.4], [Z.ILOT, 670, 392, 0.5], [Z.ILOT, 738, 416, 0.4], [Z.ILOT, 926, 56, 0.6], [Z.ILOT, 930, 400, 0.6], [Z.ILOT, 858, 416, 0.5], [Z.ILOT, 716, 34, 0.4],
   ];
   const RC8 = 8, rcw = Math.ceil(W / RC8), regCells = [];
   for (let cy = 0; cy * RC8 < OVER_H; cy++) for (let cx = 0; cx < rcw; cx++) {
@@ -637,7 +637,7 @@ export function generateWorld(seed = 7) {
       if (y < b.y + b.h && x >= b.x && x < b.x + b.w && y >= b.y) solid[i] = 1;
     }
     stampPath([[b.x + b.door, b.y + b.h], [b.x + b.door, b.y + b.h + 1]], 0.9, T.COBBLE);
-    props.push({ id: pid++, type: b.type, v: b.v || 0, x: (b.x + b.w / 2) * TILE, y: (b.y + b.h) * TILE, tx: b.x, ty: b.y, w: b.w, h: b.h, door: b.door, name: b.name, plot: b.plot, style: b.style });
+    props.push({ id: pid++, type: b.type, v: b.v || 0, x: (b.x + b.w / 2) * TILE, y: (b.y + b.h) * TILE, tx: b.x, ty: b.y, w: b.w, h: b.h, door: b.door, name: b.name, plot: b.plot, style: b.style || b.cat });
     if (list) list.push(b);
     return b;
   };
@@ -817,7 +817,7 @@ export function generateWorld(seed = 7) {
     { x: 432, y: 62, tier: 2 }, { x: 560, y: 36, tier: 3 }, { x: 590, y: 82, tier: 2 }, { x: 526, y: 150, tier: 3 }, { x: 352, y: 156, tier: 1 },
     { x: 52, y: 352, tier: 3 }, { x: 90, y: 318, tier: 2 }, { x: 318, y: 348, tier: 3 }, { x: 280, y: 312, tier: 2 }, { x: 490, y: 344, tier: 3 },
     { x: 452, y: 316, tier: 3 }, { x: 572, y: 418, tier: 4 }, { x: 606, y: 392, tier: 4 }, { x: 402, y: 204, tier: 2 }, { x: 204, y: 404, tier: 3 }, { x: 114, y: 414, tier: 2 },
-    { x: 926, y: 54, tier: 3 }, { x: 930, y: 398, tier: 3 }, { x: 670, y: 392, tier: 2 },
+    { x: 920, y: 50, tier: 3 }, { x: 924, y: 394, tier: 3 }, { x: 670, y: 392, tier: 2 },
   ]) { const s = findFree(c.x, c.y); if (s) { const p = addProp('chest', s.x, s.y, Math.min(3, c.tier)); p.chest = c.tier; chests.push(p); } }
 
   // ---------- 6f. Libertalia, la Cité Libre des Forbans (0.8) ----------
@@ -983,6 +983,28 @@ export function generateWorld(seed = 7) {
   // personnages du dehors : passeur, marchands du marché, crieur, garde, mendiant, musicien, tableau des primes
   for (const [id, x, y] of [['passeur_lib', 803, 340], ['marchande_fruits', 779, 294], ['poissonnier_lib', 786, 294], ['marchand_curios', 793, 294], ['marchand_rhum', 779, 301],
     ['crieur', LB.x + 2, LB.y - 6], ['primes_lib', LB.x - 9, LB.y], ['garde_porte', 774, LIB.y0 + 3], ['mendiant', 836, 300], ['musicien', 768, 284]]) libNpcs.push([id, x, y]);
+
+  // ---------- 6g. 1.0 : des propriétés de toutes sortes (manoir, villas, phare, refuges, cabanes des marais, fortins) ----------
+  const plots4 = [];
+  const siteFree = (x0, y0, w, h) => { for (let y = y0 - 2; y <= y0 + h + 2; y++) for (let x = x0 - 2; x <= x0 + w + 1; x++) { if (!inMap(x, y)) return false; const i = idx(x, y), t = tiles[i]; if (t === T.DEEP || t === T.WATER || occ[i] || path[i] || solid[i] || inLib(x, y)) return false; } return true; };
+  const findSite = (cx, cy, w, h, R = 18) => { for (let r = 0; r <= R; r++) for (let a = 0; a < 24; a++) { const x = Math.round(cx + Math.cos((a / 24) * 6.283) * r) - (w >> 1), y = Math.round(cy + Math.sin((a / 24) * 6.283) * r) - h; if (siteFree(x, y, w, h)) return [x, y]; } return null; };
+  const PROPS4 = [
+    ['manoir', 'Manoir des Cannaies', 832, 172, 12, 6, 6], ['villa', 'Villa du Planteur', 774, 132, 9, 5, 4], ['villa', 'Villa des Alizés', 830, 120, 9, 5, 4],
+    ['phare', 'Phare de la Passe', 858, 416, 5, 5, 2], ['refuge', 'Refuge des Écarlates', 904, 236, 6, 4, 3], ['refuge', 'Refuge du Temple', 872, 334, 6, 4, 3],
+    ['marais', 'Cabane des Palétuviers', 704, 272, 6, 4, 3], ['marais', 'Cabane du Passeur', 728, 334, 6, 4, 3], ['fortin', 'Fortin du Levant', 926, 56, 9, 6, 4], ['fortin', 'Fortin des Récifs', 930, 400, 9, 6, 4],
+  ];
+  PROPS4.forEach(([cat, name, cx, cy, w, h, door], n) => {
+    const s = findSite(cx, cy, w, h, cat === 'phare' || cat === 'fortin' ? 8 : 18);
+    if (!s) throw new Error('pas de place pour ' + name);
+    const zone = zones[idx(cx, cy)] === Z.SEA ? Z.ILOT : zones[idx(cx, cy)];
+    const b = facade({ type: 'propriete', v: n, x: s[0], y: s[1], w, h, door, name, plot: PLOT0 + 10 + n, cat, ground: cat === 'fortin' || cat === 'phare' ? T.COBBLE : T.DIRT }, zone, null);
+    b.cat = cat; plots4.push(b);
+    if (cat === 'phare' || cat === 'marais' || cat === 'fortin') { // un ponton privé vers l'eau la plus proche
+      let best = null;
+      for (const [dx, dy] of [[0, 1], [1, 0], [-1, 0], [0, -1]]) { const [ex, ey] = toCoast(b.x + b.door, b.y + b.h + 1, dx, dy, 16); if (inMap(ex, ey) && (tiles[idx(ex, ey)] === T.WATER || tiles[idx(ex, ey)] === T.DEEP)) { const d = Math.abs(ex - b.x - b.door) + Math.abs(ey - b.y - b.h); if (!best || d < best[0]) best = [d, ex - dx, ey - dy, dx, dy]; } }
+      if (best) b.dock = pier(best[1], best[2], best[3], best[4], 5, zone);
+    }
+  });
 
   // ---------- 11. Végétation et décors ----------
   const clear = (x, y, r) => {
@@ -1336,6 +1358,14 @@ export function generateWorld(seed = 7) {
     plots.push(b);
   }
   if (mouthCrypte) { const r = cave('Crypte du Roi sans Couronne', 38, 22, mouthCrypte, 9191, [['garde_maudit', 7], ['coupe_jarret', 4], ['skelgun', 3]]); bossIn(r, 'roi_sans_couronne'); caves2.push([r, 'mousquet_vaudou']); }
+  // 1.0 : les intérieurs des nouvelles propriétés, à leur mesure
+  const ROOM_CAT = { manoir: [20, 12, T.FLOOR], villa: [15, 10, T.FLOOR], phare: [9, 9, T.STONEF], refuge: [10, 7, T.FLOOR], marais: [9, 6, T.FLOOR], fortin: [16, 11, T.STONEF] };
+  for (const b of plots4) {
+    const [rw, rh, fl] = ROOM_CAT[b.cat];
+    const r = room(b.name, 'home', rw, rh, fl, { x: b.x + b.door, y: b.y + b.h });
+    b.room = r.id; b.doorId = doors.length - 1; doors[b.doorId].plot = b.plot;
+    plots.push(b);
+  }
   if (ay + rowH + 2 > H) throw new Error('bande des intérieurs trop petite (est)');
 
   // ---------- 11c. Cachettes : des coffres oubliés, chacun garde une arme ----------
@@ -1577,7 +1607,7 @@ export function generateWorld(seed = 7) {
   return {
     block: new Uint8Array(N), // constructions des joueurs : 1 bloque tout, 2 bloque les morts
     doorOwner: new Map(), rooms, doors, sail, roomGrid, havre: HC, havreDock, OVER_H,
-    plots: plots.map((b) => ({ k: b.plot, name: b.name, room: b.room, door: b.doorId, tx: b.x, ty: b.y, w: b.w, h: b.h })),
+    plots: plots.map((b) => ({ k: b.plot, name: b.name, room: b.room, door: b.doorId, tx: b.x, ty: b.y, w: b.w, h: b.h, cat: b.cat || (b.plot >= 16 && b.plot <= 18 ? 'cabane' : 'ville') })),
     twin: { plates: twinPlates, door: doors.findIndex((d) => d.seal === 'jumeaux'), room: sanct.id }, kraken: { x: KR.x * TILE + 8, y: KR.y * TILE + 8 },
     seals: [
       { id: 'jumeaux', plates: twinPlates, door: doors.findIndex((d) => d.seal === 'jumeaux'), room: sanct.id, open: 90 },

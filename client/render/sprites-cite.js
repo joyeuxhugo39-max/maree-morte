@@ -370,3 +370,99 @@ export function extend08(env) {
   env.trone = [trone()]; env.banniere = many(banniere, 2); env.gradin = many(gradin, 2); env.lanterne_r = [lanterneR()];
   if (env.fort) env.fort = [env.fort[0], fortLib()];
 }
+
+// ------------------------------------------------------------------ 1.0 : les propriétés (extérieurs) et leur mobilier
+function stilts(pb, W, H, top, col = DWOOD) { // pilotis sous une cabane surélevée
+  for (let x = 6; x < W - 4; x += 12) { pb.rect(x, top, 3, H - top, col[2]); pb.vl(x, top, H - top, col[3]); pb.line(x + 2, top + 4, x + 10, H - 2, col[1]); }
+}
+function hutSprite(w, h, marsh) {
+  const W = w * 16 + 8, H = h * 16 + 34, pb = new PB(W, H);
+  const C = marsh ? [0x2a2014, 0x3e3020, 0x544230, 0x6a5640, 0x806a50] : DWOOD;
+  const base = H - 14; // la cabane repose sur ses pilotis, 14 px au-dessus du sol
+  stilts(pb, W, H, base - 2, C);
+  pb.rect(2, base - 4, W - 4, 5, C[3]); pb.hl(2, base - 4, W - 4, C[4]); pb.hl(2, base, W - 4, C[1]);
+  const wallTop = base - 30;
+  for (let y = wallTop; y < base - 4; y++) for (let x = 6; x < W - 6; x++) pb.set(x, y, (x % 6 === 0) ? C[1] : C[2 + ((x >> 1) % 2)]);
+  const dx = 4 + (w >> 1) * 16 - 6; pb.rect(dx, base - 24, 12, 20, 0x1a120a); pb.rect(dx + 1, base - 23, 10, 19, C[1]); for (let y = base - 22; y < base - 4; y += 3) pb.hl(dx + 2, y, 8, C[3]);
+  for (const wx of [10, W - 22]) { pb.rect(wx, wallTop + 6, 10, 8, 0x1a120a); pb.rect(wx + 1, wallTop + 7, 8, 6, marsh ? 0x3a4a3a : 0x24344f); pb.line(wx, wallTop + 6, wx + 9, wallTop + 13, C[3]); }
+  for (let y = 0; y < wallTop + 4; y++) { const hw = Math.min(W / 2, 6 + y * 1.3); for (let x = Math.round(W / 2 - hw); x < W / 2 + hw; x++) pb.set(x, y, (y + (x >> 2)) % 5 === 0 ? 0x83622a : y % 3 ? 0xa8833a : 0xc9a552); }
+  if (marsh) { pb.rect(W - 26, wallTop + 2, 10, 6, 0x6a6a74); pb.hl(W - 26, wallTop + 2, 10, 0x9a9aa4); for (let k = 0; k < 6; k++) pb.set(8 + k * 3, base + 2 + (k % 2), 0x8a8a6a); }
+  else for (let k = 0; k < 7; k++) { const x = 4 + k * 11; pb.line(x, wallTop + 2, x + 3, wallTop + 10 + (k % 3) * 3, 0x2a7142); pb.set(x + 3, wallTop + 11 + (k % 3) * 3, 0xc8342e); }
+  pb.vl(dx + 6, base, H - base, C[1]); for (let y = base + 2; y < H - 1; y += 3) pb.hl(dx + 3, y, 7, C[3]); // l'échelle
+  pb.outline('auto');
+  return mk(pb, W / 2, H, { windows: [{ x: 11, y: wallTop + 7, w: 8, h: 6 }, { x: W - 21, y: wallTop + 7, w: 8, h: 6 }] });
+}
+function fortinSprite(w, h) {
+  const W = w * 16 + 8, H = h * 16 + 40, pb = new PB(W, H);
+  const wallTop = H - 52;
+  for (let y = wallTop; y < H; y++) for (let x = 2; x < W - 2; x++) pb.set(x, y, (y % 6 === 5 || (x + (Math.floor(y / 6) % 2 ? 4 : 0)) % 8 === 0) ? STONE[1] : STONE[x < 6 ? 4 : x > W - 7 ? 1 : 2 + ((x * 7 + y) % 13 === 0 ? 1 : 0)]);
+  for (let x = 2; x < W - 2; x += 7) { pb.rect(x, wallTop - 6, 5, 6, STONE[3]); pb.hl(x, wallTop - 6, 5, STONE[5]); }
+  const tx = W - 40; // la tour d'angle
+  for (let y = 6; y < H - 30; y++) for (let x = tx; x < tx + 30; x++) pb.set(x, y, (y % 6 === 5 || (x + (Math.floor(y / 6) % 2 ? 4 : 0)) % 7 === 0) ? STONE[1] : STONE[x < tx + 4 ? 4 : x > tx + 25 ? 1 : 3]);
+  for (let x = tx; x < tx + 30; x += 6) { pb.rect(x, 0, 4, 6, STONE[4]); pb.hl(x, 0, 4, STONE[5]); }
+  pb.rect(tx + 12, 18, 5, 9, 0x14101a);
+  pb.vl(tx + 15, -4, 6, WOOD[1]); pb.vl(14, wallTop - 26, 22, WOOD[1]); for (let j = 0; j < 9; j++) pb.hl(15, wallTop - 25 + j, 16 - j, j === 0 ? 0x2a2a30 : 0x141418); pb.set(20, wallTop - 22, BONE[3]); pb.set(21, wallTop - 21, BONE[3]);
+  const dx = 4 + (w >> 1) * 16 - 8; // la porte charretière
+  for (let y = H - 30; y < H; y++) for (let x = dx; x < dx + 24; x++) { const top = H - 30 + Math.round(Math.pow(Math.abs(x - dx - 11.5) / 12, 2) * 6); if (y >= top) pb.set(x, y, y === top ? STONE[4] : (x - dx) % 4 === 0 ? WOOD[1] : WOOD[2]); }
+  for (const cx of [10, W - 64]) { pb.rect(cx, wallTop + 8, 14, 5, 0x141418); pb.rect(cx + 2, wallTop + 9, 10, 3, IRON[3]); pb.set(cx + 2, wallTop + 9, IRON[5]); }
+  pb.outline('auto');
+  return mk(pb, W / 2, H, { lights: [[dx - 4, H - 20], [dx + 28, H - 20]] });
+}
+const propCache = new Map();
+export function proprieteSprite(p, env) {
+  const key = `${p.style}|${p.w}|${p.h}|${p.door}`;
+  if (propCache.has(key)) return propCache.get(key);
+  let s;
+  switch (p.style) {
+    case 'villa': s = building({ w: p.w, h: p.h, door: p.door, wall: 'plaster', plaster: PLA.white, roof: RF.terra, floors: 1, chimney: false, shutter: SHUT[1], flowers: FLOW[0], winCols: [0, 1, 2, 6, 7, 8],
+      extra: (pb, W, H, top) => { pb.rect(4, top + 1, W - 8, 4, RF.terra[2]); pb.hl(4, top + 1, W - 8, RF.terra[4]); for (let x = 8; x < W - 8; x += 18) { pb.rect(x, top + 5, 3, H - top - 8, PLA.white[4]); pb.vl(x + 2, top + 5, H - top - 8, PLA.white[1]); } pb.hl(6, H - 10, W - 12, WOOD[3]); for (let x = 6; x < W - 6; x += 3) pb.vl(x, H - 9, 6, WOOD[2]); } }); break;
+    case 'manoir': s = building({ w: p.w, h: p.h, door: p.door, wall: 'stone', roof: 'slate', floors: 2, chimney: true, shutter: SHUT[0], flowers: FLOW[2],
+      extra: (pb, W, H, top) => { chimneyAtX(pb, 18, 2); balcony(pb, W / 2 - 22, W / 2 + 22, top + 14); lantern(pb, W / 2 - 18, H - 26, 0xffd24a); lantern(pb, W / 2 + 14, H - 26, 0xffd24a); for (let k = 0; k < 18; k++) { const x = 6 + ((k * 37) % (W - 12)), y = top + 4 + ((k * 13) % 30); pb.set(x, y, 0x2a6a3a); pb.set(x + 1, y + 1, 0x3a8a4a); } pb.rect(W / 2 - 14, H - 4, 28, 4, STONE[3]); } });
+      s.lights = [[s.w / 2 - 16, s.h - 23], [s.w / 2 + 16, s.h - 23]]; break;
+    case 'phare': s = env.lighthouse[0]; break;
+    case 'refuge': s = hutSprite(p.w, p.h, false); break;
+    case 'marais': s = hutSprite(p.w, p.h, true); break;
+    case 'fortin': s = fortinSprite(p.w, p.h); break;
+    default: s = building({ w: p.w, h: p.h, door: p.door, wall: 'wood', roof: 'thatch', floors: 1 });
+  }
+  propCache.set(key, s);
+  return s;
+}
+function chimneyAtX(pb, x, y) { for (let j = 0; j < 16; j++) for (let i = 0; i < 8; i++) pb.set(x + i, y + j, (j % 4 === 3) ? STONE[1] : STONE[i < 3 ? 3 : 2]); pb.rect(x - 1, y - 2, 10, 3, STONE[2]); }
+// mobilier
+function coffreFort() { const pb = new PB(16, 22); pb.rect(1, 3, 14, 18, IRON[2]); pb.hl(1, 3, 14, IRON[4]); pb.vl(1, 3, 18, IRON[3]); pb.vl(14, 3, 18, IRON[1]); pb.rect(3, 5, 10, 13, IRON[3]); pb.disc(8, 11, 3, IRON[1]); pb.disc(8, 11, 2, GOLD[2]); pb.set(8, 9, GOLD[4]); pb.rect(12, 9, 2, 4, GOLD[1]); pb.rect(2, 20, 3, 2, IRON[0]); pb.rect(11, 20, 3, 2, IRON[0]); pb.outline('auto'); return mk(pb, 8, 21); }
+function piege() { const pb = new PB(16, 10); pb.ellipse(8, 6, 7, 3, IRON[2]); pb.ellipse(8, 6, 5, 2, IRON[1]); for (let x = 2; x < 15; x += 2) { pb.set(x, 3, IRON[5]); pb.set(x, 9, IRON[4]); } pb.rect(6, 5, 4, 2, IRON[3]); pb.line(14, 6, 16, 9, IRON[1]); pb.outline('auto'); return mk(pb, 8, 9); }
+function boiteMusique() { const pb = new PB(16, 16); pb.rect(2, 8, 12, 7, DWOOD[3]); pb.hl(2, 8, 12, DWOOD[5]); pb.rect(2, 2, 12, 5, DWOOD[2]); pb.hl(2, 2, 12, DWOOD[4]); pb.rect(4, 4, 8, 2, 0x8e1a26); pb.rect(4, 9, 8, 3, GOLD[2]); for (let x = 4; x < 12; x += 2) pb.set(x, 10, GOLD[4]); pb.set(13, 6, 0xfff6c8); pb.set(14, 4, 0xfff6c8); pb.outline('auto'); return mk(pb, 8, 15); }
+function maquette() { const pb = new PB(16, 18); pb.rect(2, 14, 12, 3, DWOOD[3]); pb.ellipse(8, 9, 7, 4.2, 0xbfe0ea); pb.ellipse(8, 9, 6, 3.4, 0x9ac8d8); pb.rect(13, 7, 3, 4, 0x8a6a4a); pb.hl(4, 11, 8, 0x6d4626); pb.vl(8, 5, 6, 0x4f321a); pb.rect(6, 6, 2, 3, 0xf3f0e2); pb.rect(9, 6, 2, 3, 0xf3f0e2); pb.set(4, 7, 0xffffff); pb.outline('auto'); return mk(pb, 8, 17); }
+function globe() { const pb = new PB(16, 26); pb.rect(5, 23, 6, 2, DWOOD[2]); pb.vl(8, 15, 8, DWOOD[3]); pb.disc(8, 9, 6.5, 0x2a6aa8); for (const [x, y, r] of [[6, 7, 2.5], [10, 11, 2], [9, 5, 1.5]]) pb.disc(x, y, r, 0x5a9a4a); pb.set(5, 6, 0xd8f0ff); for (let a = 0.6; a < 5.6; a += 0.1) pb.set(8 + Math.cos(a) * 7.6, 9 + Math.sin(a) * 7.6, GOLD[2]); pb.outline('auto'); return mk(pb, 8, 25); }
+function candelabre() { const pb = new PB(16, 32); pb.rect(5, 29, 6, 2, GOLD[1]); pb.vl(8, 12, 17, GOLD[2]); pb.hl(2, 12, 13, GOLD[2]); for (const x of [2, 8, 14]) { pb.rect(x - 1, 6, 3, 6, 0xf3f0e2); pb.set(x, 4, 0xffd24a); pb.set(x, 5, 0xff8a2a); } pb.outline('auto'); return mk(pb, 8, 31, { lights: [[2, 4], [8, 4], [14, 4]] }); }
+function statuetteOr() { const pb = new PB(14, 26); pb.rect(2, 20, 10, 5, STONE[3]); pb.hl(2, 20, 10, STONE[4]); pb.blob(7, 13, 4, 6, [0x7a4a12, 0xa86e1c, 0xd49a2a, 0xf2c14a, 0xffe58a], {}); pb.disc(7, 6, 3, 0xf2c14a); pb.set(6, 6, 0x5a1a10); pb.set(8, 6, 0x5a1a10); pb.set(6, 5, 0xffe58a); pb.outline('auto'); return mk(pb, 7, 25); }
+function easelWith(draw) { const pb = new PB(18, 30); pb.line(3, 29, 7, 6, WOOD[3]); pb.line(15, 29, 11, 6, WOOD[2]); pb.hl(3, 22, 13, WOOD[4]); pb.rect(1, 3, 16, 18, GOLD[2]); pb.hl(1, 3, 16, GOLD[4]); pb.rect(3, 5, 12, 14, 0xe8d8b0); draw(pb); pb.outline('auto'); return mk(pb, 9, 29); }
+const portrait = () => easelWith((pb) => { pb.rect(3, 5, 12, 14, 0x3a2a3a); pb.disc(9, 10, 3, 0xd8a070); pb.rect(5, 6, 8, 2, 0x141418); pb.rect(6, 13, 6, 6, 0x8e1a26); pb.set(8, 10, 0x1a1418); pb.set(10, 10, 0x1a1418); });
+const carteMurale = () => easelWith((pb) => { pb.rect(3, 5, 12, 14, 0xe8d4a0); pb.disc(7, 10, 2.5, 0x6a9a4a); pb.disc(12, 14, 2, 0x6a9a4a); pb.line(6, 8, 12, 15, 0xa01c14); pb.set(12, 15, 0xa01c14); pb.set(13, 14, 0xa01c14); });
+const bataille = () => easelWith((pb) => { for (let y = 5; y < 19; y++) for (let x = 3; x < 15; x++) pb.set(x, y, y < 12 ? mix(0x6a5a5a, 0xc8a080, (y - 5) / 7) : 0x2a4a6a); pb.rect(4, 10, 4, 3, 0x3a2414); pb.rect(10, 11, 4, 3, 0x3a2414); pb.disc(9, 9, 1.5, 0xffa030); pb.set(9, 8, 0xffe08a); for (const x of [5, 12]) pb.vl(x, 6, 4, 0xe8dec0); });
+const TROPHY_LOOK = { trophee_barbe: [0x2a2a30, 'hat'], trophee_roi_os: [0xd8c8a0, 'crown'], trophee_bourreau: [0x141418, 'hood'], trophee_sirenes: [0x3ac8b0, 'scale'], trophee_general: [0xb03232, 'banner'], trophee_corbeau: [0x1a1418, 'mask'], trophee_brasier: [0xff7a2a, 'ember'], trophee_freres: [0x8a8a9c, 'helms'], trophee_comte: [0x5e387a, 'cape'], trophee_malo: [0xd49a2a, 'sceptre'], trophee_grandfeu: [0x9fff6a, 'lantern'], trophee_mangrove: [0x2a7142, 'crown'] };
+function trophySprite(id) {
+  const [c, kind] = TROPHY_LOOK[id] || [0xd49a2a, 'crown'];
+  const pb = new PB(16, 28);
+  pb.rect(3, 20, 10, 7, DWOOD[2]); pb.hl(2, 19, 12, DWOOD[4]); pb.hl(2, 27, 12, DWOOD[0]); pb.rect(6, 22, 4, 2, GOLD[2]);
+  for (let y = 5; y < 19; y++) for (let x = 3; x < 13; x++) pb.set(x, y, x === 3 ? 0xe8f4f0 : x === 12 ? 0x7a9a9a : 0xc8e0e4); // cloche de verre
+  pb.ellipse(8, 5, 5, 2, 0xd8ecf0); pb.set(5, 7, 0xffffff); pb.set(5, 9, 0xffffff);
+  const L = mix(c, 0xffffff, 0.35), D = shade(c, 0.6);
+  if (kind === 'hat') { pb.ellipse(8, 15, 4.5, 1.6, D); pb.rect(5, 11, 6, 4, c); pb.hl(5, 11, 6, L); }
+  else if (kind === 'crown') { pb.rect(5, 13, 6, 4, c); for (const x of [5, 8, 10]) pb.vl(x, 10, 3, c); pb.hl(5, 13, 6, L); }
+  else if (kind === 'hood' || kind === 'mask') { pb.disc(8, 13, 3.6, c); pb.set(7, 12, 0xff3a2a); pb.set(9, 12, 0xff3a2a); if (kind === 'mask') pb.line(8, 14, 11, 17, 0xc8c0b0); }
+  else if (kind === 'scale') { pb.ellipse(8, 13, 3.4, 4.2, c); pb.ellipse(7, 12, 1.6, 2, L); }
+  else if (kind === 'banner') { pb.vl(6, 8, 10, WOOD[3]); pb.rect(7, 8, 5, 7, c); pb.set(9, 11, 0xf3f0e2); }
+  else if (kind === 'ember') { pb.disc(8, 14, 3.4, c); pb.disc(8, 13, 2, 0xffe08a); }
+  else if (kind === 'helms') { pb.disc(6, 14, 2.6, c); pb.disc(10, 14, 2.6, D); pb.hl(4, 14, 9, IRON[1]); }
+  else if (kind === 'cape') { for (let y = 9; y < 18; y++) pb.hl(8 - (y - 9) * 0.4, y, 1 + (y - 9) * 0.8, y % 3 ? c : D); }
+  else if (kind === 'sceptre') { pb.line(5, 17, 11, 9, c); pb.disc(11, 9, 1.8, 0xc8342e); }
+  else if (kind === 'lantern') { pb.rect(6, 11, 5, 6, IRON[2]); pb.rect(7, 12, 3, 4, c); pb.vl(8, 9, 2, IRON[1]); }
+  pb.outline('auto');
+  return mk(pb, 8, 27, { glow: [[8, 13]], glowCol: kind === 'ember' ? 'red' : 'white', glowR: 30 });
+}
+export function extendProps08(structSpr) {
+  Object.assign(structSpr, { coffre_fort: [coffreFort()], piege: [piege()], boite_musique: [boiteMusique()], maquette: [maquette()], globe: [globe()], lustre: [candelabre()], statuette: [statuetteOr()], portrait: [portrait()], carte_murale: [carteMurale()], bataille: [bataille()] });
+  for (const id of Object.keys(TROPHY_LOOK)) structSpr['t_' + id] = [trophySprite(id)];
+}

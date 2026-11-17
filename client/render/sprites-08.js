@@ -36,6 +36,16 @@ registerIcons({
     pb.hl(2, 12, 12, B[1]); pb.hl(3, 11, 10, B[3]); pb.disc(8, 13.5, 1.4, 0x3a3a46);
     if (t === 'off') { pb.line(1, 1, 14, 14, 0xc8342e, 2); }
   },
+  // 1.0 : mobilier de collection et de sécurité
+  f_trap(pb) { pb.ellipse(8, 10, 7, 3.4, 0x403f4e); pb.ellipse(8, 10, 5, 2, 0x2c2b36); for (let x = 2; x < 15; x += 2) { pb.set(x, 6, 0xa2a1b2); pb.set(x, 13, 0x7c7b8f); } pb.rect(6, 9, 4, 2, 0x5a596b); },
+  f_musicbox(pb) { pb.rect(2, 8, 12, 6, 0x8c5c33); pb.hl(2, 8, 12, 0xc79357); pb.rect(2, 3, 12, 4, 0x6d4626); pb.rect(4, 4, 8, 2, 0x9c2530); pb.rect(4, 9, 8, 3, 0xd49a2a); pb.set(13, 2, 0xfff6c8); pb.set(14, 1, 0xffffff); },
+  f_shipbottle(pb) { pb.ellipse(7, 9, 6, 4, 0xbfe0ea); pb.rect(12, 7, 3, 4, 0x8a6a4a); pb.hl(3, 11, 8, 0x6d4626); pb.vl(7, 5, 6, 0x4f321a); pb.rect(5, 6, 2, 3, 0xf3f0e2); pb.rect(8, 6, 2, 3, 0xf3f0e2); pb.rect(2, 13, 11, 2, 0x8c5c33); },
+  f_globe(pb) { pb.disc(8, 7, 5.5, 0x2a6aa8); pb.disc(6, 6, 2, 0x5a9a4a); pb.disc(10, 9, 1.6, 0x5a9a4a); pb.vl(8, 12, 3, 0x6d4626); pb.rect(5, 14, 6, 2, 0x4f321a); pb.set(5, 4, 0xd8f0ff); },
+  f_chandelier(pb) { pb.vl(8, 6, 8, 0xd49a2a); pb.hl(2, 7, 13, 0xd49a2a); for (const x of [2, 8, 14]) { pb.rect(x - 1, 3, 2, 4, 0xf3f0e2); pb.set(x - 1, 1, 0xffd24a); pb.set(x - 1, 2, 0xff8a2a); } pb.rect(5, 14, 6, 2, 0xa86e1c); },
+  f_statuette(pb) { pb.rect(4, 12, 8, 3, 0x828196); pb.ellipse(8, 8, 3.4, 4.5, 0xd49a2a); pb.disc(8, 3, 2.4, 0xf2c14a); pb.set(7, 3, 0x5a1a10); pb.set(9, 3, 0x5a1a10); pb.set(6, 7, 0xffe58a); },
+  f_portrait(pb) { pb.rect(2, 1, 12, 14, 0xd49a2a); pb.rect(3, 2, 10, 12, 0x3a2a3a); pb.disc(8, 7, 2.6, 0xd8a070); pb.rect(5, 3, 6, 2, 0x141418); pb.rect(5, 10, 6, 4, 0x8e1a26); },
+  f_mapframe(pb) { pb.rect(2, 2, 12, 12, 0x8c5c33); pb.rect(3, 3, 10, 10, 0xe8d4a0); pb.disc(6, 7, 2, 0x6a9a4a); pb.disc(10, 10, 1.6, 0x6a9a4a); pb.line(5, 5, 11, 11, 0xa01c14); },
+  f_battle(pb) { pb.rect(1, 2, 14, 12, 0xd49a2a); for (let y = 3; y < 13; y++) for (let x = 2; x < 14; x++) pb.set(x, y, y < 8 ? 0x9a8070 : 0x2a4a6a); pb.rect(3, 7, 3, 2, 0x3a2414); pb.rect(9, 8, 3, 2, 0x3a2414); pb.disc(8, 6, 1.2, 0xffa030); },
   raft_i(pb) {
     for (let k = 0; k < 4; k++) { const y = 7 + k * 2; pb.hl(2, y, 12, WOOD[3 - (k % 2)]); pb.hl(2, y + 1, 12, WOOD[1]); }
     for (const x of [4, 11]) pb.vl(x, 6, 9, 0xc8b078);

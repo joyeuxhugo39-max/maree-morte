@@ -1,3 +1,4 @@
+import { TROPHIES } from './craft.js';
 // Catalogue des objets. slot = emplacement d'équipement ; use = consommable.
 // look/lookCol = apparence sur le personnage ; icon/tint = icône d'inventaire.
 export const ITEMS = {
@@ -254,6 +255,20 @@ F('pistolet_tonnerre', { name: 'Pistolet-tonnerre', gun: 26, rarity: 2, value: 3
 F('mousquet_vaudou', { name: 'Mousquet vaudou', gun: 38, rarity: 3, value: 8800, cdMul: 1.5, shot: { n: 1, range: 320, speed: 250, kind: 'wisp', homing: 1, curse: [3, 0.2] }, form: { k: 'gun', type: 'rifle', len: 13, metal: 'bone', wood: 'ebony', glow: 'purple' }, desc: 'Ses balles sont des âmes : elles cherchent leur cible toutes seules, et la maudissent.' });
 // montures (emplacement Monture, touche C pour monter ou descendre ; on descend pour se battre)
 const M = (id, o) => { ITEMS[id] = Object.assign({ slot: 'mount', icon: 'm:' + id }, o); };
+// 1.0 : mobilier de collection, sécurité de la maison, trophées de boss
+Object.assign(ITEMS, {
+  coffre_fort: { home: 1, name: 'Coffre-fort', place: 'coffre_fort', value: 1500, rarity: 1, icon: 'chest_i', tint: 'iron', desc: 'Les 12 premières places de votre coffre ne peuvent plus être volées.' },
+  piege_loup: { home: 1, name: 'Piège à loup', place: 'piege', value: 400, icon: 'f_trap', desc: 'Chez vous : un cambrioleur qui marche dessus est blessé, immobilisé, et vous êtes prévenu.' },
+  boite_musique: { home: 1, name: 'Boîte à musique', place: 'boite_musique', value: 900, rarity: 1, icon: 'f_musicbox', desc: 'Chez vous : choisissez la musique de la maison parmi celles que vous avez entendues dans l’archipel (E).' },
+  bateau_bouteille: { home: 1, name: 'Navire en bouteille', place: 'maquette', value: 350, rarity: 1, icon: 'f_shipbottle', desc: 'Un trois-mâts minuscule. Personne ne sait comment il est entré.' },
+  globe_terrestre: { home: 1, name: 'Globe terrestre', place: 'globe', value: 600, rarity: 1, icon: 'f_globe', desc: 'Le monde connu, et beaucoup d’inconnu.' },
+  lustre: { home: 1, name: 'Lustre de cristal', place: 'lustre', value: 1200, rarity: 2, icon: 'f_chandelier', desc: 'Il éclaire toute une pièce. Et il tient, en principe.' },
+  statuette_or: { home: 1, name: 'Statuette d’or', place: 'statuette', value: 2400, rarity: 2, icon: 'f_statuette', desc: 'Une idole d’or massif. Elle vous regarde.' },
+  portrait_capitaine: { home: 1, name: 'Portrait de capitaine', place: 'portrait', value: 700, rarity: 1, icon: 'f_portrait', desc: 'Un capitaine au regard sévère. Votre grand-père, prétendez-vous.' },
+  carte_encadree: { home: 1, name: 'Carte encadrée', place: 'carte_murale', value: 500, rarity: 1, icon: 'f_mapframe', desc: 'L’archipel, gravé sur cuivre. Il manque des îles.' },
+  tableau_bataille: { home: 1, name: 'La Bataille des Brumes', place: 'bataille', value: 1800, rarity: 2, icon: 'f_battle', desc: 'Deux galions sous la mitraille. On entend presque le canon.' },
+});
+
 M('ane', { name: 'Âne têtu', mount: { kind: 'ane', speed: 1.35 }, value: 400, desc: 'Il avance quand il veut. Mais il avance. Vitesse +35 %.' });
 M('cheval', { name: 'Cheval bai', mount: { kind: 'cheval', speed: 1.6 }, rarity: 1, value: 1500, desc: 'Un brave cheval des plantations. Vitesse +60 %.' });
 M('tortue_geante', { name: 'Tortue géante', mount: { kind: 'tortue', speed: 1.25, def: 14, regen: 2 }, rarity: 2, value: 3200, desc: 'Lente, mais une carapace pour deux. À dos de tortue : vitesse +25 %, défense +14, régénération +2.' });
@@ -292,3 +307,5 @@ O('tenue_chasseur', { name: 'Tenue de chasseur de primes', atk: 8, crit: 0.08, d
 O('uniforme_marine', { name: 'Uniforme de la Marine', def: 16, hp: 50, value: 4200, rarity: 2, outfit: { top: 'capitaine', topCol: 'navy', pants: 'white', boots: 'black', hat: 'tricorne', hatCol: 'navy' }, desc: 'Arraché à un officier trop curieux. À Libertalia, il fait rire. Ailleurs, il protège.' });
 O('tenue_vaudou', { name: 'Tenue du houngan', regen: 2.5, hp: 40, def: 8, value: 3800, rarity: 2, outfit: { top: 'vareuse', topCol: 'purple', pants: 'black', boots: 'black', hat: 'crane', cape: 'purple' }, desc: 'Plumes, os et colliers de perles. Les esprits veillent sur vous.' });
 O('habit_gouverneur', { name: 'Habit de gouverneur', def: 14, hp: 70, goldFind: 0.15, value: 9500, rarity: 3, outfit: { top: 'capitaine', topCol: 'red', pants: 'white', boots: 'black', hat: 'plume', hatCol: 'red', cape: 'red' }, desc: 'Velours, dentelle et boutons d’or. Le dernier gouverneur ne le portera plus. Doublons +15 %.' });
+// les trophées de boss : objets de collection irremplaçables (jamais volés), à exposer chez soi
+for (const [boss, [id, name, desc]] of Object.entries(TROPHIES)) ITEMS[id] = { home: 1, name, place: 't_' + id, value: 1500, rarity: 3, unique: 1, trophy: boss, icon: 'f_trophy', desc: desc + ' Trophée de boss : à exposer chez vous.' };

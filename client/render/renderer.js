@@ -17,7 +17,7 @@ import { PB } from './pixel.js';
 import { hash2 } from '../../shared/rng.js';
 import { extend06, petSheets, drawTentacle } from './sprites-06.js';
 import { extend07 } from './sprites-07.js';
-import { extend08, citeSprite } from './sprites-cite.js';
+import { extend08, citeSprite, proprieteSprite, extendProps08 } from './sprites-cite.js';
 import { volcanoGen, makePuffs, makeSplats } from './sprites-volcan.js';
 import './sprites-08.js';
 import { mountSheet } from './sprites-mounts.js';
@@ -95,7 +95,7 @@ export class Renderer {
     this.water = makeWaterLayers();
     this.env = buildEnvSprites();
     this.structSpr = buildStructSprites(this.env);
-    extend06(this.env, this.structSpr); extend07(this.env); extend08(this.env); this.pets = petSheets(); this.tentacle = drawTentacle;
+    extend06(this.env, this.structSpr); extend07(this.env); extend08(this.env); extendProps08(this.structSpr); this.pets = petSheets(); this.tentacle = drawTentacle;
     // le volcan se peint en tâche de fond, un peu à chaque image (ou d'un coup si l'on arrive devant)
     this.volcJob = world.volcano ? volcanoGen(world.volcano) : null; this.volc = null; this.volcanAlpha = 1;
     this.puffs = world.volcano ? makePuffs() : null; this.plume = [];
@@ -142,7 +142,7 @@ export class Renderer {
       if (p.type === 'comptoir') p.v = p.tx % 3;
       if (p.type === 'grotte') { const d = this.world.doors.find((q) => q.secret && (q.ox >> 4) === p.tx && (q.oy >> 4) === p.ty + 1); p.door = d ? d.id : null; }
       const list = this.env[p.type];
-      const s = p.type === 'cite' ? citeSprite(p) : list ? list[p.v % list.length] : null;
+      const s = p.type === 'cite' ? citeSprite(p) : p.type === 'propriete' ? proprieteSprite(p, this.env) : list ? list[p.v % list.length] : null;
       p.spr = s;
       p.ground = !!(PROPS[p.type] && PROPS[p.type].ground);
       if (!s) continue;
@@ -424,7 +424,7 @@ export class Renderer {
     } else ctx.drawImage(s.cv, x, y);
     if (alpha < 1) ctx.globalAlpha = 1;
     if (p.fx) this.drawVolcanoFx(ctx, camX, camY, now, G, alpha);
-    if (p.type === 'home' && G.homes) { // la pancarte au-dessus de la porte : le nom du propriétaire
+    if ((p.type === 'home' || p.type === 'propriete') && G.homes) { // la pancarte au-dessus de la porte : le nom du propriétaire
       const h = G.homes.get(p.plot);
       const t = textCanvas(h ? h.name : 'À VENDRE', h ? '#2b1606' : '#7a1410', null);
       const w = t.width + 7, sx = Math.round(p.x - camX - w / 2), sy = Math.round(p.y - camY - 37 + Math.sin(now * 1.4 + p.x) * 0.6);
