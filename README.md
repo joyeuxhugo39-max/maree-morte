@@ -25,6 +25,17 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Nouveautés de la version 0.8.1 : une interface de pirate
+
+- Tous les panneaux qui s'ouvrent passent au même style que la carte au trésor : sac, journal de bord, hauts faits, boutiques, forge, coffre de la maison, aide, réglages, dialogues, confirmations, choix de quantité et écran d'accueil.
+  - Ils sont faits de parchemin vieilli, dans un cadre de bois veiné aux coins ferrés de laiton.
+  - Les titres sont écrits à l'encre, sous un pavillon noir et un fleuron.
+  - On les ferme d'un sceau de cire rouge.
+  - Les onglets sont en cuir cousu, et les listes sont tenues comme un registre.
+- Le sac devient un « sac de marin » : les objets sont rangés dans l'intérieur boisé d'un coffre, et l'on jette par-dessus bord ce qu'on veut lâcher.
+- Les boutons du menu ont des icônes peintes en pixel art à la place des émojis : coffre, maison, journal, carte, trophée, bouteille à la mer, barre à roue, cloche du bord.
+- Les messages à l'écran s'affichent sur des planches de bois.
+
 ## Nouveautés de la version 0.8 : Libertalia
 
 - **Libertalia, la Cité Libre des Forbans** : une île gigantesque à l'est (la carte passe de 640 à 960 cases de large) et, à son pied, une immense ville pirate ceinte d'un rempart à bastions, avec des tours et des portes. On y trouve le palais de la Reine et ses jardins, la place de la Liberté (statue du fondateur, fontaine) et le marché. Il y a quatre tavernes, le tripot de La Bourse aux Dés, Le Velours Écarlate (le salon de Madame Rubis), le marché noir du Borgne et La Fosse, une arène. S'y ajoutent des écuries, une armurerie, un tailleur, un apothicaire, un chantier naval, la capitainerie, des entrepôts, un cimetière, un verger, les Bas-Fonds et dix maisons à acheter. La ville compte 31 habitants, une foule qui flâne, des chats, et sa propre musique de taverne.

@@ -20,6 +20,8 @@ import { RoomNet } from './roomnet.js';
 import { iconURL, iconCanvas } from './render/sprites-items.js';
 import { updateCine, cineLocked, endCine, bossIntro, bossDown, krakenIntro, krakenDown } from './cine.js';
 import { Scene } from './scene.js';
+import { applyTheme } from './render/ui-art.js';
+applyTheme(); // 0.8.1 : parchemin, cadres de bois ferré, fleurons — avant même l'écran d'accueil
 
 const $ = (id) => document.getElementById(id);
 // page publique (github.io) : multijoueur direct entre navigateurs

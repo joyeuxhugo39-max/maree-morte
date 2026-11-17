@@ -107,8 +107,10 @@ export class UI {
   bindPanels() {
     document.querySelectorAll('[data-close]').forEach((b) => (b.onclick = () => this.close()));
     document.querySelectorAll('[data-open]').forEach((b) => (b.onclick = () => this.toggle(b.dataset.open)));
-    $('mute').onclick = () => { this.G.sfx.setMuted(!this.G.sfx.muted); $('mute').textContent = this.G.sfx.muted ? '🔇' : '🔊'; };
-    $('mute').textContent = this.G.sfx.muted ? '🔇' : '🔊';
+    const muteIc = () => { $('mute-ic').src = iconURL('ui_bell', this.G.sfx.muted ? 'off' : ''); };
+    $('mute').onclick = () => { this.G.sfx.setMuted(!this.G.sfx.muted); muteIc(); };
+    muteIc();
+    document.querySelectorAll('#menu-btns img[data-ic]').forEach((im) => { im.src = iconURL(im.dataset.ic); }); // 0.8.1 : icônes peintes
     $('respawn-btn').onclick = () => this.G.send({ t: 'respawn' });
     $('tracker').onclick = () => this.toggle('quests');
   }

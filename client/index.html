@@ -52,14 +52,14 @@
     </div>
 
     <div id="menu-btns">
-      <button data-open="inventory" title="Inventaire (I)">🎒<kbd>I</kbd></button>
-      <button id="build-btn" title="Meubler votre maison (B)">🏠<kbd>B</kbd></button>
-      <button data-open="quests" title="Journal (J)">📜<kbd>J</kbd></button>
-      <button data-open="map" title="Carte (M)">🗺<kbd>M</kbd></button>
-      <button data-open="ach" title="Hauts faits (K)">🏆<kbd>K</kbd></button>
-      <button data-open="help" title="Aide (H)">?<kbd>H</kbd></button>
-      <button data-open="settings" title="Réglages">⚙</button>
-      <button id="mute" title="Son">🔊</button>
+      <button data-open="inventory" title="Sac de marin (I)"><img class="mi" data-ic="chest_i" alt=""><kbd>I</kbd></button>
+      <button id="build-btn" title="Meubler votre maison (B)"><img class="mi" data-ic="ui_house" alt=""><kbd>B</kbd></button>
+      <button data-open="quests" title="Journal de bord (J)"><img class="mi" data-ic="ui_journal" alt=""><kbd>J</kbd></button>
+      <button data-open="map" title="Carte (M)"><img class="mi" data-ic="map" alt=""><kbd>M</kbd></button>
+      <button data-open="ach" title="Hauts faits (K)"><img class="mi" data-ic="trophy" alt=""><kbd>K</kbd></button>
+      <button data-open="help" title="Aide (H)"><img class="mi" data-ic="ui_help" alt=""><kbd>H</kbd></button>
+      <button data-open="settings" title="Réglages"><img class="mi" data-ic="ui_helm" alt=""></button>
+      <button id="mute" title="Son"><img class="mi" id="mute-ic" alt=""></button>
     </div>
   </div>
 
@@ -68,7 +68,7 @@
 
   <!-- panneaux -->
   <div id="panel-inventory" class="panel hidden">
-    <div class="panel-head"><h2>Inventaire</h2><button class="x" data-close>✕</button></div>
+    <div class="panel-head"><h2>Sac de marin</h2><button class="x" data-close>✕</button></div>
     <div class="inv-wrap">
       <div class="equip">
         <div class="paperdoll">
@@ -87,7 +87,7 @@
       <div class="bag">
         <div id="bag-tools"><div id="bag-tabs"></div><button id="bag-sort" class="chip" title="Ranger le sac par type et rareté">⇅ Trier</button></div>
         <div id="bag"></div>
-        <div id="bag-trash" title="Glissez un objet ici (ou hors du sac) pour le lâcher au sol">🗑 Glissez ici pour lâcher un objet</div>
+        <div id="bag-trash" title="Glissez un objet ici (ou hors du sac) pour le lâcher au sol">⚓ Par-dessus bord ! Glissez ici pour lâcher un objet</div>
         <div class="hint">Clic droit : utiliser / équiper · Glisser : ranger · <span id="sell-hint">Maj + clic : lâcher</span></div>
       </div>
     </div>
@@ -112,7 +112,7 @@
 
 
   <div id="panel-storage" class="panel hidden">
-    <div class="panel-head"><h2>Coffre de la base</h2><button class="x" data-close>✕</button></div>
+    <div class="panel-head"><h2>Coffre de la maison</h2><button class="x" data-close>✕</button></div>
     <div id="stor-grid"></div>
     <div class="hint">Clic : reprendre · Clic droit sur votre sac : ranger. Tous les coffres de votre maison partagent ce contenu.</div>
   </div>

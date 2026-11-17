@@ -5,6 +5,37 @@ import { shade, mix } from './pixel.js';
 const WOOD = [0x34200f, 0x4f321a, 0x6d4626, 0x8c5c33, 0xab7643, 0xc79357];
 const FLASK = { red: [0x6a1010, 0xb02a24, 0xe85a4a], yellow: [0x7a5a10, 0xc8a02a, 0xf2d85a], grey: [0x2a2c36, 0x5a5e6e, 0x9aa0b4], green: [0x1a4a14, 0x3a8a2a, 0x8ad04a], blue: [0x14305a, 0x2a5aa8, 0x6aa0ea] };
 registerIcons({
+  // 0.8.1 : icônes du menu (fini les émojis)
+  ui_journal(pb) { // le journal de bord, son signet et la plume
+    pb.rect(2, 3, 11, 11, 0x5a2e14); pb.rect(3, 3, 9, 10, 0xf0e0b8); pb.vl(7, 3, 10, 0xc8b48a);
+    for (const y of [5, 7, 9, 11]) { pb.hl(4, y, 2, 0x8a6a4a); pb.hl(9, y, 2, 0x8a6a4a); }
+    pb.vl(10, 12, 3, 0xc8342e); pb.set(10, 15, 0x8a1c16);
+    pb.line(15, 0, 9, 8, 0xfaf6ee); pb.line(14, 0, 9, 7, 0xd8d0c0); pb.set(9, 9, 0x2a1a10); pb.set(15, 1, 0xd8d0c0);
+  },
+  ui_house(pb) {
+    for (let y = 2; y < 8; y++) pb.hl(8 - (y - 1), y, (y - 1) * 2 + 1, y < 4 ? 0xe25d55 : 0xb03232);
+    pb.hl(1, 8, 14, 0x821f26);
+    pb.rect(3, 9, 10, 6, 0xe2cba0); pb.vl(3, 9, 6, 0xf4e4c0); pb.vl(12, 9, 6, 0xb89e72);
+    pb.rect(7, 11, 3, 4, 0x6d4626); pb.set(9, 13, 0xf2c14a); pb.rect(4, 10, 2, 2, 0x5a86cc); pb.rect(11, 2, 2, 4, 0x6a6a74);
+  },
+  ui_helm(pb) { // la barre à roue du capitaine
+    const W = [0x4f321a, 0x8c5c33, 0xc79357];
+    for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; pb.line(8 + Math.cos(a) * 2, 8 + Math.sin(a) * 2, 8 + Math.cos(a) * 7.4, 8 + Math.sin(a) * 7.4, W[1]); pb.set(Math.round(8 + Math.cos(a) * 7.4), Math.round(8 + Math.sin(a) * 7.4), W[2]); }
+    for (let a = 0; a < 6.3; a += 0.12) { pb.set(8 + Math.cos(a) * 5, 8 + Math.sin(a) * 5, a < 3.4 ? W[2] : W[1]); pb.set(8 + Math.cos(a) * 4.4, 8 + Math.sin(a) * 4.4, W[0]); }
+    pb.disc(8, 8, 1.8, 0xd49a2a); pb.set(7, 7, 0xffe58a);
+  },
+  ui_help(pb) { // un message dans une bouteille
+    pb.rect(6, 1, 4, 2, 0x8a6a4a); pb.rect(6, 3, 4, 2, 0x6aa86a);
+    pb.ellipse(8, 10, 5, 5.4, 0x4a8a5a); pb.ellipse(8, 10, 4, 4.4, 0x7ac08a); pb.rect(6, 7, 4, 7, 0xf0e0b8); pb.hl(6, 9, 4, 0xc8b48a); pb.hl(6, 12, 4, 0xc8b48a);
+    pb.set(5, 7, 0xd8f8e0); pb.set(5, 8, 0xd8f8e0); pb.set(10, 14, 0x2a5a3a);
+  },
+  ui_bell(pb, t) { // la cloche du bord (et, coupée, le silence)
+    const B = [0x7a4a12, 0xa86e1c, 0xd49a2a, 0xf2c14a, 0xffe58a];
+    pb.rect(7, 1, 2, 2, B[1]);
+    for (let y = 3; y < 12; y++) { const w = 2 + Math.round((y - 3) * 0.55); for (let x = 8 - w; x < 8 + w; x++) pb.set(x, y, x < 8 - w + 2 ? B[4] : x > 8 + w - 3 ? B[1] : B[2 + ((x + y) % 5 === 0 ? 1 : 0)]); }
+    pb.hl(2, 12, 12, B[1]); pb.hl(3, 11, 10, B[3]); pb.disc(8, 13.5, 1.4, 0x3a3a46);
+    if (t === 'off') { pb.line(1, 1, 14, 14, 0xc8342e, 2); }
+  },
   raft_i(pb) {
     for (let k = 0; k < 4; k++) { const y = 7 + k * 2; pb.hl(2, y, 12, WOOD[3 - (k % 2)]); pb.hl(2, y + 1, 12, WOOD[1]); }
     for (const x of [4, 11]) pb.vl(x, 6, 9, 0xc8b078);
