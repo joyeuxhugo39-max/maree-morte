@@ -72,15 +72,15 @@ QUESTS.traversee = {
   name: 'La traversée', giver: 'corentin', turnin: 'ysaline', level: 3, requires: ['premier_pas'],
   goals: [{ type: 'explore', zone: Z.HAVRE, text: 'Rejoindre Havre-des-Brumes par la mer' }, { type: 'talk', npc: 'ysaline', text: 'Parler à Ysaline, au chantier naval' }],
   rewards: { xp: 220, gold: 60, items: [['rhum', 1]] },
-  offer: "Tu veux voir du pays ? Achète-moi une barque, ou fabrique la tienne à l'établi. Mets-la à l'eau depuis le quai (E, face à l'eau) et file plein est : Havre-des-Brumes. Ma cousine Ysaline y tient le chantier naval. Dis-lui que c'est Corentin qui t'envoie.",
+  offer: "Tu veux voir du pays ? Achète-moi une barque. Mets-la à l'eau depuis le quai (E, face à l'eau) et file plein est : Havre-des-Brumes. Ma cousine Ysaline y tient le chantier naval. Dis-lui que c'est Corentin qui t'envoie.",
   progress: "Havre-des-Brumes est à l'est, de l'autre côté du bras de mer. Le chantier naval, c'est le grand bâtiment au nord de la place : entre par la porte.",
   done: "Corentin t'envoie ? Et tu as traversé sans couler ? Bravo. Si un jour tu veux un vrai navire, reviens me voir.",
 };
 QUESTS.grotte = {
   name: 'Lumière sous la roche', giver: 'rosalie', turnin: 'rosalie', level: 5, requires: ['premier_pas'],
-  goals: [{ type: 'explore', zone: Z.CAVE, text: 'Trouver une grotte secrète' }, { type: 'collect', item: 'eclat_cristal', n: 3, text: 'Éclats de cristal (pioche)' }],
+  goals: [{ type: 'explore', zone: Z.CAVE, text: 'Trouver une grotte secrète' }, { type: 'collect', item: 'eclat_cristal', n: 3, text: 'Éclats de cristal (E sur les cristaux des grottes)' }],
   rewards: { xp: 380, gold: 110, items: [['elixir_flamme', 2]] },
-  offer: "On raconte que des cristaux poussent au fond des grottes, et qu'ils brillent comme la Flamme Bénite. J'en voudrais trois, pour éclairer la salle sans risquer d'y mettre le feu. Il te faudra une pioche, et trouver une entrée : elles sont bien cachées.",
+  offer: "On raconte que des cristaux poussent au fond des grottes, et qu'ils brillent comme la Flamme Bénite. J'en voudrais trois, pour éclairer la salle sans risquer d'y mettre le feu. Il te suffira de les détacher de la roche, encore faut-il trouver une entrée : elles sont bien cachées.",
   progress: "Les grottes ne se voient que de tout près. Cherche au pied des falaises de la jungle, sur l'Île au Crâne ou sur les îlots du sud.",
   done: "Regarde-moi ça ! La salle n'a jamais été aussi belle. Tiens, deux élixirs : la maison offre.",
 };
@@ -94,10 +94,10 @@ QUESTS.roi_os = {
 };
 QUESTS.acier_duel = {
   name: 'Acier de duelliste', giver: 'isa', turnin: 'isa', level: 5, requires: ['pinces'],
-  goals: [{ type: 'collect', item: 'lingot_fer', n: 4, text: 'Lingots de fer' }, { type: 'collect', item: 'dent_zombie', n: 6, text: 'Dents de zombie' }],
+  goals: [{ type: 'collect', item: 'lame_rouillee', n: 4, text: 'Lames de boucanier (boucaniers zombies)' }, { type: 'collect', item: 'dent_zombie', n: 6, text: 'Dents de zombie' }],
   rewards: { xp: 300, gold: 60, items: [['rapiere', 1]] },
-  offer: "J'ai le dessin d'une rapière de duelliste, mais pas le métal. Apporte-moi quatre lingots de fer (le minerai se fond à la forge) et six dents de zombie pour la trempe. Je te forgerai la lame la plus fine de l'archipel.",
-  progress: 'Le minerai se trouve dans les rochers, à la pioche. Les boucaniers de la jungle ont de bonnes dents.',
+  offer: "J'ai le dessin d'une rapière de duelliste, mais pas le métal. Apporte-moi quatre vieilles lames de boucanier, je les refondrai, et six dents de zombie pour la trempe. Je te forgerai la lame la plus fine de l'archipel.",
+  progress: 'Les boucaniers de la jungle ont de bonnes dents, et des lames rouillées à la ceinture.',
   done: "Regarde-moi ce fil ! Une rapière, ça ne tranche pas : ça transperce. Vise juste, et loin devant toi.",
 };
 QUESTS.duel_aube = {
@@ -110,10 +110,10 @@ QUESTS.duel_aube = {
 };
 QUESTS.bois_marine = {
   name: 'Bois de marine', giver: 'ysaline', turnin: 'ysaline', level: 4, requires: ['traversee'],
-  goals: [{ type: 'collect', item: 'planche', n: 12, text: 'Planches' }, { type: 'collect', item: 'toile', n: 4, text: 'Toile' }],
+  goals: [{ type: 'collect', item: 'planche_epave', n: 8, text: 'Planches d’épave (E près du bois flotté)' }, { type: 'collect', item: 'voile_dechiree', n: 4, text: 'Voiles déchirées (matelots zombies)' }],
   rewards: { xp: 260, gold: 50, items: [['harpon', 1]] },
-  offer: "Mon chantier manque de tout. Douze planches et quatre toiles, et je te donne le harpon de mon grand-père : avec ça, les noyés gardent leurs distances.",
-  progress: "Les planches se scient à l'établi, la toile se tisse avec de la fibre.",
+  offer: "Mon chantier manque de tout. Huit planches d'épave, ramassées sur les plages, et quatre lambeaux de voile arrachés aux matelots zombies : et je te donne le harpon de mon grand-père : avec ça, les noyés gardent leurs distances.",
+  progress: "La mer rejette de bonnes planches près du bois flotté, sur les plages. Les matelots zombies portent encore des bouts de voile.",
   done: "Parfait, c'est du bon bois. Voilà le harpon. Frappe de loin, et ne le perds pas dans un noyé.",
 };
 QUESTS.oeil_guetteur = {
@@ -194,7 +194,7 @@ Object.assign(QUESTS, {
   trois_fragments: {
     name: 'Les trois morceaux de la carte', giver: 'vif_quai', turnin: 'vif_quai', level: 16, requires: ['evasion'],
     goals: [{ type: 'kill', mob: 'bourreau', n: 1, text: 'Le Bourreau (Forêt des Pendus, au nord-est)' }, { type: 'kill', mob: 'reine_sirenes', n: 1, text: 'La Reine des Sirènes (Lagon, à l’est)' }, { type: 'kill', mob: 'general_os', n: 1, text: 'Le Général d’Os (Atoll des Ossements, au sud-ouest)' }],
-    rewards: { xp: 7000, gold: 900, items: [['fil_or', 3], ['perle_ombre', 3]] },
+    rewards: { xp: 7000, gold: 1300, items: [] },
     offer: "Premier morceau : le Bourreau, qui pend les vivants dans la Forêt des Pendus. Deuxième : la Reine des Sirènes, au milieu de son lagon. Troisième : le Général d'Os, au fond de sa crypte, sur l'Atoll des Ossements. Moi, je garde le quai. Quelqu'un doit bien le faire.",
     progress: 'Trois gardiens, trois morceaux de carte. Emmenez des amis, et beaucoup de rhum.',
     done: "Les trois morceaux ! Regardez-moi ça... la carte est complète. Magnifique. Attendez-moi ici, je vais chercher de quoi fêter ça. Je reviens tout de suite. Promis.",
@@ -226,7 +226,7 @@ Object.assign(QUESTS, {
   comte: {
     name: 'Le Comte des Marées', giver: 'vif_camp', turnin: 'vif_camp', level: 27, requires: ['galion'],
     goals: [{ type: 'kill', mob: 'comte_vespere', n: 1, text: 'Vespère, au fond de la Crypte du Comte (Île des Damnés)' }],
-    rewards: { xp: 30000, gold: 3000, items: [['essence_damnee', 3]] },
+    rewards: { xp: 30000, gold: 3600, items: [] },
     offer: "Vespère dort dans sa crypte, sur l'Île des Damnés, la Couronne sur la tête. Tout ce qui vit là-bas est mort deux fois, et frappe comme un ouragan. N'y allez pas seul : c'est la seule chose sensée que je dirai aujourd'hui.",
     progress: 'L’Île des Damnés est tout au sud-est. La crypte s’ouvre au nord de l’île.',
     done: "La Couronne des Marées... vous l'avez. Vous l'avez vraiment. Bon. Maintenant, la question qui fâche : qu'est-ce qu'on en fait ? Morgane voudra la briser. Moi... j'ai quelques idées.",
@@ -264,7 +264,7 @@ Object.assign(QUESTS, {
   chant_lagon: {
     name: 'Le chant du lagon', giver: 'maelys', turnin: 'maelys', level: 14,
     goals: [{ type: 'collect', item: 'ecaille_sirene', n: 6, text: 'Écailles de sirène (Lagon des Sirènes)' }],
-    rewards: { xp: 1800, gold: 220, items: [['perle_ombre', 2]] },
+    rewards: { xp: 1800, gold: 380, items: [] },
     offer: "Les sirènes du lagon chantent la nuit, et nos pêcheurs ne reviennent pas. Rapporte-moi six de leurs écailles : on en fera des amulettes qui bouchent les oreilles. Le lagon est à l'est, au-delà de la Rade.",
     progress: 'Le Lagon des Sirènes est un cercle d’îlots, à l’est.',
     done: "Six écailles. Elles chantent encore, tu entends ? Plus pour longtemps. Merci, pirate.",
@@ -312,7 +312,7 @@ Object.assign(QUESTS, {
   coeur_volcan: {
     name: 'Le Brasier', giver: 'isa', turnin: 'isa', level: 25, requires: ['forge_brasier'],
     goals: [{ type: 'kill', mob: 'brasier', n: 1, text: 'Le Brasier, au fond de sa forge' }],
-    rewards: { xp: 11000, gold: 1300, items: [['perle_ombre', 4], ['coeur_golem', 2]] },
+    rewards: { xp: 11000, gold: 1900, items: [] },
     offer: "Les golems ne sont que des étincelles. Leur père, le Brasier, dort au fond du volcan, dans une forge que personne n'a bâtie. Éteins-le, et Cendrelune se taira enfin.",
     progress: 'La Forge du Brasier s’ouvre sur le flanc sud du volcan.',
     done: "Tu as éteint le Brasier ? Par ma barbe... je n'en ai pas, mais par celle de mon père : tu es une légende.",
@@ -344,7 +344,7 @@ Object.assign(QUESTS, {
   chasse_damnee: {
     name: 'La chasse damnée', giver: 'kerbrat', turnin: 'kerbrat', level: 26, requires: ['freres_cote'],
     goals: [{ type: 'kill', mob: 'damne', n: 10, text: 'Damnés abattus' }, { type: 'kill', mob: 'molosse_damne', n: 5, text: 'Molosses damnés abattus' }],
-    rewards: { xp: 16000, gold: 2200, items: [['essence_damnee', 3]] },
+    rewards: { xp: 16000, gold: 2800, items: [] },
     offer: "L'Île des Damnés. Les morts y sont morts deux fois, et ils frappent comme un mât qui tombe. Les Frères de la Côte y vont à plusieurs, jamais seuls. Ramène-moi la preuve de dix damnés et de cinq molosses.",
     progress: 'L’Île des Damnés est tout au sud-est. Zone extrême : venez à plusieurs.',
     done: "Tu en reviens vivant ? Alors tu es un vrai Frère. Prends cette essence : avec, la forge fait des miracles.",

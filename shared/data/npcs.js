@@ -13,7 +13,9 @@ export const NPCS = {
     name: 'Isa Main-de-Fer', title: 'Forgeronne',
     look: { skin: 1, hair: 0, hairStyle: 'queue', top: 'gilet', topCol: 'brown', pants: 'brown', boots: 'brown', hat: 'bandana', hatCol: 'red' },
     greet: ["Le métal ne ment jamais. Les hommes, si.", "Approche, approche ! L'acier est encore chaud.", 'Un sabre émoussé, c’est un pirate mort.'],
-    shop: ['poignard', 'coutelas', 'machette', 'sabre_abordage', 'pistolet_silex', 'pistolet_double', 'escopette', 'tromblon', 'carabine', 'mousquet', 'tricorne', 'bandana_noir', 'gilet_cuir', 'manteau_corsaire', 'bottes_pont', 'mariniere'],
+    shop: ['gourdin', 'poignard', 'coutelas', 'lance_silex', 'machette', 'sabre_abordage', 'harpon', 'masse', 'hache_guerre', 'pistolet_rouille', 'pistolet_silex', 'pistolet_double', 'escopette', 'tromblon', 'carabine', 'mousquet', 'crache_feu',
+      'bandana', 'chapeau_feuilles', 'chapeau_paille', 'bandana_noir', 'tricorne', 'casque_os', 'mariniere', 'gilet_cuir', 'armure_coquillages', 'carapace_crabe', 'manteau_corsaire', 'bottes_usees', 'bottes_pont',
+      'collier_coquillages', 'talisman_os', 'collier_requin'],
     topics: [
       { q: 'Comment devenir plus fort ?', a: "Abats des morts, gagne de l'expérience et équipe-toi mieux. Le Tourbillon d'acier s'apprend au niveau 2, la Rasade de rhum au 3, les Bombes au 4 et le Cri d'abordage au 6." },
     ],
@@ -22,7 +24,7 @@ export const NPCS = {
     name: 'Bartholomé', title: 'Tavernier de La Sirène Borgne',
     look: { skin: 0, hair: 1, hairStyle: 'chauve', beard: 2, top: 'tablier', topCol: 'white', pants: 'brown', boots: 'brown' },
     greet: ['Bienvenue à La Sirène Borgne ! On y boit, on y chante, on y oublie.', "Un p'tit verre pour la route, matelot ?", "Le rhum guérit tout. Sauf la mort. Enfin... ça dépend."],
-    shop: ['banane', 'noix_coco', 'poisson_grille', 'grog', 'rhum', 'canne_peche'],
+    shop: ['banane', 'noix_coco', 'baies', 'poisson_grille', 'brochette_crabe', 'galette_coco', 'tarte_baies', 'grog', 'rhum', 'canne_peche'],
     topics: [
       { q: 'Des rumeurs ?', a: "On raconte que des coffres au trésor dorment un peu partout sur l'île : sur la plage ouest, près des ruines, sur un îlot du marais... Les morts ne s'intéressent pas à l'or. Toi, si." },
       { q: 'Pourquoi « Sirène Borgne » ?', a: "Parce qu'elle a un œil de verre et qu'elle chante faux. Ma défunte femme. Paix à son âme. Et qu'elle y reste, surtout." },
@@ -64,9 +66,9 @@ Object.assign(NPCS, {
     name: 'Corentin', title: 'Passeur du port',
     look: { skin: 1, hair: 1, hairStyle: 'court', beard: 1, top: 'vareuse', topCol: 'teal', pants: 'navy', boots: 'black', hat: 'bonnet', hatCol: 'red' },
     greet: ['La mer, ça se mérite. Et ça se rame.', 'Une barque, matelot ? Elle ne coule presque plus.', "Le vent tourne à l'est. Bon signe pour Havre-des-Brumes."],
-    shop: ['barque', 'canne_peche', 'corde', 'toile'],
+    shop: ['barque', 'canne_peche', 'bandage'],
     topics: [
-      { q: 'Comment naviguer ?', a: "Achète-moi une barque, ou fabrique-la à l'établi. Sur un quai ou une plage, face à l'eau, appuie sur E pour la mettre à l'eau. Pour accoster, longe le rivage et appuie de nouveau sur E. À bord, pas de sabre : seulement le pistolet." },
+      { q: 'Comment naviguer ?', a: "Achète-moi une barque. Sur un quai ou une plage, face à l'eau, appuie sur E pour la mettre à l'eau. Pour accoster, longe le rivage et appuie de nouveau sur E. À bord, pas de sabre : seulement le pistolet." },
       { q: 'Où aller ?', a: "Plein est, Havre-des-Brumes : un village de pêcheurs, à l'abri des morts. Au sud-est, l'Île au Crâne : n'y va pas sans un bon sabre. Et quelques îlots perdus, ici et là, que personne n'a fouillés depuis longtemps." },
       { q: 'Et les autres pirates ?', a: "Hors des villes, personne ne te protège : ni des morts, ni des vivants. Un pirate peut en attaquer un autre partout, sauf à Port-Lanterne, à Havre-des-Brumes et dans les maisons. Celui qui tombe perd une part de son or." },
     ],
@@ -84,7 +86,7 @@ Object.assign(NPCS, {
     name: 'Ysolde', title: 'Aubergiste du Kraken Ivre',
     look: { skin: 0, hair: 4, hairStyle: 'queue', top: 'tablier', topCol: 'green', pants: 'black', boots: 'black' },
     greet: ['Bienvenue au Kraken Ivre ! Ici, même les morts payent leur tournée.', 'Tu viens de Port-Lanterne ? À la rame ? Respect.', 'Assieds-toi près du feu, la brume ne passe pas la porte.'],
-    shop: ['poisson_grille', 'galette_coco', 'ragout_marin', 'grog', 'rhum', 'bandage'],
+    shop: ['poisson_grille', 'galette_coco', 'ragout_marin', 'soupe_champignons', 'grog', 'rhum', 'bandage', 'elixir_flamme'],
     topics: [
       { q: 'Havre-des-Brumes ?', a: "Un village de pêcheurs. La brume nous cache des morts, et les morts nous laissent tranquilles. La plupart du temps. Ici, pas de bagarre : on est en zone sûre, comme à Port-Lanterne." },
       { q: "L'Île au Crâne ?", a: "Au sud, un rocher en forme de crâne. Dans sa bouche, une grotte. Au fond de la grotte, le Roi des Os. Ceux qui y sont allés en sont revenus... rarement." },
@@ -94,9 +96,9 @@ Object.assign(NPCS, {
     name: 'Ysaline', title: 'Charpentière de marine',
     look: { skin: 1, hair: 0, hairStyle: 'queue', top: 'gilet', topCol: 'brown', pants: 'navy', boots: 'brown', hat: 'bandana', hatCol: 'teal' },
     greet: ["Une coque, c'est comme un cœur : il faut l'écouter.", 'Attention aux copeaux !', 'Le sloop là-bas ? Le plus rapide de l’archipel. Et il a du répondant.'],
-    shop: ['barque', 'sloop', 'fusil_harpon', 'pistolet_double', 'planche', 'corde', 'toile'],
+    shop: ['barque', 'sloop', 'fusil_harpon', 'pistolet_double', 'harpon', 'cimeterre', 'rapiere', 'dague_cristal', 'flamberge', 'poivriere', 'pistolet_duel', 'pistolet_cristal', 'amulette_lanterne', 'pendentif_cristal'],
     topics: [
-      { q: 'Barque ou sloop ?', a: "La barque, c'est pour se promener. Le sloop file bien plus vite et porte un canon : clic droit pour tirer, sur les morts comme sur les pirates trop curieux. Tu peux aussi les construire toi-même à l'établi, si tu as le bois et la toile." },
+      { q: 'Barque ou sloop ?', a: "La barque, c'est pour se promener. Le sloop file bien plus vite et porte un canon : clic droit pour tirer, sur les morts comme sur les pirates trop curieux." },
     ],
   },
 });
@@ -105,7 +107,7 @@ Object.assign(NPCS, {
     name: 'Maître Anselme', title: 'Notaire et ébéniste',
     look: { skin: 0, hair: 4, hairStyle: 'court', beard: 1, top: 'manteau', topCol: 'brown', pants: 'black', boots: 'black', hat: 'tricorne', hatCol: 'black' },
     greet: ['Une maison, un nom sur la porte, et un endroit où mourir au chaud. Que demander de plus ?', 'Les six maisons du quartier des Corsaires sont à vendre. Enfin, celles qui restent.'],
-    shop: ['table_bois', 'chaise_bois', 'etagere_bois', 'armoire', 'plante_pot', 'tableau_mer', 'tapis_brode', 'bibliotheque', 'serrure_renforcee', 'coffre_base', 'lit'],
+    shop: ['table_bois', 'chaise_bois', 'etagere_bois', 'armoire', 'cheminee_pierre', 'plante_pot', 'tableau_mer', 'tapis_brode', 'bibliotheque', 'serrure_renforcee', 'coffre_base', 'lit', 'tapis', 'sol_planches', 'torche_base', 'lanterne_base', 'jardiniere', 'tonneau_deco', 'caisse_deco'],
     topics: [
       { q: 'Comment acheter une maison ?', a: "Approchez-vous de la porte d'une maison à vendre et appuyez sur E : 800 doublons et elle est à vous, avec votre nom sur la plaque. Une seule par pirate. Dedans, tout est vide : meublez-la avec la touche B." },
       { q: 'Et les voleurs ?', a: "Il y en a. Une porte se crochette, avec des crochets et des doigts agiles. Une serrure renforcée et un chien de garde les découragent. Rangez vos trésors dans vos coffres : un voleur n'emporte qu'une poignée de choses." },
@@ -115,7 +117,7 @@ Object.assign(NPCS, {
     name: 'La Fouine', title: 'Receleuse',
     look: { skin: 1, hair: 0, hairStyle: 'long', top: 'gilet', topCol: 'black', pants: 'black', boots: 'black', hat: 'bandana', hatCol: 'black' },
     greet: ['Tu ne m’as jamais vue. Moi non plus.', 'Des crochets ? Des bijoux à revendre ? Parle bas.'],
-    shop: ['crochets', 'poudre_noire', 'carte_dechiree'],
+    shop: ['crochets', 'carte_dechiree', 'bandage'],
     topics: [
       { q: 'Comment on crochète ?', a: "Devant la porte d'une maison qui n'est pas la tienne, E. Une goupille après l'autre : appuie sur E quand l'aiguille passe dans le vert. Rate et ton crochet casse. Réussis et tu as quarante secondes pour fouiller un coffre." },
       { q: 'Ça rapporte ?', a: "Une poignée d'objets du propriétaire... et parfois mieux : des montres, des bagues, des perles noires qu'on ne trouve nulle part ailleurs. Mais attention : tout le monde saura que tu es un voleur." },
@@ -175,7 +177,7 @@ Object.assign(NPCS, {
     name: 'Madame Soie', title: 'Couturière des forbans',
     look: { skin: 2, hair: 0, hairStyle: 'queue', top: 'capitaine', topCol: 'teal', pants: 'black', boots: 'black', hat: 'plume', hatCol: 'teal' },
     greet: ['On ne vient pas à la Rade pour être discret, mon chou. On vient pour être vu.', 'Une tenue, ça se mérite. Ou ça s’achète.', 'Ce manteau ? Pris sur un amiral. Il n’en avait plus besoin.'],
-    shop: ['tenue_mousse', 'tenue_boucanier', 'tenue_corsaire', 'tenue_sables', 'fil_or'],
+    shop: ['tenue_mousse', 'tenue_boucanier', 'tenue_corsaire', 'tenue_sables', 'tenue_brumes', 'tenue_sirene', 'tenue_peste'],
     topics: [
       { q: 'Les tenues ?', a: "Une tenue se porte par-dessus tout le reste : elle change votre allure et vous donne ses propres bonus. Je vends les classiques. Les grandes tenues, il faut les coudre ici, à ma table de couture, ou les arracher à ceux qui les portent." },
     ],
@@ -184,7 +186,7 @@ Object.assign(NPCS, {
     name: 'Le Receleur', title: 'Achète tout, ne demande rien',
     look: { skin: 2, hair: 0, hairStyle: 'court', beard: 1, top: 'manteau', topCol: 'black', pants: 'black', boots: 'black', hat: 'tricorne', hatCol: 'black', eye: 'patch' },
     greet: ['Je n’ai rien vu. Vous non plus.', 'Un coffret à bijoux ? Je ne demande pas d’où il vient.', 'Les meilleures affaires se font la nuit.'],
-    shop: ['crochets', 'serrure_renforcee', 'carte_dechiree', 'poudre_noire', 'billet_port'],
+    shop: ['crochets', 'serrure_renforcee', 'carte_dechiree', 'lame_corail', 'boussole_maudite', 'billet_port'],
   },
   passeur: { name: 'Joseph', title: 'Passeur', look: { skin: 1, hair: 3, hairStyle: 'court', beard: 1, top: 'vareuse', topCol: 'navy', pants: 'brown', boots: 'brown', hat: 'bonnet', hatCol: 'navy' },
     greet: ['Une traversée ? Le billet, et je m’occupe du reste.', 'Mon bateau n’a jamais coulé. Pas encore.'], shop: ['billet_havre', 'billet_rade', 'billet_anse'],
@@ -218,8 +220,8 @@ Object.assign(NPCS, {
     name: 'Sœur Agathe', title: 'Dernière soignante de la Quarantaine',
     look: { skin: 0, hair: 1, hairStyle: 'court', top: 'tablier', topCol: 'white', pants: 'black', boots: 'black', hat: 'foulard', hatCol: 'white' },
     greet: ['Ne touchez à rien. Surtout pas aux morts.', 'La peste n’a pas tué cette colonie. Le Docteur, si.'],
-    shop: ['herbes', 'grog', 'rhum'],
+    shop: ['bandage', 'elixir_flamme', 'grog', 'rhum'],
   },
   tailleur_rade: { name: 'Rodrigue', title: 'Marchand d’étoffes', look: { skin: 1, hair: 1, hairStyle: 'queue', top: 'gilet', topCol: 'yellow', pants: 'brown', boots: 'brown', hat: 'foulard', hatCol: 'red' },
-    greet: ['Soie, fil d’or, cuir de molosse : tout pour coudre une légende.'], shop: ['fil_or', 'toile', 'corde', 'cuir_molosse'] },
+    greet: ['Des habits de capitaine, cousus main. Le cuir et la soie, c’est mon affaire.'], shop: ['tenue_boucanier', 'tenue_corsaire', 'tenue_brumes', 'tenue_peste', 'armure_conquistador', 'tenue_freres'] },
 });

@@ -60,17 +60,11 @@ export function sanitizeLook(l) {
   };
 }
 
-// Renforcements à la forge d'Isa (sur l'emplacement, ils suivent l'objet équipé)
+// Renforcements à la forge d'Isa (sur l'emplacement, ils suivent l'objet équipé). 0.8 : seulement de l'or.
 export const UPG_SLOTS = ['weapon', 'gun', 'body'];
 export const UPG_MAX = 5;
 export function upgradeCost(slot, L) {
   const n = L + 1;
-  const mats = {
-    weapon: [['os_maudit', 3 * n], ['dent_zombie', 2 * n]],
-    gun: [['poudre_noire', 2 * n], ['os_maudit', 2 * n]],
-    body: [['pince_crabe', 4 * n], ['algue_noire', n]],
-  }[slot].map((m) => m.slice());
-  if (n >= 4) mats.push(['perle_ombre', n - 3]);
-  return { gold: 40 * n * n, mats };
+  return { gold: 70 * n * n + (n >= 4 ? 400 * (n - 3) : 0), mats: [] };
 }
 export const UPG_TEXT = { weapon: '+10 % d’attaque', gun: '+10 % de tir', body: '+12 % de défense, +5 PV' };

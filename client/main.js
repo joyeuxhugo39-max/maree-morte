@@ -5,7 +5,7 @@ import { MOBS } from '../shared/data/mobs.js';
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { mulberry32 } from '../shared/rng.js';
 import { CLOTH_KEYS, mobSheet, humanSheet } from './render/sprites-chars.js';
-import { HARVEST, STRUCTS, CLAIM_R, PLANTER_GROW, HOME_OK, HOME_PRICE } from '../shared/data/craft.js';
+import { STRUCTS, PLANTER_GROW, HOME_OK, HOME_PRICE, QUEST_PICK } from '../shared/data/craft.js';
 import { ITEMS } from '../shared/data/items.js';
 import { NPCS } from '../shared/data/npcs.js';
 import { SKILLS } from '../shared/data/skills.js';
@@ -82,7 +82,7 @@ async function boot(hotData = {}) {
   G.ui.applySettings(G.ui.settings());
   resize(); addEventListener('resize', resize);
   G.renderer.onThunder = (r) => G.sfx.thunder(r);
-  G.harvestable = G.world.props.filter((q) => HARVEST[q.type] && !SAFE.has(G.world.zones[q.ty * G.world.W + q.tx]));
+  G.harvestable = G.world.props.filter((q) => QUEST_PICK[q.type]); // 0.8 : seulement les décors à objets de quête
   $('build-btn').onclick = () => (G.build ? stopBuild() : startBuild(null));
   // molette : zoom (voir de plus haut ou de plus près)
   $('view').addEventListener('wheel', (e) => {
@@ -186,7 +186,6 @@ function onMsg(m) {
       if (ui.open === 'inventory' || ui.shopNpc) ui.renderInventory();
       if (ui.shopNpc) ui.renderShop();
       if (ui.open === 'forge') ui.renderForge();
-      if (ui.open === 'craft') ui.renderCraft();
       if (G.build) ui.renderBuildBar();
       ui.renderTracker();
       break;
@@ -203,7 +202,6 @@ function onMsg(m) {
     case 'bite': if (G.player && G.player.fish) G.player.fish.bite = now; G.sfx.play('bite'); break;
     case 'dep': G.depleted.set(m.id, now + m.s); break;
     case 'gather': for (const [id, n] of m.got) ui.feed(`+${n} ${ITEMS[id].name}`, iconURL(ITEMS[id].icon, ITEMS[id].tint)); if (!m.got.length) ui.feed('Rien cette fois…'); if (ui.open === 'craft') ui.renderCraft(); break;
-    case 'crafted': ui.feed(`Fabriqué : ${ITEMS[m.id].name}${m.n > 1 ? ' ×' + m.n : ''}`, iconURL(ITEMS[m.id].icon, ITEMS[m.id].tint)); G.sfx.play('forge', 0.5); break;
     case 'st': applyBuild(m, now); break;
     case 'stor': ui.openStorage(m.items); break;
     case 'treasure': G.treasure = m.x == null ? null : { x: m.x, y: m.y }; ui.renderTracker(); break;
@@ -573,7 +571,6 @@ function interact() {
   else if (t.kind === 'prop') G.send({ t: 'open', id: t.id });
   else if (t.kind === 'drop') G.send({ t: 'pick', id: t.id });
   else if (t.kind === 'harvest') G.send({ t: 'harvest', id: t.id });
-  else if (t.kind === 'station') G.ui.show('craft');
   else if (t.kind === 'struct') G.send({ t: 'sint', tx: t.tx, ty: t.ty });
   else if (t.kind === 'dig') { G.send({ t: 'dig' }); G.renderer.smoke(G.player.x, G.player.y, 6, 'rgba(160,120,80,0.6)', { size: 2 }); }
   else if (t.kind === 'door') useDoor(t.d, false, performance.now() / 1000);
@@ -635,8 +632,8 @@ function findInteract() {
   for (const st of G.structs.values()) {
     const x = st.tx * TILE + 8, y = st.ty * TILE + 14, d = Math.hypot(x - p.x, y - p.y);
     if (d > 30 || d >= bd) continue;
-    if (st.type === 'feu_camp' || st.type === 'etabli' || st.type === 'forge_base') { bd = d; best = { kind: 'station', x, y, h: 20, verb: 'Artisanat' }; }
-    else if (STRUCTS[st.type].pet) { if (st.mine) { bd = d; best = { kind: 'struct', tx: st.tx, ty: st.ty, x, y, h: 14, verb: p.pet === STRUCTS[st.type].pet ? 'Laisser à la maison' : 'Emmener avec vous' }; } }
+    if (!STRUCTS[st.type]) continue;
+    if (STRUCTS[st.type].pet) { if (st.mine) { bd = d; best = { kind: 'struct', tx: st.tx, ty: st.ty, x, y, h: 14, verb: p.pet === STRUCTS[st.type].pet ? 'Laisser à la maison' : 'Emmener avec vous' }; } }
     else if (!st.mine && st.type === 'coffre' && G.room >= 0 && nowT < G.burgleUntil) { bd = d; best = { kind: 'struct', tx: st.tx, ty: st.ty, x, y, h: 20, verb: 'Fouiller le coffre' }; }
     else if (st.mine && (st.type === 'coffre' || st.type === 'lit' || st.type === 'jardiniere')) { bd = d; best = { kind: 'struct', tx: st.tx, ty: st.ty, x, y, h: 20, verb: st.type === 'coffre' ? 'Ouvrir' : st.type === 'lit' ? 'Dormir' : ((st.age0 || 0) + nowT - st.seen >= PLANTER_GROW ? 'Récolter' : 'Ça pousse') }; }
   }
@@ -645,8 +642,10 @@ function findInteract() {
     if (Math.abs(pr.x - p.x) > 30 || Math.abs(pr.y - p.y) > 34) continue;
     const d = Math.hypot(pr.x - p.x, pr.y - 4 - p.y);
     if (d > 28 || d >= bd || (G.depleted.get(pr.id) || 0) > nowT) continue;
-    bd = d; const H = HARVEST[pr.type];
-    best = { kind: 'harvest', id: pr.id, x: pr.x, y: pr.y, h: pr.spr ? Math.min(40, pr.spr.h * 0.6) : 14, verb: H.verb };
+    const Q = QUEST_PICK[pr.type];
+    if (questNeeds(Q.item) <= 0) continue; // on ne ramasse que ce qu'une quête réclame
+    bd = d;
+    best = { kind: 'harvest', id: pr.id, x: pr.x, y: pr.y, h: pr.spr ? Math.min(40, pr.spr.h * 0.6) : 14, verb: Q.verb };
   }
   if (!best && G.room < 0) {
     if (p.boat) { if (nearLand(p)) best = { kind: 'land', x: p.x, y: p.y, h: 34, verb: 'Accoster' }; }
@@ -655,6 +654,13 @@ function findInteract() {
   return best;
 }
 
+// combien d'exemplaires d'un objet les quêtes en cours réclament encore (comme le serveur)
+function questNeeds(item) {
+  let need = 0;
+  for (const [qid, st] of Object.entries(G.quests || {})) if (st && st.s === 'active' && QUESTS[qid]) for (const g of QUESTS[qid].goals) if (g.type === 'collect' && g.item === item) need += g.n;
+  let have = 0; for (const s of G.inv || []) if (s && s.id === item) have += s.n;
+  return Math.max(0, need - have);
+}
 // ------------------------------------------------------------ boucle
 let lastT = performance.now();
 function loop(ts) {
@@ -680,6 +686,7 @@ function applyBuild(m, now) {
   if (G.player) for (const st of G.structs.values()) st.mine = st.owner === G.player.name;
 }
 function startBuild(id) {
+  if (!myHomeRoom()) { G.ui.toast(G.homes && [...G.homes.values()].some((h) => G.player && h.name === G.player.name) ? 'Le mobilier s’installe chez vous : entrez dans votre maison.' : 'Le mobilier s’installe dans une maison : achetez-en une (E devant une porte « À vendre »).', 'warn'); return; }
   G.ui.close();
   G.build = { id, item: id ? ITEMS[id] : null, valid: false };
   G.ui.renderBuildBar();
@@ -698,11 +705,7 @@ function updateBuild() {
       && (def.floor ? !G.floors.has(i) : !G.structs.has(i)) && Math.hypot(tx * TILE + 8 - p.x, ty * TILE + 10 - p.y) < 140;
     return;
   }
-  let ok = Math.hypot(tx * TILE + 8 - p.x, ty * TILE + 10 - p.y) < 96 && !W.solid[i] && ![T.DEEP, T.WATER, T.SWAMP, T.ROCK, T.PLANK, T.COBBLE].includes(t) && !(def.home && !HOME_OK.has(b.item.place));
-  if (def.floor) ok = ok && !G.floors.has(i); else ok = ok && !G.structs.has(i);
-  if (b.item.place === 'pavillon') ok = ok && !mine && !SAFE.has(W.zones[i]) && W.zones[i] !== Z.WRECK && W.zones[i] !== Z.CAVE && !G.bases.some((x) => Math.hypot(x.tx - tx, x.ty - ty) < CLAIM_R * 2 + 2);
-  else ok = ok && !!mine && Math.hypot(tx - mine.tx, ty - mine.ty) <= CLAIM_R + 0.5;
-  b.valid = ok;
+  b.valid = false; // 0.8 : plus de bases, le mobilier ne se pose que chez soi
 }
 // la pièce de ma maison, si j'y suis
 function myHomeRoom() {
@@ -896,7 +899,6 @@ function handleKeys(now) {
     if (!$('dialog').classList.contains('hidden') && /^Digit[1-9]$/.test(k.code)) { ui.pickChoice(+k.code.slice(5) - 1); continue; }
     if (k.code === 'Escape') { if (G.build && !ui.open) stopBuild(); else ui.close(); continue; }
     if (k.key === 'i' || k.code === 'Tab') { ui.toggle('inventory'); continue; }
-    if (k.key === 'c') { ui.toggle('craft'); continue; }
     if (k.key === 'b') { if (G.build) stopBuild(); else startBuild(null); continue; }
     if (k.key === 'x' && G.build) { unplaceHovered(); continue; }
     if (k.code === 'MouseRight' && G.build) { unplaceHovered(); continue; }

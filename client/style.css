@@ -270,19 +270,6 @@ kbd { font-family: var(--ui); font-size: 11px; background: #2a1a10; color: var(-
 @keyframes pulse { from { background: rgba(60, 10, 6, 0.75); } to { background: rgba(120, 24, 10, 0.75); } }
 
 /* --- artisanat, coffre, construction --- */
-#panel-craft { left: 50%; top: 50%; transform: translate(-50%, -50%); width: 640px; max-width: 96vw; height: 560px; max-height: 90vh; display: flex; flex-direction: column; }
-#craft-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
-#craft-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
-.craft-row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; background: rgba(255, 255, 255, 0.22); border-radius: 3px; border: 2px solid transparent; opacity: 0.75; }
-.craft-row.ready { opacity: 1; background: rgba(255, 255, 255, 0.45); }
-.craft-row:hover { border-color: var(--wood3); }
-.craft-row .ci { width: 32px; height: 32px; image-rendering: pixelated; background: #3a2616; border-radius: 3px; padding: 2px; }
-.craft-row .cn { flex: 1; min-width: 0; font-size: 14px; }
-.craft-row .cing { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; font-weight: 600; }
-.craft-row .cing img { width: 18px; height: 18px; image-rendering: pixelated; vertical-align: -4px; margin-right: 1px; }
-.craft-row .ok { color: #2e6a2e; } .craft-row .ko { color: #a01c14; }
-.craft-row .st { font-size: 11px; font-weight: 700; white-space: nowrap; }
-.craft-row .btn { padding: 4px 9px; font-size: 13px; }
 #panel-storage { left: 50%; top: 50%; transform: translate(-50%, -50%); width: 350px; max-width: 96vw; }
 #stor-grid { display: grid; grid-template-columns: repeat(6, 52px); gap: 5px; }
 #buildbar { position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%); display: flex; gap: 4px; align-items: center; padding: 5px 8px; background: rgba(26, 16, 10, 0.88); border: 2px solid #0e0805; border-radius: 4px; box-shadow: inset 0 0 0 2px #6b4426; max-width: 96vw; flex-wrap: wrap; }

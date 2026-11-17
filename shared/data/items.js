@@ -37,13 +37,8 @@ export const ITEMS = {
   rhum: { name: 'Bouteille de rhum', use: { heal: 95, drunk: 10 }, value: 40, rarity: 1, icon: 'rum', desc: 'Rend 95 PV... et la tête qui tourne.' },
   grog: { name: 'Grog épicé', use: { en: 60 }, value: 22, icon: 'grog', desc: 'Rend 60 d’énergie.' },
   // ----- matériaux -----
-  pince_crabe: { name: 'Pince de crabe', value: 3, icon: 'claw', mat: 1, desc: 'Encore un peu frétillante.' },
-  chair_putride: { name: 'Chair putride', value: 2, icon: 'flesh', mat: 1, desc: 'L’odeur ne part jamais vraiment.' },
-  os_maudit: { name: 'Os maudit', value: 5, icon: 'bone', mat: 1, desc: 'Une lueur verte y palpite. Le vieux Gaspard en veut.' },
-  dent_zombie: { name: 'Dent de boucanier', value: 7, icon: 'tooth', mat: 1, desc: 'Arrachée à un mort qui mordait encore.' },
-  algue_noire: { name: 'Algue noire', value: 8, icon: 'seaweed', mat: 1, desc: 'Ramassée sur les Noyés du marais.' },
-  poudre_noire: { name: 'Poudre noire', value: 10, icon: 'powder', mat: 1, desc: 'Sèche, heureusement.' },
-  perle_ombre: { name: "Perle d'ombre", value: 70, rarity: 2, icon: 'pearl', mat: 1, desc: 'Elle absorbe la lumière autour d’elle.' },
+  os_maudit: { quest: 1, name: 'Os maudit', value: 0, icon: 'bone', desc: 'Une lueur verte y palpite. Objet de quête : la Flamme Bénite s\'en nourrit.' },
+  dent_zombie: { quest: 1, name: 'Dent de boucanier', value: 0, icon: 'tooth', desc: 'Arrachée à un mort qui mordait encore. Objet de quête.' },
   carte_dechiree: { name: 'Carte déchirée', value: 25, rarity: 1, icon: 'map', use: { combine: 4 }, desc: 'Un fragment de carte au trésor. Réunissez-en 4 puis clic droit pour reconstituer la carte.' },
   carte_tresor: { name: 'Carte au trésor', value: 0, rarity: 2, icon: 'map', tint: 'gold', use: { treasure: 1 }, desc: 'Clic droit : révéler l’emplacement du trésor. Creusez ensuite sur la croix (touche E).' },
   // ----- pêche -----
@@ -52,45 +47,29 @@ export const ITEMS = {
   bar: { name: 'Bar de roche', use: { heal: 28 }, value: 9, icon: 'fish_s', tint: 'blue', desc: 'Rend 28 PV.' },
   dorade: { name: 'Dorade royale', use: { heal: 42 }, value: 18, rarity: 1, icon: 'fish_s', tint: 'gold', desc: 'Rend 42 PV. Bartholomé l’adore.' },
   poisson_lanterne: { name: 'Poisson-lanterne', use: { heal: 45, en: 25 }, value: 40, rarity: 2, icon: 'fish_s', tint: 'glow', desc: 'Ne mord que la nuit. Rend 45 PV et 25 d’énergie.' },
-  espadon: { name: 'Espadon', value: 90, rarity: 2, icon: 'fish_s', tint: 'sword', mat: 1, desc: 'Une prise légendaire, surtout par gros temps. Se vend une fortune.' },
-  botte_rouillee: { name: 'Botte rouillée', value: 1, icon: 'boots', tint: 'brown', mat: 1, desc: 'Quelqu’un l’a perdue. Avec le pied ?' },
+  espadon: { name: 'Espadon', value: 90, rarity: 2, icon: 'fish_s', tint: 'sword', desc: 'Une prise légendaire, surtout par gros temps. Se vend une fortune.' },
+  botte_rouillee: { name: 'Botte rouillée', value: 1, icon: 'boots', tint: 'brown', desc: 'Quelqu’un l’a perdue. Avec le pied ?' },
   bouteille_mer: { name: 'Bouteille à la mer', use: { bottle: 1 }, value: 5, icon: 'bottle', desc: 'Un message roulé à l’intérieur. Clic droit pour l’ouvrir.' },
   // ----- butins d'élite -----
   couronne_crabe: { name: 'Couronne du Crabe-Roi', slot: 'hat', def: 5, crit: 0.05, value: 420, rarity: 2, icon: 'crown', look: 'couronne', desc: 'Un peu collante. Très royale.' },
   ecaille_leviathan: { name: 'Écaille du Léviathan', slot: 'trinket', def: 4, regen: 1.2, hp: 30, value: 650, rarity: 3, icon: 'scale', desc: 'Arrachée à la Marée Morte elle-même.' },
   // ----- quête -----
   tonnelet: { name: 'Tonnelet de rhum perdu', quest: 1, value: 0, icon: 'barrel', desc: 'Le rhum de Bartholomé. Ne pas boire en route.' },
+  lame_rouillee: { name: 'Lame de boucanier', quest: 1, value: 0, icon: 'w:sabre_rouille', desc: 'Une vieille lame arrachée à un boucanier zombie. Isa en fera de l’acier neuf. Objet de quête.' },
+  planche_epave: { name: 'Planche d’épave', quest: 1, value: 0, icon: 'wreckwood', desc: 'Du bon chêne, rejeté par la mer. On en trouve près du bois flotté (E). Objet de quête.' },
+  voile_dechiree: { name: 'Voile déchirée', quest: 1, value: 0, icon: 'cloth', desc: 'Un lambeau de voile arraché à un matelot zombie. Objet de quête.' },
 };
 
 export const STACK_MAX = 99;
 export const isStackable = (id) => !!ITEMS[id] && !ITEMS[id].slot && !ITEMS[id].boat;
 
-// ======================= Artisanat et construction (0.3) =======================
+// ======================= Objets de 0.3 (l'artisanat a disparu en 0.8 : tout s'achète) =======================
 Object.assign(ITEMS, {
   // ----- matériaux récoltés -----
-  bois: { name: 'Bois', value: 2, icon: 'log', mat: 1, desc: 'Coupé à la hache. La base de presque tout.' },
-  bois_flotte: { name: 'Bois flotté', value: 1, icon: 'driftwood_i', mat: 1, desc: 'Ramassé sur la plage, blanchi par le sel.' },
-  fibre: { name: 'Fibre de palmier', value: 1, icon: 'fiber', mat: 1, desc: 'Arrachée aux palmiers et aux roseaux. Se tresse en corde.' },
-  silex: { name: 'Silex', value: 1, icon: 'flint', mat: 1, desc: 'Une pierre tranchante, ramassée à la main sur les rochers.' },
-  pierre: { name: 'Pierre', value: 2, icon: 'stone', mat: 1, desc: 'Extraite des rochers à la pioche.' },
-  minerai_fer: { name: 'Minerai de fer', value: 6, icon: 'ore', mat: 1, desc: 'Plus fréquent dans les rochers de la jungle, des ruines et de la crique.' },
-  resine: { name: 'Résine', value: 5, icon: 'resin', mat: 1, desc: 'La sève dorée des grands arbres de la jungle.' },
   baies: { name: 'Baies sauvages', use: { heal: 6 }, value: 1, icon: 'berries', desc: 'Sucrées, un peu acides. Rend 6 PV.' },
-  herbes: { name: 'Herbes médicinales', value: 2, icon: 'herb', mat: 1, desc: 'Cueillies sur les fougères et les buissons.' },
-  champignon: { name: 'Champignon des marais', value: 2, icon: 'mush', tint: 'purple', mat: 1, desc: 'Pas toxique. Presque.' },
-  champignon_luisant: { name: 'Champignon luisant', value: 8, rarity: 1, icon: 'mush', tint: 'glow', mat: 1, desc: 'Il brille la nuit. Rare et précieux.' },
-  coquillage: { name: 'Coquillage', value: 1, icon: 'shell_i', mat: 1, desc: 'Nacré et solide.' },
+  herbes: { quest: 1, name: 'Herbes médicinales', value: 0, icon: 'herb', desc: 'Cueillies sur les fougères et les buissons (E), quand une quête en réclame.' },
   // ----- matériaux transformés -----
-  corde: { name: 'Corde', value: 4, icon: 'rope', mat: 1, desc: 'Trois fibres tressées.' },
-  planche: { name: 'Planche', value: 5, icon: 'plank', mat: 1, desc: 'Du bois scié à l’établi.' },
-  charbon: { name: 'Charbon de bois', value: 3, icon: 'coal', mat: 1, desc: 'Cuit au feu de camp. Indispensable à la forge.' },
-  toile: { name: 'Toile de voile', value: 6, icon: 'cloth', mat: 1, desc: 'Tissée de fibres, solide comme une voile.' },
-  lingot_fer: { name: 'Lingot de fer', value: 14, icon: 'ingot', mat: 1, desc: 'Fondu à la forge.' },
   // ----- outils -----
-  hache_silex: { name: 'Hache de silex', tool: 'axe', tier: 1, value: 10, icon: 'axe', tint: 'flint', desc: 'Permet d’abattre les arbres (E près d’un arbre).' },
-  pioche_silex: { name: 'Pioche de silex', tool: 'pick', tier: 1, value: 10, icon: 'pick', tint: 'flint', desc: 'Permet d’extraire pierre et minerai des rochers.' },
-  hache_fer: { name: 'Hache de fer', tool: 'axe', tier: 2, value: 60, rarity: 1, icon: 'axe', tint: 'iron', desc: 'Récolte davantage de bois et de résine.' },
-  pioche_fer: { name: 'Pioche de fer', tool: 'pick', tier: 2, value: 70, rarity: 1, icon: 'pick', tint: 'iron', desc: 'Récolte davantage de pierre et de minerai.' },
   // ----- armes -----
   gourdin: { name: 'Gourdin', slot: 'weapon', atk: 8, speed: 0.62, value: 15, icon: 'w:gourdin', wtint: 'rust', desc: 'Un bout de bois bien lourd.', form: { k: 'blunt', len: 12, head: 'club', bl: 'wood' } },
   lance_silex: { name: 'Lance de silex', slot: 'weapon', atk: 10, speed: 0.5, reach: 34, arc: 0.6, value: 25, icon: 'w:lance_silex', wtint: 'steel', desc: 'Légère et tranchante.', form: { k: 'spear', len: 14, head: 'leaf', bl: 'flint', hi: 'wood', anim: 'thrust' } },
@@ -110,31 +89,22 @@ Object.assign(ITEMS, {
   tarte_baies: { name: 'Tarte aux baies', use: { heal: 50 }, value: 14, icon: 'pie', desc: 'Rend 50 PV.' },
   bandage: { name: 'Bandage', use: { heal: 30 }, value: 5, icon: 'bandage', desc: 'Fibres et herbes. Rend 30 PV.' },
   elixir_flamme: { name: 'Élixir de la Lanterne', use: { heal: 160, en: 40 }, value: 60, rarity: 2, icon: 'elixir', desc: 'Rend 160 PV et 40 d’énergie.' },
-  // ----- construction (à placer dans votre base) -----
-  pavillon: { name: 'Pavillon pirate', place: 'pavillon', value: 30, icon: 'flag', desc: 'Plantez-le pour revendiquer un terrain et y bâtir votre base (une par pirate, hors de la ville).' },
-  mur_bois: { name: 'Mur de bois', place: 'mur_bois', value: 6, icon: 'wall', tint: 'wood', desc: 'Les morts ne passent pas.' },
-  palissade: { name: 'Palissade', place: 'palissade', value: 6, icon: 'palisade', desc: 'Des pieux taillés en pointe.' },
-  mur_pierre: { name: 'Mur de pierre', place: 'mur_pierre', value: 8, icon: 'wall', tint: 'stone', desc: 'Solide et élégant.' },
-  porte_bois: { name: 'Porte', place: 'porte', value: 12, icon: 'door', desc: 'Les pirates passent, les morts non.' },
-  sol_planches: { name: 'Plancher', place: 'sol', value: 2, icon: 'floor', desc: 'Un sol en planches.' },
-  tapis: { name: 'Tapis', place: 'tapis', value: 10, icon: 'rug', desc: 'Pour le confort du capitaine.' },
-  torche_base: { name: 'Torche', place: 'torche', value: 3, icon: 'torch_i', desc: 'Éclaire votre base la nuit.' },
-  lanterne_base: { name: 'Lanterne', place: 'lanterne', value: 20, icon: 'lantern', desc: 'Une belle lumière dorée.' },
-  feu_camp: { name: 'Feu de camp', place: 'feu_camp', value: 10, icon: 'campfire', desc: 'Pour cuisiner. Éclaire et réchauffe.' },
-  etabli: { name: 'Établi', place: 'etabli', value: 30, icon: 'bench_i', desc: 'Pour scier, tisser et assembler.' },
-  forge_base: { name: 'Forge', place: 'forge_base', value: 60, icon: 'anvil', desc: 'Pour fondre et forger le métal.' },
-  coffre_base: { name: 'Coffre', place: 'coffre', value: 35, icon: 'chest_i', desc: 'Rangement de votre base (24 places, partagées entre vos coffres).' },
-  lit: { name: 'Lit', place: 'lit', value: 30, icon: 'bed', desc: 'Dormez dedans (E) : vous réapparaîtrez ici.' },
-  canon_def: { name: 'Canon de défense', place: 'canon_def', value: 120, rarity: 1, icon: 'cannon_i', desc: 'Tire seul sur les morts qui approchent, quand vous êtes là.' },
-  jardiniere: { name: 'Jardinière', place: 'jardiniere', value: 20, icon: 'planter', desc: 'Des baies et des herbes y poussent toutes seules.' },
-  tonneau_deco: { name: 'Tonneau', place: 'tonneau', value: 6, icon: 'barrel', desc: 'Décoration.' },
-  caisse_deco: { name: 'Caisse', place: 'caisse', value: 4, icon: 'crate_i', desc: 'Décoration.' },
+  // ----- mobilier de maison (touche B, chez vous) -----
+  sol_planches: { home: 1, name: 'Plancher', place: 'sol', value: 2, icon: 'floor', desc: 'Un sol en planches pour votre maison.' },
+  tapis: { home: 1, name: 'Tapis', place: 'tapis', value: 10, icon: 'rug', desc: 'Pour le confort du capitaine, chez vous.' },
+  torche_base: { home: 1, name: 'Torche', place: 'torche', value: 3, icon: 'torch_i', desc: 'Éclaire votre maison.' },
+  lanterne_base: { home: 1, name: 'Lanterne', place: 'lanterne', value: 20, icon: 'lantern', desc: 'Une belle lumière dorée, chez vous.' },
+  coffre_base: { home: 1, name: 'Coffre', place: 'coffre', value: 35, icon: 'chest_i', desc: 'Un coffre de plus chez vous. Le rangement est partagé entre tous vos coffres.' },
+  lit: { home: 1, name: 'Lit', place: 'lit', value: 30, icon: 'bed', desc: 'Chez vous, dormez dedans (E) : vous réapparaîtrez ici.' },
+  jardiniere: { home: 1, name: 'Jardinière', place: 'jardiniere', value: 20, icon: 'planter', desc: 'Chez vous, des bananes et des noix de coco y poussent toutes seules.' },
+  tonneau_deco: { home: 1, name: 'Tonneau', place: 'tonneau', value: 6, icon: 'barrel', desc: 'Décoration pour votre maison.' },
+  caisse_deco: { home: 1, name: 'Caisse', place: 'caisse', value: 4, icon: 'crate_i', desc: 'Décoration pour votre maison.' },
 });
 // ----- 0.4 : navigation et grottes -----
 Object.assign(ITEMS, {
   barque: { name: 'Barque', boat: { kind: 'barque', speed: 98 }, value: 180, icon: 'boat_i', desc: 'Une barque à rames. Face à l’eau, E pour la mettre à l’eau ; près du rivage, E pour accoster.' },
   sloop: { name: 'Sloop', boat: { kind: 'sloop', speed: 142, cannon: 1 }, value: 1400, rarity: 2, icon: 'sloop_i', desc: 'Un petit voilier rapide, armé d’un canon : clic droit à bord pour tirer.' },
-  eclat_cristal: { name: 'Éclat de cristal', value: 22, icon: 'crystal', desc: 'Il luit faiblement dans le noir. Il pousse au fond des grottes (pioche).' },
+  eclat_cristal: { quest: 1, name: 'Éclat de cristal', value: 0, icon: 'crystal', desc: 'Il luit faiblement dans le noir. Objet de quête : on le détache des cristaux des grottes (E).' },
   pendentif_cristal: { name: 'Pendentif de cristal', slot: 'trinket', hp: 25, crit: 0.04, value: 260, rarity: 1, icon: 'crystalneck', desc: 'Un éclat de cristal serti de fer. Il bat comme un cœur.' },
 });
 // ----- 0.5 : l'arsenal -----
@@ -195,7 +165,7 @@ Object.assign(ITEMS, {
   coffret_bijoux: { name: 'Coffret à bijoux', value: 1500, rarity: 2, icon: 'r_casket', desc: 'Plein de bagues dépareillées. Un receleur en donnera un bon prix.' },
   tableau_maitre: { name: 'Tableau de maître', place: 'tableau_maitre_h', home: 1, value: 3000, rarity: 3, icon: 'f_masterpiece', desc: 'Une toile inestimable, dérobée dans une maison de corsaire.' },
   // Kraken
-  encre_noire: { name: 'Encre des abysses', value: 14, icon: 'ink', desc: 'Une encre glacée qui ne sèche jamais.' },
+  encre_noire: { quest: 1, name: 'Encre des abysses', value: 0, icon: 'ink', desc: 'Une encre glacée qui ne sèche jamais. Objet de quête.' },
   conque_abysses: { name: 'Conque des Abysses', quest: 1, use: { conch: 1 }, value: 500, rarity: 2, icon: 'conch', desc: 'À bord, dans le Gouffre du Kraken, utilisez-la (clic droit) pour appeler la bête.' },
   oeil_kraken: { name: 'Œil du Kraken', slot: 'trinket', hp: 50, atk: 6, crit: 0.06, value: 4000, rarity: 3, icon: 'kraken_eye', desc: 'Il vous regarde encore. Il voit les morts venir.' },
   tentacule_fumee: { name: 'Tentacule fumé', use: { heal: 120, en: 30 }, value: 40, rarity: 1, icon: 'tentacle_food', desc: 'Rend 120 PV et 30 d’énergie. Ça résiste sous la dent.' },
@@ -207,16 +177,12 @@ ITEMS.medaillon_lunes = { name: 'Médaillon des Deux Lunes', slot: 'trinket', at
 // ----- 0.7 : le Grand Large -----
 Object.assign(ITEMS, {
   // matériaux des nouvelles régions
-  soie_pendu: { name: 'Soie de pendu', value: 18, icon: 'silk', tint: 'black', mat: 1, desc: 'Un ruban de soie noire, dénoué d’une corde de la Forêt des Pendus.' },
-  fil_or: { name: 'Fil d’or', value: 45, icon: 'goldthread', mat: 1, desc: 'Pour broder les galons d’un vrai capitaine.' },
-  plume_corbeau: { name: 'Plume de corbeau', value: 14, icon: 'feather', mat: 1, desc: 'Arrachée au masque d’un médecin de peste.' },
-  ecaille_sirene: { name: 'Écaille de sirène', value: 22, icon: 'sscale', mat: 1, desc: 'Irisée, froide, et elle chante quand on la porte à l’oreille.' },
-  os_legionnaire: { name: 'Os de légionnaire', value: 16, icon: 'bigbone', mat: 1, desc: 'Un fémur gravé de numéros de régiment.' },
-  braise: { name: 'Braise éternelle', value: 30, icon: 'ember', mat: 1, desc: 'Elle ne refroidit jamais. Ne la mettez pas dans votre poche.' },
-  coeur_golem: { name: 'Cœur de golem', value: 70, icon: 'golemcore', rarity: 1, mat: 1, desc: 'Une pierre de lave qui bat encore.' },
-  essence_damnee: { name: 'Essence damnée', value: 140, icon: 'essence', rarity: 2, mat: 1, desc: 'Ce qui reste d’une âme qui a refusé de partir.' },
-  bois_epave: { name: 'Bois d’épave', value: 12, icon: 'wreckwood', mat: 1, desc: 'Arraché à la coque d’un navire maudit. Il sent la poudre et la vase.' },
-  cuir_molosse: { name: 'Cuir de molosse', value: 26, icon: 'leather', mat: 1, desc: 'Épais, couturé de cicatrices. Parfait pour une tenue de combat.' },
+  soie_pendu: { quest: 1, name: 'Soie de pendu', value: 0, icon: 'silk', tint: 'black', desc: 'Un ruban de soie noire, dénoué d’une corde de la Forêt des Pendus. Objet de quête.' },
+  plume_corbeau: { quest: 1, name: 'Plume de corbeau', value: 0, icon: 'feather', desc: 'Arrachée au masque d’un médecin de peste. Objet de quête.' },
+  ecaille_sirene: { quest: 1, name: 'Écaille de sirène', value: 0, icon: 'sscale', desc: 'Irisée, froide, et elle chante quand on la porte à l’oreille. Objet de quête.' },
+  os_legionnaire: { quest: 1, name: 'Os de légionnaire', value: 0, icon: 'bigbone', desc: 'Un fémur gravé de numéros de régiment. Objet de quête.' },
+  braise: { quest: 1, name: 'Braise éternelle', value: 0, icon: 'ember', desc: 'Elle ne refroidit jamais. Ne la mettez pas dans votre poche. Objet de quête.' },
+  coeur_golem: { quest: 1, name: 'Cœur de golem', value: 0, icon: 'golemcore', rarity: 1, desc: 'Une pierre de lave qui bat encore. Objet de quête.' },
   // billets du passeur : de ville en ville, sans prendre la mer
   billet_port: { name: 'Billet pour Port-Lanterne', use: { travel: 'port' }, value: 40, icon: 'ticket', tint: 'red', desc: 'Utilisez-le dans une ville pour embarquer sur le bateau du passeur.' },
   billet_havre: { name: 'Billet pour Havre-des-Brumes', use: { travel: 'havre' }, value: 40, icon: 'ticket', tint: 'teal', desc: 'Utilisez-le dans une ville pour embarquer sur le bateau du passeur.' },

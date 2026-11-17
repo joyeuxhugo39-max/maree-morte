@@ -7,7 +7,7 @@ import { ZONES, Z, SAFE } from '../shared/world.js';
 import { SLOTS, SLOT_NAMES, RARITY, INV_SIZE, MAP_W, OVER_H, TILE, clockString, dayFrac, darkness, weatherAt, isFullMoon } from '../shared/constants.js';
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { UPG_SLOTS, UPG_MAX, upgradeCost, UPG_TEXT } from '../shared/formulas.js';
-import { RECIPES, STATIONS, CATEGORIES, STRUCTS, HOME_OK } from '../shared/data/craft.js';
+import { STRUCTS, HOME_OK } from '../shared/data/craft.js';
 import { iconURL } from './render/sprites-items.js';
 import { MOBS } from '../shared/data/mobs.js';
 import { slotFrameURL, plankURL, mouseURL, lockURL } from './render/ui-art.js';
@@ -120,7 +120,6 @@ export class UI {
     if (name === 'forge') this.renderForge();
     if (name === 'ach') this.renderAch();
     if (name === 'settings') this.renderSettings();
-    if (name === 'craft') this.renderCraft();
     this.G.sfx.play('click');
   }
   close() {
@@ -632,48 +631,7 @@ export class UI {
       list.appendChild(row);
     }
   }
-  // ------------------------------------------------------------ artisanat
-  stationsNear() {
-    const G = this.G, p = G.player, ok = { main: true };
-    if (!p) return ok;
-    const near = (pts, r) => pts.some(([x, y]) => Math.hypot(x - p.x, y - p.y) < r);
-    const at = (type) => G.world.props.filter((q) => q.type === type).map((q) => [q.x, q.y]);
-    if (!this.townSt) this.townSt = { feu: at('brazier'), etabli: at('workbench'), forge: [...at('anvil'), ...at('forge')] };
-    for (const k of ['feu', 'etabli', 'forge']) ok[k] = near(this.townSt[k], 50);
-    for (const st of G.structs.values()) { const d = { feu_camp: 'feu', etabli: 'etabli', forge_base: 'forge' }[st.type]; if (d && Math.hypot(st.tx * TILE + 8 - p.x, st.ty * TILE + 14 - p.y) < 42) ok[d] = true; }
-    return ok;
-  }
-  renderCraft(cat) {
-    const G = this.G;
-    if (cat) this.craftCat = cat;
-    const cur = this.craftCat || 'all';
-    const tabs = $('craft-tabs');
-    tabs.innerHTML = '';
-    for (const [k, label] of [['all', 'Tout'], ...Object.entries(CATEGORIES)]) {
-      const b = document.createElement('button'); b.className = 'chip' + (k === cur ? ' on' : ''); b.textContent = label;
-      b.onclick = () => this.renderCraft(k);
-      tabs.appendChild(b);
-    }
-    const near = this.stationsNear();
-    const list = $('craft-list');
-    list.innerHTML = '';
-    const rows = RECIPES.filter((r) => cur === 'all' || r.cat === cur).map((r) => {
-      const has = r.ing.every(([id, n]) => G.countItem(id) >= n);
-      return { r, has, here: !!near[r.st] };
-    }).sort((a, b) => (b.has && b.here) - (a.has && a.here) || b.has - a.has);
-    for (const { r, has, here } of rows) {
-      const it = ITEMS[r.out];
-      const row = document.createElement('div'); row.className = 'craft-row' + (has && here ? ' ready' : '');
-      const ing = r.ing.map(([id, n]) => { const c = G.countItem(id); return `<span class="${c >= n ? 'ok' : 'ko'}" title="${esc(ITEMS[id].name)}"><img src="${iconURL(ITEMS[id].icon, ITEMS[id].tint)}">${c}/${n}</span>`; }).join('');
-      row.innerHTML = `<img class="ci" src="${iconURL(it.icon, it.tint)}"><div class="cn"><b style="color:${it.rarity ? RARITY[it.rarity].color.replace('#efe6d2', '#2b1d14') : ''}">${esc(it.name)}${r.n > 1 ? ' ×' + r.n : ''}</b><div class="cing">${ing}</div></div><span class="st ${here ? 'ok' : 'ko'}">${STATIONS[r.st]}</span>`;
-      const b = document.createElement('button'); b.className = 'btn'; b.textContent = 'Fabriquer'; b.disabled = !(has && here);
-      b.onclick = (e) => G.send({ t: 'craft', r: r.id, n: e.shiftKey ? 5 : 1 });
-      row.appendChild(b);
-      row.onmouseenter = (e) => this.tip(e, this.itemTip(r.out, r.n, 'craft'));
-      row.onmouseleave = () => this.untip();
-      list.appendChild(row);
-    }
-  }
+
   // ------------------------------------------------------------ coffre de la base
   openStorage(items) {
     if (this.open !== 'storage') {
@@ -709,7 +667,7 @@ export class UI {
     if (G.build.id && !counts[G.build.id]) { G.build.id = null; G.build.item = null; }
     const ids = Object.keys(counts);
     bar.innerHTML = `<span class="bt">${home ? 'Ameublement' : 'Construction'}</span>` + ids.map((id) => `<div class="hk${G.build.id === id ? ' flash' : ''}" data-id="${id}"><img src="${iconURL(ITEMS[id].icon, ITEMS[id].tint)}"><span class="cnt">${counts[id]}</span></div>`).join('')
-      + (ids.length ? '' : `<span class="bh">${home ? 'Rien à poser : achetez des meubles chez Anselme ou fabriquez-en (C).' : 'Rien à poser : fabriquez des constructions (C).'}</span>`)
+      + (ids.length ? '' : `<span class="bh">Rien à poser : achetez des meubles chez Anselme, le marchand de meubles.</span>`)
       + '<span class="bh">Clic : poser · Clic droit : démonter · Échap : quitter</span>';
     bar.querySelectorAll('.hk').forEach((el) => {
       const id = el.dataset.id;

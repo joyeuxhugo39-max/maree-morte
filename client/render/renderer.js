@@ -8,7 +8,7 @@ import { MOBS } from '../../shared/data/mobs.js';
 import { NPCS } from '../../shared/data/npcs.js';
 import { Terrain, makeWaterLayers, CHUNK_PX } from './terrain.js';
 import { buildEnvSprites, buildStructSprites } from './sprites-env.js';
-import { STRUCTS, CLAIM_R, PLANTER_GROW } from '../../shared/data/craft.js';
+import { STRUCTS, PLANTER_GROW } from '../../shared/data/craft.js';
 import { humanSheet, mobSheet, whiteSheet, weaponSprite, parrotSheet, catSheet, FW, FH } from './sprites-chars.js';
 import { iconCanvas } from './sprites-items.js';
 import { heldWeapon } from './weapons.js';
@@ -1396,13 +1396,6 @@ export class Renderer {
   drawBuildPreview(ctx, G, camX, camY, now) {
     const b = G.build;
     if (!b || !G.mouseWorld) return;
-    const mine = G.bases && G.bases.find((x) => x.mine);
-    const cx = mine ? mine.tx : Math.floor(G.mouseWorld.x / TILE), cy = mine ? mine.ty : Math.floor(G.mouseWorld.y / TILE);
-    if (mine || (b.item && b.item.place === 'pavillon')) {
-      ctx.strokeStyle = 'rgba(255,215,90,0.55)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
-      ctx.beginPath(); ctx.ellipse(cx * TILE + 8 - camX, cy * TILE + 8 - camY, (CLAIM_R + 0.5) * TILE, (CLAIM_R + 0.5) * TILE, 0, 0, TAU); ctx.stroke();
-      ctx.setLineDash([]);
-    }
     const tx = Math.floor(G.mouseWorld.x / TILE), ty = Math.floor(G.mouseWorld.y / TILE);
     ctx.strokeStyle = b.valid ? 'rgba(120,255,140,0.9)' : 'rgba(255,90,70,0.9)';
     ctx.strokeRect(tx * TILE - camX + 0.5, ty * TILE - camY + 0.5, 15, 15);

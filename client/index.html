@@ -53,8 +53,7 @@
 
     <div id="menu-btns">
       <button data-open="inventory" title="Inventaire (I)">🎒<kbd>I</kbd></button>
-      <button data-open="craft" title="Artisanat (C)">⚒<kbd>C</kbd></button>
-      <button id="build-btn" title="Construire (B)">🏠<kbd>B</kbd></button>
+      <button id="build-btn" title="Meubler votre maison (B)">🏠<kbd>B</kbd></button>
       <button data-open="quests" title="Journal (J)">📜<kbd>J</kbd></button>
       <button data-open="map" title="Carte (M)">🗺<kbd>M</kbd></button>
       <button data-open="ach" title="Hauts faits (K)">🏆<kbd>K</kbd></button>
@@ -107,17 +106,11 @@
     <canvas id="bigmap"></canvas>
   </div>
 
-  <div id="panel-craft" class="panel hidden">
-    <div class="panel-head"><h2>Artisanat</h2><button class="x" data-close>✕</button></div>
-    <div id="craft-tabs"></div>
-    <div id="craft-list"></div>
-    <div class="hint">Récoltez avec <kbd>E</kbd> : arbres (hache), rochers (pioche ou à la main), buissons, palmiers, roseaux, coquillages… Maj + clic : fabriquer ×5. Les postes : feu de camp ou Flamme de la place, établi et forge près d'Isa, ou ceux de votre base.</div>
-  </div>
 
   <div id="panel-storage" class="panel hidden">
     <div class="panel-head"><h2>Coffre de la base</h2><button class="x" data-close>✕</button></div>
     <div id="stor-grid"></div>
-    <div class="hint">Clic : reprendre · Clic droit sur votre sac : ranger. Tous les coffres de votre base partagent ce contenu.</div>
+    <div class="hint">Clic : reprendre · Clic droit sur votre sac : ranger. Tous les coffres de votre maison partagent ce contenu.</div>
   </div>
 
   <div id="panel-forge" class="panel hidden">
@@ -154,7 +147,7 @@
       <div><kbd>E</kbd> — parler, ouvrir un coffre, ramasser, entrer dans un bâtiment</div>
       <div><kbd>E</kbd> face à l'eau — mettre votre barque ou votre sloop à l'eau · <kbd>E</kbd> près du rivage — accoster</div>
       <div><kbd>F</kbd> — manger / boire le meilleur soin du sac</div>
-      <div><kbd>C</kbd> — artisanat · <kbd>B</kbd> — construire votre base (plantez d'abord un pavillon pirate) ou meubler votre maison</div>
+      <div><kbd>B</kbd> — meubler votre maison (un coffre gratuit vous y attend) · tout s'achète chez les marchands</div>
       <div><kbd>E</kbd> devant une maison à vendre (Port-Lanterne, la Rade, l'Anse, l'Îlot de l'Ermite) — l'acheter · devant celle d'un autre, avec des crochets — la crocheter</div>
       <div>Les <b>passeurs</b> des quais vendent des billets : utilisés dans une ville, ils vous déposent dans une autre. Les <b>tenues</b> (emplacement Tenue) changent votre allure et donnent leurs propres bonus.</div>
       <div><kbd>R</kbd> — pêcher face à l'eau (canne à pêche requise), puis <kbd>R</kbd> quand ça mord</div>

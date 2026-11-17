@@ -5,7 +5,8 @@ import {
   INTERACT_RANGE, PICKUP_RANGE, T, dayFrac, isNight, weatherAt, DAY_LENGTH as DAYLEN, isFullMoon,
 } from '../shared/constants.js';
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
-import { HARVEST, STRUCTS, RECIPE, STATIONS, CLAIM_R, BASE_MAX, PLANTER_GROW, HOME_OK, HOME_MAX, HOME_PRICE } from '../shared/data/craft.js';
+import { STRUCTS, PLANTER_GROW, HOME_OK, HOME_MAX, HOME_PRICE, QUEST_PICK } from '../shared/data/craft.js';
+import { LEGACY_VALUE, LEGACY_STRUCT, QUEST_ITEM_OLD_VALUE } from '../shared/data/legacy.js';
 import { generateWorld, canStand, moveWithCollision, moveBoat, zoneAt, tileAt, blocksShot, canSail, roomIdAt, Z, ZONES, SAFE } from '../shared/world.js';
 import { ITEMS, STACK_MAX, isStackable } from '../shared/data/items.js';
 import { MOBS } from '../shared/data/mobs.js';
@@ -18,24 +19,26 @@ const DT = 1 / TICK_RATE;
 const PVP_MUL = 0.6; // les dégâts entre joueurs sont réduits
 const NAME_RE = /^[\p{L}0-9][\p{L}0-9 _'-]{1,14}[\p{L}0-9]$/u;
 const rand = (a, b) => a + Math.random() * (b - a);
+// 0.8 : les élites (hors navires et créatures d'événement) mettent une demi-heure à revenir
+const respawnDelay = (def) => (def.elite && !def.sea && !def.ship && def.respawn < 9999 ? Math.max(1800, def.respawn * 5) : def.respawn);
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return Math.abs(d); };
 const dirOf = (dx, dy) => Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 1 : 2) : (dy < 0 ? 3 : 0);
 
 const CHEST_LOOT = [
   { gold: [15, 35], items: [['banane', 0.8, 2, 4], ['noix_coco', 0.5, 1, 2], ['bandana', 0.15, 1, 1], ['chapeau_paille', 0.15, 1, 1], ['bottes_usees', 0.2, 1, 1], ['carte_dechiree', 0.3, 1, 1], ['poignard', 0.12, 1, 1]] },
-  { gold: [40, 80], items: [['poisson_grille', 0.8, 2, 3], ['grog', 0.6, 1, 2], ['coutelas', 0.2, 1, 1], ['gilet_cuir', 0.15, 1, 1], ['collier_requin', 0.1, 1, 1], ['carte_dechiree', 0.4, 1, 1], ['perle_ombre', 0.15, 1, 1], ['pistolet_double', 0.06, 1, 1], ['machette', 0.08, 1, 1], ['poivriere', 0.03, 1, 1]] },
-  { gold: [90, 160], items: [['rhum', 0.9, 1, 3], ['perle_ombre', 0.6, 1, 2], ['tromblon', 0.12, 1, 1], ['manteau_corsaire', 0.15, 1, 1], ['amulette_lanterne', 0.08, 1, 1], ['carte_dechiree', 0.5, 1, 2], ['cimeterre', 0.1, 1, 1], ['poivriere', 0.08, 1, 1], ['carabine', 0.06, 1, 1], ['crache_feu', 0.04, 1, 1]] },
-  { gold: [80, 160], items: [['rhum', 0.8, 1, 2], ['perle_ombre', 0.6, 1, 2], ['carte_dechiree', 0.5, 1, 2], ['eclat_cristal', 0.3, 1, 2], ['elixir_flamme', 0.3, 1, 1]] },
+  { gold: [40, 80], items: [['poisson_grille', 0.8, 2, 3], ['grog', 0.6, 1, 2], ['coutelas', 0.2, 1, 1], ['gilet_cuir', 0.15, 1, 1], ['collier_requin', 0.1, 1, 1], ['carte_dechiree', 0.4, 1, 1], ['pistolet_double', 0.06, 1, 1], ['machette', 0.08, 1, 1], ['poivriere', 0.03, 1, 1]] },
+  { gold: [150, 240], items: [['rhum', 0.9, 1, 3], ['tromblon', 0.12, 1, 1], ['manteau_corsaire', 0.15, 1, 1], ['amulette_lanterne', 0.08, 1, 1], ['carte_dechiree', 0.5, 1, 2], ['cimeterre', 0.1, 1, 1], ['poivriere', 0.08, 1, 1], ['carabine', 0.06, 1, 1], ['crache_feu', 0.04, 1, 1]] },
+  { gold: [160, 260], items: [['rhum', 0.8, 1, 2], ['carte_dechiree', 0.5, 1, 2], ['elixir_flamme', 0.45, 1, 2]] },
 ];
-CHEST_LOOT[4] = { gold: [400, 700], items: [['essence_damnee', 0.8, 1, 2], ['perle_ombre', 1, 2, 4], ['faux_damnee', 0.06, 1, 1], ['canon_damne', 0.06, 1, 1], ['armure_damnee', 0.05, 1, 1], ['tenue_comte', 0.04, 1, 1], ['dent_comte', 0.04, 1, 1], ['carte_tresor', 0.4, 1, 1]] };
+CHEST_LOOT[4] = { gold: [800, 1300], items: [['elixir_flamme', 0.8, 1, 3], ['faux_damnee', 0.06, 1, 1], ['canon_damne', 0.06, 1, 1], ['armure_damnee', 0.05, 1, 1], ['tenue_comte', 0.04, 1, 1], ['dent_comte', 0.04, 1, 1], ['carte_tresor', 0.4, 1, 1]] };
 const CHEST_COOLDOWN_MS = 15 * 60 * 1000;
 // les îles du Grand Large, pour le haut fait d'explorateur
 const LAVA_BOMB = { id: 0, name: 'une bombe de lave' }; // la « source » des dégâts du volcan
 const FAR_ZONES = [Z.RADE, Z.COLLINES, Z.PENDUS, Z.SIRENES, Z.ANSE, Z.OSSEMENTS, Z.QUARANTAINE, Z.VOLCAN, Z.DAMNES, Z.BRUMES, Z.ERMITE];
 // cambriolage : les objets très rares qu'on ne trouve que chez les autres
 const BURGLE_RARE = [['montre_gousset', 30], ['bague_capitaine', 25], ['coffret_bijoux', 25], ['collier_perles_noires', 12], ['tableau_maitre', 8]];
-const HOME_STORE = 30;
+const HOME_STORE = 48; // le coffre de la maison (0.8 : il remplace les coffres des bases)
 // répliques des boss quand ils changent de phase
 const BOSS_LINES = {
   cendre: [null, 'Vous allez goûter à ma bordée !', 'Brûlez avec moi, chiens de terre !'],
@@ -114,7 +117,7 @@ export class Game {
     this.worldPersist = !!(storage && typeof storage.saveWorld === 'function');
     this.worldDirty = false; this.lastWorldSave = 0;
     const at = (type) => this.world.props.filter((pp) => pp.type === type).map((pp) => [pp.x, pp.y]);
-    this.townStations = { feu: at('brazier'), etabli: at('workbench'), forge: [...at('anvil'), ...at('forge')], couture: at('mannequin') };
+    this.refunds = new Map(); // 0.8 : ce que valaient les bases et les matériaux, en attendant que leur pirate revienne
     if (this.worldPersist && storage.loadWorld) Promise.resolve(storage.loadWorld()).then((w) => this.importWorld(w)).catch((e) => this.log('[monde] chargement impossible', e && e.message));
   }
 
@@ -170,8 +173,7 @@ export class Game {
       case 'dig': return this.dig(p);
       case 'upg': return this.upgrade(p, String(m.s));
       case 'title': return this.setTitle(p, m.id == null ? null : String(m.id));
-      case 'harvest': return this.harvest(p, m.id | 0);
-      case 'craft': return this.craft(p, String(m.r), m.n | 0);
+      case 'harvest': return this.questPick(p, m.id | 0);
       case 'place': return this.place(p, m.slot | 0, m.tx | 0, m.ty | 0);
       case 'unplace': return this.unplace(p, m.tx | 0, m.ty | 0);
       case 'sint': return this.structInteract(p, m.tx | 0, m.ty | 0);
@@ -210,8 +212,9 @@ export class Game {
     const p = this.createPlayer(conn, name, key, data, m.look);
     s.player = p;
     this.players.set(p.id, p);
-    if (p.pendingBase) { this.importBase(p.key, p.name, p.pendingBase); p.pendingBase = null; }
+    if (p.pendingBase) { this.refundBase(p.key, p.pendingBase); p.pendingBase = null; }
     if (p.pendingHome) { this.importHome(p.key, p.name, p.pendingHome); p.pendingHome = null; }
+    this.convertLegacy(p);
     this.send(p, {
       t: 'welcome', id: p.id, seed: this.world.seed, wt: this.worldTime, solo: this.solo,
       me: this.meState(p), inv: p.inv, eq: p.eq, q: p.quests, chests: p.chests, look: p.look, base: p.base,
@@ -245,7 +248,11 @@ export class Game {
     if (d) {
       p.level = Math.max(1, Math.min(MAX_LEVEL, d.level | 0 || 1));
       p.xp = Math.max(0, d.xp | 0); p.gold = Math.max(0, d.gold | 0);
-      if (Array.isArray(d.inv)) for (let i = 0; i < INV_SIZE; i++) { const it = d.inv[i]; p.inv[i] = it && ITEMS[it.id] ? { id: it.id, n: Math.max(1, Math.min(STACK_MAX, it.n | 0)) } : null; }
+      if (Array.isArray(d.inv)) for (let i = 0; i < INV_SIZE; i++) {
+        const it = d.inv[i];
+        p.inv[i] = it && ITEMS[it.id] ? { id: it.id, n: Math.max(1, Math.min(STACK_MAX, it.n | 0)) } : null;
+        if (it && !ITEMS[it.id] && LEGACY_VALUE[it.id]) p.legacyGold = (p.legacyGold || 0) + LEGACY_VALUE[it.id] * Math.max(1, it.n | 0); // 0.8 : matériaux et outils revendus
+      }
       if (d.eq) for (const s of SLOTS) p.eq[s] = d.eq[s] && ITEMS[d.eq[s]] && ITEMS[d.eq[s]].slot === s ? d.eq[s] : null;
       if (d.quests && typeof d.quests === 'object') for (const q in d.quests) if (QUESTS[q]) p.quests[q] = { s: d.quests[q].s === 'done' ? 'done' : 'active', p: Array.isArray(d.quests[q].p) ? d.quests[q].p.map((v) => v | 0) : [], t: +d.quests[q].t || 0 };
       if (d.chests) p.chests = d.chests;
@@ -256,7 +263,7 @@ export class Game {
       if (d.title && p.ach[d.title]) p.title = d.title;
       if (d.cnt) { p.cnt.crab = d.cnt.crab | 0; p.cnt.fish = d.cnt.fish | 0; p.cnt.ships = d.cnt.ships | 0; }
       if (d.respawnAt && typeof d.respawnAt.tx === 'number') p.respawnAt = { tx: d.respawnAt.tx | 0, ty: d.respawnAt.ty | 0 };
-      if (!this.worldPersist && d.base) p.pendingBase = d.base;
+      if (!this.worldPersist && d.base) p.pendingBase = d.base; // 0.8 : remboursée à la connexion
       if (!this.worldPersist && d.home) p.pendingHome = d.home;
       if (typeof d.pet === 'string') p.pet = d.pet;
       if (Array.isArray(d.found)) for (const id of d.found) if (this.world.doors[id | 0] && this.world.doors[id | 0].secret) p.found.add(id | 0);
@@ -277,6 +284,21 @@ export class Game {
     p.zone = zoneAt(this.world, p.x, p.y);
     p.room = roomIdAt(this.world, p.x, p.y);
     return p;
+  }
+  // 0.8 : les anciens matériaux de quête au-delà de ce que réclament les quêtes en cours, et tout ce qui
+  // ne sert plus, sont revendus ; le pirate en est averti dans le chat
+  convertLegacy(p) {
+    let gold = p.legacyGold || 0; p.legacyGold = 0;
+    for (let i = 0; i < p.inv.length; i++) {
+      const s = p.inv[i];
+      if (!s || !QUEST_ITEM_OLD_VALUE[s.id]) continue;
+      let need = 0;
+      for (const [qid, st] of Object.entries(p.quests)) if (st.s === 'active' && QUESTS[qid]) for (const g of QUESTS[qid].goals) if (g.type === 'collect' && g.item === s.id) need += g.n;
+      const have = this.countItem(p, s.id), extra = Math.min(s.n, Math.max(0, have - need));
+      if (extra > 0) { gold += extra * QUEST_ITEM_OLD_VALUE[s.id]; s.n -= extra; if (s.n <= 0) p.inv[i] = null; p.dirtyInv = true; }
+    }
+    if (gold > 0) this.addRefund(p.key, gold);
+    this.applyRefund(p);
   }
   serialize(p) {
     return { name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: p.quests, chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: p.ach, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
@@ -446,7 +468,6 @@ export class Game {
     }
   }
   respawnMob(m, rising = false) {
-    for (const b of this.bases.values()) if (Math.hypot(m.sx / TILE - b.tx, m.sy / TILE - b.ty) < CLAIM_R + 2) { m.deadUntil = this.time + 30; return; }
     m.x = m.sx; m.y = m.sy; m.hp = m.maxHp; m.state = 'idle'; m.target = 0; m.tags.clear(); m.windup = 0;
     m.phase = 0; m.cd = {}; m.frenzy = 0; m.shieldUntil = 0; m.dash = null; m.leap = null; m.pauseUntil = 0;
     m.id = this.nextId++; // nouvel identifiant : les clients le voient « apparaître »
@@ -1122,7 +1143,7 @@ export class Game {
   }
   killMob(m, killer, force = false) {
     m.state = 'dead'; m.hp = 0;
-    m.deadUntil = this.time + m.def.respawn * rand(0.85, 1.15);
+    m.deadUntil = this.time + respawnDelay(m.def) * rand(0.85, 1.15);
     this.ev(m.x, m.y, ['die', m.id]);
     const def = m.def;
     if (def.ai === 'frere' && !force) { // il faut abattre les deux frères presque en même temps
@@ -1140,7 +1161,7 @@ export class Game {
       if (tw && tw.fallen) { // victoire : chaque pirate qui a frappé l'un des frères compte pour les deux
         for (const [pid] of tw.tags) if (!m.tags.has(pid)) m.tags.set(pid, 1);
         for (const [pid] of m.tags) if (!tw.tags.has(pid)) tw.tags.set(pid, 1);
-        tw.fallen = 0; tw.deadUntil = this.time + tw.def.respawn; this.killMob(tw, killer, true);
+        tw.fallen = 0; tw.deadUntil = this.time + respawnDelay(tw.def); this.killMob(tw, killer, true);
       }
     }
     if (def.plague && !m.summoned) this.addCloud(m.x, m.y, 30, 5, 10);
@@ -1183,8 +1204,24 @@ export class Game {
     const gold = Math.round(rand(g0, g1));
     if (gold > 0) this.spawnDrop(m.x, m.y, 'or', gold, top.id);
     for (const [item, ch, a, b] of def.loot) {
+      if (!ITEMS[item]) continue;
+      if (ITEMS[item].quest) { // objet de quête : seulement pour un pirate qui en réclame encore (en comptant ce qui l'attend au sol)
+        const owed = (q) => { let n = this.questNeeds(q, item); for (const d of this.drops.values()) if (d.item === item && d.owner === q.id) n -= d.n; return n; };
+        const who = [top, ...[...m.tags.keys()].map((id) => this.players.get(id))].find((q) => q && !q.dead && owed(q) > 0);
+        if (who && Math.random() < Math.min(1, ch * 1.4)) this.spawnDrop(m.x, m.y, item, Math.min(owed(who), Math.max(1, Math.round(rand(a, b)))), who.id);
+        continue;
+      }
       if (Math.random() < ch) this.spawnDrop(m.x, m.y, item, Math.round(rand(a, b)), top.id);
     }
+  }
+  // combien d'exemplaires de cet objet les quêtes en cours réclament-elles encore ?
+  questNeeds(p, item) {
+    let need = 0;
+    for (const [qid, st] of Object.entries(p.quests)) {
+      if (st.s !== 'active' || !QUESTS[qid]) continue;
+      for (const g of QUESTS[qid].goals) if (g.type === 'collect' && g.item === item) need += g.n;
+    }
+    return Math.max(0, need - this.countItem(p, item));
   }
   // ---- effets des armes : saignement (b), brûlure (f), vol de vie
   addDot(t, kind, total, src, dur = 3) {
@@ -1961,9 +1998,9 @@ export class Game {
     if (p.boat) return this.toast(p, 'Accostez d’abord.', 'warn');
     if (Math.hypot(p.treasure.x - p.x, p.treasure.y - p.y) > 26) return this.toast(p, 'Ce n’est pas ici. Suivez la flèche jusqu’à la croix.', 'warn');
     const t = p.treasure; p.treasure = null;
-    const gold = Math.round(rand(120, 260)); p.gold += gold; p.dirtyMe = true;
+    const gold = Math.round(rand(220, 420)); p.gold += gold; p.dirtyMe = true;
     const got = [];
-    for (const [item, ch, a, b] of [['perle_ombre', 0.8, 1, 2], ['rhum', 0.7, 1, 2], ['collier_requin', 0.15, 1, 1], ['boussole_maudite', 0.06, 1, 1], ['tromblon', 0.1, 1, 1], ['manteau_corsaire', 0.12, 1, 1], ['chapeau_capitaine', 0.05, 1, 1], ['carte_dechiree', 0.35, 1, 1], ['cimeterre', 0.08, 1, 1], ['pistolet_duel', 0.04, 1, 1], ['faux', 0.03, 1, 1], ['couleuvrine', 0.02, 1, 1]]) {
+    for (const [item, ch, a, b] of [['elixir_flamme', 0.5, 1, 2], ['rhum', 0.7, 1, 2], ['collier_requin', 0.15, 1, 1], ['boussole_maudite', 0.06, 1, 1], ['tromblon', 0.1, 1, 1], ['manteau_corsaire', 0.12, 1, 1], ['chapeau_capitaine', 0.05, 1, 1], ['carte_dechiree', 0.35, 1, 1], ['cimeterre', 0.08, 1, 1], ['pistolet_duel', 0.04, 1, 1], ['faux', 0.03, 1, 1], ['couleuvrine', 0.02, 1, 1]]) {
       if (Math.random() < ch) { const n = Math.round(rand(a, b)); this.giveOrDrop(p, item, n); got.push(ITEMS[item].name + (n > 1 ? ' x' + n : '')); }
     }
     this.send(p, { t: 'treasure', x: null });
@@ -2058,55 +2095,20 @@ export class Game {
   // ------------------------------------------------------------ récolte
   bestTool(p, kind) { let t = 0; for (const s of p.inv) if (s && ITEMS[s.id].tool === kind) t = Math.max(t, ITEMS[s.id].tier || 1); return t; }
   broadcastAll(msg) { for (const q of this.players.values()) this.send(q, msg); }
-  harvest(p, id) {
+  // 0.8 : plus de récolte. Seuls quelques décors donnent un objet de quête, à qui en réclame un.
+  questPick(p, id) {
     const pr = this.propById.get(id);
     if (!pr || p.dead) return;
-    const H = HARVEST[pr.type];
-    if (!H || Math.hypot(pr.x - p.x, pr.y - p.y) > 34 || SAFE.has(zoneAt(this.world, pr.x, pr.y))) return;
-    if ((this.depleted.get(id) || 0) > this.time) return this.toast(p, 'Déjà récolté. Ça repoussera.', 'warn');
+    const Q = QUEST_PICK[pr.type];
+    if (!Q || Math.hypot(pr.x - p.x, pr.y - p.y) > 34 || this.questNeeds(p, Q.item) <= 0) return;
+    if ((this.depleted.get(id) || 0) > this.time) return this.toast(p, 'Il n’y a plus rien ici pour l’instant.', 'warn');
     if ((p.cds.harvest || 0) > this.time) return;
     p.cds.harvest = this.time + 0.45;
-    let tool = H.tool ? this.bestTool(p, H.tool) : 0;
-    if (H.tool && !tool) return this.toast(p, H.tool === 'axe' ? 'Il vous faut une hache pour abattre cet arbre.' : 'Il vous faut une pioche.', 'warn');
-    let give = H.give;
-    if (pr.type === 'rock') { const pick = this.bestTool(p, 'pick'); if (pick) { give = H.pick; tool = pick; } }
-    const z = zoneAt(this.world, pr.x, pr.y), oreMul = (z === Z.JUNGLE || z === Z.RUINS || z === Z.WRECK) ? 1.6 : 1;
-    const got = [];
-    for (const g of give) {
-      let n = 0;
-      if (g.length === 3) n = Math.floor(rand(g[1], g[2] + 1)) + (tool >= 2 ? 1 : 0);
-      else if (Math.random() < g[1] * (g[0] === 'minerai_fer' ? oreMul : 1) * (tool >= 2 ? 1.35 : 1)) n = 1;
-      if (pr.type === 'mushroom' && g[0] === 'champignon_luisant' && pr.v % 2) n = 1;
-      if (n > 0) { this.giveOrDrop(p, g[0], n); got.push([g[0], n]); }
-    }
-    this.depleted.set(id, this.time + H.regrow);
-    this.broadcastAll({ t: 'dep', id, s: H.regrow });
-    this.send(p, { t: 'gather', got });
+    this.giveOrDrop(p, Q.item, 1);
+    this.depleted.set(id, this.time + Q.regrow);
+    this.broadcastAll({ t: 'dep', id, s: Q.regrow });
+    this.send(p, { t: 'gather', got: [[Q.item, 1]] });
     this.ev(pr.x, pr.y, ['harv', p.id, id, pr.type]);
-  }
-  // ------------------------------------------------------------ artisanat
-  nearStation(p, st) {
-    if (st === 'main') return true;
-    for (const [x, y] of this.townStations[st] || []) if (Math.hypot(x - p.x, y - p.y) < 52) return true;
-    for (const s of this.structs.values()) if (STRUCTS[s.type].station === st && Math.hypot(s.x - p.x, s.y - p.y) < 44) return true;
-    return false;
-  }
-  craft(p, rid, n) {
-    const r = RECIPE[rid];
-    if (!r || p.dead) return;
-    n = Math.max(1, Math.min(20, n || 1));
-    if (!this.nearStation(p, r.st)) return this.toast(p, `Il faut être près d’un poste : ${STATIONS[r.st]}.`, 'warn');
-    let made = 0;
-    for (let k = 0; k < n; k++) {
-      if (!r.ing.every(([id, c]) => this.countItem(p, id) >= c)) break;
-      for (const [id, c] of r.ing) this.removeItem(p, id, c);
-      const left = this.addItem(p, r.out, r.n);
-      if (left) this.spawnDrop(p.x, p.y, r.out, left, p.id);
-      made++;
-    }
-    if (!made) return this.toast(p, 'Il vous manque des ingrédients.', 'warn');
-    this.send(p, { t: 'crafted', id: r.out, n: made * r.n });
-    this.ev(p.x, p.y, ['fx', 'craft', p.x, p.y, p.id]);
   }
   // ------------------------------------------------------------ bases
   structEntry(st) { return [st.type, st.tx, st.ty, st.oname || (this.bases.get(st.owner) ? this.bases.get(st.owner).name : ''), st.data && st.data.t ? Math.round((Date.now() - st.data.t) / 1000) : 0]; }
@@ -2155,40 +2157,7 @@ export class Game {
     if (!it.place) return;
     const myHome = this.homeOf(p.key);
     if (myHome && p.room >= 0 && p.room === this.world.plots[myHome.k].room) return this.placeHome(p, slot, tx, ty, myHome);
-    if (STRUCTS[it.place].home && !HOME_OK.has(it.place)) return this.toast(p, 'Ce meuble s’installe chez vous, dans votre maison.', 'warn');
-    if (ty >= this.world.OVER_H) return this.toast(p, 'Impossible de construire ici.', 'warn');
-    const type = it.place, def = STRUCTS[type], W = this.world;
-    if (tx < 1 || ty < 1 || tx >= W.W - 1 || ty >= W.H - 1) return;
-    const i = ty * W.W + tx, t = W.tiles[i], z = W.zones[i];
-    if (Math.hypot(tx * TILE + 8 - p.x, ty * TILE + 10 - p.y) > 96) return this.toast(p, 'Trop loin.', 'warn');
-    if (W.solid[i] || t === T.DEEP || t === T.WATER || t === T.SWAMP || t === T.ROCK || t === T.PLANK || t === T.COBBLE) return this.toast(p, 'Impossible de construire ici.', 'warn');
-    let base = this.bases.get(p.key);
-    if (type === 'pavillon') {
-      if (base) return this.toast(p, 'Vous avez déjà une base. Démontez son pavillon pour déménager.', 'warn');
-      if (SAFE.has(z) || z === Z.WRECK || z === Z.SEA || z === Z.CAVE) return this.toast(p, 'Ce terrain ne peut pas être revendiqué.', 'warn');
-      for (const b of this.bases.values()) if (Math.hypot(b.tx - tx, b.ty - ty) < CLAIM_R * 2 + 2) return this.toast(p, 'Trop près de la base d’un autre pirate.', 'warn');
-      for (const n of this.world.npcs) if (Math.hypot(n.x / TILE - tx, n.y / TILE - ty) < 10) return this.toast(p, 'Trop près de la ville.', 'warn');
-      base = { key: p.key, name: p.name, tx, ty, storage: new Array(24).fill(null), count: 0 };
-      this.bases.set(p.key, base);
-      this.broadcastAll({ t: 'st', b: [[p.name, tx, ty, 0]] });
-      this.send(p, { t: 'st', b: [[p.name, tx, ty, 1]] });
-    } else {
-      if (!base) return this.toast(p, 'Plantez d’abord un pavillon pirate pour fonder votre base.', 'warn');
-      if (Math.hypot(tx - base.tx, ty - base.ty) > CLAIM_R + 0.5) return this.toast(p, 'Hors des limites de votre base.', 'warn');
-      if (base.count >= BASE_MAX) return this.toast(p, 'Votre base est pleine.', 'warn');
-      if (!def.floor) {
-        for (const q of this.players.values()) if (Math.abs(q.x - (tx * TILE + 8)) < 12 && Math.abs(q.y - (ty * TILE + 10)) < 12) return this.toast(p, 'Quelqu’un se tient là.', 'warn');
-        for (const m of this.mobs) if (m.state !== 'dead' && Math.abs(m.x - (tx * TILE + 8)) < 12 && Math.abs(m.y - (ty * TILE + 10)) < 12) return this.toast(p, 'Un mort se tient là !', 'warn');
-      }
-    }
-    if (!this.addStruct(p.key, type, tx, ty, def.planter ? { t: Date.now() } : {})) {
-      if (type === 'pavillon') this.bases.delete(p.key);
-      return this.toast(p, 'Emplacement occupé.', 'warn');
-    }
-    s.n--; if (s.n <= 0) p.inv[slot] = null;
-    p.dirtyInv = true;
-    this.ev(tx * TILE + 8, ty * TILE + 10, ['fx', 'build', tx * TILE + 8, ty * TILE + 12]);
-    if (type === 'pavillon') this.toast(p, 'Terrain revendiqué ! Construisez dans le cercle autour du pavillon (touche B).', 'quest');
+    return this.toast(p, myHome ? 'Le mobilier s’installe chez vous : entrez dans votre maison.' : 'Le mobilier s’installe dans une maison : achetez-en une.', 'warn');
   }
   placeHome(p, slot, tx, ty, h) {
     const s = p.inv[slot], it = ITEMS[s.id], type = it.place, def = STRUCTS[type], W = this.world;
@@ -2220,20 +2189,60 @@ export class Game {
       if (p.gold < HOME_PRICE) return this.toast(p, `Il vous faut ${HOME_PRICE} doublons.`, 'warn');
       p.gold -= HOME_PRICE; p.dirtyMe = true;
       this.homes.set(k, { k, key: p.key, name: p.name, storage: new Array(HOME_STORE).fill(null), lock: 0, count: 0, burgledAt: 0 });
+      this.freeChest(k);
       this.broadcastHomes(); this.worldDirty = true;
       this.unlock(p, 'proprietaire');
-      this.toast(p, `Vous voilà propriétaire ! Votre nom est sur la porte. Meublez-la avec la touche B.`, 'quest');
+      this.toast(p, `Vous voilà propriétaire ! Un coffre vous attend à l'intérieur (${HOME_STORE} places). Meublez la maison avec la touche B.`, 'quest');
       this.ev(d.ox, d.oy, ['fx', 'quest', d.ox, d.oy, p.id]);
     } else if (a === 'sell') {
       const h = this.homes.get(k);
       if (!h || h.key !== p.key) return;
       if (h.storage.some(Boolean)) return this.toast(p, 'Videz d’abord vos coffres.', 'warn');
-      for (const [i, st] of [...this.structs]) if (st.home === k) { this.removeStruct(i, false); this.giveOrDrop(p, STRUCTS[st.type].item, 1); }
+      for (const [i, st] of [...this.structs]) if (st.home === k) { this.removeStruct(i, false); if (!(st.data && st.data.free)) this.giveOrDrop(p, STRUCTS[st.type].item, 1); }
       for (const [i, f] of [...this.floors]) if (f.home === k) { this.removeStruct(i, true); this.giveOrDrop(p, STRUCTS[f.type].item, 1); }
       this.homes.delete(k); p.gold += Math.floor(HOME_PRICE / 2); p.dirtyMe = true;
       this.broadcastHomes(); this.worldDirty = true;
       this.toast(p, `Maison vendue : +${Math.floor(HOME_PRICE / 2)} doublons.`, 'info');
     }
+  }
+  // le coffre offert avec la maison : contre le mur du fond, il ne se démonte pas
+  freeChest(k) {
+    const W = this.world, r = W.rooms[W.plots[k].room];
+    if ([...this.structs.values()].some((st) => st.home === k && st.type === 'coffre')) return;
+    const h = this.homes.get(k);
+    for (const dx of [1, 2, r.w - 2, 3, r.w - 3, 0, r.w - 1]) {
+      const tx = r.x0 + dx, ty = r.y0;
+      if (tx < r.x0 || tx >= r.x0 + r.w || W.tiles[ty * W.W + tx] !== T.FLOOR) continue;
+      if (this.addStruct(h.key, 'coffre', tx, ty, { free: 1 }, true, k)) return;
+    }
+  }
+  // 0.8 : un pirate revient ; on lui rend ce que valaient sa base et ses matériaux
+  addRefund(key, gold = 0, items = []) {
+    if (!key || (!gold && !items.length)) return;
+    const r = this.refunds.get(key) || { gold: 0, items: [] };
+    r.gold += Math.round(gold); for (const it of items) r.items.push(it);
+    this.refunds.set(key, r); this.worldDirty = true;
+  }
+  refundBase(key, d) { // une ancienne base : ses constructions en or, son coffre rapatrié
+    if (!d) return;
+    let gold = 0; const items = [];
+    for (const [type] of [...(d.s || []), ...(d.f || [])]) { const it = STRUCTS[type] ? STRUCTS[type].item : LEGACY_STRUCT[type]; gold += (it && ITEMS[it] ? ITEMS[it].value : LEGACY_VALUE[it] || 0); }
+    for (const c of d.storage || []) { if (!c) continue; if (ITEMS[c.id] && !ITEMS[c.id].quest) items.push({ id: c.id, n: Math.max(1, Math.min(STACK_MAX, c.n | 0)) }); else gold += (LEGACY_VALUE[c.id] || QUEST_ITEM_OLD_VALUE[c.id] || 0) * (c.n | 0); }
+    this.addRefund(key, gold, items);
+  }
+  applyRefund(p) {
+    const r = this.refunds.get(p.key);
+    if (!r) return;
+    this.refunds.delete(p.key); this.worldDirty = true;
+    let gold = r.gold;
+    const h = this.homeOf(p.key);
+    for (const it of r.items) {
+      let left = this.addItem(p, it.id, it.n);
+      if (left && h) { const free = h.storage.findIndex((c) => !c); if (free >= 0) { h.storage[free] = { id: it.id, n: left }; left = 0; } }
+      if (left) gold += Math.floor(ITEMS[it.id].value * 0.5) * left;
+    }
+    p.gold += gold; p.dirtyMe = true; p.dirtyInv = true;
+    this.send(p, { t: 'chat', from: null, lvl: 0, m: `⚓ Les bases et l’artisanat ont disparu de l’archipel : vos constructions et vos matériaux ont été revendus (+${gold} doublons)${r.items.length ? ', le contenu de votre coffre vous est rendu' : ''}.`, kind: 'sys', pid: 0 });
   }
   exportHome(key) {
     const h = this.homeOf(key);
@@ -2251,13 +2260,17 @@ export class Game {
     if (k < 0) k = this.world.plots.findIndex((pl) => !this.homes.has(pl.k));
     if (k < 0) return;
     const storage = new Array(HOME_STORE).fill(null);
-    if (Array.isArray(d.storage)) d.storage.slice(0, HOME_STORE).forEach((c, j) => { if (c && ITEMS[c.id]) storage[j] = { id: c.id, n: Math.max(1, Math.min(STACK_MAX, c.n | 0)) }; });
+    let refund = 0;
+    if (Array.isArray(d.storage)) d.storage.slice(0, HOME_STORE).forEach((c, j) => { if (!c) return; if (ITEMS[c.id] && !ITEMS[c.id].quest) storage[j] = { id: c.id, n: Math.max(1, Math.min(STACK_MAX, c.n | 0)) }; else refund += (LEGACY_VALUE[c.id] || QUEST_ITEM_OLD_VALUE[c.id] || 0) * (c.n | 0); });
+    for (const [type] of [...(d.s || []), ...(d.f || [])]) if (!STRUCTS[type] && LEGACY_STRUCT[type]) refund += LEGACY_VALUE[LEGACY_STRUCT[type]] || 0;
+    if (refund) this.addRefund(key, refund);
     this.homes.set(k, { k, key, name, storage, lock: Math.max(0, Math.min(2, d.lock | 0)), count: 0, burgledAt: 0 });
     const r = this.world.rooms[this.world.plots[k].room];
     const add = [], addf = [];
     for (const [type, dx, dy, t] of d.s || []) { const def = STRUCTS[type]; if (!def || def.floor) continue; const tx = r.x0 + (dx | 0), ty = r.y0 + (dy | 0); if (tx < r.x0 || ty < r.y0 || tx >= r.x0 + r.w || ty >= r.y0 + r.h) continue; if (this.addStruct(key, type, tx, ty, def.planter ? { t: t || Date.now() } : {}, false, k)) add.push(this.structEntry(this.structs.get(ty * this.world.W + tx))); }
     for (const [type, dx, dy] of d.f || []) { const def = STRUCTS[type]; if (!def || !def.floor) continue; const tx = r.x0 + (dx | 0), ty = r.y0 + (dy | 0); if (this.addStruct(key, type, tx, ty, {}, false, k)) addf.push([type, tx, ty]); }
     this.broadcastAll({ t: 'st', a: add, af: addf });
+    this.freeChest(k);
     this.broadcastHomes();
   }
   removeHome(key) {
@@ -2362,14 +2375,10 @@ export class Game {
     if (Math.hypot(tx * TILE + 8 - p.x, ty * TILE + 10 - p.y) > 96) return this.toast(p, 'Trop loin.', 'warn');
     const base = this.bases.get(p.key);
     if (st.type === 'coffre' && st.home != null) { const h = this.homes.get(st.home); const others = [...this.structs.values()].filter((o) => o.home === st.home && o.type === 'coffre').length; if (h && others <= 1 && h.storage.some(Boolean)) return this.toast(p, 'Videz d’abord votre coffre.', 'warn'); }
-    if (st.type === 'pavillon') {
-      if (base && base.count > 1) return this.toast(p, 'Démontez d’abord le reste de votre base.', 'warn');
-      if (base && base.storage.some(Boolean)) return this.toast(p, 'Videz d’abord votre coffre.', 'warn');
-    }
+    if (st.data && st.data.free) return this.toast(p, 'Ce coffre fait partie de la maison.', 'info');
     this.removeStruct(i, floor);
     this.giveOrDrop(p, STRUCTS[st.type].item, 1);
     if (st.type === 'lit' && p.respawnAt && p.respawnAt.tx === tx && p.respawnAt.ty === ty) p.respawnAt = null;
-    if (st.type === 'pavillon') { this.bases.delete(p.key); this.broadcastAll({ t: 'st', rb: [p.name] }); }
   }
   structInteract(p, tx, ty) {
     const W = this.world, st = this.structs.get(ty * W.W + tx);
@@ -2386,13 +2395,13 @@ export class Game {
       p.respawnAt = { tx, ty }; p.hp = p.stats.maxHp; p.dirtyMe = true;
       return this.toast(p, 'Vous vous reposez. Vous réapparaîtrez ici.', 'quest');
     }
-    if (st.type === 'coffre') { if (!mine) return this.toast(p, 'Ce coffre est verrouillé.', 'warn'); p.store = st.home != null ? { home: st.home } : { base: 1 }; return this.chestAction(p, 'open', 0); }
+    if (st.type === 'coffre') { if (!mine || st.home == null) return this.toast(p, 'Ce coffre est verrouillé.', 'warn'); p.store = { home: st.home }; return this.chestAction(p, 'open', 0); }
     if (st.type === 'jardiniere') {
       const ready = Date.now() - (st.data.t || 0) >= PLANTER_GROW * 1000;
       if (!ready) return this.toast(p, `Ça pousse… encore ${Math.ceil((PLANTER_GROW * 1000 - (Date.now() - st.data.t)) / 60000)} min.`, 'info');
       st.data.t = Date.now();
-      const got = [['baies', Math.floor(rand(2, 5))], ['herbes', Math.floor(rand(0, 3))]];
-      if (Math.random() < 0.4) got.push(['banane', 1]);
+      const got = [['banane', Math.floor(rand(1, 4))], ['baies', Math.floor(rand(1, 4))]];
+      if (Math.random() < 0.4) got.push(['noix_coco', 1]);
       for (const [id, n] of got) if (n > 0) this.giveOrDrop(p, id, n);
       this.send(p, { t: 'gather', got: got.filter(([, n]) => n > 0) });
       this.broadcastAll({ t: 'st', a: [this.structEntry(st)] });
@@ -2403,12 +2412,11 @@ export class Game {
     if (p.dead) return;
     const homeK = p.store && p.store.home != null ? p.store.home : null;
     const h = homeK != null ? this.homes.get(homeK) : null;
-    const base = homeK == null ? this.bases.get(p.key) : null;
-    if ((homeK != null && (!h || h.key !== p.key)) || (homeK == null && !base)) return;
+    if (!h || h.key !== p.key) return;
     let near = false;
     for (const st of this.structs.values()) if (st.type === 'coffre' && st.owner === p.key && (st.home ?? null) === homeK && Math.hypot(st.x - p.x, st.y - p.y) < 48) near = true;
     if (!near) return;
-    const S = h ? h.storage : base.storage;
+    const S = h.storage;
     if (a === 'put') {
       const it = p.inv[slot];
       if (!it || ITEMS[it.id].quest || this.boatInUse(p, it.id)) return;
@@ -2449,17 +2457,7 @@ export class Game {
       f: [...this.floors.values()].filter((f) => f.owner === key).map((f) => [f.type, f.tx, f.ty]),
     };
   }
-  importBase(key, name, d) {
-    if (!d || this.bases.has(key) || typeof d.tx !== 'number') return;
-    for (const b of this.bases.values()) if (Math.hypot(b.tx - d.tx, b.ty - d.ty) < CLAIM_R * 2 + 2) return;
-    const storage = new Array(24).fill(null);
-    if (Array.isArray(d.storage)) d.storage.slice(0, 24).forEach((c, k) => { if (c && ITEMS[c.id]) storage[k] = { id: c.id, n: Math.max(1, Math.min(STACK_MAX, c.n | 0)) }; });
-    this.bases.set(key, { key, name, tx: d.tx | 0, ty: d.ty | 0, storage, count: 0 });
-    const add = [], addf = [];
-    for (const [type, tx, ty, t] of d.s || []) if (STRUCTS[type] && !STRUCTS[type].floor && this.addStruct(key, type, tx | 0, ty | 0, STRUCTS[type].planter ? { t: t || Date.now() } : {}, false)) add.push(this.structEntry(this.structs.get((ty | 0) * this.world.W + (tx | 0))));
-    for (const [type, tx, ty] of d.f || []) if (STRUCTS[type] && STRUCTS[type].floor && this.addStruct(key, type, tx | 0, ty | 0, {}, false)) addf.push([type, tx, ty]);
-    this.broadcastAll({ t: 'st', a: add, af: addf, b: [[name, d.tx, d.ty, 0]] });
-  }
+  importBase(key, name, d) { this.refundBase(key, d); } // 0.8 : les bases ont disparu
   removeBase(key) {
     const b = this.bases.get(key);
     if (!b) return;
@@ -2469,12 +2467,13 @@ export class Game {
     this.bases.delete(key);
     this.broadcastAll({ t: 'st', r, rb: [b.name] });
   }
-  exportWorld() { return { v: 1, bases: [...this.bases.values()].map((b) => ({ ...this.exportBase(b.key), key: b.key, name: b.name })), homes: [...this.homes.values()].map((h) => ({ ...this.exportHome(h.key), key: h.key, name: h.name })) }; }
+  exportWorld() { return { v: 2, bases: [], homes: [...this.homes.values()].map((h) => ({ ...this.exportHome(h.key), key: h.key, name: h.name })), refunds: [...this.refunds].map(([key, r]) => [key, r.gold, r.items]) }; }
   importWorld(w) {
-    if (!w || !Array.isArray(w.bases)) return;
-    for (const b of w.bases) this.importBase(b.key, b.name, b);
+    if (!w) return;
+    for (const b of w.bases || []) this.refundBase(b.key, b);
     for (const h of w.homes || []) this.importHome(h.key, h.name, h);
-    this.log(`[monde] ${this.bases.size} base(s) chargée(s)`);
+    for (const [key, gold, items] of w.refunds || []) this.addRefund(key, gold | 0, Array.isArray(items) ? items.filter((it) => it && ITEMS[it.id]) : []);
+    this.log(`[monde] ${this.homes.size} maison(s) chargée(s), ${this.refunds.size} remboursement(s) en attente`);
   }
 
   // ------------------------------------------------------------ boucle
@@ -2512,7 +2511,6 @@ export class Game {
       if (p.gold >= 1000 && !p.ach.riche) this.unlock(p, 'riche');
     }
     if (this.tickCount % 10 === 0) this.updateInvasion(f);
-    if (this.tickCount % 5 === 0) this.updateTurrets();
     if (this.tickCount % 10 === 0) { this.updateDots(); this.updateClouds(); }
     if (this.tickCount % 5 === 0) { this.updateSeals(); this.updateBurglars(); }
     if (this.tickCount % 10 === 0) this.updateKraken();
