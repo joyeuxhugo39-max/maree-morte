@@ -22,6 +22,8 @@ import { volcanoGen, makePuffs, makeSplats } from './sprites-volcan.js';
 import './sprites-08.js';
 import { raceCourse } from '../../shared/data/seasons.js';
 import { mountSheet } from './sprites-mounts.js';
+import { shipRender } from './ships.js'; // 1.1 : les vrais navires
+import { BERTHS, berthPos, MOB_SHIP } from '../../shared/data/ships.js';
 
 const TAU = Math.PI * 2;
 const TREES = new Set(['tree', 'jtree', 'palm', 'deadtree']);
@@ -208,7 +210,7 @@ export class Renderer {
     const room = G.player && G.room >= 0 ? this.world.rooms[G.room] : null;
     this.room = room;
     // dans une petite pièce, on se rapproche un peu
-    const boost = room && this.lastW ? Math.max(0, Math.min(1, Math.floor(Math.min(this.lastW / ((room.w + 2) * TILE), this.lastH / ((room.h + 3) * TILE))) - this.baseScale)) : 0;
+    const boost = room && this.lastW ? Math.max(0, Math.min(1, Math.floor(Math.min(this.lastW / ((room.w + 2) * TILE), this.lastH / ((room.h + 3) * TILE))) - this.baseScale)) : (G.player && G.player.ship && this.baseScale >= 3 ? -1 : 0); // 1.1 : en mer, on voit plus loin
     if (boost !== (this.boost || 0)) { this.boost = boost; this.resize(this.lastW, this.lastH); return; }
     let minX = 0, maxX = MAP_W * TILE - W, minY = 0, maxY = OVER_H * TILE - H, rx0 = 0, ry0 = 0, rx1 = 0, ry1 = 0;
     if (room) {
@@ -255,6 +257,7 @@ export class Renderer {
     for (const p of props) if (p.ground && !depl(p)) ctx.drawImage(p.spr.cv, Math.round(p.x - p.spr.ax - camX), Math.round(p.y - p.spr.ay - camY));
     this.drawGroundMarks(ctx, G, camX, camY, now);
     this.drawSeaFx(ctx, G, camX, camY, now);
+    if (!room) this.drawShipsBase(ctx, G, camX, camY, now, dt); // 1.1 : les navires (coque, pont)
     // objets tombés au sol
     for (const e of G.ents.values()) if (e.k === 'd') this.drawDrop(ctx, e, camX, camY, now, G);
     // télégraphes
@@ -290,11 +293,12 @@ export class Renderer {
     for (const e of G.ents.values()) if (e.k === 'p' && e.petObj && !e.petObj.hidden) draw.push({ y: e.petObj.y, pet: e.petObj });
     for (const f of G.folk || []) if (!f.hidden && f.x > camX - 30 && f.x < camX + W + 30 && f.y > camY - 30 && f.y < camY + H + 40) draw.push({ y: f.y, e: f });
     for (const c of G.cats || []) if (c.x > camX - 20 && c.x < camX + W + 20 && c.y > camY - 20 && c.y < camY + H + 20) draw.push({ y: c.y, c });
+    if (!room) for (const b of BERTHS) { const [bx, by] = berthPos(b); if (bx > camX - 30 && bx < camX + W + 30 && by > camY - 30 && by < camY + H + 40) draw.push({ y: by, bt: b }); } // 1.1 : les bittes d'amarrage
     draw.sort((a, b) => a.y - b.y);
     // ombres
     ctx.fillStyle = 'rgba(20,12,34,0.28)';
     for (const d of draw) {
-      if (d.st) continue;
+      if (d.st || d.bt) continue;
       if (d.p) {
         const s = d.p.spr;
         if (d.p.type === 'ship' || d.p.type === 'wreck' || d.p.type === 'lighthouse' || d.p.type === 'boat' || d.p.type === 'volcan') continue;
@@ -306,8 +310,7 @@ export class Renderer {
       } else {
         const o = d.e || d.n;
         if (o.k === 'd' || (o.dyingT && now - o.dyingT > 0.4) || isSea(o)) continue;
-        if (o === G.player ? G.player.boat : (o.flags & 16)) continue;
-        if (this.inWater(o.x, o.y)) continue;
+        if (this.inWater(o.x, o.y) && !(o === G.player ? G.player.ship : (o.k === 'p' && (o.flags & 16)))) continue;
         const big = o.sheet && o.sheet.fw > FW ? 2 : 1;
         ctx.beginPath(); ctx.ellipse(o.x - camX, o.y - camY - 1, 6 * big, 2.5 * big, 0, 0, TAU); ctx.fill();
       }
@@ -319,8 +322,10 @@ export class Renderer {
       else if (d.c) this.drawCat(ctx, d.c, camX, camY, now);
       else if (d.pet) this.drawPet(ctx, d.pet, camX, camY, now);
       else if (d.n) this.drawNpc(ctx, d.n, camX, camY, now, G);
+      else if (d.bt) this.drawBerth(ctx, d.bt, camX, camY, now);
       else this.drawEntity(ctx, d.e, camX, camY, now, G);
     }
+    if (!room) this.drawShipsTop(ctx, G, camX, camY, now); // 1.1 : mâture et voiles, au-dessus de tout
 
     this.drawFishing(ctx, G, camX, camY, now);
     this.drawFx(ctx, camX, camY, now, dt);
@@ -674,6 +679,11 @@ export class Renderer {
     return c;
   }
   drawAlly(ctx, e, camX, camY, now, G) {
+    if (!e.sink) { // 1.1 : les navires alliés, eux aussi de vrais navires
+      const red = (e.name || '').includes('Mouette');
+      if (!e.capSheet) e.capSheet = humanSheet((red ? NPCS.morgane : NPCS.elouan).look);
+      return this.drawNpcShip(ctx, e, 'sloop', red ? 'brick' : 'sloop', camX, camY, now, G, e.capSheet);
+    }
     const dir = e.dir & 3, fr = this.boats.sloop[dir][0];
     const sink = e.sinkT ? Math.min(1, (now - e.sinkT) / 2.0) : 0;
     const X = Math.round(e.x - camX), Y = Math.round(e.y - camY), bob = Math.round(Math.sin(now * 2.2 + e.id) * 0.8);
@@ -820,7 +830,14 @@ export class Renderer {
     }
   }
   drawShip(ctx, e, camX, camY, now, G) {
-    const def = MOBS[e.type], sd = def.ship, dir = e.dir & 3, set = this.boats[SHIP_SET[sd.sail] || 'noir'], fr = set[dir][0];
+    const def = MOBS[e.type], sd = def.ship;
+    if (!this.crewSheet) this.crewSheet = mobSheet('zsailor');
+    if (MOB_SHIP[sd.sail]) { // 1.1 : le même navire que ceux des pirates, mené par des noyés
+      const [kind, pal] = MOB_SHIP[sd.sail];
+      if (sd.sail === 'ghost' && !e.dyingT) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.3 + Math.sin(now * 4) * 0.08; ctx.drawImage(this.glows.green, Math.round(e.x - camX) - 90, Math.round(e.y - camY) - 70, 180, 110); ctx.restore(); }
+      return this.drawNpcShip(ctx, e, kind, pal, camX, camY, now, G, this.crewSheet);
+    }
+    const dir = e.dir & 3, set = this.boats[SHIP_SET[sd.sail] || 'noir'], fr = set[dir][0];
     const sc = sd.scale || 1, X = Math.round(e.x - camX), Y = Math.round(e.y - camY);
     const sink = e.dyingT ? Math.min(1, (now - e.dyingT) / 2.2) : 0;
     const bob = Math.round(Math.sin(now * 2 + e.id) * 0.8);
@@ -850,8 +867,6 @@ export class Renderer {
     if (e.type === 'tentacule') return this.drawTentacleMob(ctx, e, camX, camY, now, G);
     const sh = this.sheetOf(e);
     if (!sh) return;
-    const boat = e === G.player ? (G.player.boat && ITEMS[G.player.boat] && ITEMS[G.player.boat].boat ? ITEMS[G.player.boat].boat.kind : null) : ((e.flags & 16) && e.bt ? e.bt : null);
-    if (boat && e.k === 'p') return this.drawBoat(ctx, e, boat, sh, camX, camY, now);
     const ride = e.k === 'p' && !e.dyingT ? (e === G.player ? (G.me && G.me.ride) : e.rd) : null;
     if (ride && !(e.rollT && now - e.rollT < 0.3)) return this.drawRider(ctx, e, ride, sh, camX, camY, now, G);
     let dir = e.dir & 3, frame = 0;
@@ -885,8 +900,7 @@ export class Renderer {
       if (e.leap) { const lk = (now - e.leap.t0) / e.leap.dur; if (lk < 1) y -= Math.round(Math.sin(lk * Math.PI) * 30); else { e.leap = null; this.shake(3, 0.2); this.smoke(e.x, e.y, 8, 'rgba(200,180,150,0.55)', { size: 3 }); } }
       if (e.dashT && now > e.dashT && now < e.dashT + 0.7 && e.moving && rnd() < 0.8) this.smoke(e.x, e.y, 1, 'rgba(220,200,160,0.5)', { size: 2, life: 0.4 });
     }
-    const onDeck = e.k === 'p' && (e === G.player ? G.me && G.me.ab : e.ab); // 1.0 : un canonnier sur le pont d'un compagnon
-    if (onDeck) y -= 7;
+    const onDeck = e.k === 'p' && (e === G.player ? !!G.player.ship : !!(e.flags & 16)); // 1.1 : sur le pont d'un navire
     const water = !onDeck && this.inWater(e.x, e.y);
     const cut = Math.max(sit, water ? (sh.fw > FW ? 8 : 5) : 0);
     ctx.save();
@@ -1509,6 +1523,7 @@ export class Renderer {
     if (!room) for (const fo of G.folk || []) if (fo.lantern && !fo.hidden && fo.x > camX - 80 && fo.x < camX + W + 80 && fo.y > camY - 80 && fo.y < camY + H + 80) { cut(fo.x + 5, fo.y - 12, 56, 1); vis.push([{ x: fo.x + 5, y: fo.y - 12, r: 50, c: 'warm', flicker: 1 }, 1 + Math.sin(now * 8 + fo.x) * 0.05]); }
     if (!room && dark > 0.2) for (const g of this.garlands) if (g.x1 > camX && g.x0 < camX + W && g.y1 > camY && g.y0 < camY + H) cut((g.x0 + g.x1) / 2, (g.y0 + g.y1) / 2 + 4, (g.x1 - g.x0) * 0.55, 0.45);
     for (const p of this.projs.values()) cut(p.x, p.y, 16, 0.8);
+    if (!room) for (const [lx, ly] of this.shipLights(G)) if (lx > camX - 90 && lx < camX + W + 90 && ly > camY - 90 && ly < camY + H + 90) { const fl = 1 + Math.sin(now * 9 + lx) * 0.05; cut(lx, ly, 62 * fl, 1); vis.push([{ x: lx, y: ly, r: 52, c: 'warm', flicker: 1 }, fl]); } // 1.1 : les fanaux des navires
     for (const fx of this.fx) if (fx.kind === 'boom' || fx.kind === 'flash') cut(fx.x, fx.y, (fx.r || 30) * 2.2, Math.max(0, 1 - (now - fx.t0) / fx.dur));
     // faisceau du phare
     const LH = room ? null : this.lighthouse;
@@ -1603,7 +1618,7 @@ export class Renderer {
       if (e.type === 'tentacule') { if (e.hp < 100) this.hpBar(ctx, x, Math.round(e.y - camY) - 58, 18, e.hp / 100, '#e04a3a'); continue; }
       const sh = e.sheet;
       const riding = e.k === 'p' && (e === G.player ? G.me && G.me.ride : e.rd);
-      const top = Math.round(e.y - camY - (sh ? sh.ay : 26) + (e.type === 'boss' ? 4 : 2) + (e.k === 'p' && (e === G.player ? G.player.boat : (e.flags & 16)) ? 5 : 0) - (riding ? 12 : 0));
+      const top = Math.round(e.y - camY - (sh ? sh.ay : 26) + (e.type === 'boss' ? 4 : 2) - (riding ? 12 : 0));
       if (e.k === 'p') {
         const me = e === G.player;
         const mate = !me && G.ui.inGroup(e.id); // 1.0 : les compagnons de groupe en vert, le sigle d'équipage à droite du nom
@@ -1855,3 +1870,4 @@ export function dirFromAngle(a) {
   const c = Math.cos(a), s = Math.sin(a);
   return Math.abs(c) > Math.abs(s) ? (c < 0 ? 1 : 2) : (s < 0 ? 3 : 0);
 }
+Object.assign(Renderer.prototype, shipRender); // 1.1 : les navires (client/render/ships.js)

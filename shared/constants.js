@@ -2,8 +2,8 @@ import { hash2 } from './rng.js';
 
 export const TILE = 16;
 // 1.0 : versions — le client et le serveur doivent parler le même protocole ; les sauvegardes portent leur version
-export const GAME_VERSION = '1.0.0';
-export const PROTOCOL = 10;
+export const GAME_VERSION = '1.1.0';
+export const PROTOCOL = 11;
 export const SAVE_VERSION = 10;
 // 1.0 : la brume de la carte — ce que chaque pirate a vu, par carrés de 8 cases
 export const SEEN_CELL = 8;

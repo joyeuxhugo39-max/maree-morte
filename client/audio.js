@@ -153,6 +153,9 @@ export class Sfx {
       case 'summon': this.tone(110, 0.6, { type: 'sawtooth', vol: 0.06 * v, slide: 0.5 }); this.hiss(0.5, { f: 300, vol: 0.12 * v, slide: 2 }); break;
       case 'door': this.tone(240, 0.22, { type: 'sawtooth', vol: 0.035 * v, slide: 0.6 }); this.hiss(0.14, { f: 500, q: 0.6, vol: 0.16 * v, delay: 0.16, type: 'lowpass' }); break;
       case 'deny': this.tone(180, 0.12, { type: 'square', vol: 0.06 * v }); break;
+      case 'chain': for (let k = 0; k < 14; k++) { this.tone(1500 + Math.random() * 900, 0.03, { type: 'square', vol: 0.025 * v, delay: k * 0.06 }); this.hiss(0.04, { f: 3800, q: 2, vol: 0.05 * v, delay: k * 0.06 }); } break; // 1.1 : la chaîne d'ancre
+      case 'creak': this.tone(70 + Math.random() * 30, 0.5, { type: 'sawtooth', vol: 0.018 * v, attack: 0.12, slide: 1.25 }); this.hiss(0.45, { f: 320, q: 6, vol: 0.05 * v, slide: 1.4 }); break; // le bois qui travaille
+      case 'flap': [0, 0.09, 0.2].forEach((d) => this.hiss(0.12, { f: 700, q: 0.7, vol: 0.12 * v, delay: d, type: 'lowpass' })); break; // la toile qui claque
       case 'splash': this.hiss(0.35, { f: 1200, q: 0.6, vol: 0.2 * v, slide: 0.4 }); this.tone(500, 0.12, { type: 'sine', vol: 0.05 * v, slide: 2 }); break;
       case 'bite': this.tone(880, 0.08, { vol: 0.08 * v }); this.tone(1175, 0.12, { vol: 0.08 * v, delay: 0.08 }); this.hiss(0.2, { f: 1500, vol: 0.12 * v }); break;
       case 'reel': [0, 0.05, 0.1, 0.15].forEach((d) => this.tone(1400 + d * 2000, 0.03, { vol: 0.04 * v, delay: d })); break;

@@ -25,6 +25,35 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Nouveautés de la version 1.1 : de vrais navires
+
+Les navires ne sont plus des montures qu'on met à l'eau n'importe où : ce sont de vrais navires, qui restent
+dans le monde, sur lesquels on marche, et qu'on mène à plusieurs.
+
+- **On arme son navire au port**, et seulement là. Chaque port a son quai d'armement, marqué d'une bitte d'amarrage ⚓ : Port-Lanterne, la Rade, Havre-des-Brumes, Anse-Tranquille et deux à Libertalia. On peut aussi passer par un charpentier de marine. Le navire apparaît amarré, ancre au fond, voiles ferlées, la passerelle posée sur le quai. Chaque pirate n'a qu'un navire armé à la fois.
+- **On monte à bord à pied.** On passe par la passerelle, ou par l'ouverture du bastingage depuis une plage ou des hauts-fonds. Sur le pont, on marche librement autour des mâts, de la barre et des canons. On descend de la même façon, vers un quai, une plage ou des hauts-fonds tout proches.
+- **Les postes** se tiennent avec E :
+  - la **barre** : Q et D tournent la roue, qui reste où on la laisse ;
+  - les **drisses** du grand mât : Z déploie la voilure, S la cargue ;
+  - le **cabestan** : S jette l'ancre, Z tenu la lève, plus vite à plusieurs ;
+  - les **canons** de chaque bord : on vise à la souris dans l'arc du sabord, et l'on recharge.
+- **Un navire lourd.**
+  - Il prend son erre lentement : quelques secondes pour un sloop, bien plus pour un galion.
+  - Il lui faut de la vitesse pour gouverner, il vire large et dérive dans les virages. Ancre au fond et lancé, il pivote sur elle.
+  - **Le vent compte** : il tourne lentement, s'affiche sur le tableau de bord et dans le pavillon. Vent arrière, on file ; face au vent, on avance moitié moins vite.
+  - On talonne les rochers et l'on s'écrase sur la côte, et la coque en souffre. Échoué, on cargue la voile et l'équipage déborde le navire à la gaffe.
+- **Il paraît vrai.**
+  - Coque et pont sont vus de dessus dans tous les caps, avec le franc-bord qui dépasse.
+  - La mâture et les voiles sont en perspective. Les voiles se gonflent au vent arrière, se plaquent au mât et faseyent face au vent, et leurs vergues sont brassées.
+  - La mâture gîte dans les virages et roule à la houle.
+  - Il laisse un sillage en V, de l'écume à l'étrave, et des fanaux allumés la nuit.
+  - Les canons reculent, l'ancre descend dans une gerbe d'écume, et un tableau de bord donne coque, barre, voilure, ancre, vent et nœuds.
+- **Il reste dans le monde.** Il reste où on l'a laissé, ou part à la dérive si l'on est descendu voiles dehors ! On le retrouve sur la carte, il est sauvegardé avec son propriétaire, et on le reprend à la reconnexion, sur son pont. Vide et son propriétaire parti, il rentre au port au bout de dix minutes.
+- **À l'abordage.** Le groupe et l'équipage du propriétaire montent à bord. Les autres pirates aussi, mais seulement quand le JcJ le permet entre eux.
+- **Les coups** : les boulets frappent les coques (la sienne est épargnée), et un pirate touché sur le pont voit sa coque encaisser l'essentiel. Coque à zéro, le navire sombre et l'équipage regagne la côte à la nage.
+- **Les navires ennemis et alliés** (Brick des Noyés, Frégate maudite, Galion Fantôme, navires du Kraken) sont dessinés de la même façon. On vise leur vraie coque.
+- **Le reste** : on plonge depuis le pont (l'ancre est jetée d'office) et l'on remonte sur son pont. On pêche depuis le pont. Le tourbillon du Kraken aspire les navires, et ses tentacules les retiennent.
+
 ## Nouveautés de la version 1.0
 
 Une page de présentation publique accompagne le jeu : `docs/accueil.html` (sur GitHub Pages,
@@ -260,7 +289,9 @@ les garder. Le `Dockerfile` permet aussi un déploiement sur n'importe quel serv
 | Clic droit ou 1 | tirer |
 | 2 à 5 | émotes : danse, salut, doigt d'honneur, salto |
 | Espace | roulade |
-| E | parler, ouvrir, ramasser, creuser, fouiller, entrer, mettre à l'eau, accoster, monter à bord, plonger, tirer un levier |
+| E | parler, ouvrir, ramasser, creuser, fouiller, entrer, armer un navire (à la bitte d'amarrage), tenir ou quitter un poste du navire, plonger, tirer un levier |
+| Q / D | à la barre : tourner la roue |
+| Z / S | aux drisses : déployer, carguer la voilure · au cabestan : lever (tenir Z), jeter l'ancre (S) |
 | Molette | zoomer, dézoomer |
 | C | monter sur sa monture, en descendre |
 | P | compagnons : groupe, amis, équipage, honneur, saison, échanges |
@@ -287,7 +318,8 @@ server/
   events.js        grandes invasions annoncées
   arena.js         la Fosse, duels et paris
   tavern.js        mini-jeux de taverne
-  naval.js         navires partagés, coques
+  naval.js         coques, chantier naval
+  ships.js         les navires (1.1) : armement à quai, physique, pont, postes, canons, naufrage
   dungeon.js       le Bastion Englouti
   sea.js           plongée et air
   seasons.js       concours de pêche, Grand Tour, podiums
@@ -302,6 +334,7 @@ client/
   social-ui.js     chat, compagnons, échanges
   tavern-ui.js     mini-jeux de taverne
   townsfolk.js     habitants des villes
+  render/ships.js  le dessin des navires (coque, pont, mâture, voiles, sillage)
   scene.js         dialogues cinématiques (portraits, répliques, questions au choix)
   cine.js          cinématiques des boss
   render/          moteur de rendu et pixel art procédural (sprites-volcan.js : la montagne ; sprites-cite.js : Libertalia)

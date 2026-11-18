@@ -69,7 +69,7 @@ Object.assign(NPCS, {
     greet: ['La mer, ça se mérite. Et ça se rame.', 'Une barque, matelot ? Elle ne coule presque plus.', "Le vent tourne à l'est. Bon signe pour Havre-des-Brumes."],
     shop: ['barque', 'canne_peche', 'bandage', 'cloche_plongee'],
     topics: [
-      { q: 'Comment naviguer ?', a: "Achète-moi une barque. Sur un quai ou une plage, face à l'eau, appuie sur E pour la mettre à l'eau. Pour accoster, longe le rivage et appuie de nouveau sur E. À bord, pas de sabre : seulement le pistolet." },
+      { q: 'Comment naviguer ?', a: "Achète-moi une barque, puis arme-la à la bitte d'amarrage, au bout du quai : elle t'attendra amarrée, ancre au fond. Monte par la passerelle. Au cabestan, lève l'ancre (Z, et tiens bon). Au mât, déploie la voile (Z). À la barre, tourne la roue avec Q et D — elle reste où tu la laisses, et il faut de l'erre pour gouverner. Vent arrière, tu files ; face au vent, tu peines. Pour descendre, jette l'ancre près d'un quai ou d'une plage et passe par la passerelle." },
       { q: 'Où aller ?', a: "Plein est, Havre-des-Brumes : un village de pêcheurs, à l'abri des morts. Au sud-est, l'Île au Crâne : n'y va pas sans un bon sabre. Et quelques îlots perdus, ici et là, que personne n'a fouillés depuis longtemps." },
       { q: 'Et les autres pirates ?', a: "Hors des villes, personne ne te protège : ni des morts, ni des vivants. Un pirate peut en attaquer un autre partout, sauf à Port-Lanterne, à Havre-des-Brumes et dans les maisons. Celui qui tombe perd une part de son or." },
     ],

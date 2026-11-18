@@ -16,6 +16,7 @@ import { humanSheet, SKINS, HAIRS, CLOTH, CLOTH_KEYS, FW, FH, mobSheet, portrait
 import { MINI_COL } from './render/terrain.js';
 import { social } from './social-ui.js';
 import { tavernUI } from './tavern-ui.js';
+import { KNOT, windName, BERTHS, berthPos } from '../shared/data/ships.js';
 import { PLACES, REP_LEVELS, repLevel, placeOf, buyPrice, sellPrice, taxOf, discountOf } from '../shared/data/places.js';
 
 const $ = (id) => document.getElementById(id);
@@ -158,6 +159,7 @@ export class UI {
     }
   }
   update(now) {
+    this.updateShipHud(now);
     const G = this.G, me = G.me;
     if (!me) return;
     if (now - (this.lastHud || 0) > 0.08) {
@@ -189,8 +191,6 @@ export class UI {
       if (me.cry > 0) buffs.push(`⚔ Abordage ${Math.ceil(me.cry - (now - G.meAt))}s`);
       if (me.drunk > 0) buffs.push(`🍾 Ivre ${Math.max(0, Math.ceil(me.drunk - (now - G.meAt)))}s`);
       if (G.zone === Z.TOWN) buffs.push('🔥 Flamme Bénite');
-      if (G.player && G.player.boat) buffs.push(`⛵ ${(ITEMS[G.player.boat] && ITEMS[G.player.boat].name) || 'Barque'}${me.hullMax ? ` — coque ${me.hull}/${me.hullMax}` : ''}${me.crewN ? ` — ${me.crewN} canonnier${me.crewN > 1 ? 's' : ''}` : ''}`);
-      else if (me.ab) buffs.push(`⚓ Canonnier à bord${me.hullMax ? ` — coque ${me.hull}/${me.hullMax}` : ''} (clic droit : bordée)`);
       if (me.ride) buffs.push('🐎 En selle (C pour descendre)');
       const BN = { spd: '💨 Célérité', atk: '💪 Force du taureau', def: '🛡 Tonique de fer', chant: '🎶 Entrain' };
       for (const [k, s] of me.bf || []) { const left = Math.max(0, Math.ceil(s - (now - G.meAt))); if (left > 0) buffs.push(`${BN[k] || k} ${left}s`); }
@@ -364,7 +364,7 @@ export class UI {
       this.hk[id].querySelector('.ic').src = it ? iconURL(it.icon, it.tint) : iconURL(id === 'slash' ? 'sk_fists' : 'sk_shot');
       this.hk[id].classList.toggle('empty', !it);
     }
-    const boat = G.player && G.player.boat && ITEMS[G.player.boat] && ITEMS[G.player.boat].boat;
+    const boat = null;
     for (const id of HOTBAR) {
       const el = this.hk[id], s = SKILLS[id];
       if (!el) continue;
@@ -759,6 +759,7 @@ export class UI {
       ch.push({ label: '🏆 Le classement de la semaine', go: () => { this.arenaBoardAsk = npcId; this.G.send({ t: 'arena', a: 'board' }); } });
       ch.push({ label: '🤺 Comment défier un pirate ?', go: () => this.say("Approchez-vous de lui ici même, dans la Fosse, et appuyez sur E : vous pourrez le défier en duel, avec ou sans mise. Les gradins parient sur le vainqueur — la maison garde cinq pour cent. On ne meurt pas dans ma Fosse : on finit dans les gradins.", [{ label: 'Autre chose…', go: () => this.dialogMain(npcId) }, { label: 'Au revoir.', go: () => this.close() }]) });
     }
+    if (N.repair || (N.shop || []).some((i) => ITEMS[i] && ITEMS[i].boat)) ch.push({ label: '⛵ Armer un navire (il vous attendra à quai)', cls: 'q', go: () => this.openBerth({ name: N.name, title: 'Charpentier de marine' }) }); // 1.1
     if (this.G.me && this.G.me.repairCost > 0 && (N.repair || (N.shop || []).some((i) => ITEMS[i] && ITEMS[i].boat))) ch.push({ label: `⚓ Réparer les coques (${this.G.me.repairCost} doublons)`, cls: 'q', go: () => { this.G.send({ t: 'repair' }); this.close(); } }); // 1.0
     if (N.bail && this.G.me && this.G.me.jail > 0) ch.push({ label: `🔑 Payer la caution (${this.G.me.bail} doublons)`, cls: 'q', go: () => { this.G.send({ t: 'bail' }); this.close(); } });
     if (npcId === 'isa') ch.push({ label: '⚒ Renforcer mon équipement', go: () => { this.close(); this.show('forge'); } });
@@ -767,6 +768,56 @@ export class UI {
     this.say(greet, ch);
   }
 
+  // ------------------------------------------------------------ 1.1 : armer un navire à quai
+  openBerth(b) {
+    const G = this.G;
+    this.close();
+    this.dialogNpc = null;
+    $('dialog').classList.remove('hidden');
+    $('dlg-name').textContent = b.name; $('dlg-title').textContent = b.title || 'Quai d’armement';
+    const pc = $('dlg-portrait'), x = pc.getContext('2d');
+    x.clearRect(0, 0, pc.width, pc.height); x.fillStyle = '#f2c14a';
+    for (const [rx, ry, w, h] of [[9, 3, 2, 12], [6, 5, 8, 2], [4, 13, 12, 2], [3, 11, 2, 3], [15, 11, 2, 3], [8, 1, 4, 3]]) x.fillRect(rx, ry, w, h);
+    const seen = new Set(), ch = [];
+    for (const s of G.inv || []) {
+      if (!s || !ITEMS[s.id] || !ITEMS[s.id].boat || seen.has(s.id)) continue;
+      seen.add(s.id);
+      const it = ITEMS[s.id], armed = G.myShip && G.myShip.item === s.id;
+      ch.push({ label: `⛵ ${armed ? 'Faire revenir' : 'Armer'} : ${it.name}${it.boat.cannon ? ` (${it.boat.cannon} canon${it.boat.cannon > 1 ? 's' : ''} par bord)` : ''}`, cls: 'q', go: () => { G.send({ t: 'ship', item: s.id }); this.close(); } });
+    }
+    if (G.myShip) ch.push({ label: '⚓ Ranger mon navire au port', go: () => { G.send({ t: 'ship', a: 'stow' }); this.close(); } });
+    ch.push({ label: 'Plus tard.', go: () => this.close() });
+    this.say(seen.size ? 'Une place à quai vous attend. Quel navire armer ? Il apparaîtra amarré, ancre au fond et voiles ferlées ; on y monte à pied, par la passerelle. (Un seul navire à vous dans l’archipel : en armer un autre fait rentrer le premier.)'
+      : 'Vous n’avez pas encore de navire. Les charpentiers de marine en vendent : Corentin, sur le quai de Port-Lanterne, a des barques ; Joseph, des radeaux.', ch);
+  }
+  // le tableau de bord du navire : coque, barre, voilure, ancre, vent et vitesse, et ce que fait le poste tenu
+  updateShipHud(now) {
+    const G = this.G, p = G.player, el = $('shiphud');
+    if (!el) return;
+    const s = p && p.ship ? G.ships.get(p.ship) : null;
+    if (!s || !s.buf || !s.buf.length) { if (!el.classList.contains('hidden')) el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    if (now - (this.shudAt || 0) < 0.1) return;
+    this.shudAt = now;
+    const hm = s.hmax || 1, hull = Math.max(0, s.hull || 0);
+    $('sh-name').textContent = s.name + (s.own && s.own !== p.name ? ` de ${s.own}` : '');
+    $('sh-hull-f').style.width = Math.min(100, hull / hm * 100) + '%'; $('sh-hull-f').className = hull / hm < 0.3 ? 'low' : '';
+    $('sh-hull-t').textContent = `${Math.round(hull)} / ${hm}`;
+    $('sh-wheel-n').style.transform = `rotate(${Math.round((s.rud || 0) * 140)}deg)`;
+    $('sh-sail-f').style.width = Math.round((s.sail || 0) * 100) + '%';
+    const anc = s.anc || 0;
+    $('sh-anchor').textContent = anc >= 200 ? (anc % 100 > 0 ? `remonte ${anc % 100} %` : 'au fond') : anc >= 100 ? 'tombe…' : 'levée';
+    $('sh-anchor').className = anc >= 100 ? 'down' : '';
+    $('sh-wind-a').style.transform = `rotate(${((G.wind && G.wind[0]) || 0).toFixed(2)}rad)`;
+    $('sh-wind-t').textContent = `Vent ${windName((G.wind && G.wind[0]) || 0)}`;
+    $('sh-speed').textContent = `${Math.round((s.sp || 0) / KNOT)} nœuds`;
+    const k = G.post && G.post.k, gi = k && k.startsWith('gun') ? +k.slice(3) : -1, cd = gi >= 0 && G.gunCd ? Math.max(0, (G.gunCd[gi] || 0) - now) : 0;
+    $('sh-hint').textContent = !k ? 'E près d’un poste : la barre, les drisses du grand mât, le cabestan, les canons.'
+      : k === 'helm' ? 'À la barre — Q / D : tourner la roue (elle reste où vous la laissez) · E : quitter'
+      : k === 'sails' ? 'Aux drisses — Z : déployer les voiles · S : les carguer · E : quitter'
+      : k === 'cap' ? 'Au cabestan — Z (tenir) : lever l’ancre, plus vite à plusieurs · S : la jeter · E : quitter'
+      : `Au canon — visez à la souris, clic pour tirer${cd > 0 ? ` · rechargement ${cd.toFixed(1)} s` : ' · prêt !'} · E : quitter`;
+  }
   // ------------------------------------------------------------ boutique
   openShop(npcId) {
     const G = this.G, N = NPCS[npcId];
@@ -1212,6 +1263,9 @@ export class UI {
       x.fillStyle = '#000'; x.fillRect(px - 4, py - 4, 9, 9); x.fillStyle = '#fff'; x.fillRect(px - 3, py - 3, 7, 7); x.fillStyle = '#e03a2a'; x.fillRect(px - 1, py - 1, 3, 3);
     }
     x.font = '600 13px "Pixelify Sans", sans-serif'; x.fillStyle = 'rgba(0,0,0,0.6)'; x.fillText('Vous êtes ici', (at.x / TILE) * S, (at.y / TILE) * S + 18);
+    const ms = G.myShip; // 1.1 : votre navire, où que vous l'ayez laissé
+    if (ms && !(G.player && G.player.ship === ms.id)) { const mx = ms.x / TILE * S, my = ms.y / TILE * S; x.fillStyle = '#1c1426'; x.beginPath(); x.arc(mx, my, 7, 0, Math.PI * 2); x.fill(); x.fillStyle = '#f6e9c6'; x.beginPath(); x.moveTo(mx - 4, my + 2); x.lineTo(mx + 4, my + 2); x.lineTo(mx + 2, my + 4); x.lineTo(mx - 2, my + 4); x.fill(); x.fillRect(mx - 0.5, my - 5, 1, 7); x.beginPath(); x.moveTo(mx + 0.5, my - 5); x.lineTo(mx + 4, my); x.lineTo(mx + 0.5, my); x.fill(); x.fillStyle = 'rgba(0,0,0,0.6)'; x.fillText('Votre navire', mx, my + 18); }
+    x.fillStyle = '#f2c14a'; for (const b of BERTHS) { const [bx, by] = berthPos(b); x.fillText('⚓', bx / TILE * S, by / TILE * S + 5); }
   }
 }
 Object.assign(UI.prototype, social); // 1.0 : la vie en société

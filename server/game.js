@@ -21,7 +21,7 @@ export function migrateSave(d) {
   return d;
 }
 // les champs qu'écrit serialize() : tout autre champ d'une sauvegarde est conservé à part
-const SAVE_KEYS = new Set(['fishRec', 'hulls', 'mem', 'songs', 'rep', 'inf', 'jail', 'hon', 'pvph', 'glory', 'gxp', 'friends', 'blocked', 'tradeLog', 'seen', 'st', 'kc', 'met', 'col', 'tut', 'name', 'look', 'level', 'xp', 'gold', 'hp', 'inv', 'eq', 'quests', 'track', 'chests', 'x', 'y', 'kills', 'upg', 'treasure', 'ach', 'title', 'cnt', 'respawnAt', 'found', 'boat', 'pk', 'caches', 'zs', 'pet', 'home', 'base', 'saved', 'sv', 'held']);
+const SAVE_KEYS = new Set(['ship', 'deck', 'fishRec', 'hulls', 'mem', 'songs', 'rep', 'inf', 'jail', 'hon', 'pvph', 'glory', 'gxp', 'friends', 'blocked', 'tradeLog', 'seen', 'st', 'kc', 'met', 'col', 'tut', 'name', 'look', 'level', 'xp', 'gold', 'hp', 'inv', 'eq', 'quests', 'track', 'chests', 'x', 'y', 'kills', 'upg', 'treasure', 'ach', 'title', 'cnt', 'respawnAt', 'found', 'boat', 'pk', 'caches', 'zs', 'pet', 'home', 'base', 'saved', 'sv', 'held']);
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { STRUCTS, PLANTER_GROW, HOME_OK, HOME_MAX, HOME_PRICE, QUEST_PICK, PROPERTY, HOME_LIMIT, RESALE, plotCategory } from '../shared/data/craft.js';
 import { social } from './social.js';
@@ -30,6 +30,8 @@ import { events } from './events.js';
 import { arena } from './arena.js';
 import { tavern } from './tavern.js';
 import { naval } from './naval.js';
+import { shipsLogic } from './ships.js';
+import { shipOf, mobShipKind, hullHit as hullPointHit } from '../shared/data/ships.js';
 import { dungeonLogic } from './dungeon.js';
 import { sea } from './sea.js';
 import { seasons } from './seasons.js';
@@ -121,6 +123,7 @@ export class Game {
     this.tavernInit();
     this.dungeonInit();
     this.seasonsInit();
+    this.shipsInit();
     this.seenW = Math.ceil(this.world.W / SEEN_CELL); this.seenH = Math.ceil(this.world.OVER_H / SEEN_CELL); this.seenBytes = Math.ceil(this.seenW * this.seenH / 8);
     this.usedTokens = new Set(); this.fails = new Map(); this.bans = {}; this.reports = []; this.maintenance = null; // 1.0
     if (storage && storage.loadMeta) { Promise.resolve(storage.loadMeta('bans')).then((b) => { if (b) this.bans = b; }).catch(() => {}); Promise.resolve(storage.loadMeta('reports')).then((r) => { if (Array.isArray(r)) this.reports = r; }).catch(() => {}); }
@@ -182,6 +185,7 @@ export class Game {
     if (!this.players.has(p.id)) return;
     this.socialLogout(p);
     this.save(p);
+    this.shipLogout(p);
     this.players.delete(p.id);
     if (!this.worldPersist) { this.removeBase(p.key); this.removeHome(p.key); }
     for (const m of this.mobs) if (m.target === p.id) m.target = 0;
@@ -227,8 +231,10 @@ export class Game {
       case 'crew': return this.crewAction(p, String(m.a), m);
       case 'trade': return this.tradeAction(p, String(m.a), m);
       case 'bail': return this.bail(p);
-      case 'embark': return this.embark(p, String(m.name || ''));
-      case 'disembark': return this.disembark(p, null);
+      case 'post': return m.off ? this.leavePost(p) : this.takePost(p, String(m.k || ''), m.i | 0); // 1.1 : les postes du navire
+      case 'ctl': return this.postInput(p, m.x, m.y);
+      case 'gun': return this.fireGun(p, +m.a);
+      case 'ship': return m.a === 'stow' ? this.stowShip(p) : this.armShip(p, String(m.item || ''));
       case 'repair': return this.repair(p);
       case 'lever': return this.pullLever(p, m.i | 0);
       case 'dive': return this.dive(p);
@@ -259,8 +265,7 @@ export class Game {
       case 'sint': return this.structInteract(p, m.tx | 0, m.ty | 0);
       case 'stor': return this.chestAction(p, String(m.a), m.slot | 0);
       case 'door': return this.onDoor(p, m.id | 0, !!m.out);
-      case 'board': return this.board(p, +m.a, m.slot == null ? -1 : m.slot | 0);
-      case 'land': return this.land(p, +m.a);
+      case 'board': return this.armShip(p, '');
       case 'home': return this.homeAction(p, String(m.a), m.k | 0);
       case 'lock': return this.pickLock(p, m.k | 0, !!m.ok);
     }
@@ -307,6 +312,7 @@ export class Game {
     const p = this.createPlayer(conn, name, key, data, m.look);
     s.player = p;
     this.players.set(p.id, p);
+    this.shipLogin(p); // 1.1 : son navire (et son pont, s'il y était)
     if (p.pendingBase) { this.refundBase(p.key, p.pendingBase); p.pendingBase = null; }
     if (p.pendingHome) { this.importHome(p.key, p.name, p.pendingHome); p.pendingHome = null; }
     this.convertLegacy(p);
@@ -319,7 +325,7 @@ export class Game {
       name: p.name, x: p.x, y: p.y, isNew: !res.data, ach: p.ach, treasure: p.treasure,
       history: (this.chatLog || []).slice(-12),
       build: this.buildSnapshot(p.key), dep: [...this.depleted].filter(([, t]) => t > this.time).map(([id, t]) => [id, Math.round(t - this.time)]),
-      respawnAt: p.respawnAt, found: [...p.found], boat: p.boat, room: p.room,
+      respawnAt: p.respawnAt, found: [...p.found], boat: p.boat, room: p.room, s: p.ship || 0, lx: p.lx, ly: p.ly,
       kr: this.kraken ? 1 : 0, mem: [...p.mem], homes: this.homesList(), seals: Object.fromEntries(Object.entries(this.seals).map(([k, v]) => [k, Math.max(0, Math.round(v - this.time))])), pet: p.pet,
     });
     this.broadcastChat(null, `${p.name} accoste à Port-Lanterne.`, 'sys');
@@ -445,6 +451,7 @@ export class Game {
     this.socialLoad(p, d);
     this.justiceLoad(p, d);
     this.navalLoad(p, d);
+    this.shipLoad(p, d);
     this.seasonsLoad(p, d);
     p.mem = new Set(d && Array.isArray(d.mem) ? d.mem.filter((k) => MEM_KEYS.has(k)) : []); // 1.0 : les choix qui comptent
     p.songs = new Set(['day', ...(d && Array.isArray(d.songs) ? d.songs.filter((k) => HOUSE_MUSIC.some(([x]) => x && x === k)) : [])]);
@@ -481,9 +488,7 @@ export class Game {
       if (d.caches && typeof d.caches === 'object') for (const k in d.caches) if (String(k).startsWith('i:')) p.caches[k] = 1;
       if (Array.isArray(d.zs)) for (const z of d.zs) if (FAR_ZONES.includes(z | 0)) p.zs.add(z | 0);
       if (typeof d.x === 'number' && typeof d.y === 'number') {
-        const bt = d.boat && ITEMS[d.boat] && ITEMS[d.boat].boat && p.inv.some((s) => s && s.id === d.boat) ? d.boat : null;
-        if (bt && canSail(this.world, d.x, d.y)) { p.x = d.x; p.y = d.y; p.boat = bt; }
-        else if (canStand(this.world, d.x, d.y, false, key)) { p.x = d.x; p.y = d.y; }
+        if (canStand(this.world, d.x, d.y, false, key)) { p.x = d.x; p.y = d.y; }
       }
     } else {
       this.addItem(p, 'banane', 3);
@@ -516,7 +521,7 @@ export class Game {
     this.applyRefund(p);
   }
   serialize(p) {
-    return { ...(p.heldF || {}), ...this.socialSave(p), ...this.justiceSave(p), songs: [...(p.songs || [])], mem: [...(p.mem || [])], hulls: p.hulls, fishRec: p.fishRec, sv: SAVE_VERSION, held: p.held || [], seen: p.seen ? b64(p.seen) : undefined, st: p.st, kc: p.kc, met: p.met ? [...p.met] : [], col: p.col ? [...p.col] : [], tut: p.tut, name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: { ...(p.heldQ || {}), ...p.quests }, track: p.track || [], chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: { ...(p.heldA || {}), ...p.ach }, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: p.boat || null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
+    return { ...(p.heldF || {}), ...this.socialSave(p), ...this.justiceSave(p), ...this.shipSave(p), songs: [...(p.songs || [])], mem: [...(p.mem || [])], hulls: p.hulls, fishRec: p.fishRec, sv: SAVE_VERSION, held: p.held || [], seen: p.seen ? b64(p.seen) : undefined, st: p.st, kc: p.kc, met: p.met ? [...p.met] : [], col: p.col ? [...p.col] : [], tut: p.tut, name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: { ...(p.heldQ || {}), ...p.quests }, track: p.track || [], chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: { ...(p.heldA || {}), ...p.ach }, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
   }
   save(p) {
     p.lastSave = this.time;
@@ -561,7 +566,7 @@ export class Game {
     if (p.riding) return this.dismount(p);
     const it = p.eq.mount && ITEMS[p.eq.mount];
     if (!it || !it.mount || p.dead) return this.toast(p, 'Équipez d’abord une monture (emplacement Monture), puis appuyez sur C.', 'warn');
-    if (p.boat) return this.toast(p, 'Pas en mer !', 'warn');
+    if (p.ship) return this.toast(p, 'Pas de monture sur un pont !', 'warn');
     if (p.room !== -1) return this.toast(p, 'Pas à l’intérieur !', 'warn');
     if (this.time - p.lastHurt < 1.5) return this.toast(p, 'Pas en plein combat !', 'warn');
     p.riding = true; p.lookVer++;
@@ -581,7 +586,7 @@ export class Game {
       st: { atk: p.stats.atk, gun: p.stats.gun, def: p.stats.def, crit: Math.round(p.stats.crit * 100), speed: p.stats.speed, regen: +p.stats.regen.toFixed(1) },
       cry: Math.max(0, +(p.cry - this.time).toFixed(1)), drunk: Math.max(0, +(p.drunkUntil - this.time).toFixed(1)),
       dead: p.dead, kills: p.kills, upg: p.upg, title: p.title, boat: p.boat, room: p.room, pk: p.pk, pet: p.pet || '', vo: this.time < p.thiefUntil ? 1 : 0,
-      ...this.justiceMe(p), gxpNext: GLORY_XP, ...this.navalMe(p), air: this.seaRoom(p) ? Math.ceil(p.air || 0) : -1, airMax: this.airMax(p), songs: [...(p.songs || [])],
+      ...this.justiceMe(p), gxpNext: GLORY_XP, ...this.shipMe(p), air: this.seaRoom(p) ? Math.ceil(p.air || 0) : -1, airMax: this.airMax(p), songs: [...(p.songs || [])],
       ride: p.riding && p.eq.mount ? ITEMS[p.eq.mount].mount.kind : '', cnt: p.cnt, zsn: p.zs.size, zst: FAR_ZONES.length, cch: Object.keys(p.caches).length, bf: p.buffs ? Object.entries(p.buffs).filter(([, v]) => v.until > this.time).map(([k, v]) => [k, Math.ceil(v.until - this.time)]) : [], rc: p.recallAt ? +(p.recallAt - this.time).toFixed(1) : 0,
     };
   }
@@ -1258,6 +1263,7 @@ export class Game {
     }
     if (P >= 1 && ready('pull', 14)) {
       this.ev(m.x, m.y, ['pull', Math.round(m.x), Math.round(m.y), 270, 70, 5]);
+      this.whirl = { x: m.x, y: m.y, r: 270, v: 70, until: now + 5.5 }; // 1.1 : il aspire les navires
       for (const q of T) if (Math.hypot(q.x - m.x, q.y - m.y) < 270) q.pullUntil = now + 5.5;
       for (let k = 1; k <= 5; k++) this.later(k, () => { if (this.kraken === kr && m.state !== 'dead') for (const q of this.krakenTargets(70)) this.damagePlayer(q, 26, m); });
       return;
@@ -1608,7 +1614,7 @@ export class Game {
     if (p.dead) return;
     if (this.time < p.invulnUntil && !dot) { this.ev(p.x, p.y, ['dodge', p.id]); return; }
     let dmg = dot ? Math.max(1, Math.round(raw)) : mitigate(raw, p.stats.def);
-    if (!dot && (p.boat || p.aboard)) dmg = this.hullHit(p, dmg); // 1.0 : la coque encaisse
+    if (!dot && p.ship) dmg = this.hullHit(p, dmg); // la coque encaisse
     p.hp -= dmg; p.lastHurt = this.time; p.dirtyMe = true;
     if (p.recallAt && !dot) { p.recallAt = 0; this.toast(p, 'Rappel interrompu !', 'warn'); }
     if (src && src.key && src !== p) { p.lastPvp = this.time; src.lastPvp = this.time; this.onPvpHit(p, src); }
@@ -1621,7 +1627,7 @@ export class Game {
     if (p.riding) this.dismount(p);
     p.recallAt = 0;
     p.hp = 0; p.dead = true; p.deathAt = this.time; p.moving = false;
-    if (p.boat) { p.boat = null; p.lookVer++; }
+    if (p.ship) this.leaveDeck(p);
     p.fishing = null;
     const pk = src && src.key && src !== p && this.players.has(src.id) ? src : null;
     const lost = pk ? this.pvpLoss(p, pk) : Math.floor(p.gold * 0.1); // 1.0 : en duel, pertes limitées
@@ -1647,8 +1653,8 @@ export class Game {
   respawn(p) {
     if (!p.dead || this.time - p.deathAt < 1.5) return;
     p.dead = false; p.hp = p.stats.maxHp; p.en = p.stats.maxEn;
-    if (p.boat) { p.boat = null; p.lookVer++; }
-    p.aboard = 0; p.diveBoat = null; p.air = null;
+    if (p.ship) this.leaveDeck(p);
+    p.diveBoat = null; p.air = null;
     if (p.shieldNext) { p.shieldNext = false; p.shieldUntil = this.time + SHIELD_AFTER_DEATH; p.lookVer++; this.toast(p, `Pavillon blanc : personne ne peut vous attaquer pendant ${SHIELD_AFTER_DEATH / 60} minutes (et vous n’attaquez personne).`, 'info'); }
     if (p.jail > 0) { p.invulnUntil = this.time + 3; this.imprison(p, 0); this.ev(p.x, p.y, ['fx', 'respawn', p.x, p.y]); return; }
     const sp = this.world.spawnPoint;
@@ -1782,13 +1788,14 @@ export class Game {
           const kb = 3 * (fx.kb || 1);
           for (const m of this.mobs) {
             if (m.state === 'dead' || pr.hit.has(m.id) || m.under) continue;
-            if (Math.hypot(m.x - pr.x, m.y - 8 - pr.y) < m.def.r + 4) {
+            if (m.def.ship ? hullPointHit(shipOf(mobShipKind(m.def)), m.x, m.y, Math.atan2(m.vy || 0, m.vx || 1), pr.x, pr.y + 8) : Math.hypot(m.x - pr.x, m.y - 8 - pr.y) < m.def.r + 4) { // 1.1 : un navire, on vise sa coque
               pr.hit.add(m.id);
               if (owner) { const n = Math.hypot(pr.vx, pr.vy); this.damageMob(m, pr.dmg, owner, pr.crit, pr.vx / n * kb, pr.vy / n * kb); this.hitEffects(owner, m, pr.dmg, fx); }
               if (fx.ricochet && (pr.rico || 0) < fx.ricochet && this.ricochet(pr, m)) break; // la balle rebondit vers un autre mort
               if (pr.pierce > 0 && !fx.explode) pr.pierce--; else { dead = true; this.ev(pr.x, pr.y, ['ph', pr.id, Math.round(pr.x), Math.round(pr.y)]); break; }
             }
           }
+          if (!dead && pr.kind === 'cball') { const sh = this.projShip(pr); if (sh) { this.shipStruck(sh, pr, owner); dead = true; this.ev(pr.x, pr.y, ['ph', pr.id, Math.round(pr.x), Math.round(pr.y)]); break; } } // 1.1
           if (!dead && pr.pvp && owner) for (const q of this.players.values()) {
             if (q === owner || pr.hit.has(q.id) || !this.canPvp(owner, q)) continue;
             if (Math.hypot(q.x - pr.x, q.y - 9 - pr.y) < (q.boat ? 11 : 8)) {
@@ -1799,6 +1806,7 @@ export class Game {
             }
           }
         } else {
+          if (pr.kind === 'cball') { const sh = this.projShip(pr); if (sh) { this.shipStruck(sh, pr, this.mobs.find((m) => m.id === pr.owner)); dead = true; this.ev(pr.x, pr.y, ['ph', pr.id, Math.round(pr.x), Math.round(pr.y)]); break; } } // 1.1 : la coque d'abord
           for (const p of this.players.values()) {
             if (p.dead || SAFE.has(p.zone)) continue;
             if (Math.hypot(p.x - pr.x, p.y - 9 - pr.y) < 8) {
@@ -1856,7 +1864,7 @@ export class Game {
 
   onAttack(p, a) {
     if (p.dead || !isFinite(a)) return;
-    if (p.boat) return;
+    if (p.post) { if (p.post.startsWith('gun')) this.fireGun(p, a); return; } // 1.1 : à son poste
     const cd = p.stats.atkSpeed;
     if ((p.cds.slash || 0) > this.time + 0.04) return;
     p.cds.slash = this.time + cd;
@@ -1895,11 +1903,9 @@ export class Game {
     if (!sk || p.dead) return;
     if (p.riding) this.dismount(p);
     if (p.level < sk.lvl) return this.toast(p, `${sk.name} : niveau ${sk.lvl} requis.`, 'warn');
-    const cannon = id === 'shot' && p.boat && ITEMS[p.boat].boat.cannon;
-    const aboard = id === 'shot' && p.aboard; // 1.0 : un canonnier à bord
-    if ((p.boat || p.aboard) && (id === 'whirl' || id === 'roll')) return;
-    if (sk.needGun && !p.eq.gun && !cannon && !aboard) return this.toast(p, p.boat ? 'Il vous faut un pistolet, ou un sloop et son canon.' : "Il vous faut une arme à feu (emplacement Pistolet).", 'warn');
-    const cd = cannon || aboard ? 1.8 : sk.cd * (id === 'shot' ? p.stats.gunCd : 1);
+    if (p.post) { if (id === 'shot' && p.post.startsWith('gun')) this.fireGun(p, +m.a); return; } // 1.1 : au canon, on tire le canon
+    if (sk.needGun && !p.eq.gun) return this.toast(p, "Il vous faut une arme à feu (emplacement Pistolet).", 'warn');
+    const cd = sk.cd * (id === 'shot' ? p.stats.gunCd : 1);
     if ((p.cds[id] || 0) > this.time + 0.05) return;
     if (p.en < sk.cost) return this.toast(p, "Pas assez d'énergie.", 'warn');
     const a = isFinite(+m.a) ? +m.a : 0;
@@ -1908,17 +1914,7 @@ export class Game {
     switch (id) {
       case 'shot': {
         p.dir = dirOf(Math.cos(a), Math.sin(a));
-        if (aboard && this.broadside(p, a)) break;
         const pvp = !SAFE.has(p.zone);
-        if (cannon) { // canon du sloop (deux pour le brick)
-          this.ev(p.x, p.y, ['atk', p.id, +a.toFixed(2), 3]);
-          for (let k = 0; k < cannon; k++) {
-            const off = cannon > 1 ? (k - (cannon - 1) / 2) * 0.09 : 0;
-            const [v, crit] = this.rollDamage(p, 24 + p.level * 4);
-            this.spawnProj(p.x + Math.cos(a) * 12, p.y - 8 + Math.sin(a) * 8, a + off, 250, 240, v, 'p', p.id, 'cball', 1, crit, pvp);
-          }
-          break;
-        }
         const gun = ITEMS[p.eq.gun];
         const s = gun.shot;
         const fx = s.explode || s.burn || s.bleed || s.kb || s.poison || s.frost || s.stun || s.chain || s.pull || s.curse || s.ricochet || s.boomer || s.homing
@@ -1982,26 +1978,24 @@ export class Game {
   // ------------------------------------------------------------ déplacement
   onMove(p, m) {
     if (p.dead) return;
-    if (p.aboard) { p.dir = (m.d | 0) & 3; return; } // à bord d'un autre : c'est le capitaine qui mène
+    if (this.deckMoveMsg(p, m)) return; // 1.1 : sur un pont, à l'abordage, ou à terre
     if (p.race) this.raceCheck(p); // 1.0 : le Grand Tour
     const x = +m.x, y = +m.y;
     if (!isFinite(x) || !isFinite(y)) return;
     if (this.time < (p.grabbedUntil || 0)) { p.lastMoveAt = this.time; if (Math.hypot(x - p.x, y - p.y) > 3) this.sendPos(p); return; }
     const dt = Math.min(0.6, this.time - p.lastMoveAt);
     p.lastMoveAt = this.time;
-    const boat = p.boat ? ITEMS[p.boat].boat : null;
-    const spd = boat ? boat.speed * (1 + 0.06 * this.passengers(p).length) : p.stats.speed * (this.time < p.cry ? 1.2 : 1); // chaque canonnier rame aussi
+    const spd = p.stats.speed * (this.time < p.cry ? 1.2 : 1);
     const pull = this.time < (p.pullUntil || 0) ? 95 : 0;
     p.moveBudget = Math.min(spd * 1.2 + ROLL_SPEED * ROLL_TIME + 30 + pull, p.moveBudget + (spd * 1.3 + pull) * dt + 3);
     const d = Math.hypot(x - p.x, y - p.y);
-    const ok = (boat ? canSail(this.world, x, y) : canStand(this.world, x, y, false, p.key)) && roomIdAt(this.world, x, y) === p.room;
+    const ok = canStand(this.world, x, y, false, p.key) && roomIdAt(this.world, x, y) === p.room && !(p.room === -1 && this.pointOnShip(x, y));
     if (d > p.moveBudget || !ok) {
       this.sendPos(p);
       p.moveBudget *= 0.5;
       return;
     }
     p.moveBudget -= d;
-    if (boat) { p.st.sea += d / TILE; if (d > 0.5) p.headA = Math.atan2(y - p.y, x - p.x); } // en cases ; le cap du navire
     p.x = x; p.y = y;
     p.dir = (m.d | 0) & 3;
     p.moving = !!m.m;
@@ -2033,7 +2027,7 @@ export class Game {
     }
     if (fresh.length && !quiet) this.send(p, { t: 'seen', c: fresh });
   }
-  sendPos(p, extra) { this.send(p, Object.assign({ t: 'pos', x: p.x, y: p.y, boat: p.boat || null, room: p.room }, extra)); }
+  sendPos(p, extra) { this.send(p, Object.assign({ t: 'pos', x: p.x, y: p.y, boat: p.boat || null, room: p.room, s: p.ship || 0, lx: p.lx, ly: p.ly }, extra)); }
   setZone(p, z) {
     if (z === p.zone) return;
     p.zone = z;
@@ -2045,6 +2039,7 @@ export class Game {
     if (ZONES[z] && ZONES[z].hard && !p.hardWarned) { p.hardWarned = 1; this.toast(p, 'Île des Damnés : zone extrême. Ici, même les morts ont peur.', 'warn'); }
   }
   teleport(p, x, y, extra) {
+    if (p.ship && !(extra && extra.deck)) this.leaveDeck(p); // 1.1 : on quitte le pont
     p.x = x; p.y = y; p.moveBudget = 0; p.moving = false; p.lastMoveAt = this.time;
     p.room = roomIdAt(this.world, x, y);
     this.setZone(p, zoneAt(this.world, x, y));
@@ -2092,43 +2087,6 @@ export class Game {
     for (const s of p.inv) if (s && ITEMS[s.id].boat && (!best || ITEMS[s.id].boat.speed > ITEMS[best].boat.speed)) best = s.id;
     return best;
   }
-  board(p, a, slot = -1) {
-    if (p.riding) this.dismount(p);
-    if (p.dead || p.boat || p.room !== -1) return;
-    const id = this.boatSlot(p, slot);
-    if (!id) return this.toast(p, 'Il vous faut une barque (Corentin, sur le quai, en vend).', 'warn');
-    if (p.aboard) return;
-    if (this.hullOf(p, id) <= 0) return this.toast(p, `${ITEMS[id].name} a sombré : faites réparer sa coque au chantier naval (Corentin, Ysaline…).`, 'warn');
-    let best = null, bs = 1e9;
-    for (const r of [16, 22, 28, 34, 40, 46]) for (let k = 0; k < 16; k++) {
-      const ang = k / 16 * Math.PI * 2, x = p.x + Math.cos(ang) * r, y = p.y + Math.sin(ang) * r * 0.85;
-      if (!canSail(this.world, x, y)) continue;
-      const sc = r + (isFinite(a) ? angDiff(ang, a) * 10 : 0);
-      if (sc < bs) { bs = sc; best = [x, y]; }
-    }
-    if (!best) return this.toast(p, 'Approchez-vous de l’eau libre (un quai ou une plage) pour mettre à l’eau.', 'warn');
-    p.boat = id; p.lookVer++;
-    this.teleport(p, best[0], best[1], { board: 1 });
-    this.ev(p.x, p.y, ['fx', 'splash', p.x, p.y]);
-    if (!p.ach.navigateur && !p.sailedOnce) { p.sailedOnce = true; this.toast(p, 'En mer ! E près du rivage pour accoster.', 'info'); }
-  }
-  land(p, a) {
-    if (p.dead || !p.boat) return;
-    let best = null, bs = 1e9;
-    for (const r of [14, 20, 26, 32, 38, 44]) for (let k = 0; k < 16; k++) {
-      const ang = k / 16 * Math.PI * 2, x = p.x + Math.cos(ang) * r, y = p.y + Math.sin(ang) * r * 0.85;
-      const t = tileAt(this.world, x, y);
-      if (t === T.WATER || t === T.DEEP || t === T.SWAMP || !canStand(this.world, x, y, false, p.key) || roomIdAt(this.world, x, y) !== -1) continue;
-      const sc = r + (isFinite(a) ? angDiff(ang, a) * 8 : 0);
-      if (sc < bs) { bs = sc; best = [x, y]; }
-    }
-    if (!best) return this.toast(p, 'Pas de rivage où accoster ici.', 'warn');
-    for (const q of this.passengers(p)) this.disembark(q, 'Le navire accoste : tout le monde à terre.');
-    p.boat = null; p.lookVer++;
-    this.teleport(p, best[0], best[1], { land: 1 });
-    this.ev(p.x, p.y, ['fx', 'splash', p.x, p.y]);
-  }
-
   // ------------------------------------------------------------ objets
   addItem(p, id, n) {
     if (!ITEMS[id]) return n;
@@ -2141,7 +2099,7 @@ export class Game {
     return n;
   }
   countItem(p, id) { let c = 0; for (const s of p.inv) if (s && s.id === id) c += s.n; return c; }
-  boatInUse(p, id) { return p.boat === id && this.countItem(p, id) <= 1; }
+  boatInUse(p, id) { const sh = this.ownShip(p.key); return !!sh && sh.item === id && this.countItem(p, id) <= 1; } // 1.1 : armé, il ne se vend ni ne se donne
   removeItem(p, id, n) {
     for (let i = INV_SIZE - 1; i >= 0 && n > 0; i--) { const s = p.inv[i]; if (s && s.id === id) { const k = Math.min(n, s.n); s.n -= k; n -= k; if (!s.n) p.inv[i] = null; } }
     p.dirtyInv = true; p.dirtyQ = true;
@@ -2181,7 +2139,7 @@ export class Game {
     const it = ITEMS[s.id];
     if (it.slot) return this.equip(p, i);
     if (it.tool === 'fish') return this.toast(p, 'Face à l’eau, appuyez sur R pour pêcher.', 'info');
-    if (it.boat) return p.boat ? this.land(p, NaN) : this.board(p, NaN, i);
+    if (it.boat) return this.armShip(p, s.id); // 1.1 : un navire s'arme à quai
     if (it.pet) { // animal de compagnie : il vous suit, ou il se repose dans le sac
       p.pet = p.pet === it.pet ? null : it.pet; p.lookVer++; p.dirtyMe = true;
       return this.toast(p, p.pet ? `${it.name} vous suit.` : `${it.name} se repose.`, 'info');
@@ -2229,7 +2187,7 @@ export class Game {
     }
     if (it.use.dive) return this.dive(p); // 1.0 : la cloche de plongée
     if (it.use.recall) {
-      if (p.boat) return this.toast(p, 'Accostez d’abord.', 'warn');
+      if (p.ship) return this.toast(p, 'Descendez d’abord à terre.', 'warn');
       if (this.jailBlocks(p)) return;
       if (p.recallAt) return;
       p.recallAt = this.time + 3; p.recallSlot = s.id; p.dirtyMe = true;
@@ -2567,15 +2525,15 @@ export class Game {
     for (const r of [26, 34, 20, 42]) {
       fx = p.x + Math.cos(a) * r; fy = p.y - 4 + Math.sin(a) * r;
       const t = tileAt(this.world, fx, fy);
-      if (t === T.WATER || t === T.DEEP || t === T.SWAMP) { ok = true; break; }
+      if ((t === T.WATER || t === T.DEEP || t === T.SWAMP) && !this.pointOnShip(fx, fy + 4)) { ok = true; break; }
     }
     if (!ok) return this.toast(p, 'Tournez-vous vers l’eau pour lancer la ligne.', 'warn');
-    p.fishing = { x: fx, y: fy, px: p.x, py: p.y, biteAt: this.time + rand(2.5, 7.5), state: 'wait', deep: tileAt(this.world, fx, fy) === T.DEEP };
+    p.fishing = { x: fx, y: fy, px: p.x, py: p.y, lx: p.lx, ly: p.ly, sh: p.ship || 0, biteAt: this.time + rand(2.5, 7.5), state: 'wait', deep: tileAt(this.world, fx, fy) === T.DEEP };
     this.ev(p.x, p.y, ['fish', p.id, Math.round(fx), Math.round(fy)]);
   }
   updateFishing(p) {
     const f = p.fishing;
-    if (Math.hypot(p.x - f.px, p.y - f.py) > 6) { p.fishing = null; this.ev(p.x, p.y, ['fishend', p.id, 0]); return; }
+    if (f.sh ? (p.ship !== f.sh || Math.hypot(p.lx - f.lx, p.ly - f.ly) > 6 || Math.hypot(p.x - f.x, p.y - f.y) > 70) : Math.hypot(p.x - f.px, p.y - f.py) > 6) { p.fishing = null; this.ev(p.x, p.y, ['fishend', p.id, 0]); return; }
     if (f.state === 'wait' && this.time >= f.biteAt) { f.state = 'bite'; f.until = this.time + 1.0; this.send(p, { t: 'bite' }); this.ev(f.x, f.y, ['bite', p.id]); }
     else if (f.state === 'bite' && this.time > f.until) { p.fishing = null; this.ev(p.x, p.y, ['fishend', p.id, 0]); this.toast(p, 'Le poisson s’est échappé !', 'warn'); }
   }
@@ -2599,7 +2557,7 @@ export class Game {
   // ------------------------------------------------------------ trésors
   dig(p) {
     if (p.dead || !p.treasure) return;
-    if (p.boat) return this.toast(p, 'Accostez d’abord.', 'warn');
+    if (p.ship) return this.toast(p, 'Descendez d’abord à terre.', 'warn');
     if (Math.hypot(p.treasure.x - p.x, p.treasure.y - p.y) > 26) return this.toast(p, 'Ce n’est pas ici. Suivez la flèche jusqu’à la croix.', 'warn');
     const t = p.treasure; p.treasure = null;
     const gold = Math.round(rand(220, 420)); p.gold += gold; p.dirtyMe = true;
@@ -3140,7 +3098,7 @@ export class Game {
     if (this.tickCount % 20 === 0) { this.justiceGlobalTick(); this.eventTick(); }
     if (this.tickCount % 1200 === 0) this.seasonRoll(); // une fois par minute : la saison a-t-elle changé ?
     if (this.tickCount % 5 === 0) { this.arenaTick(); this.dungeonTick(); }
-    this.navalTick();
+    this.shipsTick();
     if (this.tickCount % 40 === 0 && this.players.size > 1) { // les autres pirates sur la carte
       const pl = [...this.players.values()].map((q) => [q.id, q.name, Math.round(q.x), Math.round(q.y), q.room, q.dead ? 1 : 0, this.isWanted(q) ? 1 : 0]);
       for (const p of this.players.values()) this.send(p, { t: 'map', pl });
@@ -3173,7 +3131,8 @@ export class Game {
         if (q === p || !near(q)) continue;
         seen.set(q.id, q.lookVer + 1000 * q.level);
         if (p.known.get(q.id) !== q.lookVer + 1000 * q.level) ent.push(this.entMeta(q, 'p'));
-        pos.push([q.id, Math.round(q.x), Math.round(q.y), q.dir, (q.moving ? 1 : 0) | (q.dead ? 2 : 0) | (this.time < q.invulnUntil ? 4 : 0) | (this.time < q.cry ? 8 : 0) | (q.boat ? 16 : 0), Math.round(q.hp / q.stats.maxHp * 100)]);
+        const fl = (q.moving ? 1 : 0) | (q.dead ? 2 : 0) | (this.time < q.invulnUntil ? 4 : 0) | (this.time < q.cry ? 8 : 0) | (q.ship ? 16 : 0), hp = Math.round(q.hp / q.stats.maxHp * 100);
+        pos.push(q.ship ? [q.id, Math.round(q.lx), Math.round(q.ly), q.dir, fl, hp, q.ship] : [q.id, Math.round(q.x), Math.round(q.y), q.dir, fl, hp]);
       }
       for (const m of this.mobs) {
         if (m.state === 'dead' || !near(m)) continue;
@@ -3187,6 +3146,13 @@ export class Game {
         if (p.known.get(a.id) !== a.ver) ent.push({ id: a.id, k: 'a', name: a.name, cap: a.cap, x: Math.round(a.x), y: Math.round(a.y), sink: a.sink });
         pos.push([a.id, Math.round(a.x), Math.round(a.y), a.dir, (a.moving ? 1 : 0) | (a.sink ? 2 : 0), 100]);
       }
+      const shp = [];
+      if (p.room === -1) for (const sh of this.ships.values()) { // 1.1 : les navires (de plus loin : ils sont grands)
+        if (Math.abs(sh.x - p.x) > AOI_X + 160 || Math.abs(sh.y - p.y) > AOI_Y + 160) continue;
+        seen.set(sh.id, sh.ver);
+        if (p.known.get(sh.id) !== sh.ver) ent.push(this.shipMeta(sh));
+        shp.push(this.shipLine(sh));
+      }
       for (const d of this.drops.values()) {
         if (!near(d)) continue;
         seen.set(d.id, d.n);
@@ -3198,10 +3164,11 @@ export class Game {
       const ev = [];
       for (const e of this.events) if (e.r === p.room && Math.abs(e.x - p.x) < AOI_X + 60 && Math.abs(e.y - p.y) < AOI_Y + 60) ev.push(e.e);
       const msg = { t: 's', T, e: pos };
+      if (shp.length) msg.sh = shp;
       if (ent.length) msg.n = ent;
       if (rm.length) msg.r = rm;
       if (ev.length) msg.ev = ev;
-      if (sendTime) { msg.wt = +this.worldTime.toFixed(2); msg.on = this.players.size; }
+      if (sendTime) { msg.wt = +this.worldTime.toFixed(2); msg.on = this.players.size; msg.wd = [+this.wind.a.toFixed(2), +this.wind.s.toFixed(2)]; }
       this.send(p, msg);
       this.flush(p);
     }
@@ -3213,7 +3180,8 @@ Object.assign(Game.prototype, justice); // 1.0 : protection, infamie, primes, ho
 Object.assign(Game.prototype, events); // 1.0 : les invasions rares et annoncées
 Object.assign(Game.prototype, arena); // 1.0 : l'Arène de la Fosse
 Object.assign(Game.prototype, tavern); // 1.0 : les jeux de taverne
-Object.assign(Game.prototype, naval); // 1.0 : navires partagés et coques
+Object.assign(Game.prototype, naval); // 1.0 : les coques
+Object.assign(Game.prototype, shipsLogic); // 1.1 : les vrais navires (à quai, sur le pont, aux postes)
 Object.assign(Game.prototype, dungeonLogic); // 1.0 : le Bastion Englouti
 Object.assign(Game.prototype, sea); // 1.0 : les fonds marins
 Object.assign(Game.prototype, seasons); // 1.0 : saisons, concours de pêche, Grand Tour

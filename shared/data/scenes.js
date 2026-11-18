@@ -144,7 +144,7 @@ export const OLD_SCENES = {
       ['npc', "Havre-des-Brumes, plein est. Ma cousine Ysaline y tient le chantier naval. Il te faut une barque : achète-la-moi, mets-la à l'eau depuis le quai, face à l'eau, et file."],
       { ask: [
         { q: 'C’est dangereux, la mer ?', a: [['npc', "Moins que la terre, ces temps-ci. Évite seulement le Gouffre, au sud. Il chante, la nuit."]] },
-        { q: 'Comment on accoste ?', a: [['npc', "Près d'un rivage, E. Et ne lâche pas la barre avant d'avoir les deux pieds sur le sable."]] },
+        { q: 'Comment on accoste ?', a: [['npc', "Tu approches d'un quai ou d'une plage, tu cargues la voile, tu jettes l'ancre, et tu descends par la passerelle. Et si tu descends voiles dehors, ton navire repart sans toi."]] },
       ], go: 'En route' },
       ['npc', "Dis-lui que c'est Corentin qui t'envoie. Elle te fera un prix. Peut-être."],
     ],

@@ -104,8 +104,8 @@ Object.assign(ITEMS, {
 });
 // ----- 0.4 : navigation et grottes -----
 Object.assign(ITEMS, {
-  barque: { name: 'Barque', boat: { kind: 'barque', speed: 98 }, value: 180, icon: 'boat_i', desc: 'Une barque à rames. Face à l’eau, E pour la mettre à l’eau ; près du rivage, E pour accoster.' },
-  sloop: { name: 'Sloop', boat: { kind: 'sloop', speed: 142, cannon: 1 }, value: 1400, rarity: 2, icon: 'sloop_i', desc: 'Un petit voilier rapide, armé d’un canon : clic droit à bord pour tirer.' },
+  barque: { name: 'Barque', boat: { kind: 'barque', speed: 98 }, value: 180, icon: 'boat_i', desc: 'Une barque à voile et à rames, légère et maniable. Elle s’arme à quai, à la bitte d’amarrage d’un port ; on y monte par la passerelle.' },
+  sloop: { name: 'Sloop', boat: { kind: 'sloop', speed: 142, cannon: 1 }, value: 1400, rarity: 2, icon: 'sloop_i', desc: 'Un petit voilier vif, un canon de chaque bord. Il s’arme à quai, à la bitte d’amarrage d’un port. À bord : la barre, les drisses, le cabestan et les canons.' },
   eclat_cristal: { quest: 1, name: 'Éclat de cristal', value: 0, icon: 'crystal', desc: 'Il luit faiblement dans le noir. Objet de quête : on le détache des cristaux des grottes (E).' },
   pendentif_cristal: { name: 'Pendentif de cristal', slot: 'trinket', hp: 25, crit: 0.04, value: 260, rarity: 1, icon: 'crystalneck', desc: 'Un éclat de cristal serti de fer. Il bat comme un cœur.' },
 });
@@ -279,9 +279,9 @@ M('pur_sang', { name: 'Pur-sang noir', mount: { kind: 'pursang', speed: 1.85 }, 
 M('destrier_squelette', { name: 'Destrier squelette', mount: { kind: 'squelette', speed: 2.1, def: 4 }, rarity: 3, value: 14000, desc: 'Ses yeux brûlent d’un feu vert. Il ne se fatigue jamais, il ne mange jamais. Vitesse +110 %.' });
 Object.assign(ITEMS, {
   // bateaux
-  radeau: { name: 'Radeau', boat: { kind: 'radeau', speed: 72 }, value: 70, icon: 'raft_i', desc: 'Quelques troncs liés à la corde. Ça flotte. Lentement.' },
+  radeau: { name: 'Radeau', boat: { kind: 'radeau', speed: 72 }, value: 70, icon: 'raft_i', desc: 'Quelques troncs liés à la corde, une voile rapiécée. Ça flotte. Lentement. Il s’arme à quai, comme les autres.' },
   goelette: { name: 'Goélette', boat: { kind: 'goelette', speed: 192, cannon: 2 }, value: 7500, rarity: 2, icon: 'schooner_i', desc: 'Deux mâts, des voiles auriques, la finesse d’une lame : le navire le plus rapide de l’archipel. Deux canons.' },
-  galion: { name: 'Galion', boat: { kind: 'galion', speed: 158, cannon: 3 }, value: 16000, rarity: 3, icon: 'galleon_i', desc: 'Un château flottant de trois mâts. Lent à virer, mais trois canons par bordée.' },
+  galion: { name: 'Galion', boat: { kind: 'galion', speed: 158, cannon: 3 }, value: 16000, rarity: 3, icon: 'galleon_i', desc: 'Un château flottant de trois mâts. Lourd : long à prendre son élan, plus long encore à virer. Mais trois canons par bord, et une coque à toute épreuve.' },
   // voyages
   conque_rappel: { name: 'Conque de rappel', use: { recall: 1 }, value: 80, icon: 'conch_pink', desc: 'Soufflez dedans (clic droit) : trois secondes plus tard, vous voilà devant votre maison, ou en ville. Interrompu si l’on vous frappe.' },
   longue_vue: { name: 'Longue-vue', use: { spy: 1 }, value: 150, icon: 'spyglass', desc: 'Clic droit : voir bien plus loin pendant quinze secondes. Elle ne s’use pas.' },

@@ -122,7 +122,7 @@ export const justice = {
   imprison(p, secs, why) {
     if (secs) p.jail = Math.max(p.jail | 0, Math.round(secs));
     if (p.riding) this.dismount(p);
-    if (p.boat) { p.boat = null; p.lookVer++; }
+    if (p.ship) this.leaveDeck(p);
     const tr = this.trades && this.trades.get(p.id); if (tr) this.tradeCancel(tr, `${p.name} a été arrêté : échange annulé.`);
     p.arrestT = 0; p.recallAt = 0;
     const [x, y] = this.jailSpot();
