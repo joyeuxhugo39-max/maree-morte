@@ -1,6 +1,6 @@
 # Lot 2 — Compte développeur, personnage laboratoire, atelier et console
 
-Branche de travail : `dossier-global`. Rien n'est encore publié.
+Publié en version 1.2.0 le 18 novembre 2026 : `main`, GitHub Pages et la page claude.ai (version 14).
 
 ## 1. L'identification existante, vérifiée d'abord
 

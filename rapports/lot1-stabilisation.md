@@ -1,6 +1,6 @@
 # Lot 1 — Stabilisation
 
-Branche de travail : `dossier-global`. Rien n'est encore publié (ni `main`, ni GitHub Pages, ni la page claude.ai).
+Publié en version 1.2.0 le 18 novembre 2026 : `main`, GitHub Pages et la page claude.ai (version 14).
 
 ## 1. Le blocage de navigation (priorité absolue)
 
