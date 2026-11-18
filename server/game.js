@@ -232,9 +232,9 @@ export class Game {
       case 'trade': return this.tradeAction(p, String(m.a), m);
       case 'bail': return this.bail(p);
       case 'post': return m.off ? this.leavePost(p) : this.takePost(p, String(m.k || ''), m.i | 0); // 1.1 : les postes du navire
-      case 'ctl': return this.postInput(p, m.x, m.y);
+      case 'ctl': return this.postInput(p, m.x, m.y, m.sl);
       case 'gun': return this.fireGun(p, +m.a);
-      case 'ship': return m.a === 'stow' ? this.stowShip(p) : this.armShip(p, String(m.item || ''));
+      case 'ship': return m.a === 'stow' ? this.stowShip(p) : m.a === 'board' ? this.boardByE(p, m.id) : m.a === 'land' ? this.landByE(p) : m.a === 'unstick' ? this.unstickShip(p) : m.a === 'home' ? this.homeShip(p) : this.armShip(p, String(m.item || ''));
       case 'repair': return this.repair(p);
       case 'lever': return this.pullLever(p, m.i | 0);
       case 'dive': return this.dive(p);
@@ -3088,6 +3088,7 @@ export class Game {
         if (p.race) this.raceCheck(p);
       }
       if (p.fishing) this.updateFishing(p);
+      if (p.homing) this.homeTick(p); // lot 1 : retour au port
       if (p.gold >= 1000 && !p.ach.riche) this.unlock(p, 'riche');
     }
     if (this.tickCount % 10 === 0) { this.updateDots(); this.updateClouds(); }

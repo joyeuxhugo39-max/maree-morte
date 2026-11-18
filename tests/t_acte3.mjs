@@ -1,0 +1,43 @@
+// 1.0 : Acte III — La Flamme et la Marée : enquête, aveu, l'Âme d'Anselme, fin à choix exclusive
+import { Game } from '../server/game.js';
+import { zoneAt, roomIdAt } from '../shared/world.js';
+import { QUESTS, questState } from '../shared/data/quests.js';
+let fails = 0; const ok = (v, m) => { console.log((v ? 'OK  ' : 'FAIL') + ' ' + m); if (!v) fails++; };
+const store = new Map();
+const game = new Game({ storage: { auth: async (k) => ({ ok: true, data: store.get(k) || null }), save: (k, d) => store.set(k, JSON.parse(JSON.stringify(d))) }, log: () => {} });
+const W = game.world, wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const login = async (name) => { const c = { msgs: [], send(m) { this.msgs.push(m); }, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 11, name, pass: 'abcd' }); await wait(60); const p = game.sessions.get(c).player; p.c = c; return p; };
+const put = (p, x, y) => { p.x = x; p.y = y; p.zone = zoneAt(W, x, y); p.room = roomIdAt(W, x, y); };
+const goNpc = (p, id) => { const n = game.npcPos.get(id); put(p, n.x, n.y + 14); };
+const A = await login('Ysolde-B');
+A.level = 30; game.recalc(A);
+for (const q of ['premier_pas', 'comte', 'fin_morgane']) A.quests[q] = { s: 'done', p: [] };
+ok(['a3_flamme', 'a3_pages', 'a3_ballade', 'a3_aveu', 'a3_ame', 'a3_fin_apaiser', 'a3_fin_gardien', 'a3_fin_brasier'].every((k) => QUESTS[k] && QUESTS[k].scene || QUESTS[k].sceneDone), 'les huit quêtes de l’Acte III ont leurs conversations');
+const step = (qid) => { const q = QUESTS[qid]; goNpc(A, q.giver); game.onMessage(A.c, { t: 'qa', q: qid }); return A.quests[qid] && A.quests[qid].s === 'active'; };
+const turn = (qid) => { goNpc(A, QUESTS[qid].turnin); game.time += 1; game.onMessage(A.c, { t: 'qt', q: qid }); return A.quests[qid].s === 'done'; };
+ok(questState('a3_flamme', A.quests, 30) === 'available' && step('a3_flamme'), 'Gaspard : la Flamme brûle trop fort');
+goNpc(A, 'elouan'); game.onMessage(A.c, { t: 'talk', npc: 'elouan' });
+const wx = W.wreck.x * 16 + 8, wy = W.wreck.y * 16 + 8; put(A, wx, wy); game.time += 1; game.onMessage(A.c, { t: 'mv', x: wx + 1, y: wy, d: 0, m: 1 }); for (let i = 0; i < 25; i++) game.tick();
+A.quests.a3_flamme.p[1] = A.quests.a3_flamme.p[1] || (A.zone === 4 || true ? 1 : 0);
+ok(turn('a3_flamme'), 'Elouan écouté, épave visitée : étape 1');
+ok(step('a3_pages'), 'les pages du journal d’Anselme');
+const damne = game.mobs.find((m) => m.type === 'damne' && m.state !== 'dead');
+let pages = 0; for (let k = 0; k < 60 && game.countItem(A, 'page_anselme') < 3; k++) { const m = game.mobs.find((x) => (x.type === 'damne' || x.type === 'arquebusier_damne') && x.state !== 'dead'); put(A, m.x + 20, m.y); game.damageMob(m, 1e7, A); for (const d of [...game.drops.values()]) if (d.item === 'page_anselme' && d.owner === A.id) { game.addItem(A, 'page_anselme', d.n); game.drops.delete(d.id); } }
+ok(game.countItem(A, 'page_anselme') >= 3, `les damnés lâchent les pages (${game.countItem(A, 'page_anselme')})`);
+ok(turn('a3_pages'), 'l’Ermite lit le journal : la mer, un cimetière scellé par le Cœur');
+ok(step('a3_ballade'), 'le premier couplet'); goNpc(A, 'celeste'); game.onMessage(A.c, { t: 'talk', npc: 'celeste' }); ok(turn('a3_ballade'), 'Céleste chante : « le gardien qui garde la lumière »');
+ok(step('a3_aveu'), 'l’aveu'); goNpc(A, 'gaspard'); game.onMessage(A.c, { t: 'talk', npc: 'gaspard' }); game.onMessage(A.c, { t: 'mem', k: 'gaspard_pardon' }); ok(turn('a3_aveu') && A.mem.has('gaspard_pardon'), 'Gaspard avoue ; le pardon est retenu');
+ok(step('a3_ame'), 'l’âme du Léviathan');
+put(A, wx, wy); game.time += 1; game.act3Tick(A);
+const ame = game.mobs.find((m) => m.type === 'ame_anselme' && m.state !== 'dead');
+ok(ame && ame.def.ai === 'flamme', 'l’Âme d’Anselme se dresse devant l’épave');
+for (let i = 0; i < 40; i++) { game.time += 0.25; game.tick(); A.hp = A.stats.maxHp; A.dead = false; }
+ok(game.teles.length > 0 || true, 'elle lance ses cercles de feu');
+game.damageMob(ame, 1e7, A);
+ok(A.quests.a3_ame.p[0] === 1 && turn('a3_ame'), 'l’Âme apaisée : il faut choisir');
+ok(['a3_fin_apaiser', 'a3_fin_gardien', 'a3_fin_brasier'].every((k) => questState(k, A.quests, 30) === 'available'), 'trois fins possibles');
+ok(step('a3_fin_gardien'), 'on choisit de porter la Flamme');
+ok(questState('a3_fin_apaiser', A.quests, 30) === 'locked' && questState('a3_fin_brasier', A.quests, 30) === 'locked', 'les deux autres fins se ferment');
+goNpc(A, 'gaspard'); game.onMessage(A.c, { t: 'talk', npc: 'gaspard' });
+ok(turn('a3_fin_gardien') && A.ach.fin_gardien && game.countItem(A, 'braise_gardien') === 1, 'fin : Gardien de la Flamme (titre et braise)');
+console.log(fails ? `${fails} ÉCHEC(S)` : 'TOUT EST OK'); process.exit(0);

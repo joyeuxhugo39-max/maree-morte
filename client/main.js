@@ -189,6 +189,7 @@ function onMsg(m) {
       if (G.player && m.boat !== undefined && now - (G.posAt || 0) > 0.4) G.player.boat = m.boat || null;
       if (G.player && m.ship !== undefined && now - (G.posAt || 0) > 0.6 && (m.ship || 0) !== (G.player.ship || 0)) { G.player.ship = m.ship || 0; if (!m.ship) G.post = null; }
       if (!m.post && G.post && now - (G.postAt || 0) > 0.6) G.post = null;
+      if (m.post && !G.post && now - (G.postAt || 0) > 1.2) { G.send({ t: 'post', off: 1 }); G.postAt = now; } // lot 1 : désaccord sur le poste → on le quitte
       if (m.wind) G.wind = m.wind;
       if (m.room !== undefined && m.room !== G.room && now - (G.posAt || 0) > 0.4) G.room = m.room;
       if (prev && m.lvl !== prev.lvl) { G.refreshNpcs(); ui.renderTracker(); }
@@ -304,6 +305,7 @@ function onMsg(m) {
     case 'post': G.post = m.k ? { k: m.k, lx: m.lx, ly: m.ly } : null; G.postAt = now; G.ctlSent = null; if (m.k && G.player) { G.player.lx = m.lx; G.player.ly = m.ly; if (m.s) G.player.ship = m.s; } break; // 1.1
     case 'ms': G.myShip = m.id ? m : null; break;
     case 'gcd': G.gunCd = G.gunCd || {}; G.gunCd[m.i] = now + m.cd; break;
+    case 'homing': G.homingUntil = m.dur ? now + m.dur : 0; break; // lot 1 : retour au port
     case 'loot': {
       const it = m.id === 'or' ? null : ITEMS[m.id];
       if (m.buy) ui.toast(`Acheté : ${it.name} (−${m.buy} doublons)`, 'loot', iconURL(it.icon, it.tint));
@@ -726,6 +728,8 @@ function interact() {
   else if (t.kind === 'post') { G.send({ t: 'post', k: t.k, i: t.i || 0 }); G.ctlSent = null; } // 1.1 : prendre un poste
   else if (t.kind === 'unpost') leavePost();
   else if (t.kind === 'berth') G.ui.openBerth(t.b); // 1.1 : armer un navire à quai
+  else if (t.kind === 'shipboard') G.send({ t: 'ship', a: 'board', id: t.id }); // lot 1
+  else if (t.kind === 'shipland') G.send({ t: 'ship', a: 'land' });
 }
 function useDoor(d, out, now) {
   const p = G.player;
@@ -764,12 +768,18 @@ function findInteract() {
     }
     if (best) return best;
     if (ds) return { kind: 'dive', x: p.x, y: p.y, h: 36, verb: `Plonger : ${ds.name}` };
+    if ((s.sp || 0) < 34 && landNear(s, S)) return { kind: 'shipland', x: p.x, y: p.y, h: 34, verb: 'Descendre à terre' }; // lot 1
     for (const e of G.ents.values()) {
       if (e.k !== 'p' || e.dead || (e.flags & 2)) continue;
       const d = Math.hypot(e.x - p.x, e.y - p.y);
       if (d < 22 && d < bd) { bd = d; best = { kind: 'player', id: e.id, name: e.name, x: e.x, y: e.y, h: 46, verb: 'Interagir' }; }
     }
     return best;
+  }
+  if (G.room < 0) for (const s of G.ships.values()) { // lot 1 : monter à bord avec E (prioritaire tout près du navire)
+    if (s.sinkT || !s.buf.length || (s.sp || 0) > 26) continue;
+    const S = shipOf(s.kind), xs = S.open ? [-S.L * 0.3, 0, S.L * 0.3] : (S.ops || []).map((o) => o.x);
+    for (const ox of xs) for (const side of [-1, 1]) { const [rx, ry] = toWorld(s, ox, side * hullHalf(S, ox)), d = Math.hypot(rx - p.x, ry - p.y); if (d < 52 && d < bd) { bd = d - 20; best = { kind: 'shipboard', id: s.id, x: rx, y: ry - 6, h: 18, verb: s.own === p.name ? 'Monter à bord' : `Monter à bord (${s.name} de ${s.own})` }; } }
   }
   if (G.room < 0) for (const b of BERTHS) { const [bx, by] = berthPos(b), d = Math.hypot(bx - p.x, by - p.y); if (d < 34 && d < bd) { bd = d; best = { kind: 'berth', b, x: bx, y: by - 16, h: 14, verb: 'Armer un navire' }; } }
   if (best) return best;
@@ -1119,6 +1129,7 @@ function handleKeys(now) {
     if (!$('dialog').classList.contains('hidden') && /^Digit[1-9]$/.test(k.code)) { ui.pickChoice(+k.code.slice(5) - 1); continue; }
     if (k.code === 'Escape') { if (G.build && !ui.open) stopBuild(); else ui.close(); continue; }
     if (ui.open === 'tavern' && k.code === 'Space') { ui.armTap(); continue; } // le bras de fer
+    if (G.post && G.post.k === 'helm' && k.code === 'Space') { cycleSail(); continue; } // lot 1 : la voilure, depuis la barre
     if (k.key === 'i' || k.code === 'Tab') { ui.toggle('inventory'); continue; }
     if (k.key === 'b') { if (G.build) stopBuild(); else startBuild(null); continue; }
     if (k.key === 'c') { G.send({ t: 'ride' }); continue; }
@@ -1215,10 +1226,28 @@ function deckUpdate(now, dt, ax, rolling) {
 }
 // tenir un poste : les touches qui servent au poste le commandent ; les autres le font quitter
 function stationInput(ax) {
-  const k = G.post.k, useX = k === 'helm', useY = k === 'sails' || k === 'cap', gun = k.startsWith('gun');
-  if ((!useX && Math.abs(ax.x) > 0.5) || (!useY && Math.abs(ax.y) > 0.5) || (gun && (ax.x || ax.y))) { leavePost(); return; }
-  const x = useX ? Math.sign(Math.round(ax.x * 2) / 2) : 0, y = useY ? Math.sign(Math.round(ax.y * 2) / 2) : 0, key = x + ',' + y;
+  const k = G.post.k, helm = k === 'helm', gun = k.startsWith('gun'), s = G.ships.get(G.player.ship);
+  let x = 0, y = 0;
+  if (helm && G.helmMode !== 'reel') {
+    // lot 1 : la barre simple — la direction tenue est le cap voulu ; on tourne la roue pour y aller, puis on la remet droite
+    let target = 0;
+    if ((ax.x || ax.y) && s) { let d = Math.atan2(ax.y, ax.x) - s.a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; target = Math.max(-1, Math.min(1, d * 1.4)); }
+    const e = target - ((s && s.rud) || 0); x = Math.abs(e) > 0.12 ? Math.sign(e) : 0;
+  } else {
+    const useX = helm, useY = helm || k === 'sails' || k === 'cap';
+    if ((!useX && Math.abs(ax.x) > 0.5) || (!useY && Math.abs(ax.y) > 0.5) || (gun && (ax.x || ax.y))) { leavePost(); return; }
+    x = useX ? Math.sign(Math.round(ax.x * 2) / 2) : 0; y = useY ? Math.sign(Math.round(ax.y * 2) / 2) : 0;
+  }
+  const key = x + ',' + y;
   if (key !== G.ctlSent) { G.ctlSent = key; G.send({ t: 'ctl', x, y }); }
+}
+// lot 1 : à la barre, Espace change la voilure d'un cran (ferlée → mi-voile → toute → ferlée)
+function cycleSail() {
+  const s = G.ships.get(G.player.ship); if (!s) return;
+  const cur = s.sail || 0, next = cur < 0.25 ? 0.5 : cur < 0.75 ? 1 : 0;
+  const [x] = (G.ctlSent || '0,0').split(',').map(Number);
+  G.send({ t: 'ctl', x, y: 0, sl: next }); G.sfx.play('flap', 0.6);
+  G.ui.toast(next === 0 ? 'Voile carguée.' : next === 0.5 ? 'Mi-voile.' : 'Toute la toile !', 'info');
 }
 function leavePost() { if (!G.post) return; G.send({ t: 'post', off: 1 }); G.post = null; G.ctlSent = null; G.postAt = nowS(); }
 // descendre à terre : par une ouverture du bastingage, vers la terre ferme toute proche
@@ -1259,6 +1288,17 @@ function tryBoard(ax, now) {
     }
   }
   return false;
+}
+function landNear(s, S) {
+  if (s._ln && performance.now() - s._ln.t < 400) return s._ln.v;
+  let v = false;
+  for (let lx = -S.L / 2 + 4; lx <= S.L / 2 - 4 && !v; lx += 10) for (const side of [-1, 1]) {
+    const hw = hullHalf(S, lx); if (hw < 3) continue;
+    const [rx, ry] = toWorld(s, lx, side * hw), nx = -Math.sin(s.a) * side, ny = Math.cos(s.a) * side;
+    for (let g = 8; g <= 64 && !v; g += 8) { const x = rx + nx * g, y = ry + ny * g + 4; if (canStand(G.world, x, y, false, G.myKey) && roomIdAt(G.world, x, y) < 0) v = true; }
+  }
+  s._ln = { t: performance.now(), v };
+  return v;
 }
 const POST_NAMES = { helm: 'Prendre la barre', sails: 'Tenir les drisses (la voilure)', cap: 'Le cabestan (l’ancre)' };
 // les animaux de compagnie trottent derrière leur maître

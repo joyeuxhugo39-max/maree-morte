@@ -85,6 +85,7 @@ export const shipRender = {
   drawShipsBase(ctx, G, camX, camY, now, dt) {
     if (!G.ships) return;
     const W = this.W, H = this.H;
+    this.coach = G.player && G.player.ship && G.shipCoach ? { id: G.player.ship, k: G.shipCoach } : null; // lot 1 : le poste à rejoindre
     for (const s of G.ships.values()) this.drawShipBody(ctx, s, camX, camY, now, dt);
   },
   drawShipBody(ctx, s, camX, camY, now, dt) {
@@ -195,6 +196,11 @@ export const shipRender = {
     } else {
       const [ax, ay] = pr(S.L / 2 - 9, -hwB - 2, 3);
       px(ax, ay - 2, '#2c2b36', 1, 5); px(ax - 2, ay + 2, '#2c2b36', 5, 1); px(ax - 2, ay + 1, '#2c2b36', 1, 1); px(ax + 2, ay + 1, '#2c2b36', 1, 1); px(ax - 1, ay - 2, '#7c7b8f', 3, 1);
+    }
+    // lot 1 : le poste à rejoindre pour partir (un anneau doré qui pulse)
+    if (this.coach && this.coach.id === s.id) {
+      const st = stations(S).find((q) => q.k === this.coach.k);
+      if (st) { const [cx, cy] = pr(st.at[0], st.at[1], 1), r = 7 + Math.sin(now * 5) * 1.5; ctx.strokeStyle = `rgba(255,210,74,${(0.65 + 0.3 * Math.sin(now * 5)).toFixed(2)})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(cx, cy, r, r * 0.75, 0, 0, TAU); ctx.stroke(); }
     }
     // les fanaux
     const dark = this.darkNow || 0;

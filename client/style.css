@@ -693,3 +693,8 @@ table.ladder td { padding: 4px; border-bottom: 1px dashed rgba(96, 54, 22, 0.25)
 .bar span { z-index: 1; letter-spacing: 0.3px; }
 .card-name { letter-spacing: 0.3px; }
 .lvl { background: linear-gradient(#ffe08a, var(--gold) 55%, #b8841a); box-shadow: 0 0 0 1px #5a3a0a, inset 0 1px 0 rgba(255, 255, 255, 0.5); }
+/* lot 1 : les boutons de secours du navire */
+#shiphud #sh-btns { flex-basis: 100%; display: flex; justify-content: center; gap: 6px; pointer-events: auto; }
+#shiphud #sh-btns button { font: inherit; font-size: 11px; padding: 2px 9px; color: var(--ink); background: var(--parch2); border: 2px solid var(--wood0); border-radius: 3px; cursor: pointer; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35); }
+#shiphud #sh-btns button:hover { background: var(--parch3); }
+#shiphud #sh-btns button.hot { background: var(--gold); animation: mpblink 0.6s ease-in-out infinite alternate; }

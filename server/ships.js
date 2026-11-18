@@ -21,7 +21,8 @@ const DT = 1 / TICK_RATE;
 const DESPAWN = 600; // un navire vide dont le propriétaire est parti : dix minutes
 const BOARD_SPEED = 28; // au-delà, on ne saute plus à bord (ni à terre)
 const GUN_RELOAD = 3.2;
-const ANCHOR_UP = 5.5; // secondes pour lever l'ancre seul
+const ANCHOR_UP = 3.5; // secondes pour lever l'ancre seul (lot 1 : plus court, l'équipage aide)
+const HOME_CHANNEL = 8, HOME_CD = 180, UNSTICK_CD = 20; // lot 1 : rentrer au port, dégager le navire
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const wrap = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 
@@ -136,7 +137,7 @@ export const shipsLogic = {
         if (sh.own !== p.key) this.toast(this.shipOwner(sh) || p, `${p.name} monte à bord.`, 'info');
         return true;
       }
-      if (p.post) return true; // à son poste, on ne marche pas
+      if (p.post) this.leavePost(p, sh); // lot 1 : on marche, donc on a quitté son poste
       const dt = Math.min(0.6, this.time - p.lastMoveAt);
       p.lastMoveAt = this.time;
       const spd = p.stats.speed;
@@ -185,10 +186,12 @@ export const shipsLogic = {
     p.post = null; p.dirtyMe = true;
     this.send(p, { t: 'post', k: '' });
   },
-  postInput(p, x, y) {
+  postInput(p, x, y, sl) {
     const sh = this.myShip(p);
     if (!sh || !p.post) return;
     sh.ctl[p.id] = [clamp(+x || 0, -1, 1), clamp(+y || 0, -1, 1)];
+    // lot 1 : à la barre, un cran de voilure d'un coup (Espace) ; l'équipage lève l'ancre s'il le faut
+    if (p.post === 'helm' && sl != null && isFinite(+sl)) { sh.sailT = clamp(+sl, 0, 1); if (sh.sailT > 0 && sh.anchor) sh.autoAnchor = true; }
   },
   fireGun(p, a) {
     const sh = this.myShip(p);
@@ -255,13 +258,17 @@ export const shipsLogic = {
     // la barre : la roue tourne tant qu'on la pousse, et reste où on la laisse
     const helm = sh.posts.helm && sh.ctl[sh.posts.helm];
     if (helm && helm[0]) sh.rud = clamp(sh.rud + helm[0] * S.rud * dt, -1, 1);
-    // la voilure : on déploie (Z) ou l'on cargue (S) ; la toile suit avec retard
+    // la voilure : on déploie (Z) ou l'on cargue (S) aux drisses — ou depuis la barre, l'équipage obéit au barreur
     const sails = sh.posts.sails && sh.ctl[sh.posts.sails];
-    if (sails && sails[1]) sh.sailT = clamp(sh.sailT - sails[1] * 0.5 * dt, 0, 1);
+    const sy = sails && sails[1] ? sails[1] : helm && helm[1] ? helm[1] : 0;
+    if (sy) sh.sailT = clamp(sh.sailT - sy * 0.5 * dt, 0, 1);
+    if (helm && helm[1] < -0.3 && sh.anchor) sh.autoAnchor = true; // on veut partir : l'équipage lève l'ancre
     sh.sail += clamp(sh.sailT - sh.sail, -0.55 * dt, 0.32 * dt);
     // l'ancre : jetée en un instant, levée à la force des bras
     let crank = 0, drop = false;
     for (const id of sh.cap) { const c = sh.ctl[id]; if (c && c[1] < -0.3) crank++; if (c && c[1] > 0.3) drop = true; }
+    if (sh.autoAnchor && sh.anchor === 2) crank = Math.max(crank, 1); // l'équipage au cabestan
+    if (sh.anchor === 0 || (sh.autoAnchor && sh.sailT <= 0 && !sh.anchorP)) sh.autoAnchor = false;
     if (sh.anchor === 0 && drop) { sh.anchor = 1; sh.anchorAt = this.time + 1.1; this.ev(sh.x, sh.y, ['fx', 'anchor', sh.id, 1]); }
     if (sh.anchor === 1 && this.time >= sh.anchorAt) { sh.anchor = 2; sh.anchorP = 0; }
     if (sh.anchor === 2 && crank) {
@@ -317,6 +324,89 @@ export const shipsLogic = {
     this.ev(bx, by, ['fx', 'crash', Math.round(bx), Math.round(by)]);
     for (const id of sh.crew) { const q = this.players.get(id); if (q) this.toast(q, sp > 80 ? 'Le navire s’écrase sur les rochers !' : 'Le navire talonne !', 'warn'); }
     this.shipHit(sh, Math.round((sp - 34) * 0.55));
+  },
+  // ------------------------------------------------------------ lot 1 : monter, descendre, dégager, rentrer au port
+  // monter à bord avec E, depuis le rivage ou des hauts-fonds tout proches : par l'ouverture la plus proche
+  boardByE(p, id) {
+    const sh = this.ships.get(id | 0);
+    if (!sh || sh.sinkT || p.dead || p.room !== -1 || p.ship) return;
+    if (!this.canBoard(p, sh)) return this.toast(p, `Ce navire appartient à ${sh.ownName} : seuls son groupe et son équipage y montent.`, 'warn');
+    if (this.shipSpeed(sh) > BOARD_SPEED) return this.toast(p, 'Le navire file trop vite pour sauter à bord.', 'warn');
+    const S = this.spec(sh), xs = S.open ? [-S.L * 0.3, 0, S.L * 0.3] : (S.ops || []).map((o) => o.x);
+    let best = null;
+    for (const ox of xs) for (const side of [-1, 1]) {
+      const hw = hullHalf(S, ox), [rx, ry] = toWorld(sh, ox, side * hw), d = Math.hypot(rx - p.x, ry - p.y);
+      if (!best || d < best.d) best = { d, ox, side, hw };
+    }
+    if (!best || best.d > 64) return this.toast(p, 'Approchez-vous du navire.', 'warn');
+    const [lx, ly] = nearestDeck(S, best.ox, best.side * (best.hw - 9));
+    this.joinDeck(p, sh, lx, ly);
+    this.sendPos(p);
+  },
+  // descendre à terre avec E : le point de terre ferme le plus proche de la coque (quai, plage, hauts-fonds)
+  landByE(p) {
+    const sh = this.myShip(p);
+    if (!sh || p.dead) return;
+    if (this.shipSpeed(sh) > BOARD_SPEED + 10) return this.toast(p, 'Le navire file trop vite : ralentissez (S aux drisses ou à la barre) avant de sauter à terre.', 'warn');
+    const S = this.spec(sh), W = this.world;
+    let best = null;
+    for (let lx = -S.L / 2 + 4; lx <= S.L / 2 - 4; lx += 6) for (const side of [-1, 1]) {
+      const hw = hullHalf(S, lx); if (hw < 3) continue;
+      const [rx, ry] = toWorld(sh, lx, side * hw), nx = -Math.sin(sh.a) * side, ny = Math.cos(sh.a) * side;
+      for (let g = 4; g <= 72; g += 4) {
+        const x = rx + nx * g, y = ry + ny * g + 4;
+        if (canStand(W, x, y, false, p.key) && roomIdAt(W, x, y) === -1 && !this.pointOnShip(x, y)) { const d = g + Math.hypot(lx - p.lx, side * hw - p.ly) * 0.3; if (!best || d < best.d) best = { d, x, y }; break; }
+      }
+    }
+    if (!best) return this.toast(p, 'Pas de terre ferme à portée : approchez un quai, une plage ou des hauts-fonds (ou « Rentrer au port » sur le tableau de bord).', 'warn');
+    const left = sh.own === p.key && sh.crew.size === 1 && !sh.anchor && sh.sail > 0.15;
+    this.leaveDeck(p);
+    this.teleport(p, best.x, best.y, { land: 1 });
+    if (left) this.toast(p, 'Votre navire repart sans vous, voiles dehors ! (Jetez l’ancre avant de descendre.)', 'warn');
+  },
+  // dégager un navire coincé (échoué, pris contre un quai) : il glisse vers l'eau libre la plus proche
+  unstickShip(p) {
+    const sh = this.myShip(p);
+    if (!sh || sh.sinkT) return;
+    if (this.time < (sh.unstickAt || 0)) return this.toast(p, 'L’équipage reprend son souffle : réessayez dans un instant.', 'info');
+    const S = this.spec(sh), others = [...this.ships.values()].filter((o) => o !== sh);
+    let spot = null;
+    for (let r = 12; r <= 240 && !spot; r += 12) for (let k = 0; k < 16 && !spot; k++) {
+      const x = sh.x + Math.cos(k / 16 * Math.PI * 2) * r, y = sh.y + Math.sin(k / 16 * Math.PI * 2) * r;
+      for (const da of [0, 0.4, -0.4, 0.8, -0.8, Math.PI]) if (shipFits(this.world, S, x, y, sh.a + da, others)) { spot = [x, y, sh.a + da]; break; }
+    }
+    if (!spot) return this.toast(p, 'Impossible de dégager le navire ici : utilisez « Rentrer au port ».', 'warn');
+    sh.unstickAt = this.time + UNSTICK_CD;
+    [sh.x, sh.y, sh.a] = spot; sh.vx = sh.vy = sh.w = 0; sh.blockedAt = -99;
+    for (const id of sh.crew) { const q = this.players.get(id); if (q) { [q.x, q.y] = toWorld(sh, q.lx, q.ly); this.sendPos(q); } }
+    this.ev(sh.x, sh.y, ['fx', 'splash', Math.round(sh.x), Math.round(sh.y)]);
+    for (const id of sh.crew) { const q = this.players.get(id); if (q) this.toast(q, 'À la gaffe et aux avirons, l’équipage dégage le navire.', 'info'); }
+  },
+  // rentrer au port : l'équipage ramène le navire au quai le plus proche (après quelques secondes au calme)
+  homeShip(p) {
+    const sh = this.myShip(p) || this.ownShip(p.key);
+    if (!sh || sh.sinkT) return this.toast(p, 'Vous n’avez pas de navire armé.', 'info');
+    if (sh.own !== p.key && !(p.ship === sh.id && !sh.oid)) return this.toast(p, 'Seul le capitaine peut ramener le navire au port.', 'warn');
+    if (this.time < (sh.homeAt || 0)) return this.toast(p, `Le navire a déjà fait le voyage : encore ${Math.ceil(sh.homeAt - this.time)} s.`, 'warn');
+    if (p.homing) return;
+    if (this.time - p.lastHurt < 4) return this.toast(p, 'Pas en plein combat !', 'warn');
+    p.homing = { until: this.time + HOME_CHANNEL, hp: p.hp, sid: sh.id };
+    this.send(p, { t: 'homing', dur: HOME_CHANNEL });
+    this.toast(p, `Cap sur le port… (${HOME_CHANNEL} s, sans être touché)`, 'info');
+  },
+  homeTick(p) {
+    const h = p.homing; if (!h) return;
+    if (p.dead || p.hp < h.hp - 0.5 || this.time - p.lastHurt < 0.2) { p.homing = null; this.send(p, { t: 'homing', dur: 0 }); return this.toast(p, 'Retour au port interrompu !', 'warn'); }
+    if (this.time < h.until) return;
+    p.homing = null;
+    const sh = this.ships.get(h.sid); if (!sh || sh.sinkT) return;
+    const place = placeOf(this.world, sh.x, sh.y), b = (place && berthOfPlace(place)) || BERTHS.reduce((a, q) => (Math.hypot(q.tx * TILE - sh.x, q.ty * TILE - sh.y) < Math.hypot(a.tx * TILE - sh.x, a.ty * TILE - sh.y) ? q : a), BERTHS[0]);
+    const spot = findBerth(this.world, this.spec(sh), b, [...this.ships.values()].filter((o) => o !== sh));
+    if (!spot) return this.toast(p, `Le ${b.name.toLowerCase()} est encombré : réessayez plus tard.`, 'warn');
+    sh.homeAt = this.time + HOME_CD;
+    sh.x = spot.x; sh.y = spot.y; sh.a = spot.a; sh.vx = sh.vy = sh.w = 0; sh.rud = 0; sh.sail = sh.sailT = 0; sh.anchor = 2; sh.anchorP = 0; sh.autoAnchor = false; sh.berth = b.key;
+    for (const id of sh.crew) { const q = this.players.get(id); if (!q) continue; this.leavePost(q, sh); [q.x, q.y] = toWorld(sh, q.lx, q.ly); q.zone = zoneAt(this.world, q.x, q.y); this.sendPos(q, { travel: 1 }); this.toast(q, `Le navire est amarré au ${b.name.toLowerCase()}.`, 'quest'); }
+    if (!sh.crew.has(p.id)) this.toast(p, `Votre navire est amarré au ${b.name.toLowerCase()}.`, 'quest');
   },
   // ------------------------------------------------------------ la coque : coups, naufrage
   shipHit(sh, dmg) {

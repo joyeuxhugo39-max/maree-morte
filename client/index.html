@@ -47,6 +47,7 @@
         <div class="sh-box"><span>Ancre</span><b id="sh-anchor"></b></div>
         <div class="sh-box sh-wind"><div id="sh-wind-a">➤</div><div><span id="sh-wind-t"></span><b id="sh-speed"></b></div></div>
         <div id="sh-hint"></div>
+        <div id="sh-btns"><button id="sh-unstick" title="Si le navire est coincé contre la côte ou un quai">Dégager</button><button id="sh-home" title="L'équipage ramène le navire au quai le plus proche">Rentrer au port</button><button id="sh-land" title="Sauter sur la terre ferme la plus proche">Descendre à terre</button></div>
       </div>
       <div id="xpbar"><div class="fill" id="xp-fill"></div><span id="xp-txt">0 / 80 XP</span></div>
       <div id="hotbar"></div>
@@ -192,6 +193,7 @@
       <label for="set-sfx">Effets sonores <input id="set-sfx" type="range" min="0" max="1" step="0.05"></label>
       <label for="set-aide">Aides à l'écran <select id="set-aide"><option value="discret">Discrètes</option><option value="complet">Complètes (minimap, flèche, suivi)</option><option value="aucune">Aucune</option></select></label>
       <label for="set-zoom">Zoom <select id="set-zoom"><option value="0">Automatique</option><option value="1">×1</option><option value="2">×2</option><option value="3">×3</option><option value="4">×4</option><option value="5">×5</option><option value="6">×6</option></select> <small>(ou la molette)</small></label>
+      <label for="set-barre">Barre du navire <select id="set-barre"><option value="simple">Simple : le navire vire vers la direction tenue</option><option value="reel">Réaliste : Q / D tournent la roue</option></select></label>
       <label for="set-shake"><input id="set-shake" type="checkbox"> Tremblements de l'écran</label>
       <label for="set-myname"><input id="set-myname" type="checkbox"> Afficher mon nom au-dessus de moi</label>
       <label for="set-global"><input id="set-global" type="checkbox"> Montrer le canal global dans l'onglet « Tout » du chat</label>

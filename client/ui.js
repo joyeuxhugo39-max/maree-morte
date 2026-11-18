@@ -794,6 +794,12 @@ export class UI {
   updateShipHud(now) {
     const G = this.G, p = G.player, el = $('shiphud');
     if (!el) return;
+    if (!this.shBtns) { // lot 1 : les boutons de secours
+      this.shBtns = true;
+      $('sh-unstick').onclick = () => G.send({ t: 'ship', a: 'unstick' });
+      $('sh-land').onclick = () => G.send({ t: 'ship', a: 'land' });
+      $('sh-home').onclick = () => this.confirm('Ramener le navire au quai le plus proche ? L’équipage s’en charge en quelques secondes, si personne ne vous touche.', () => G.send({ t: 'ship', a: 'home' }));
+    }
     const s = p && p.ship ? G.ships.get(p.ship) : null;
     if (!s || !s.buf || !s.buf.length) { if (!el.classList.contains('hidden')) el.classList.add('hidden'); return; }
     el.classList.remove('hidden');
@@ -812,11 +818,23 @@ export class UI {
     $('sh-wind-t').textContent = `Vent ${windName((G.wind && G.wind[0]) || 0)}`;
     $('sh-speed').textContent = `${Math.round((s.sp || 0) / KNOT)} nœuds`;
     const k = G.post && G.post.k, gi = k && k.startsWith('gun') ? +k.slice(3) : -1, cd = gi >= 0 && G.gunCd ? Math.max(0, (G.gunCd[gi] || 0) - now) : 0;
-    $('sh-hint').textContent = !k ? 'E près d’un poste : la barre, les drisses du grand mât, le cabestan, les canons.'
-      : k === 'helm' ? 'À la barre — Q / D : tourner la roue (elle reste où vous la laissez) · E : quitter'
+    const simple = G.helmMode !== 'reel', homing = G.homingUntil && now < G.homingUntil;
+    // l'allure : d'où vient le vent par rapport au cap
+    const rel = Math.cos(((G.wind && G.wind[0]) || 0) - (s.a || 0)), allure = rel > 0.7 ? 'vent arrière' : rel > 0.2 ? 'grand largue' : rel > -0.3 ? 'vent de travers' : rel > -0.75 ? 'au près' : 'face au vent';
+    $('sh-wind-t').textContent = `Vent ${windName((G.wind && G.wind[0]) || 0)} · ${allure}`;
+    // l'étape suivante, tant que le navire n'est pas lancé
+    const coach = anc >= 100 && (s.sail || 0) < 0.1 ? (k === 'helm' ? (simple ? 'Pour partir : maintenez une direction, puis Espace pour hisser la voile (l’équipage lève l’ancre).' : 'Pour partir : Z (tenir) — l’équipage lève l’ancre et hisse la voile.') : 'Pour partir : prenez la barre (E, à la poupe), puis Espace ou Z.')
+      : (s.sail || 0) < 0.1 && k !== 'helm' ? 'Voile ferlée : à la barre, Espace ou Z pour la hisser.' : '';
+    G.shipCoach = coach && k !== 'helm' ? 'helm' : null;
+    $('sh-hint').textContent = homing ? `Cap sur le port… ${Math.ceil(G.homingUntil - now)} s (sans être touché)`
+      : coach || (!k ? 'E près d’un poste : la barre (poupe), les drisses (grand mât), le cabestan (proue), les canons. E près du bord : descendre à terre.'
+      : k === 'helm' ? (simple ? 'À la barre — ZQSD : la direction voulue · Espace : voilure (ferlée, mi-voile, toute) · E : quitter' : 'À la barre — Q / D : la roue (elle reste où vous la laissez) · Z / S : voilure · E : quitter')
       : k === 'sails' ? 'Aux drisses — Z : déployer les voiles · S : les carguer · E : quitter'
       : k === 'cap' ? 'Au cabestan — Z (tenir) : lever l’ancre, plus vite à plusieurs · S : la jeter · E : quitter'
-      : `Au canon — visez à la souris, clic pour tirer${cd > 0 ? ` · rechargement ${cd.toFixed(1)} s` : ' · prêt !'} · E : quitter`;
+      : `Au canon — visez à la souris, clic pour tirer${cd > 0 ? ` · rechargement ${cd.toFixed(1)} s` : ' · prêt !'} · E : quitter`);
+    const mine = s.own === p.name;
+    $('sh-home').style.display = mine ? '' : 'none';
+    $('sh-unstick').classList.toggle('hot', (s.sp || 0) < 3 && anc < 100 && (s.sail || 0) > 0.2);
   }
   // ------------------------------------------------------------ boutique
   openShop(npcId) {
@@ -999,12 +1017,12 @@ export class UI {
     this.G.aide = mode;
   }
   // ------------------------------------------------------------ réglages
-  settings() { const d = { music: 0.6, sfx: 1, zoom: 0, shake: true, myname: false, aide: 'discret', global: true, mpSound: true }; try { return Object.assign(d, JSON.parse(localStorage.getItem('mm_settings') || '{}')); } catch (e) { return d; } }
+  settings() { const d = { music: 0.6, sfx: 1, zoom: 0, shake: true, myname: false, aide: 'discret', global: true, mpSound: true, barre: 'simple' }; try { return Object.assign(d, JSON.parse(localStorage.getItem('mm_settings') || '{}')); } catch (e) { return d; } }
   applySettings(st) {
     const G = this.G;
     G.sfx.setVolumes(st.music, st.sfx);
     G.renderer.zoom = +st.zoom || 0; G.renderer.resize(innerWidth, innerHeight);
-    G.renderer.shakeOn = !!st.shake; G.showMyName = !!st.myname;
+    G.renderer.shakeOn = !!st.shake; G.showMyName = !!st.myname; G.helmMode = st.barre === 'reel' ? 'reel' : 'simple';
     this.setAide(st.aide || 'discret');
     try { localStorage.setItem('mm_settings', JSON.stringify(st)); } catch (e) { /* */ }
     if (this.chatFilter) this.setChatFilter(this.chatFilter);
@@ -1012,10 +1030,10 @@ export class UI {
   renderSettings() {
     const st = this.settings();
     $('set-music').value = st.music; $('set-sfx').value = st.sfx; $('set-zoom').value = String(st.zoom || 0);
-    $('set-shake').checked = !!st.shake; $('set-myname').checked = !!st.myname; $('set-aide').value = st.aide || 'discret';
+    $('set-shake').checked = !!st.shake; $('set-myname').checked = !!st.myname; $('set-aide').value = st.aide || 'discret'; $('set-barre').value = st.barre === 'reel' ? 'reel' : 'simple';
     $('set-global').checked = st.global !== false; $('set-mpsound').checked = st.mpSound !== false;
-    const upd = () => this.applySettings({ music: +$('set-music').value, sfx: +$('set-sfx').value, zoom: +$('set-zoom').value, shake: $('set-shake').checked, myname: $('set-myname').checked, aide: $('set-aide').value, global: $('set-global').checked, mpSound: $('set-mpsound').checked });
-    for (const id of ['set-music', 'set-sfx', 'set-zoom', 'set-shake', 'set-myname', 'set-aide', 'set-global', 'set-mpsound']) $(id).oninput = $(id).onchange = upd;
+    const upd = () => this.applySettings({ music: +$('set-music').value, sfx: +$('set-sfx').value, zoom: +$('set-zoom').value, shake: $('set-shake').checked, myname: $('set-myname').checked, aide: $('set-aide').value, barre: $('set-barre').value, global: $('set-global').checked, mpSound: $('set-mpsound').checked });
+    for (const id of ['set-music', 'set-sfx', 'set-zoom', 'set-shake', 'set-myname', 'set-aide', 'set-barre', 'set-global', 'set-mpsound']) $(id).oninput = $(id).onchange = upd;
   }
 
   // ------------------------------------------------------------ chat : voir social-ui.js (canaux, historique, invitations, groupe, équipage, échange)

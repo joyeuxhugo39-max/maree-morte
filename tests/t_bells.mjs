@@ -1,0 +1,14 @@
+import { Game } from '../server/game.js';
+import { zoneAt, roomIdAt } from '../shared/world.js';
+let fails = 0; const ok = (v, m) => { console.log((v ? 'OK  ' : 'FAIL') + ' ' + m); if (!v) fails++; };
+const game = new Game({ storage: { auth: async () => ({ ok: true, data: null }), save() {} }, log: () => {} });
+const W = game.world; const c = { msgs: [], send(m) { this.msgs.push(m); }, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 11, name: 'Sonneur', pass: 'abcd' }); await new Promise((r) => setTimeout(r, 60));
+const A = game.sessions.get(c).player; const put = (x, y) => { A.x = x; A.y = y; A.zone = zoneAt(W, x, y); A.room = roomIdAt(W, x, y); };
+ok(W.bells.length === 3, 'trois cloches marines');
+const g0 = A.gold;
+put(W.bells[0].x, W.bells[0].y + 10); game.ringBell(A, 0); game.time += 300;
+put(W.bells[1].x, W.bells[1].y + 10); game.ringBell(A, 1); ok(!A.ach.secret_cloches, 'deux cloches : pas encore');
+game.time += 2000; put(W.bells[2].x, W.bells[2].y + 10); game.ringBell(A, 2); ok(!A.ach.secret_cloches, 'trop tard : la première a sonné hier');
+game.time += 3; put(W.bells[0].x, W.bells[0].y + 10); game.ringBell(A, 0); game.time += 3; put(W.bells[1].x, W.bells[1].y + 10); game.ringBell(A, 1);
+ok(A.ach.secret_cloches && A.gold === g0 + 3000, 'les trois dans la même journée : le secret est percé');
+console.log(fails ? `${fails} ÉCHEC(S)` : 'TOUT EST OK'); process.exit(0);
