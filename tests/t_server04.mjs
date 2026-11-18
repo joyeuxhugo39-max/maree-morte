@@ -8,8 +8,8 @@ const game = new Game({ storage, log: () => {} });
 const W = game.world;
 const mk = (name) => { const c = { name, msgs: [], send(m) { this.msgs.push(m); }, close() {} }; game.addClient(c); return c; };
 const ca = mk('A'), cb = mk('B');
-game.onMessage(ca, { t: 'login', v: 11, name: 'Alpha', pass: 'abcd' });
-game.onMessage(cb, { t: 'login', v: 11, name: 'Bravo', pass: 'abcd' });
+game.onMessage(ca, { t: 'login', v: 12, name: 'Alpha', pass: 'abcd' });
+game.onMessage(cb, { t: 'login', v: 12, name: 'Bravo', pass: 'abcd' });
 await new Promise((r) => setTimeout(r, 20));
 const A = game.sessions.get(ca).player, B = game.sessions.get(cb).player;
 A.level = B.level = 12; game.recalc(A); game.recalc(B); A.hp = A.stats.maxHp; B.hp = B.stats.maxHp; // 1.0 : sous le niveau 10, on est protégé
@@ -106,7 +106,7 @@ place(A, gw.x, gw.y); A.room = -1; game.onMessage(ca, { t: 'mv', s: sh.id, lx: o
 game.save(A);
 const sv = store.get('alpha');
 ok(sv.ship && sv.ship.item === 'barque' && sv.deck && sv.found.length === 1, 'sauvegarde : navire, pont + grotte trouvée');
-game.removeClient(ca); game.removeShip(sh, null); const ca2 = mk('A2'); game.onMessage(ca2, { t: 'login', v: 11, name: 'Alpha', pass: 'abcd' }); await new Promise((r) => setTimeout(r, 20));
+game.removeClient(ca); game.removeShip(sh, null); const ca2 = mk('A2'); game.onMessage(ca2, { t: 'login', v: 12, name: 'Alpha', pass: 'abcd' }); await new Promise((r) => setTimeout(r, 20));
 const A2 = game.sessions.get(ca2).player; const wel = last(ca2, 'welcome');
 ok(A2.ship && wel.s === A2.ship && game.ownShip('alpha') && wel.found.length === 1, 'reconnexion sur son pont, grotte mémorisée');
 // 9. PNJ intérieurs et quête traversée

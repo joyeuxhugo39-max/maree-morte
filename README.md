@@ -25,6 +25,24 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Nouveautés de la version 1.2 : partir en mer sans se perdre, et un atelier de test
+
+- **Partir depuis la barre seule.** À la barre, Z ou Espace : l'équipage lève l'ancre et hisse la voile. Espace
+  règle ensuite la voilure : demi-voile, toute la toile, voile carguée.
+- **Barre « simple » par défaut.** On tient une direction, le navire vire de lui-même vers ce cap. L'ancienne barre
+  reste dans les réglages, sous le nom « réaliste ».
+- **Monter et descendre avec E.** « Monter à bord » s'affiche près du flanc, « Descendre à terre » près d'un quai ou
+  d'une plage. Marcher sur le pont fait quitter un poste : plus de joueur figé à la barre.
+- **Trois boutons de secours.**
+  - **Dégager** : le navire glisse vers l'eau libre.
+  - **Rentrer au port** : 8 s sans être touché.
+  - **Descendre à terre**.
+
+  Un conseil dit quoi faire, et un anneau doré montre la barre.
+- **Outils développeur** (serveur Node seulement) : un compte autorisé, un secret côté serveur, un personnage
+  laboratoire séparé, un atelier à onglets et une console. Voir « Serveur Node » plus bas.
+- **Tests dans le dépôt.** `npm test` lance les suites serveur.
+
 ## Nouveautés de la version 1.1.1 : la finition graphique
 
 - **Une lumière en couleur.**

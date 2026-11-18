@@ -9,7 +9,7 @@ const st = new FileStorage(DIR);
 const mkGame = () => new Game({ storage: st, log: () => {} });
 let game = mkGame();
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-const login = async (g, name, pass = 'abcd') => { const c = { msgs: [], send(m) { this.msgs.push(m); }, close() {} }; g.addClient(c); g.onMessage(c, { t: 'login', v: 11, name, pass }); await wait(300); const s = g.sessions.get(c); return { c, p: s && s.player }; };
+const login = async (g, name, pass = 'abcd') => { const c = { msgs: [], send(m) { this.msgs.push(m); }, close() {} }; g.addClient(c); g.onMessage(c, { t: 'login', v: 12, name, pass }); await wait(300); const s = g.sessions.get(c); return { c, p: s && s.player }; };
 const file = (name) => path.join(DIR, 'accounts', crypto.createHash('sha1').update(name.toLowerCase()).digest('hex') + '.json');
 let { c, p } = await login(game, 'Anouk');
 p.gold = 4321; p.level = 12; game.addItem(p, 'rhum_vieux', 3);

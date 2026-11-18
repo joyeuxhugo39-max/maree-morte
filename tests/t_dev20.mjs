@@ -31,7 +31,7 @@ const mkConn = (ip) => { const c = { ip, msgs: [], send(m) { this.msgs.push(m); 
 const game = new Game({ storage, log: () => {} });
 const D = installDev(game, { env: { DEV_ACCOUNTS: 'Capitaine, Second', DEV_SECRET: SECRET, DEV_TTL_MIN: '30' } });
 await D.ready;
-const login = async (name, ip) => { const c = mkConn(ip); game.addClient(c); game.onMessage(c, { t: 'login', v: 11, name, pass: 'motdepasse' }); await wait(250); const p = game.sessions.get(c).player; return { c, p: () => game.sessions.get(c).player }; };
+const login = async (name, ip) => { const c = mkConn(ip); game.addClient(c); game.onMessage(c, { t: 'login', v: 12, name, pass: 'motdepasse' }); await wait(250); const p = game.sessions.get(c).player; return { c, p: () => game.sessions.get(c).player }; };
 const dev = async (u, m) => { const n = u.c.msgs.length; game.onMessage(u.c, Object.assign({ t: 'dev' }, m)); await wait(m.a === 'cmd' && /^lab/.test(m.c || '') ? 400 : 40); return u.c.msgs.slice(n).filter((x) => x.t === 'dev'); };
 const last = (L) => L[L.length - 1] || {};
 const M = await login('Mousse', '5.5.5.5');

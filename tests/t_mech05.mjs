@@ -4,7 +4,7 @@ const store = new Map();
 const game = new Game({ storage: { auth: async (k) => ({ ok: true, data: store.get(k) || null }), save: (k, d) => store.set(k, JSON.parse(JSON.stringify(d))) }, log: () => {} });
 const W = game.world;
 const c = { msgs: [], send(m) { this.msgs.push(m); }, close() {} };
-game.addClient(c); game.onMessage(c, { t: 'login', v: 11, name: 'Testeur', pass: 'abcd' });
+game.addClient(c); game.onMessage(c, { t: 'login', v: 12, name: 'Testeur', pass: 'abcd' });
 await new Promise((r) => setTimeout(r, 20));
 const p = game.sessions.get(c).player; p.level = 30; game.recalc(p); p.hp = p.stats.maxHp;
 let fails = 0; const ok = (v, m) => { console.log((v ? 'OK  ' : 'FAIL') + ' ' + m); if (!v) fails++; };
