@@ -1526,6 +1526,12 @@ export class Game {
         if (who && Math.random() < Math.min(1, ch * 1.4)) this.spawnDrop(m.x, m.y, item, Math.min(owed(who), Math.max(1, Math.round(rand(a, b)))), who.id);
       }
     }
+    // lot 3 : un objet ordinaire qui ne tombe que pour une quête en cours (trois fois au plus par pirate : pas de filon)
+    for (const [item, ch] of def.qloot || []) {
+      const owed = (q) => { let n = this.questNeeds(q, item); for (const d of this.drops.values()) if (d.item === item && d.owner === q.id) n -= d.n; return n; };
+      const who = [top, ...[...m.tags.keys()].map((id) => this.players.get(id))].find((q) => q && !q.dead && owed(q) > 0 && ((q.cnt.ql && q.cnt.ql[item]) || 0) < 3);
+      if (who && Math.random() < ch) { who.cnt.ql = who.cnt.ql || {}; who.cnt.ql[item] = (who.cnt.ql[item] || 0) + 1; this.spawnDrop(m.x, m.y, item, 1, who.id); }
+    }
   }
   // combien d'exemplaires de cet objet les quêtes en cours réclament-elles encore ?
   questNeeds(p, item) {

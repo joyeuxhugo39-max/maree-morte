@@ -320,11 +320,11 @@ Object.assign(QUESTS, {
     done: "Tu as éteint le Brasier ? Par ma barbe... je n'en ai pas, mais par celle de mon père : tu es une légende.",
   },
   marchandise: {
-    name: 'Marchandise discrète', giver: 'receleur', turnin: 'receleur', level: 10,
-    goals: [{ type: 'collect', item: 'coffret_bijoux', n: 1, text: 'Un coffret à bijoux (cambriolage)' }],
+    name: 'Marchandise discrète', giver: 'receleur', turnin: 'receleur', level: 12,
+    goals: [{ type: 'collect', item: 'coffret_bijoux', n: 1, text: 'Un coffret à bijoux (cambriolage, ou sur un flibustier des collines)' }],
     rewards: { xp: 1500, gold: 2500, items: [['crochets', 3]] },
-    offer: "Un client cherche un coffret à bijoux. N'importe lequel. Vous savez où on en trouve : chez les autres. Rapportez-m'en un, et je paie le double de ce qu'il vaut.",
-    progress: 'On trouve des coffrets en cambriolant les maisons des autres pirates.',
+    offer: "Un client cherche un coffret à bijoux. N'importe lequel. Vous savez où on en trouve : chez les autres. Et si crocheter n'est pas votre fort, les flibustiers maudits des collines ont pillé plus d'une demeure avant de crever : ils traînent encore leur butin. Rapportez-m'en un, et je paie le double de ce qu'il vaut.",
+    progress: 'Un coffret se trouve en cambriolant la maison d’un autre pirate, ou sur un flibustier maudit des Collines de la Rade.',
     done: "Charmant. Je n'ai rien vu, vous n'avez rien vu, et voici votre or.",
   },
   naufrageur: {
@@ -641,16 +641,16 @@ Object.assign(QUESTS, {
   },
   lib_fosse: {
     name: 'Les épreuves de la Fosse', giver: 'maitre_fosse', turnin: 'maitre_fosse', level: 22,
-    goals: [{ type: 'kill', mob: 'goule_ecarlate', n: 8, text: 'Goules écarlates abattues' }, { type: 'kill', mob: 'coupe_jarret', n: 8, text: 'Coupe-jarrets abattus' }, { type: 'kill', mob: 'capitaine_naufrageur', n: 1, text: 'Grand-Feu abattu' }],
+    goals: [{ type: 'kill', mob: 'goule_ecarlate', n: 8, text: 'Goules écarlates abattues' }, { type: 'kill', mob: 'coupe_jarret', n: 8, text: 'Coupe-jarrets abattus' }, { type: 'kill', mob: 'capitaine_naufrageur', n: 1, text: 'Grand-Feu abattu' }, { type: 'act', act: 'fosse_vague', n: 5, text: 'Cinq vagues tenues dans la Fosse, devant la foule' }],
     rewards: { xp: 14000, gold: 2200, items: [['lame_executrice', 1]] },
-    offer: "Trois épreuves pour devenir champion de la Fosse : huit goules de la jungle, huit coupe-jarrets des Bas-Fonds, et la tête de Grand-Feu.",
-    progress: 'Goules dans la Jungle Écarlate (est), coupe-jarrets dans les Bas-Fonds la nuit, Grand-Feu dans la Baie (nord-est).',
+    offer: "Trois épreuves dehors pour devenir champion de la Fosse : huit goules de la jungle, huit coupe-jarrets des Bas-Fonds, et la tête de Grand-Feu. Et la dernière ici, devant la foule : cinq vagues.",
+    progress: 'Goules dans la Jungle Écarlate (est), coupe-jarrets dans les Bas-Fonds la nuit, Grand-Feu dans la Baie (nord-est). Puis cinq vagues dans la Fosse : parlez au maître de la Fosse pour descendre.',
     done: "Champion ! CHAMPION ! La Fosse n'avait pas crié comme ça depuis des années. Prenez la lame de l'exécutrice : elle revient au meilleur.",
     scene: [
       ['npc', "Tu regardes la Fosse comme un gamin regarde la mer. Tu veux te battre ?"],
       ['me', "Je me bats tous les jours. Dehors, sans gradins."],
       ['npc', "Ha ! Alors prouve-le. Dans la Fosse, on ne devient pas champion en tapant sur des mannequins. On devient champion en ramenant des preuves."],
-      { ask: [{ q: 'Quelles épreuves ?', a: [['npc', "Les goules écarlates de la jungle, les plus rapides de l'île. Les coupe-jarrets des Bas-Fonds, les plus vicieux. Et Grand-Feu, le plus fou. Trois épreuves, un champion."]] }], go: 'J’accepte' },
+      { ask: [{ q: 'Quelles épreuves ?', a: [['npc', "Les goules écarlates de la jungle, les plus rapides de l'île. Les coupe-jarrets des Bas-Fonds, les plus vicieux. Et Grand-Feu, le plus fou. Trois preuves à ramener. Puis tu descends ici, et tu tiens cinq vagues devant la foule : un champion, ça se voit."]] }], go: 'J’accepte' },
     ],
   },
   lib_vieux_sou: {

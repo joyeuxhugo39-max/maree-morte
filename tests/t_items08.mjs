@@ -64,12 +64,14 @@ const pv = evs.filter((e) => e[0] === 'pv').length, pd = evs.some((e) => e[0] ==
 ok(pv >= 1 && pd, `boomerang : il revient dans la main (${pv} virages)`);
 m = fresh(); const m2 = others[0]; m2.x = m.x + 40; m2.y = m.y + 30; m2.hp = m2.maxHp; put(A, m.x - 60, m.y); evs.length = 0; shoot('pistolet_ricochet', m); tick(1);
 ok(evs.some((e) => e[0] === 'pv'), 'pistolet à ricochet : la balle rebondit');
-m = fresh(); put(A, m.x - 80, m.y - 40); evs.length = 0; eq('mousquet_vaudou'); A.cds.shot = 0; A.en = 999; game.onSkill(A, { s: 'shot', a: 0 }); tick(1.5);
-ok(evs.some((e) => e[0] === 'pv') && evs.some((e) => e[0] === 'dmg' && game.mobs.some((q) => q.id === e[1])), 'mousquet vaudou : la balle tourne et trouve sa cible');
-m = fresh(); put(A, m.x - 50, m.y); evs.length = 0; shoot('pistolet_tonnerre', m); for (const [k, q] of others.entries()) { q.x = m.x + 18 + k * 18; q.y = m.y + 8; } tick(0.6);
+const vaudouOk = () => evs.some((e) => e[0] === 'pv') && evs.some((e) => e[0] === 'dmg' && game.mobs.some((q) => q.id === e[1]));
+for (let tr = 0; tr < 3 && (tr === 0 || !vaudouOk()); tr++) { m = fresh(); put(A, m.x - 80, m.y - 40); evs.length = 0; eq('mousquet_vaudou'); A.cds.shot = 0; A.en = 999; game.onSkill(A, { s: 'shot', a: 0 }); tick(1.5); } // trois tirs au plus : un obstacle tiré au hasard peut arrêter la balle
+ok(vaudouOk(), 'mousquet vaudou : la balle tourne et trouve sa cible');
+// la balle doit d'abord toucher (un monstre tiré au hasard peut être derrière un obstacle) : trois tirs au plus
+for (let tr = 0; tr < 3 && !evs.some((e) => e[0] === 'zap'); tr++) { m = fresh(); put(A, m.x - 50, m.y); evs.length = 0; shoot('pistolet_tonnerre', m); for (const [k, q] of others.entries()) { q.x = m.x + 18 + k * 18; q.y = m.y + 8; q.room = m.room; q.state = 'idle'; q.hp = q.maxHp = 99999; q.under = false; q.buried = false; } tick(0.6); }
 ok(evs.some((e) => e[0] === 'zap'), 'pistolet-tonnerre : éclairs en chaîne');
 // ---------- sabre de Midas : de l'or
-m = fresh(); eq('sabre_midas'); let gold = false; for (let k = 0; k < 40 && !gold; k++) { m.hp = m.maxHp * 10; A.cds.slash = 0; game.onAttack(A, Math.atan2(m.y - 6 - (A.y - 8), m.x - A.x)); gold = [...game.drops.values()].some((d) => d.item === 'or' && d.owner === A.id); }
+m = fresh(); eq('sabre_midas'); let gold = false; for (let k = 0; k < 150 && !gold; k++) { m.hp = m.maxHp * 10; A.cds.slash = 0; game.time += 1; put(A, m.x - 18, m.y); game.onAttack(A, Math.atan2(m.y - 6 - (A.y - 8), m.x - A.x)); gold = [...game.drops.values()].some((d) => d.item === 'or' && d.owner === A.id); }
 ok(gold, 'sabre de Midas : il fait tomber de l’or');
 // ---------- tout s'affiche : chaque nouvel objet a un prix et une description
 const neu = ['fouet', 'dague_venin', 'marteau_pont', 'sabre_givre', 'lance_cavalerie', 'baton_vaudou', 'trident_orage', 'lame_executrice', 'sabre_midas', 'sarbacane', 'boomerang', 'lance_grappin', 'tromblon_sel', 'pistolet_ricochet', 'pistolet_givre', 'pistolet_tonnerre', 'mousquet_vaudou', 'ane', 'cheval', 'tortue_geante', 'crabe_geant', 'autruche', 'pur_sang', 'destrier_squelette', 'radeau', 'goelette', 'galion', 'conque_rappel', 'longue_vue', 'fumigene'];

@@ -73,7 +73,9 @@ export const arena = {
     for (const q of this.players.values()) if (this.inFosse(q) || q.arena) this.send(q, msg);
   },
   spawnArenaWave() {
-    const r = this.arenaRun; r.wave++;
+    const r = this.arenaRun;
+    if (r.wave >= 1) for (const id of r.team) { const q = this.players.get(id); if (q && !q.dead) this.questAct(q, 'fosse_vague'); } // lot 3 : une vague tenue
+    r.wave++;
     const lv = r.lvl + (r.wave - 1) * 0.8, n = r.team.size;
     const pool = GRUNTS.filter((k) => MOBS[k] && MOBS[k].level <= lv + 2 && MOBS[k].level >= lv - 6);
     const types = pool.length ? pool : ['zsailor'];

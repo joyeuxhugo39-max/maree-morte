@@ -93,7 +93,8 @@ MOBS.tentacule = {
 for (const k of ['zsailor', 'buccaneer', 'ghoul']) MOBS[k].night = 1;
 const mob = (id, o) => { MOBS[id] = Object.assign({ aggro: 110, leash: 240, atkCd: 1.2, windup: 0.4, r: 7, respawn: 30 }, o); };
 mob('flibustier', { name: 'Flibustier maudit', level: 13, hp: 320, dmg: 25, speed: 41, range: 20, xp: 135, gold: [18, 36], groan: 1, night: 1, weapon: ['saber', 'steel'],
-  loot: [['dent_zombie', 0.5, 1, 2], ['rhum', 0.12, 1, 1], ['carte_dechiree', 0.05, 1, 1], ['tenue_boucanier', 0.012, 1, 1], ['hache_guerre', 0.01, 1, 1]] });
+  loot: [['dent_zombie', 0.5, 1, 2], ['rhum', 0.12, 1, 1], ['carte_dechiree', 0.05, 1, 1], ['tenue_boucanier', 0.012, 1, 1], ['hache_guerre', 0.01, 1, 1]],
+  qloot: [['coffret_bijoux', 0.25]] }); // lot 3 : le fruit de leurs pillages, pour la « Marchandise discrète » du receleur
 mob('chien_mort', { name: 'Molosse crevé', level: 12, hp: 210, dmg: 21, speed: 74, range: 16, atkCd: 0.8, windup: 0.25, xp: 110, gold: [6, 15], night: 1,
   loot: [['os_maudit', 0.3, 1, 2]] });
 mob('pendu', { name: 'Pendu', level: 15, hp: 380, dmg: 28, speed: 36, range: 21, xp: 170, gold: [15, 33], groan: 1, night: 1,

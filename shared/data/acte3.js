@@ -190,7 +190,7 @@ export const DONJONS = {
     sceneDone: [
       ['npc', "Tu as l'air trempé jusqu'à l'âme. Alors ? Ys ?"],
       ['me', "Des rues, des colonnes, des statues… et un roi assis sur son trône, qui ne dort pas."],
-      ['npc', "Gradlon. Le roi d'Ys. La légende dit qu'il a ouvert les portes de la mer lui-même. Je savais qu'il était encore là. Garde ce casque : tu en auras besoin, si tu retournes lui rendre visite."],
+      ['npc', "Gradlon. Le roi d'Ys. La légende dit qu'il a ouvert les portes de la mer lui-même. Je savais qu'il était encore là. Ysaline m'a confié son casque de scaphandrier pour toi, au cas où tu remonterais : garde-le, tu en auras besoin si tu retournes lui rendre visite."],
     ],
   },
   roi_ys: {
@@ -200,6 +200,23 @@ export const DONJONS = {
     offer: "Gradlon garde Ys, et Ys garde les cloches. Tant qu'il siège, les cloches sonnent, et les marins qui les entendent se jettent à l'eau. Il faut qu'il se taise. Prends des amis, et beaucoup d'air.",
     progress: 'Ys-la-Noyée, au sud-est du Gouffre : la cloche de plongée, puis le trône au fond de la cité.',
     done: "Les cloches se sont tues. Pour la première fois depuis que je suis né, la nuit est silencieuse au-dessus du Gouffre.",
+    // lot 3 : la seule grande quête sans conversation jouée — Elouan, qui entend les cloches depuis toujours
+    scene: [
+      ['npc', "Tu les entends, toi aussi ? Depuis que tu es descendu là-bas, elles sonnent plus fort. Chaque nuit un peu plus."],
+      ['me', "Les cloches d'Ys. J'ai vu le trône. Et celui qui est assis dessus."],
+      ['npc', "Gradlon. On raconte qu'il a ouvert lui-même les portes de la mer, pour sauver sa fille ou pour la punir : ça dépend de qui a bu. Ce qui ne change pas, c'est ce que font les cloches. Les marins qui les entendent marchent vers l'eau, les yeux ouverts, et ils n'en reviennent pas."],
+      { ask: [
+        { q: 'Comment le vaincre ?', a: [['npc', "Je n'en sais rien. Je sais qu'il siège au fond de la cité, et qu'autour de lui l'air se fait rare. Prends des amis, le casque d'Ysaline, et pas de détour : chaque bulle compte."]] },
+        { q: 'Pourquoi y tiens-tu tant ?', a: [['npc', "Mon père les a entendues, une nuit de brume, à la barre de son navire. Il a lâché la roue, il a enjambé le bastingage, et il souriait. J'avais neuf ans. Je voudrais dormir une nuit sans entendre ce sourire."]] },
+      ], go: 'Je le ferai taire' },
+    ],
+    sceneDone: [
+      ['npc', "…Écoute."],
+      ['me', "Je n'entends rien."],
+      ['npc', "Justement. Rien. Pas une cloche, pas un écho. Pour la première fois depuis que je suis né, la nuit est silencieuse au-dessus du Gouffre."],
+      ['me', "Gradlon ne siège plus. Ys n'est plus qu'une ville morte, et elle se tait."],
+      ['npc', "Alors laissons-la dormir. Voilà ta part, et va boire une tournée à la santé de mon père : il aurait aimé te serrer la main."],
+    ],
   },
   bastion: {
     name: 'Le Bastion Englouti', giver: 'kerbrat', turnin: 'kerbrat', level: 22, requires: ['freres_cote'], ach: 'bastion',
