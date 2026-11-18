@@ -7,7 +7,7 @@
 * { box-sizing: border-box; font-variant-ligatures: none; }
 html, body { margin: 0; height: 100%; background: #0b1622; overflow: hidden; font-family: var(--ui); color: var(--text); -webkit-user-select: none; user-select: none; touch-action: none; }
 #game { position: fixed; inset: 0; }
-#view { position: absolute; left: 0; top: 0; image-rendering: pixelated; image-rendering: crisp-edges; cursor: crosshair; }
+#view { position: absolute; left: 0; top: 0; image-rendering: pixelated; image-rendering: crisp-edges; cursor: crosshair; filter: saturate(0.9) contrast(1.08) brightness(0.98) sepia(0.06); } /* finition : l'étalonnage de l'archipel — des verts moins criards, plus de profondeur, une pointe de chaleur */
 .hidden { display: none !important; }
 kbd { font-family: var(--ui); font-size: 11px; background: #2a1a10; color: var(--gold); border: 1px solid #000; border-bottom-width: 2px; padding: 0 4px; border-radius: 2px; }
 #vignette { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 140px rgba(150, 0, 0, 0); transition: box-shadow 0.25s; }
@@ -682,3 +682,14 @@ table.ladder td { padding: 4px; border-bottom: 1px dashed rgba(96, 54, 22, 0.25)
 #shiphud #sh-wind-a { font-size: 15px; color: var(--sea); line-height: 1; }
 #shiphud .sh-wind div { display: flex; flex-direction: column; }
 #shiphud #sh-hint { flex-basis: 100%; text-align: center; color: var(--text); font-size: 11px; text-shadow: 0 1px 0 #000, 0 0 3px #000; }
+/* finition : les jauges du pirate — un liseré de laiton, un reflet, des graduations, et la trace des PV perdus */
+.bar { background: linear-gradient(#170d07, #2a1a0e); border: 1px solid #0a0503; border-radius: 2px; box-shadow: 0 0 0 1px #9a7838, 0 0 0 2px #2a1a0c, inset 0 2px 3px rgba(0, 0, 0, 0.7), 0 3px 4px rgba(0, 0, 0, 0.45); overflow: hidden; }
+.bar .fill { border-right: 1px solid rgba(255, 240, 200, 0.55); }
+.bar .fill::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 11px, rgba(0, 0, 0, 0.16) 11px 12px); }
+.bar .fill::after { content: ''; position: absolute; left: 0; right: 0; top: 1px; height: 38%; background: linear-gradient(rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0)); }
+.bar .trail { position: absolute; inset: 0; width: 100%; background: linear-gradient(#ffe0b0, #e8a060); opacity: 0.75; transition: width 0.55s 0.3s ease-out; }
+.bar.hp .fill { background: linear-gradient(#ff8a72, #e0443a 45%, #8a1c1c); }
+.bar.en .fill { background: linear-gradient(#ffe89a, #eab43a 45%, #9a6410); }
+.bar span { z-index: 1; letter-spacing: 0.3px; }
+.card-name { letter-spacing: 0.3px; }
+.lvl { background: linear-gradient(#ffe08a, var(--gold) 55%, #b8841a); box-shadow: 0 0 0 1px #5a3a0a, inset 0 1px 0 rgba(255, 255, 255, 0.5); }

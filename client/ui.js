@@ -164,7 +164,7 @@ export class UI {
     if (!me) return;
     if (now - (this.lastHud || 0) > 0.08) {
       this.lastHud = now;
-      $('hp-fill').style.width = (me.hp / me.maxHp * 100).toFixed(1) + '%';
+      $('hp-fill').style.width = (me.hp / me.maxHp * 100).toFixed(1) + '%'; $('hp-trail').style.width = $('hp-fill').style.width; // la trace des PV perdus suit, un peu en retard
       $('hp-txt').textContent = `${me.hp} / ${me.maxHp}`;
       $('en-fill').style.width = (me.en / me.maxEn * 100).toFixed(1) + '%';
       $('en-txt').textContent = `${me.en} / ${me.maxEn}`;

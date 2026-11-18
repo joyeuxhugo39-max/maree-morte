@@ -66,6 +66,38 @@ const RING3 = RING.filter((r) => r[2] <= 3.2);
 const TUFT = [[-2, -2, 4], [-1, -1, 3], [0, -3, 4], [0, -2, 3], [0, -1, 2], [1, -1, 3], [2, -2, 4], [-1, 0, 0], [0, 0, 0], [1, 0, 0]];
 const FLOWER_COLS = [0xffffff, 0xffe066, 0xff93b8, 0xbfa8ff, 0xff7a5c, 0x8fe3ff];
 
+// finition : un rocher des fonds marins (bloc de tuiles CWALL posé sur le sable) — arrondi, éclairé d'en haut,
+// piqué de corail rose et frangé d'algues
+const REEF = [0x17242a, 0x24363d, 0x34494f, 0x476168, 0x617c80, 0x82a0a0];
+// le sable, tel que le dessine la case SAND (pour que le rocher se pose dessus sans couture)
+function sandAt(wx, wy) {
+  const P = PAL[T.SAND], n = valueNoise(wx / 23, wy / 23, 41) * 0.7 + valueNoise(wx / 5, wy / 5, 42) * 0.3;
+  let k = n < 0.36 ? 1 : n < 0.62 ? 2 : 3;
+  const h = hash2(wx, wy, 43); if (h > 0.986) k = 4; else if (h < 0.012) k = 0;
+  const rip = (wy + Math.floor(valueNoise(wx / 11, wy / 30, 44) * 8)) % 8;
+  if (rip === 0 && k > 1 && valueNoise(wx / 40, wy / 40, 45) > 0.5) k -= 1;
+  return P[k];
+}
+function reefRock(wx, wy, lx, ly, at) {
+  let dl = 0, dr = 0, du = 0, dd = 0;
+  while (dl < 48 && at(lx - dl - 1, ly) === T.CWALL) dl++;
+  while (dr < 48 && at(lx + dr + 1, ly) === T.CWALL) dr++;
+  while (du < 48 && at(lx, ly - du - 1) === T.CWALL) du++;
+  while (dd < 48 && at(lx, ly + dd + 1) === T.CWALL) dd++;
+  // une forme de galet : un ovale irrégulier dans le bloc, éclairé d'en haut à gauche
+  const w = dl + dr + 1, h = du + dd + 1, nx = (dl - (w - 1) / 2) / (w / 2), ny = (du - (h - 1) / 2) / (h / 2);
+  const ang = Math.atan2(ny, nx), r = 0.9 + (valueNoise(Math.cos(ang) * 2 + wx / 64, Math.sin(ang) * 2 + wy / 64, 174) - 0.5) * 0.34;
+  const d = Math.hypot(nx, ny * 1.08);
+  if (d > r) { const s = sandAt(wx, wy), sh = ny > 0 || nx > 0 ? Math.max(0, 0.26 - (d - r) * 1.1) : 0; return sh > 0 ? shade(s, 1 - sh) : s; } // autour : le sable, et l'ombre du rocher en bas à droite
+  const z = Math.sqrt(Math.max(0, 1 - (d / r) * (d / r))), n = valueNoise(wx / 3, wy / 3, 171);
+  let k = 0.6 + z * 2.4 - nx * 0.9 - ny * 1.3 + (n - 0.5) * 1.4;
+  if (d > r - 0.12) k -= 1.1; // le contour sombre
+  let col = REEF[Math.max(0, Math.min(5, Math.floor(k)))];
+  const hs = hash2(wx, wy, 172);
+  if (ny < -0.1 && hs > 0.955) col = hs > 0.98 ? 0xf08aa0 : 0xe8a060; // du corail sur le dessus
+  if (ny > 0.35 && d > r * 0.6 && valueNoise(wx / 2, wy / 5, 173) > 0.58) col = 0x3a7a52; // des algues au pied
+  return col;
+}
 export class Terrain {
   constructor(world) {
     this.w = world;
@@ -366,6 +398,8 @@ export class Terrain {
           break;
         }
         case T.CWALL: {
+          const rw = W.roomGrid[(wy >> 4) * MAP_W + (wx >> 4)], rmw = rw >= 0 ? W.rooms[rw] : null;
+          if (rmw && rmw.kind === 'underwater') { col = reefRock(wx, wy, lx, ly, at); break; } // finition : les rochers des fonds
           const P = PAL[T.CWALL];
           let below = 0;
           while (below < 14 && at(lx, ly + below + 1) === T.CWALL) below++;

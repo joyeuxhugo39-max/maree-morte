@@ -23,6 +23,7 @@ import './sprites-08.js';
 import { raceCourse } from '../../shared/data/seasons.js';
 import { mountSheet } from './sprites-mounts.js';
 import { shipRender } from './ships.js'; // 1.1 : les vrais navires
+import { lighting } from './lighting.js'; // finition : la lumière en couleur
 import { BERTHS, berthPos, MOB_SHIP } from '../../shared/data/ships.js';
 
 const TAU = Math.PI * 2;
@@ -358,7 +359,7 @@ export class Renderer {
     } else this.critters.length = 0;
     this.drawLighting(ctx, G, camX, camY, now, dark, f);
     if (room && room.kind === 'underwater') this.drawUnderwaterTop(ctx, now); // 1.0 : sous la mer
-    if (!room && dark > 0.2 && isFullMoon(G.worldTime || 0)) { ctx.fillStyle = `rgba(120,18,30,${0.12 * dark})`; ctx.fillRect(0, 0, W, H); } // la pleine lune rougit la nuit
+    if (!room && dark > 0.2 && isFullMoon(G.worldTime || 0)) { ctx.fillStyle = `rgba(120,18,30,${0.05 * dark})`; ctx.fillRect(0, 0, W, H); } // la pleine lune rougit la nuit
     if (!room) { this.drawCritters(ctx, camX, camY, now, dark, true); this.drawWeather(ctx, G, now, dt, dark); }
     else { this.weather = { rain: 0, storm: 0, kind: 0 }; this.rain.length = 0; }
     this.drawLabels(ctx, G, draw, camX, camY, now);
@@ -1482,89 +1483,9 @@ export class Renderer {
       if (tileAt(this.world, x, y) === T.SWAMP) this.burst(x, y, 2, { z: 0, col: ['#7a9a5a', '#a8c080'], up: 14, speed: 3, life: 0.5, g: 30 });
     }
   }
-  drawLighting(ctx, G, camX, camY, now, dark, f) {
-    const W = this.W, H = this.H, room = this.room, cave = room && (room.kind === 'cave' || room.kind === 'underwater');
-    // teinte du crépuscule et de l'aube
-    const dusk = room ? 0 : f > 0.5 && f < 0.66 ? Math.sin((f - 0.5) / 0.16 * Math.PI) : f > 0.87 && f < 0.99 ? Math.sin((f - 0.87) / 0.12 * Math.PI) * 0.7 : 0;
-    if (dusk > 0) { ctx.fillStyle = `rgba(255,120,60,${0.16 * dusk})`; ctx.fillRect(0, 0, W, H); }
-    const z = G.player ? zoneAt(this.world, G.player.x, G.player.y) : Z.TOWN;
-    const gloom = room ? (cave ? 1 : 0.6) : (z === Z.SWAMP || z === Z.WRECK) ? 0.2 : 0;
-    const wx = this.weather || { rain: 0, storm: 0 };
-    const town = !room && SAFE.has(z); // 1.0 : les villes luisent la nuit
-    const a = (town ? 0.9 : 1) * (room ? (cave ? 0.74 : 0.36) : Math.min(0.82, dark * 0.72 + gloom * (1 - dark * 0.55) + wx.rain * 0.12 * (1 - dark * 0.5) + wx.storm * 0.14 * (1 - dark * 0.5)));
-    if (a < 0.02) return;
-    const L = this.lctx;
-    L.globalCompositeOperation = 'source-over';
-    L.clearRect(0, 0, W, H);
-    L.fillStyle = `rgba(6,12,34,${a})`;
-    L.fillRect(0, 0, W, H);
-    L.globalCompositeOperation = 'destination-out';
-    const cut = (x, y, r, k = 1) => { L.globalAlpha = k; L.drawImage(this.mask, x - r - camX, y - r - camY, r * 2, r * 2); };
-    const vis = [];
-    for (const l of this.lights) {
-      if (l.x < camX - 140 || l.x > camX + W + 140 || l.y < camY - 140 || l.y > camY + H + 140) continue;
-      if (l.win && (dark < 0.25 || room)) continue;
-      const fl = l.flicker ? 1 + Math.sin(now * 9 + l.x) * 0.04 + Math.sin(now * 23 + l.y) * 0.03 : 1;
-      cut(l.x, l.y, l.r * fl, l.soft ? 0.7 : 1);
-      vis.push([l, fl]);
-    }
-    if (G.player) cut(G.player.x, G.player.y - 10, cave ? 112 : 62, cave ? 1 : 0.8);
-    if (room) for (const d of this.world.doors) if (d.room === room.id) { cut(d.ex, d.ey, 52, 0.9); vis.push([{ x: d.ex, y: d.ey + 4, r: 44, c: dark > 0.5 ? 'cold' : 'white', soft: 1 }, 1]); }
-    if (G.structs) for (const st of G.structs.values()) {
-      const def = STRUCTS[st.type];
-      if (!def.light) continue;
-      const x = st.tx * TILE + 8, y = st.ty * TILE + 4;
-      if (x < camX - 120 || x > camX + W + 120 || y < camY - 120 || y > camY + H + 120) continue;
-      const fl = 1 + Math.sin(now * 9 + x) * 0.05;
-      cut(x, y, def.light * fl, 1);
-      vis.push([{ x, y, r: def.light, c: 'warm', flicker: 1 }, fl]);
-    }
-    for (const e of G.ents.values()) if (e.k === 'p') cut(e.x, e.y - 10, 44, 0.6);
-    if (!room) for (const fo of G.folk || []) if (fo.lantern && !fo.hidden && fo.x > camX - 80 && fo.x < camX + W + 80 && fo.y > camY - 80 && fo.y < camY + H + 80) { cut(fo.x + 5, fo.y - 12, 56, 1); vis.push([{ x: fo.x + 5, y: fo.y - 12, r: 50, c: 'warm', flicker: 1 }, 1 + Math.sin(now * 8 + fo.x) * 0.05]); }
-    if (!room && dark > 0.2) for (const g of this.garlands) if (g.x1 > camX && g.x0 < camX + W && g.y1 > camY && g.y0 < camY + H) cut((g.x0 + g.x1) / 2, (g.y0 + g.y1) / 2 + 4, (g.x1 - g.x0) * 0.55, 0.45);
-    for (const p of this.projs.values()) cut(p.x, p.y, 16, 0.8);
-    if (!room) for (const [lx, ly] of this.shipLights(G)) if (lx > camX - 90 && lx < camX + W + 90 && ly > camY - 90 && ly < camY + H + 90) { const fl = 1 + Math.sin(now * 9 + lx) * 0.05; cut(lx, ly, 62 * fl, 1); vis.push([{ x: lx, y: ly, r: 52, c: 'warm', flicker: 1 }, fl]); } // 1.1 : les fanaux des navires
-    for (const fx of this.fx) if (fx.kind === 'boom' || fx.kind === 'flash') cut(fx.x, fx.y, (fx.r || 30) * 2.2, Math.max(0, 1 - (now - fx.t0) / fx.dur));
-    // faisceau du phare
-    const LH = room ? null : this.lighthouse;
-    if (LH && dark > 0.2) {
-      const ang = now * 0.55;
-      L.globalAlpha = 0.55 * dark;
-      L.fillStyle = '#000';
-      L.beginPath();
-      L.moveTo(LH.x - camX, LH.y - camY);
-      L.arc(LH.x - camX, LH.y - camY, 420, ang - 0.13, ang + 0.13);
-      L.closePath(); L.fill();
-      cut(LH.x, LH.y, 46, 1);
-    }
-    L.globalAlpha = 1;
-    L.globalCompositeOperation = 'source-over';
-    ctx.drawImage(this.light, 0, 0);
-    // halos colorés
-    ctx.globalCompositeOperation = 'lighter';
-    for (const [l, fl] of vis) {
-      const g = this.glows[l.c] || this.glows.warm;
-      ctx.globalAlpha = (l.win ? 0.5 : 0.8) * (room ? (l.soft ? 0.7 : 0.9) : Math.min(1, dark * 1.4 + gloom));
-      const r = l.r * fl * (l.win ? 0.8 : 0.9);
-      ctx.drawImage(g, l.x - r - camX, l.y - r - camY, r * 2, r * 2);
-    }
-    if (LH && dark > 0.2) {
-      const ang = now * 0.55;
-      ctx.globalAlpha = 0.14 * dark;
-      ctx.fillStyle = '#fff4c0';
-      ctx.beginPath(); ctx.moveTo(LH.x - camX, LH.y - camY); ctx.arc(LH.x - camX, LH.y - camY, 420, ang - 0.1, ang + 0.1); ctx.closePath(); ctx.fill();
-      ctx.globalAlpha = 0.9 * dark; ctx.drawImage(this.glows.white, LH.x - 30 - camX, LH.y - 30 - camY, 60, 60);
-    }
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = 1;
-    if (!room && dark > 0.2) this.drawGarlands(ctx, camX, camY, now, dark, true);
-    // fenêtres allumées
-    if (dark > 0.25 && !room) {
-      ctx.fillStyle = `rgba(255,214,110,${Math.min(1, (dark - 0.25) * 2)})`;
-      for (const [l] of vis) if (l.win) ctx.fillRect(Math.round(l.win.x - camX), Math.round(l.win.y - camY), l.win.w, l.win.h);
-    }
-    // yeux luisants des morts
-    if (a > 0.15) {
+  // yeux luisants des morts (finition : appelé par l'éclairage, voir lighting.js)
+  drawEyes(ctx, G, camX, camY, now, a) {
+    {
       for (const e of G.ents.values()) {
         if (e.k !== 'm' || !e.sheet || e.dyingT) continue;
         const sh = e.sheet, dir = (now - (e.atkT || -9) < 0.28) ? dirFromAngle(e.atkA) : e.dir & 3;
@@ -1871,3 +1792,4 @@ export function dirFromAngle(a) {
   return Math.abs(c) > Math.abs(s) ? (c < 0 ? 1 : 2) : (s < 0 ? 3 : 0);
 }
 Object.assign(Renderer.prototype, shipRender); // 1.1 : les navires (client/render/ships.js)
+Object.assign(Renderer.prototype, lighting); // finition : l'éclairage (client/render/lighting.js)

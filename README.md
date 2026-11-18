@@ -25,6 +25,20 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Nouveautés de la version 1.1.1 : la finition graphique
+
+- **Une lumière en couleur.**
+  - L'éclairage ne perce plus un voile noir. Une carte de lumière colorée multiplie la scène : le jour blanc et chaud, l'or du couchant, le rose de l'aube, le bleu de lune la nuit (rouge les nuits de pleine lune), la pénombre chaude des intérieurs, le noir violet des grottes, le vert d'eau des fonds.
+  - Les sources y ajoutent leur couleur : lanternes et feux orangés, magies froides, feux-follets verts, cristaux violets, fanaux des navires, faisceau du phare, explosions. Les lanternes éclairent donc vraiment le pavé et les murs, sans paliers ni disques blancs.
+  - Un halo doux reste sur les sources seulement, les vitres s'allument chaudes, et les yeux des morts luisent dans le noir.
+- **Un étalonnage commun**, pour une même identité partout :
+  - des verts moins criards, plus de contraste et une pointe de chaleur sur tout le monde ;
+  - une teinte par lieu (marais, îles maudites, volcan, brumes), la pluie et l'orage qui assombrissent ;
+  - l'heure dorée qui embrase le ciel au couchant ;
+  - un léger vignettage.
+- **Les fonds marins** : les rochers ne sont plus des carrés sombres, mais des galets arrondis, éclairés d'en haut, piqués de corail et frangés d'algues, posés sur le sable.
+- **Les jauges du pirate** (PV, énergie) prennent le style du reste de l'interface : un liseré de laiton, un reflet, des graduations, et la trace des PV perdus.
+
 ## Nouveautés de la version 1.1 : de vrais navires
 
 Les navires ne sont plus des montures qu'on met à l'eau n'importe où : ce sont de vrais navires, qui restent
@@ -335,6 +349,7 @@ client/
   tavern-ui.js     mini-jeux de taverne
   townsfolk.js     habitants des villes
   render/ships.js  le dessin des navires (coque, pont, mâture, voiles, sillage)
+  render/lighting.js  la lumière (carte de lumière colorée, ambiances, halos, vignettage)
   scene.js         dialogues cinématiques (portraits, répliques, questions au choix)
   cine.js          cinématiques des boss
   render/          moteur de rendu et pixel art procédural (sprites-volcan.js : la montagne ; sprites-cite.js : Libertalia)
