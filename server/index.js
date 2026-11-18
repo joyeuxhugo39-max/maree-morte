@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import { WebSocketServer } from 'ws';
 import { Game } from './game.js';
 import { FileStorage } from './db.js';
+import { installDev } from './dev.js';
 import { TICK_RATE } from '../shared/constants.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -40,6 +41,7 @@ async function adminApi(req, res, cmd, q) {
     if (cmd === 'journal') return json(res, 200, await storage.readJournal(q.get('day'), q.get('q') || ''));
     if (cmd === 'accounts') return json(res, 200, await storage.listAccounts(q.get('q') || ''));
     if (cmd === 'snapshots') return json(res, 200, await storage.listSnapshots());
+    if (cmd === 'dev-revoke' && req.method === 'POST') return json(res, 200, dev.revokeAll()); // lot 2 : coupe toutes les sessions développeur
     if (cmd === 'snapshot' && req.method === 'POST') return json(res, 200, { ok: true, name: await storage.snapshot('admin') });
     if (cmd === 'restore' && req.method === 'POST') {
       const key = String(body.name || '').toLowerCase();
@@ -73,6 +75,8 @@ const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 // 1.0 : un instantané avant tout démarrage (donc avant chaque déploiement), puis toutes les heures
 await storage.snapshot('demarrage').then((n) => log('[sauvegarde] instantané', n)).catch((e) => log('[sauvegarde] instantané impossible', e.message));
 const game = new Game({ storage, log });
+// lot 2 : outils développeur — inactifs tant que DEV_ACCOUNTS et DEV_SECRET ne sont pas définis sur le serveur
+const dev = installDev(game);
 setInterval(() => { storage.snapshot().then((n) => log('[sauvegarde] instantané', n)).catch((e) => log('[sauvegarde] instantané impossible', e.message)); }, 3600 * 1000);
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096 });
 

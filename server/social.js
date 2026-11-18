@@ -75,8 +75,8 @@ export const social = {
       case 'unfriend': p.friends.delete(key); break;
       case 'block': if (!key || key === p.key) return; p.blocked.add(key); p.friends.delete(key); this.toast(p, `Vous n’entendrez plus ${name}.`, 'info'); break;
       case 'unblock': p.blocked.delete(key); break;
-      case 'invite': return this.groupInvite(p, q);
-      case 'accept': return this.groupAccept(p, q);
+      case 'invite': if (this.labWall(p, q)) return; return this.groupInvite(p, q);
+      case 'accept': if (this.labWall(p, q)) return; return this.groupAccept(p, q);
       case 'decline': if (q) this.toast(q, `${p.name} décline votre invitation.`, 'info'); return;
       case 'leave': return this.groupLeave(p);
       case 'kick': { const g = p.group && this.groups.get(p.group); if (g && g.leader === p.id && q && q.group === g.id) this.groupLeave(q, 'Vous avez été retiré du groupe.'); return; }
@@ -140,6 +140,7 @@ export const social = {
   },
   // ------------------------------------------------------------ équipages
   crewAction(p, a, m) {
+    if (p.lab) return this.labWall(p); // lot 2
     const c = p.crew ? this.crews.get(p.crew) : null, rank = c ? c.members[p.key] : null;
     switch (a) {
       case 'create': {
@@ -159,7 +160,7 @@ export const social = {
       case 'invite': {
         if (!c || rank === 'matelot') return this.toast(p, 'Seuls le capitaine et les officiers recrutent.', 'warn');
         const q = this.byName(m.name); if (!q || q.crew) return this.toast(p, q ? `${q.name} a déjà un équipage.` : 'Pirate introuvable.', 'warn');
-        if (this.blocks(q, p)) return;
+        if (this.labWall(p, q) || this.blocks(q, p)) return;
         q.crewInvite = { id: c.id, until: this.time + 120 };
         this.send(q, { t: 'ask', kind: 'equipage', from: p.name, crew: c.name, tag: c.tag });
         return this.toast(p, `Invitation envoyée à ${q.name}.`, 'info');
@@ -211,6 +212,7 @@ export const social = {
       case 'ask': {
         const q = this.byName(m.name);
         if (!q || q === p || q.dead || p.dead) return this.toast(p, 'Pirate introuvable.', 'warn');
+        if (this.labWall(p, q)) return; // lot 2
         if (this.blocks(q, p)) return this.toast(p, `${q.name} ne souhaite pas commercer avec vous.`, 'warn');
         if (this.trades.has(p.id) || this.trades.has(q.id)) return this.toast(p, 'Un échange est déjà en cours.', 'warn');
         if (q.room !== p.room || Math.hypot(q.x - p.x, q.y - p.y) > 120) return this.toast(p, 'Approchez-vous pour échanger.', 'warn');

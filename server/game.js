@@ -2,7 +2,7 @@
 // aussi dans le navigateur pour le mode solo.
 import {
   TILE, TICK_RATE, AOI_X, AOI_Y, INV_SIZE, SLOTS, DAY_LENGTH, ROLL_TIME, ROLL_SPEED,
-  INTERACT_RANGE, PICKUP_RANGE, T, dayFrac, isNight, weatherAt, DAY_LENGTH as DAYLEN, isFullMoon,
+  INTERACT_RANGE, PICKUP_RANGE, T, dayFrac, isNight, weatherAt, WX, DAY_LENGTH as DAYLEN, isFullMoon,
   SAVE_VERSION, PROTOCOL, GAME_VERSION, SEEN_CELL,
 } from '../shared/constants.js';
 // 1.0 : la brume — un bit par carré de 8 cases de l'archipel, encodé en base64 dans la sauvegarde
@@ -181,7 +181,7 @@ export class Game {
     this.sessions.delete(conn);
     if (s && s.player) this.logout(s.player);
   }
-  logout(p) {
+  logout(p, quiet = false) {
     if (!this.players.has(p.id)) return;
     this.socialLogout(p);
     this.save(p);
@@ -189,7 +189,7 @@ export class Game {
     this.players.delete(p.id);
     if (!this.worldPersist) { this.removeBase(p.key); this.removeHome(p.key); }
     for (const m of this.mobs) if (m.target === p.id) m.target = 0;
-    this.broadcastChat(null, `${p.name} a quitté l'archipel.`, 'sys');
+    if (!quiet) this.broadcastChat(null, `${p.name} a quitté l'archipel.`, 'sys');
     this.log(`[jeu] ${p.name} déconnecté (${this.players.size} en ligne)`);
   }
   send(p, msg) { try { p.conn.send(msg); } catch (e) { /* connexion fermée */ } }
@@ -202,6 +202,8 @@ export class Game {
     s.lastRefill = this.time;
     if (s.bucket < 1) return;
     s.bucket -= 1;
+    // lot 2 : outils développeur — branchés seulement par le serveur Node (server/dev.js) ; ailleurs, refus net
+    if (m.t === 'dev') return this.devHook ? this.devHook(conn, s, m) : conn.send({ t: 'dev', a: 'refus', msg: 'Accès refusé.' });
     if (!s.player) { if (m.t === 'login' && !s.pending) this.login(conn, s, m); return; }
     const p = s.player;
     switch (m.t) {
@@ -298,7 +300,11 @@ export class Game {
       this.log(`[sauvegarde] ${name} : sauvegarde v${res.data.sv} plus récente que le serveur (v${SAVE_VERSION}), connexion refusée`);
       return conn.send({ t: 'err', msg: 'Ce pirate a été sauvegardé par une version plus récente du jeu. Revenez quand le serveur sera à jour.' });
     }
-    let data = migrateSave(res.data);
+    return this.enterWorld(conn, s, { name, key, raw: res.data, look: m.look, ip });
+  }
+  // place un pirate dans le monde (connexion, ou lot 2 : passage au personnage laboratoire et retour)
+  async enterWorld(conn, s, { name, key, raw, look, ip, lab = null }) {
+    let data = migrateSave(raw);
     for (const other of [...this.players.values()]) {
       if (other.key !== key) continue;
       data = this.serialize(other); // l'état vivant est plus récent que la sauvegarde
@@ -308,16 +314,17 @@ export class Game {
       this.logout(other);
       if (os) { os[1].player = null; try { os[0].close(); } catch (e) { /* déjà fermée */ } }
     }
-    res = { ok: true, data };
-    const p = this.createPlayer(conn, name, key, data, m.look);
+    const res = { ok: true, data };
+    const p = this.createPlayer(conn, name, key, data, look);
+    if (lab) { Object.assign(p, lab); if (!data) p.tut = 99; } // lot 2 : marqué laboratoire avant tout le reste
     s.player = p;
     this.players.set(p.id, p);
     this.shipLogin(p); // 1.1 : son navire (et son pont, s'il y était)
     if (p.pendingBase) { this.refundBase(p.key, p.pendingBase); p.pendingBase = null; }
     if (p.pendingHome) { this.importHome(p.key, p.name, p.pendingHome); p.pendingHome = null; }
     this.convertLegacy(p);
-    const token = await this.makeToken(key);
-    p.ip = ip; this.audit('connexion', { who: key, ip });
+    const token = await this.makeToken(lab ? lab.labOf : key); // la reprise ramène toujours au vrai personnage
+    p.ip = ip; this.audit(lab ? 'labo-entree' : 'connexion', { who: lab ? lab.labOf : key, char: key, ip });
     this.send(p, {
       t: 'welcome', id: p.id, seed: this.world.seed, wt: this.worldTime, solo: this.solo, rt: token, ver: GAME_VERSION, maint: this.maintenance || null, seen: b64(p.seen),
       codex: { kc: p.kc, met: [...p.met], col: [...p.col], st: p.st }, tut: p.tut,
@@ -327,8 +334,9 @@ export class Game {
       build: this.buildSnapshot(p.key), dep: [...this.depleted].filter(([, t]) => t > this.time).map(([id, t]) => [id, Math.round(t - this.time)]),
       respawnAt: p.respawnAt, found: [...p.found], boat: p.boat, room: p.room, s: p.ship || 0, lx: p.lx, ly: p.ly,
       kr: this.kraken ? 1 : 0, mem: [...p.mem], homes: this.homesList(), seals: Object.fromEntries(Object.entries(this.seals).map(([k, v]) => [k, Math.max(0, Math.round(v - this.time))])), pet: p.pet,
+      lab: lab ? lab.labSlot : 0,
     });
-    this.broadcastChat(null, `${p.name} accoste à Port-Lanterne.`, 'sys');
+    if (!lab) this.broadcastChat(null, `${p.name} accoste à Port-Lanterne.`, 'sys');
     this.socialLogin(p);
     this.justiceLogin(p);
     if (this.wevt) this.pushEvent(p);
@@ -1471,14 +1479,15 @@ export class Game {
       const names = [...m.tags.keys()].map((id) => this.players.get(id)).filter(Boolean).map((p) => p.name);
       this.broadcastChat(null, `⚔ ${names.join(', ')} ${names.length > 1 ? 'ont' : 'a'} vaincu le Capitaine Barbe-Cendre ! La marée recule...`, 'boss');
     }
-    if (def.elite && !m.event && !def.sea) this.broadcastChat(null, `⚔ ${killer.name} a terrassé ${def.name} !`, 'boss');
+    if (def.elite && !m.event && !def.sea && !m.dev) this.broadcastChat(null, `⚔ ${killer.name} a terrassé ${def.name} !`, 'boss');
     if (m.type === 'roi_squelette') for (const pid of m.tags.keys()) { const q = this.players.get(pid); if (q) this.unlock(q, 'roi_os'); }
-    if (m.summoned && !m.event && !m.bossEvent && !m.horde) return;
+    if (m.summoned && !m.event && !m.bossEvent && !m.horde && !m.dev) return;
+    if (m.dev && !(killer && killer.lab)) return; // lot 2 : un monstre du laboratoire ne rapporte rien aux vrais pirates
     let top = killer, topD = 0;
     const tags = this.expandTags(m); // 1.0 : le groupe proche partage l'expérience et les objectifs (+10 % par compagnon)
     for (const [pid, d] of tags) {
       const p = this.players.get(pid);
-      if (!p || p.dead || dist(p, m) > 700) continue;
+      if (!p || p.dead || dist(p, m) > 700 || (m.dev && !p.lab)) continue;
       if (d > topD) { topD = d; top = p; }
       const diff = p.level - def.level;
       const xp = Math.max(1, Math.round(def.xp * (diff > 3 ? Math.max(0.15, 1 - (diff - 3) * 0.25) : 1) * ((m.gbonus && m.gbonus.get(pid)) || 1)));
@@ -1609,7 +1618,9 @@ export class Game {
     }
   }
   // JcJ : partout, sauf dans les zones sûres (villes, intérieurs)
-  canPvp(a, b) { return !!a && !!b && a !== b && !a.dead && !b.dead && !SAFE.has(a.zone) && !SAFE.has(b.zone) && a.room === b.room && this.pvpAllowed(a, b); }
+  canPvp(a, b) { return !!a && !!b && a !== b && !a.dead && !b.dead && !!a.lab === !!b.lab && !SAFE.has(a.zone) && !SAFE.has(b.zone) && a.room === b.room && this.pvpAllowed(a, b); }
+  // lot 2 : le personnage laboratoire ne touche jamais aux vrais pirates (échanges, groupes, duels, butin, classements)
+  labWall(p, q) { if (!(p && p.lab) && !(q && q.lab)) return false; this.toast(p, 'Personnage laboratoire : il reste à l’écart des vrais pirates (échanges, groupes, duels, butin, propriétés).', 'warn'); return true; }
   damagePlayer(p, raw, src, crit = false, dot = 0) {
     if (p.dead) return;
     if (this.time < p.invulnUntil && !dot) { this.ev(p.x, p.y, ['dodge', p.id]); return; }
@@ -1617,6 +1628,7 @@ export class Game {
     if (!dot && p.ship) dmg = this.hullHit(p, dmg); // la coque encaisse
     p.hp -= dmg; p.lastHurt = this.time; p.dirtyMe = true;
     if (p.recallAt && !dot) { p.recallAt = 0; this.toast(p, 'Rappel interrompu !', 'warn'); }
+    if (src && src.key && src !== p && !!src.lab !== !!p.lab) return; // lot 2 : jamais de coups entre labo et vrais pirates
     if (src && src.key && src !== p) { p.lastPvp = this.time; src.lastPvp = this.time; this.onPvpHit(p, src); }
     this.ev(p.x, p.y, dot ? ['dmg', p.id, dmg, 0, src ? src.id : 0, dot] : ['dmg', p.id, dmg, crit ? 1 : 0, src ? src.id : 0]);
     if (p.hp <= 0) this.killPlayer(p, src);
@@ -2113,13 +2125,15 @@ export class Game {
     const a = Math.random() * Math.PI * 2, r = rand(2, 12);
     let dx = x + Math.cos(a) * r, dy = y + Math.sin(a) * r * 0.7;
     if (!canStand(this.world, dx, dy)) { dx = x; dy = y; }
-    this.drops.set(id, { id, x: dx, y: dy, item, n, owner, ownUntil: this.time + 30, expire: this.time + 120, born: this.time, room: roomIdAt(this.world, dx, dy) });
+    const lab = !!(owner && this.players.get(owner) && this.players.get(owner).lab); // lot 2 : butin du labo, pour le labo seul
+    this.drops.set(id, { id, x: dx, y: dy, item, n, owner, lab, ownUntil: this.time + 30, expire: this.time + 120, born: this.time, room: roomIdAt(this.world, dx, dy) });
   }
   pick(p, id, auto = false) {
     const d = this.drops.get(id);
     if (!d || p.dead) return;
     if (Math.hypot(d.x - p.x, d.y - p.y) > PICKUP_RANGE + 14) return;
     if (this.time - d.born < 0.5) return;
+    if ((d.lab && !p.lab) || (p.lab && d.owner && !d.lab)) return; // lot 2 : butins séparés
     if (d.owner && d.owner !== p.id && this.time < d.ownUntil && this.players.has(d.owner)) { if (!auto) this.toast(p, "Ce butin appartient à un autre pirate (encore un peu).", 'warn'); return; }
     if (d.item === 'or') {
       p.gold += d.n; p.dirtyMe = true;
@@ -2273,6 +2287,7 @@ export class Game {
     const s = p.inv[i];
     if (!s || p.dead) return;
     if (ITEMS[s.id].quest) return this.toast(p, "Vous ne pouvez pas jeter un objet de quête.", 'warn');
+    if (p.lab) return this.labWall(p); // lot 2 : rien ne sort du laboratoire
     if (this.boatInUse(p, s.id)) return this.toast(p, 'Vous êtes à bord !', 'warn');
     const k = n > 0 ? Math.min(n, s.n) : s.n;
     s.n -= k; if (s.n <= 0) p.inv[i] = null;
@@ -2397,9 +2412,9 @@ export class Game {
     p.dirtyQ = true;
     this.toast(p, `Nouvelle quête : ${q.name}`, 'quest');
   }
-  turnIn(p, qid) {
+  turnIn(p, qid, force = false) { // force : lot 2, outils développeur (personnage laboratoire), jamais depuis le client
     const q = QUESTS[qid], st = p.quests[qid];
-    if (!q || !st || st.s !== 'active' || !this.nearNpc(p, q.turnin)) return;
+    if (!q || !st || st.s !== 'active' || (!force && !this.nearNpc(p, q.turnin))) return;
     if (!goalsMet(qid, st, (id) => this.countItem(p, id))) return this.toast(p, 'Les objectifs ne sont pas remplis.', 'warn');
     for (const g of q.goals) if (g.type === 'collect') this.removeItem(p, g.item, g.n);
     p.quests[qid] = q.repeat ? { s: 'done', p: [], t: Date.now() } : { s: 'done', p: [] };
@@ -2699,6 +2714,7 @@ export class Game {
   homesList() { return [...this.homes.values()].map((h) => [h.k, h.name, h.lock, h.music || '']); }
   broadcastHomes() { this.broadcastAll({ t: 'homes', list: this.homesList() }); }
   homeAction(p, a, k) {
+    if (p.lab && a === 'buy') return this.labWall(p);
     const pl = this.world.plots[k];
     if (!pl || p.dead) return;
     const d = this.world.doors[pl.door];
@@ -2826,6 +2842,7 @@ export class Game {
   }
   // ------------------------------------------------------------ cambriolage
   pickLock(p, k, ok) {
+    if (p.lab) return this.labWall(p);
     const pl = this.world.plots[k], h = this.homes.get(k);
     if (!pl || !h || p.dead || p.boat || h.key === p.key) return;
     const d = this.world.doors[pl.door];
@@ -3169,7 +3186,7 @@ export class Game {
       if (ent.length) msg.n = ent;
       if (rm.length) msg.r = rm;
       if (ev.length) msg.ev = ev;
-      if (sendTime) { msg.wt = +this.worldTime.toFixed(2); msg.on = this.players.size; msg.wd = [+this.wind.a.toFixed(2), +this.wind.s.toFixed(2)]; }
+      if (sendTime) { msg.wt = +this.worldTime.toFixed(2); msg.on = this.players.size; msg.wd = [+this.wind.a.toFixed(2), +this.wind.s.toFixed(2)]; if (WX.force) msg.wx = [WX.force.kind, Math.round(WX.force.until)]; }
       this.send(p, msg);
       this.flush(p);
     }

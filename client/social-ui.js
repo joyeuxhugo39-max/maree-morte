@@ -72,7 +72,8 @@ export const social = {
       e.stopPropagation();
       if (e.key === 'Enter') {
         const m = inp.value.trim();
-        if (m) { this.G.send({ t: 'chat', m, ch: this.chatCh }); this.chatHist.push(m); if (this.chatHist.length > 30) this.chatHist.shift(); }
+        if (/^\/dev\b/i.test(m)) { if (this.G.dev) this.G.dev.start(); } // lot 2 : jamais envoyé dans la discussion
+        else if (m) { this.G.send({ t: 'chat', m, ch: this.chatCh }); this.chatHist.push(m); if (this.chatHist.length > 30) this.chatHist.shift(); }
         this.chatHistI = -1; inp.value = ''; inp.blur();
       }
       if (e.key === 'Escape') { inp.value = ''; inp.blur(); }

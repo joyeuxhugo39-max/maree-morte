@@ -1,6 +1,6 @@
 // Point d'entrée du client : état, réseau, prédiction locale, boucle principale.
 import { generateWorld, moveWithCollision, moveBoat, canSail, canStand, roomIdAt, tileAt, zoneAt, Z, ZONES, SAFE } from '../shared/world.js';
-import { TILE, ROLL_SPEED, ROLL_TIME, SPEED_MUL, INTERACT_RANGE, isNight, dayFrac, weatherAt, WEATHER_PERIOD, T, isFullMoon, moonPhase, PROTOCOL } from '../shared/constants.js';
+import { TILE, ROLL_SPEED, ROLL_TIME, SPEED_MUL, INTERACT_RANGE, isNight, dayFrac, weatherAt, WX, WEATHER_PERIOD, T, isFullMoon, moonPhase, PROTOCOL } from '../shared/constants.js';
 import { MOBS } from '../shared/data/mobs.js';
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { mulberry32 } from '../shared/rng.js';
@@ -20,6 +20,7 @@ import { RoomNet } from './roomnet.js';
 import { iconURL, iconCanvas } from './render/sprites-items.js';
 import { updateCine, cineLocked, endCine, bossIntro, bossDown, krakenIntro, krakenDown } from './cine.js';
 import { Scene } from './scene.js';
+import { devHook } from './dev-hook.js';
 import { Townsfolk } from './townsfolk.js';
 import { applyTheme } from './render/ui-art.js';
 import { shipOf, hullHalf, toWorld, stations, deckMove, deckOk, nearestDeck, openingAt, insideHull, toLocal, BERTHS, berthPos, RAIL } from '../shared/data/ships.js';
@@ -83,6 +84,7 @@ async function boot(hotData = {}) {
   G.allNpcs = G.world.npcs.map((n) => ({ ...n, name: NPCS[n.id].name, look: NPCS[n.id].look, parrot: !!NPCS[n.id].parrot, board: !!NPCS[n.id].board }));
   G.npcs = G.allNpcs.filter((n) => !NPCS[n.id].vis);
   G.ui = new UI(G); G.scene = new Scene(G);
+  devHook(G, { QUESTS, bossIntro, bossDown, krakenIntro, krakenDown, endCine }); // lot 2 : le panneau vient du serveur, après vérification
   G.input = new Input($('view'), () => G.ui.typing());
   const resize = () => G.renderer.resize(innerWidth, innerHeight);
   G.ui.applySettings(G.ui.settings());
@@ -106,7 +108,7 @@ async function boot(hotData = {}) {
   const srv = new URLSearchParams(location.search).get('serveur');
   if (!inClaude && (srv || (window.MM_MODE !== 'artifact' && !PAGES)) && /^https?:$/.test(location.protocol)) {
     const url = srv ? (/^wss?:/.test(srv) ? srv : 'wss://' + srv.replace(/^https?:\/\//, '').replace(/\/$/, '') + '/ws') : (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
-    try { G.net = await new WSNet(url).connect(3500); online = true; G.mode = 'online'; hookNet(); } catch (e) { G.net = null; }
+    try { G.net = await new WSNet(url).connect(3500); online = true; G.mode = 'online'; hookNet(); G.dev.loginScreen(); } catch (e) { G.net = null; }
   }
   if (inClaude) {
     // page publiée sur claude.ai : multijoueur via la salle partagée si possible
@@ -178,9 +180,11 @@ function onMsg(m) {
     case 'err': ui.loginError(m.msg); if (m.reload) setTimeout(() => location.reload(), 2500); break;
     case 'maint': G.maint = m.m; ui.maintenance(m.m); break;
     case 'welcome':
-      if (m.rt && G.mode === 'online') { try { sessionStorage.setItem('mm_resume', JSON.stringify({ name: m.name, rt: m.rt, auto: 0 })); } catch (e) { /* */ } }
+      if (m.rt && G.mode === 'online') { try { sessionStorage.setItem('mm_resume', JSON.stringify({ name: m.lab && G.loginInfo ? G.loginInfo.name : m.name, rt: m.rt, auto: 0 })); } catch (e) { /* */ } } // le labo reprend sur le vrai personnage
       start(m, now); if (m.maint) { G.maint = m.maint; ui.maintenance(m.maint); }
+      G.dev.onWelcome(m);
       break;
+    case 'dev': G.dev.onMessage(m); break;
     case 's': snapshot(m, now); break;
     case 'me': {
       const prev = G.me;
@@ -386,7 +390,7 @@ function snapshot(m, t) {
     e.hp = hp; e.flags = flags;
   }
   if (m.ev) for (const ev of m.ev) onEvent(ev, t);
-  if (m.wt != null) G.worldTime = m.wt;
+  if (m.wt != null) { G.worldTime = m.wt; if (G.mode === 'online') WX.force = m.wx ? { kind: m.wx[0], until: m.wx[1] } : null; } // lot 2 : météo imposée
   if (m.on) G.online = m.on;
 }
 function upsertShip(meta) {

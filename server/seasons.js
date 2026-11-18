@@ -47,7 +47,7 @@ export const seasons = {
     if (kg > best) p.fishRec[id] = kg;
     const rec = S.records[id];
     let msg = `${FISH_NAMES[id]} : ${String(kg).replace('.', ',')} kg`;
-    if (!rec || kg > rec[1]) { S.records[id] = [p.name, kg]; msg += ' — record de la saison !'; if (rec) this.broadcastChat(null, `🎣 ${p.name} bat le record de la saison : ${FISH_NAMES[id].toLowerCase()} de ${String(kg).replace('.', ',')} kg !`, 'sys'); }
+    if (!p.lab && (!rec || kg > rec[1])) { S.records[id] = [p.name, kg]; msg += ' — record de la saison !'; if (rec) this.broadcastChat(null, `🎣 ${p.name} bat le record de la saison : ${FISH_NAMES[id].toLowerCase()} de ${String(kg).replace('.', ',')} kg !`, 'sys'); }
     else if (kg > best && best) msg += ' — record personnel !';
     const sc = fishScore(p.fishRec), cur = S.fish[p.key];
     S.fish[p.key] = { n: p.name, s: Math.max(sc, cur && cur.s || 0) };
@@ -76,7 +76,7 @@ export const seasons = {
     if (r.i === C.length) { // retour à la première porte : arrivée
       const t = Math.round((this.time - r.t0) * 10) / 10, S = this.season, cur = S.race[p.key];
       p.race = null;
-      if (!cur || t < cur.t) S.race[p.key] = { n: p.name, t };
+      if (!p.lab && (!cur || t < cur.t)) S.race[p.key] = { n: p.name, t }; // lot 2 : le labo ne compte pas
       this.send(p, { t: 'race', off: 1, done: t });
       this.toast(p, `Arrivée ! ${fmt(t)}${!cur || t < cur.t ? ' — meilleur temps de la saison pour vous !' : ` (votre meilleur : ${fmt(cur.t)})`}`, 'quest');
       this.unlock(p, 'grand_tour');

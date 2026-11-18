@@ -65,7 +65,11 @@ export function clockString(f) {
 
 // Météo identique pour tous : dépend uniquement de l'heure du monde.
 export const WEATHER_PERIOD = 210;
+// lot 2 : météo imposée par les outils développeur (serveur Node seulement) : { kind, until } en heure du monde
+export const WX = { force: null };
 export function weatherAt(wt) {
+  const F = WX.force;
+  if (F && wt < F.until) return { kind: F.kind, rain: F.kind === 0 ? 0 : F.kind === 1 ? 0.6 : 1, storm: F.kind === 2 ? 1 : 0 };
   const k = Math.floor(wt / WEATHER_PERIOD), f = (wt - k * WEATHER_PERIOD) / WEATHER_PERIOD;
   const h = hash2(k, 7, 99);
   const kind = k < 1 ? 0 : h < 0.58 ? 0 : h < 0.86 ? 1 : 2;

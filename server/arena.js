@@ -109,7 +109,7 @@ export const arena = {
       if (gold) { q.gold += gold; q.dirtyMe = true; }
       if (done) this.giveXp(q, done * 25 * q.level);
       const best = this.fosseBoard.top[q.key];
-      if (!best || done > best.w) { this.fosseBoard.top[q.key] = { n: q.name, w: done, t: Math.round(this.time - r.start) }; }
+      if (!q.lab && (!best || done > best.w)) { this.fosseBoard.top[q.key] = { n: q.name, w: done, t: Math.round(this.time - r.start) }; }
       if (done >= 10) this.unlock(q, 'gladiateur');
       this.toast(q, `La Fosse vous acclame : ${done} vague${done > 1 ? 's' : ''} tenue${done > 1 ? 's' : ''}${gold ? `, +${gold} doublons` : ''}. Meilleur score de la semaine : ${this.fosseBoard.top[q.key].w}.`, 'quest');
     }
@@ -128,6 +128,7 @@ export const arena = {
   // ------------------------------------------------------------ les duels à mise
   duelAsk(p, name, bet) {
     const q = this.byName(name);
+    if (this.labWall(p, q)) return; // lot 2
     if (!q || q === p || !this.inFosse(q)) return this.toast(p, 'Votre adversaire doit être dans la Fosse.', 'warn');
     if (this.duel || this.arenaRun) return this.toast(p, 'La Fosse est occupée.', 'warn');
     if (p.gold < bet) return this.toast(p, 'Vous n’avez pas de quoi miser autant.', 'warn');
@@ -151,6 +152,7 @@ export const arena = {
     this.pushArena();
   },
   duelBet(p, on, n) {
+    if (p.lab) return this.labWall(p);
     const d = this.duel;
     if (!d || this.time >= d.startAt || d.ids.includes(p.id) || (on !== 0 && on !== 1) || !n) return this.toast(p, 'Les paris sont fermés.', 'warn');
     if (d.bets.has(p.id)) return this.toast(p, 'Vous avez déjà parié.', 'warn');

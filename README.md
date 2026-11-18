@@ -294,6 +294,43 @@ Attention : sur l'offre gratuite de Render, le disque est effacé à chaque dép
 comptes repartent de zéro ; il faut un disque persistant (payant) ou une base de données pour
 les garder. Le `Dockerfile` permet aussi un déploiement sur n'importe quel serveur.
 
+**Outils développeur** (serveur Node seulement) : ils restent inactifs tant que ces deux variables ne sont pas
+définies sur le serveur. Elles ne se mettent jamais dans le dépôt.
+
+- `DEV_ACCOUNTS` : les noms de pirates autorisés, séparés par des virgules, par exemple `Hugo`.
+- `DEV_SECRET` : un secret de 16 caractères au moins. Exemple pour en tirer un :
+  `node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"`.
+- `DEV_TTL_MIN` (facultatif) : la durée d'une session développeur, en minutes. 120 par défaut.
+
+En local :
+
+```bash
+DEV_ACCOUNTS=Hugo DEV_SECRET=… npm start
+```
+
+Sur Render, ces variables s'ajoutent dans *Environment* du service.
+
+Pour ouvrir l'atelier :
+
+1. Se connecter avec le compte autorisé.
+2. Taper `/dev` dans la discussion, puis donner le secret.
+3. L'atelier s'ouvre. F9 le montre ou le cache.
+
+Ce que contient l'atelier :
+
+- les onglets Personnage, Objets, Quêtes, Ennemis, Téléportation, Économie, Navires, Environnement, Cinématiques
+  et Journal ;
+- une recherche globale ;
+- une console avec autocomplétion (Tab) et `aide`.
+
+Toutes les commandes qui modifient un personnage s'appliquent au **personnage laboratoire** (`lab 1`, `lab 2`,
+`lab 3`), jamais au vrai. Le laboratoire a sa propre sauvegarde et reste à l'écart des vrais pirates : pas
+d'échange, de groupe, de duel, de butin partagé, de propriété ni de classement.
+
+Les tentatives sont limitées : cinq essais ratés imposent quinze minutes d'attente. La console d'administration
+révoque toutes les sessions avec `POST /admin/api/dev-revoke`. Chaque commande est inscrite au journal du serveur.
+Sur les pages GitHub et claude.ai, où le jeu tourne dans un navigateur, ces outils n'existent pas.
+
 ## Commandes
 
 | Touche | Action |

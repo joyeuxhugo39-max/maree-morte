@@ -73,7 +73,7 @@ export const shipsLogic = {
     this.ev(sh.x, sh.y, ['fx', 'splash', Math.round(sh.x), Math.round(sh.y)]);
     p.dirtyMe = true;
     this.toast(p, `${ITEMS[item].name} vous attend, amarré au ${b.name.toLowerCase()} : montez à bord par la passerelle. Le vent souffle ${windName(this.wind.a)}.`, 'quest');
-    if (!p.cnt.arm) this.toast(p, 'Au cabestan, Z lève l’ancre. Au grand mât, Z déploie les voiles. À la barre, Q et D tournent la roue. E pour prendre ou quitter un poste.', 'info');
+    if (!p.cnt.arm) this.toast(p, 'À bord, prenez la barre (E, à la poupe) : Z ou Espace pour partir, l’équipage lève l’ancre et hisse la voile. Tenez une direction pour virer.', 'info');
     p.cnt.arm = (p.cnt.arm || 0) + 1;
   },
   // ranger son navire (à quai, personne d'autre à bord)
