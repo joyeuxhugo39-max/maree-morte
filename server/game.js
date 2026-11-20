@@ -2523,7 +2523,11 @@ export class Game {
     p.track = (p.track || []).filter((x) => x !== qid);
     p.gold += q.rewards.gold || 0;
     for (const [id, n] of q.rewards.items || []) this.giveOrDrop(p, id, n);
-    this.giveXp(p, q.rewards.xp || 0);
+    // lot 3 : une quête faite avec beaucoup d'avance rapporte moins d'expérience (comme les monstres), pour que le
+    // pirate qui fait tout ne survole pas la suite : pleine jusqu'à un niveau d'avance, puis 60 %, 35 %, 20 %, 12 %
+    const ahead = p.level - (q.level || 1), qf = ahead <= 1 ? 1 : ahead === 2 ? 0.6 : ahead === 3 ? 0.35 : ahead === 4 ? 0.2 : 0.12;
+    this.giveXp(p, Math.round((q.rewards.xp || 0) * qf));
+    if (qf < 1 && q.rewards.xp) this.toast(p, `Expérience réduite (${Math.round(qf * 100)} %) : cette quête est de niveau ${q.level || 1}, vous avez ${ahead} niveaux d’avance.`, 'info');
     const np = this.npcPos.get(q.turnin); if (np) this.addRep(p, this.placeAt(np.x, np.y), 30);
     if (q.ach) this.unlock(p, q.ach); // 1.0 : une fin choisie, un titre
     p.dirtyQ = true; p.dirtyMe = true;

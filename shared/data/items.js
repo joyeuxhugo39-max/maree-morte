@@ -383,13 +383,18 @@ for (const it of Object.values(ITEMS)) {
   if (it.slot !== 'weapon' && it.slot !== 'gun') continue;
   it.role = roleOf(it);
   const L = reqLevel(it);
+  const critF = 1 + 0.8 * (it.crit || 0); // lot 3 : un coup critique fait ×1,8 — la chance de critique compte dans la cible
   if (it.slot === 'weapon') {
     const fx = Math.min(2, MELEE_FX.filter((k) => it[k]).length);
-    const t = (12 + 3 * L) * MELEE_MUL[it.role] * Math.pow(0.92, fx) * (it.speed || 0.5);
+    const t = (12 + 3 * L) * MELEE_MUL[it.role] * Math.pow(0.92, fx) * (it.speed || 0.5) / critF;
     it.atk = Math.round(Math.max(t * 0.85, Math.min(t * 1.35, it.atk || 0)));
-  } else if (GUN_MUL[it.role] && (it.shot.n || 1) === 1 && !it.shot.burst) { // les armes à plombs gardent leurs réglages
+  } else if (GUN_MUL[it.role] && (it.shot.n || 1) === 1 && !it.shot.burst) {
     const fx = Math.min(2, SHOT_FX.filter((k) => it.shot[k]).length);
-    const t = (8 + 1.6 * L) * GUN_MUL[it.role] * (it.cdMul || 1) * Math.pow(0.92, fx);
+    const t = (8 + 1.6 * L) * GUN_MUL[it.role] * (it.cdMul || 1) * Math.pow(0.92, fx) / critF;
     it.gun = Math.round(Math.max(t * 0.85, Math.min(t * 1.35, it.gun || 0)));
+  } else if (it.role === 'dispersion' && !it.shot.burst) { // lot 3 : les tromblons aussi, sur le total de leurs plombs
+    const fx = Math.min(2, SHOT_FX.filter((k) => it.shot[k]).length), n = it.shot.n || 1;
+    const t = (8 + 1.6 * L) * 1.5 * (it.cdMul || 1) * Math.pow(0.92, fx) / critF / n; // redoutables à bout portant : ×1,5 d'un tir simple
+    it.gun = Math.round(Math.max(t * 0.85, Math.min(t * 1.15, it.gun || 0))); // le ×1,5 suffit : marge plus étroite
   }
 }
