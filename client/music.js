@@ -36,11 +36,24 @@ const SIG = {
       [65, 2], [67, 1], [69, 2], [65, 1], [64, 2], [67, 1], [72, 2], [64, 1], [62, 2], [64, 1], [65, 1], [64, 1], [62, 1], [62, 3], [57, 3]]) },
 };
 
+// lot 4 : le leitmotiv de Silas Virevent — une petite valse de filou en ré mineur (dorien : le si bécarre sur sol majeur),
+// qui revient sous trois visages : élégant (sa table), effréné (la poursuite), en majeur quand on devient complices
+SIG.silas = { meter: 6, root: 62, chords: [[38, 'm'], [43, 'M'], [38, 'm'], [36, 'M'], [34, 'M'], [33, 'M'], [38, 'm'], [38, 'm']],
+  mel: mel([[74, 1], [77, 1], [76, 1], [74, 2], [69, 1], [71, 1], [74, 1], [79, 2], [77, 1], [76, 1], [77, 1], [76, 1], [74, 1], [73, 1], [74, 2],
+    [72, 2], [76, 1], [79, 2], [76, 1], [74, 1], [77, 1], [82, 2], [81, 1], [79, 1], [81, 2], [76, 1], [73, 2], [69, 1], [74, 1], [77, 1], [81, 1], [79, 1], [77, 1], [76, 1], [74, 4], [0, 2]]) };
+SIG.silasMaj = { meter: 6, root: 62, mode: 'major', chords: [[38, 'M'], [43, 'M'], [38, 'M'], [33, 'M'], [35, 'm'], [33, 'M'], [38, 'M'], [38, 'M']],
+  mel: mel([[74, 1], [78, 1], [76, 1], [74, 2], [69, 1], [71, 1], [74, 1], [79, 2], [78, 1], [76, 1], [78, 1], [76, 1], [74, 1], [73, 1], [74, 2],
+    [73, 2], [76, 1], [81, 2], [76, 1], [74, 1], [78, 1], [83, 2], [81, 1], [78, 1], [81, 2], [76, 1], [73, 2], [69, 1], [74, 1], [78, 1], [81, 1], [79, 1], [78, 1], [76, 1], [74, 4], [0, 2]]) };
+SIG.silasWar = { meter: 16, root: 62, chords: [[38, 'm'], [43, 'M'], [38, 'm'], [36, 'M'], [34, 'M'], [33, 'M'], [38, 'm'], [38, 'm']], // le même motif, en quatre temps, pour le combat sur La Mouche d'Or
+  mel: mel([[74, 2], [77, 2], [76, 2], [74, 6], [69, 4], [71, 2], [74, 2], [79, 6], [77, 2], [76, 4], [77, 2], [76, 2], [74, 2], [73, 2], [74, 8],
+    [72, 6], [76, 2], [79, 6], [76, 2], [74, 2], [77, 2], [82, 6], [81, 2], [79, 4], [81, 6], [76, 2], [73, 6], [69, 2], [74, 2], [77, 2], [81, 2], [79, 2], [77, 4], [76, 4], [74, 12], [0, 4]]) };
+
 // ---- styles : ce qui change d'une ambiance à l'autre
 const R6 = {
   calmA: [[3, 3], [2, 1, 3], [3, 2, 1], [2, 1, 2, 1], [4, 2], [6]], calmB: [[2, 1, 2, 1], [1, 1, 1, 3], [3, 1, 1, 1], [2, 1, 3]],
   liveA: [[2, 1, 2, 1], [2, 1, 3], [3, 2, 1], [1, 1, 1, 2, 1], [3, 3]], liveB: [[1, 1, 1, 1, 1, 1], [2, 1, 1, 1, 1], [1, 1, 1, 3], [2, 1, 2, 1], [3, 1, 1, 1]],
   run: [[1, 1, 1, 1, 1, 1], [2, 1, 1, 1, 1], [1, 1, 1, 2, 1], [2, 1, 2, 1]],
+  menuetA: [[2, 2, 2], [4, 2], [2, 1, 1, 2], [2, 4], [3, 1, 2], [6]], menuetB: [[1, 1, 2, 2], [2, 2, 1, 1], [2, 1, 1, 2], [4, 2]], menuetRun: [[1, 1, 1, 1, 2], [2, 1, 1, 1, 1], [1, 1, 2, 2]], // lot 4 : trois temps
 };
 const R16 = {
   A: [[8, 4, 4], [4, 4, 8], [8, 8], [6, 2, 8], [12, 4], [4, 4, 4, 4]], B: [[4, 4, 4, 4], [6, 6, 4], [3, 3, 2, 8], [8, 4, 2, 2], [2, 2, 4, 8]],
@@ -60,6 +73,26 @@ export const STYLES = {
   // 0.8 : Libertalia — gigues de taverne, violons et cuivres, la cité ne dort jamais
   cite: { meter: 6, step: [0.15, 0.172], modes: ['major', 'mixo', 'dorian'], mroots: [62, 60, 65, 67, 64], forms: [['A', 'A', 'B', 'A'], ['A', 'B', 'A', 'C'], ['A', 'A', 'B', 'B']], rhyA: R6.liveA, rhyB: R6.liveB, rhyRun: R6.run,
     leads: ['fiddle', 'whistle', 'pluck', 'brass'], comps: ['oompah', 'strum'], perc: 'jig', intro: 2, rest: [25, 60], sig: SIG.sea, sigForm: ['S', 'B', 'A'], sigChance: 0.25, level: 0.85 },
+  // lot 4 : les neuf identités du Plus Grand Braquage (cahier des charges dans rapports/lot4-cinematiques.md) — de la musique
+  // générée par le code, comme le reste du jeu : aucun fichier audio. Un vrai enregistrement peut remplacer chacune (Sfx.musicFile).
+  silas: { meter: 6, step: [0.19, 0.205], modes: ['minor', 'dorian'], mroots: [62], forms: [['A', 'B', 'A']], rhyA: R6.calmA, rhyB: R6.liveA, rhyRun: R6.calmB,
+    leads: ['fiddle', 'pluck'], comps: ['softpah', 'arp'], perc: 'none', intro: 1, rest: [6, 14], sig: SIG.silas, sigForm: ['S', 'B', 'S'], sigChance: 1, level: 0.72, fadeIn: 1.4 },
+  preparation: { meter: 6, step: [0.172, 0.182], modes: ['dorian', 'minor'], mroots: [62, 57], forms: [['A', 'B', 'A'], ['A', 'A', 'B']], rhyA: R6.liveB, rhyB: R6.liveA, rhyRun: R6.run,
+    leads: ['pluck', 'flute'], comps: ['arp'], perc: 'tick', intro: 2, rest: [8, 18], sig: SIG.silas, sigForm: ['A', 'S', 'B'], sigChance: 0.4, level: 0.62, fadeIn: 1.0 },
+  reception: { meter: 6, step: [0.23, 0.25], modes: ['major'], mroots: [65, 67, 62], forms: [['A', 'A', 'B', 'A'], ['A', 'B', 'A', 'B']], rhyA: R6.menuetA, rhyB: R6.menuetB, rhyRun: R6.menuetRun,
+    leads: ['fiddle', 'flute'], comps: ['menuet'], perc: 'none', intro: 1, rest: [4, 10], sig: null, level: 0.6, fadeIn: 1.2 },
+  trahison: { meter: 6, step: [0.3, 0.34], modes: ['minor'], mroots: [62, 59], forms: [['A', 'B'], ['A', 'C']], rhyA: R6.calmA, rhyB: R6.calmA, rhyRun: R6.calmB,
+    leads: ['choir', 'flute'], comps: ['hold'], perc: 'none', intro: 1, rest: [18, 34], sig: null, level: 0.55, fadeIn: 2.5 },
+  poursuite: { meter: 6, step: [0.118, 0.128], modes: ['minor', 'dorian'], mroots: [62, 64], forms: [['A', 'B', 'A', 'C'], ['A', 'A', 'B', 'A']], rhyA: R6.liveB, rhyB: R6.run, rhyRun: R6.run,
+    leads: ['fiddle', 'whistle'], comps: ['drive'], perc: 'jig', intro: 1, rest: null, sig: SIG.silas, sigForm: ['S', 'B', 'S', 'C'], sigChance: 0.35, level: 1.0 },
+  silas_boss: { meter: 16, step: [0.1, 0.108], modes: ['minor'], mroots: [62], forms: [['A', 'B', 'A', 'C']], rhyA: R16.A, rhyB: R16.B, rhyRun: R16.run,
+    leads: ['brass', 'fiddle'], comps: ['war'], perc: 'siege', intro: 1, rest: null, sig: SIG.silasWar, sigForm: ['S', 'B', 'S', 'C'], sigChance: 0.6, level: 1.1 },
+  fin_garder: { meter: 6, step: [0.15, 0.165], modes: ['major', 'mixo'], mroots: [62, 67], forms: [['A', 'A', 'B', 'A']], rhyA: R6.liveA, rhyB: R6.liveB, rhyRun: R6.run,
+    leads: ['brass', 'fiddle'], comps: ['oompah'], perc: 'jig', intro: 1, rest: [20, 40], sig: null, level: 0.9, fadeIn: 0.8 },
+  fin_denoncer: { meter: 6, step: [0.22, 0.24], modes: ['mixo', 'major'], mroots: [60, 65], forms: [['A', 'B', 'A']], rhyA: R6.calmA, rhyB: R6.calmB, rhyRun: R6.calmB,
+    leads: ['choir', 'flute'], comps: ['strum'], perc: 'folk', intro: 2, rest: [25, 50], sig: null, level: 0.72, fadeIn: 1.6 },
+  fin_complice: { meter: 6, step: [0.16, 0.172], modes: ['major'], mroots: [62], forms: [['A', 'B', 'A']], rhyA: R6.liveA, rhyB: R6.liveB, rhyRun: R6.run,
+    leads: ['whistle', 'pluck'], comps: ['oompah', 'strum'], perc: 'jig', intro: 1, rest: [20, 40], sig: SIG.silasMaj, sigForm: ['S', 'A', 'S'], sigChance: 1, level: 0.85, fadeIn: 1.0 },
   // nappes d'ambiance : la nuit et les marais ne chantent pas, ils respirent
   night: { ambient: 'night', play: [45, 80], rest: [30, 70] },
   swamp: { ambient: 'swamp', play: [40, 70], rest: [25, 60] },
@@ -147,9 +180,13 @@ const COMP = {
   strum(e, s, c) { e(s, 'bass', c.bass, 5, 0.85); c.triad.forEach((n, i) => { e(s + i * 0.14, 'harp', n, 2.4, 0.8); e(s + 3 + i * 0.14, 'harp', n, 2, 0.55); }); },
   arp(e, s, c) { e(s, 'bass', c.bass, 5, 0.8); [0, 1, 2, 1, 2, 1].forEach((i, k) => e(s + k, 'harp', c.triad[i], 1.2, k === 0 || k === 3 ? 0.8 : 0.5)); },
   drive(e, s, c) { for (let k = 0; k < 6; k++) e(s + k, 'drive', k === 2 || k === 5 ? c.bass + 7 : c.bass, 0.8, 1); for (const k of [0, 3]) for (const n of c.triad) e(s + k, 'stab', n, 1.6, 0.9); },
+  menuet(e, s, c) { e(s, 'bass', c.bass, 2, 0.8); for (const k of [2, 4]) for (const n of c.triad) e(s + k, 'harp', n + 12, 1.4, k === 2 ? 0.65 : 0.5); }, // lot 4 : un, deux, trois
+  hold(e, s, c) { e(s, 'bass', c.bass, 6, 0.55); for (const n of c.triad) e(s, 'pad', n, 6, 0.9); }, // lot 4 : des accords tenus, presque immobiles
   war(e, s, c) { for (let k = 0; k < 16; k += 2) e(s + k, 'drive', k % 8 === 4 ? c.bass + 12 : k % 8 === 6 ? c.bass + 7 : c.bass, 1.5, 1); for (let k = 0; k < 16; k += 2) e(s + k, 'stab', c.triad[(k / 2) % 3] + 12, 1.1, 0.9); for (const n of c.triad) e(s, 'pad', n, 15, 1); },
 };
 const PERC = {
+  none() {}, // lot 4 : pas de percussions (le bal, la vérité)
+  tick(e, s, b) { for (let k = 0; k < 6; k += 1) e(s + k, 'shake', 0, 0, k % 3 === 0 ? 0.7 : 0.35); if (b % 2 === 0) e(s, 'kick', 0, 0, 0.35); }, // lot 4 : une horloge, on prépare
   folk(e, s, b) { e(s, 'kick', 0, 0, 0.55); if (b % 2) e(s + 3, 'shake', 0, 0, 0.6); },
   jig(e, s, b, fill) { e(s, 'kick', 0, 0, 0.85); e(s + 3, 'snare', 0, 0, 0.5); for (let k = 0; k < 6; k++) e(s + k, 'shake', 0, 0, k % 3 === 0 ? 0.9 : 0.45); if (fill) for (let k = 3; k < 6; k++) e(s + k, 'snare', 0, 0, 0.3 + k * 0.08); },
   battle(e, s, b, fill) { e(s, 'taiko', 0, 0, 1); e(s + 3, 'taiko', 0, 0, 0.75); e(s + 2, 'tom', 0, 0, 0.5); e(s + 5, 'tom', 0, 0, 0.5); e(s + 3, 'snare', 0, 0, 0.7); for (let k = 0; k < 6; k++) e(s + k, 'shake', 0, 0, 0.6); if (fill) for (let k = 3; k < 6; k++) e(s + k, 'snare', 0, 0, 0.4 + k * 0.1); },
@@ -161,7 +198,7 @@ const PERC = {
 export function makePiece(name, seed, prevRoot = 0, first = true) {
   const S = STYLES[name], rnd = mulberry32(seed >>> 0);
   const useSig = !!S.sig && rnd() < S.sigChance;
-  const mode = useSig ? 'minor' : pick(S.modes, rnd), scale = MODES[mode], minor = mode === 'minor' || mode === 'dorian';
+  const mode = useSig ? (S.sig.mode || 'minor') : pick(S.modes, rnd), scale = MODES[mode], minor = mode === 'minor' || mode === 'dorian';
   const roots = S.mroots.filter((r) => r !== prevRoot);
   const mroot = pick(roots.length ? roots : S.mroots, rnd);
   let broot = mroot - 24; while (broot < 33) broot += 12; while (broot > 45) broot -= 12;
@@ -258,7 +295,7 @@ export class Composer {
     if (this.want !== this.cur) {
       const from = STYLES[this.cur], to = STYLES[this.want];
       const wasPlaying = !!this.piece || !!this.amb;
-      this.drop(0.5); this.cur = this.want;
+      this.drop(this.fadeOut ?? 0.5); this.fadeOut = null; this.cur = this.want; // lot 4 : la cinématique choisit la durée du fondu
       // un combat commence tout de suite ; une promenade attend que le silence ait duré
       if (to && !to.rest) this.restUntil = now + 0.25;
       else this.restUntil = Math.max(now + 1.2, wasPlaying || (from && !from.rest) ? now + 1.2 : Math.min(this.restUntil, now + 30));
@@ -271,7 +308,7 @@ export class Composer {
       const first = now - this.lastEnd > 2.5;
       this.piece = makePiece(this.cur, this.seed = (this.seed * 1664525 + 1013904223) >>> 0, this.prevRoot, first);
       this.prevRoot = this.piece.root; this.pos = 0; this.t0 = now + 0.12;
-      if (first || !this.gain) this.newGain(first && S.rest ? 0.5 : 0.08);
+      if (first || !this.gain) this.newGain(S.fadeIn || (first && S.rest ? 0.5 : 0.08));
     }
     const p = this.piece, g = this.gain;
     while (this.pos < p.ev.length) {

@@ -2,6 +2,7 @@
 import { ITEMS } from '../shared/data/items.js';
 import { QUESTS, QUEST_ORDER, questState } from '../shared/data/quests.js';
 import { NPCS } from '../shared/data/npcs.js';
+import { SILAS_PITCH, SILAS_AGAIN } from '../shared/data/cinemas.js'; // lot 4
 import { SKILLS, HOTBAR, EMOTES } from '../shared/data/skills.js';
 import { ZONES, Z, SAFE, roomIdAt, zoneAt } from '../shared/world.js';
 import { T, SEEN_CELL } from '../shared/constants.js';
@@ -716,6 +717,13 @@ export class UI {
       this.G.sfx.play(m.gain > 0 ? 'coin' : 'deny');
     }, wait);
   }
+  // lot 4 : Silas Virevent — la proposition (si l'on n'a pas encore dit oui), puis la préparation, jouée en cinématique
+  silasChoices(ch) {
+    const G = this.G, mem = G.mem || new Set(), talk = (key) => { this.close(); G.scene.play('silas', key === 'pitch' ? SILAS_PITCH : SILAS_AGAIN, null); };
+    if (mem.has('silas_oui')) ch.unshift({ label: '« Où en est l’affaire ? »', cls: 'q', go: () => { this.close(); G.send({ t: 'cinema', a: 'ask', id: 'silas_preparation' }); } });
+    else if (!mem.has('vu:silas_rencontre')) ch.unshift({ label: '« On m’a dit que tu cherchais quelqu’un. »', cls: 'q', go: () => { G.mem.add('vu:silas_rencontre'); G.send({ t: 'mem', k: 'vu:silas_rencontre' }); talk('pitch'); } });
+    else ch.unshift({ label: mem.has('silas_non') ? '« Ton affaire tient toujours ? »' : '« Tu voulais me parler ? »', cls: 'q', go: () => talk(mem.has('silas_non') ? 'again' : 'pitch') });
+  }
   // 1.0 : ce dont un personnage se souvient — vos quêtes, vos choix, vos exploits
   memoryLine(npcId) {
     const G = this.G, N = NPCS[npcId];
@@ -747,6 +755,7 @@ export class UI {
       } });
       else if ((q.turnin === npcId || q.giver === npcId) && s === 'active') ch.push({ label: `… ${q.name}`, go: () => this.say(q.progress, [{ label: 'Compris.', go: () => this.dialogMain(npcId) }]) });
     }
+    if (npcId === 'silas') this.silasChoices(ch); // lot 4
     if (N.shop) ch.push({ label: '🛒 Voir la marchandise', go: () => this.openShop(npcId) });
     if (N.dice) ch.push({ label: '🎲 Jouer aux dés', cls: 'q', go: () => this.diceMenu(npcId) });
     const np = (this.G.npcs || []).find((q) => q.id === npcId), npr = np ? roomIdAt(this.G.world, np.x, np.y) : -1;
@@ -1018,12 +1027,12 @@ export class UI {
     this.G.aide = mode;
   }
   // ------------------------------------------------------------ réglages
-  settings() { const d = { music: 0.6, sfx: 1, zoom: 0, shake: true, myname: false, aide: 'discret', global: true, mpSound: true, barre: 'simple' }; try { return Object.assign(d, JSON.parse(localStorage.getItem('mm_settings') || '{}')); } catch (e) { return d; } }
+  settings() { const d = { music: 0.6, sfx: 1, zoom: 0, shake: true, cine: 'complet', myname: false, aide: 'discret', global: true, mpSound: true, barre: 'simple' }; try { return Object.assign(d, JSON.parse(localStorage.getItem('mm_settings') || '{}')); } catch (e) { return d; } }
   applySettings(st) {
     const G = this.G;
     G.sfx.setVolumes(st.music, st.sfx);
     G.renderer.zoom = +st.zoom || 0; G.renderer.resize(innerWidth, innerHeight);
-    G.renderer.shakeOn = !!st.shake; G.showMyName = !!st.myname; G.helmMode = st.barre === 'reel' ? 'reel' : 'simple';
+    G.renderer.shakeOn = !!st.shake; G.cineMode = st.cine === 'reduit' ? 'reduit' : 'complet'; G.showMyName = !!st.myname; G.helmMode = st.barre === 'reel' ? 'reel' : 'simple';
     this.setAide(st.aide || 'discret');
     try { localStorage.setItem('mm_settings', JSON.stringify(st)); } catch (e) { /* */ }
     if (this.chatFilter) this.setChatFilter(this.chatFilter);
@@ -1031,10 +1040,10 @@ export class UI {
   renderSettings() {
     const st = this.settings();
     $('set-music').value = st.music; $('set-sfx').value = st.sfx; $('set-zoom').value = String(st.zoom || 0);
-    $('set-shake').checked = !!st.shake; $('set-myname').checked = !!st.myname; $('set-aide').value = st.aide || 'discret'; $('set-barre').value = st.barre === 'reel' ? 'reel' : 'simple';
+    $('set-shake').checked = !!st.shake; $('set-cine').value = st.cine === 'reduit' ? 'reduit' : 'complet'; $('set-myname').checked = !!st.myname; $('set-aide').value = st.aide || 'discret'; $('set-barre').value = st.barre === 'reel' ? 'reel' : 'simple';
     $('set-global').checked = st.global !== false; $('set-mpsound').checked = st.mpSound !== false;
-    const upd = () => this.applySettings({ music: +$('set-music').value, sfx: +$('set-sfx').value, zoom: +$('set-zoom').value, shake: $('set-shake').checked, myname: $('set-myname').checked, aide: $('set-aide').value, barre: $('set-barre').value, global: $('set-global').checked, mpSound: $('set-mpsound').checked });
-    for (const id of ['set-music', 'set-sfx', 'set-zoom', 'set-shake', 'set-myname', 'set-aide', 'set-barre', 'set-global', 'set-mpsound']) $(id).oninput = $(id).onchange = upd;
+    const upd = () => this.applySettings({ music: +$('set-music').value, sfx: +$('set-sfx').value, zoom: +$('set-zoom').value, shake: $('set-shake').checked, cine: $('set-cine').value, myname: $('set-myname').checked, aide: $('set-aide').value, barre: $('set-barre').value, global: $('set-global').checked, mpSound: $('set-mpsound').checked });
+    for (const id of ['set-music', 'set-sfx', 'set-zoom', 'set-shake', 'set-cine', 'set-myname', 'set-aide', 'set-barre', 'set-global', 'set-mpsound']) $(id).oninput = $(id).onchange = upd;
   }
 
   // ------------------------------------------------------------ chat : voir social-ui.js (canaux, historique, invitations, groupe, équipage, échange)

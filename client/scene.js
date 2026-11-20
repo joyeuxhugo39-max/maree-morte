@@ -13,10 +13,11 @@ const voiceOf = (id) => { let h = 7; for (const c of String(id)) h = (h * 31 + c
 export class Scene {
   constructor(G) { this.G = G; this.on = false; this.cam = null; this.wait = null; this.npc = null; }
   // joue une suite d'étapes, puis propose les choix de fin (s'il y en a) ; renvoie le choix retenu (ou null si l'on a quitté)
-  async play(npcId, steps, end = null) {
-    const G = this.G, n = G.npcs.find((q) => q.id === npcId) || G.allNpcs.find((q) => q.id === npcId);
+  // lot 4 : opts.actor — l'acteur d'une cinématique qui incarne le PNJ (la caméra le cadre) ; opts.onLine(qui, { g, e }) — ses gestes
+  async play(npcId, steps, end = null, opts = {}) {
+    const G = this.G, n = opts.actor || G.npcs.find((q) => q.id === npcId) || G.allNpcs.find((q) => q.id === npcId);
     if (this.on) this.stop();
-    this.on = true; this.aborted = false; this.npcId = npcId; this.npc = n;
+    this.on = true; this.aborted = false; this.npcId = npcId; this.npc = n; this.onLine = opts.onLine || null;
     G.ui.close(true);
     document.body.classList.add('cine', 'scene');
     $('scene').classList.remove('hidden');
@@ -39,6 +40,7 @@ export class Scene {
     document.body.classList.remove('cine', 'scene');
     $('scene').classList.add('hidden');
     if (this.npc) this.npc.fixed = false;
+    this.onLine = null;
     if (this.wait) { const w = this.wait; this.wait = null; w(ABORT); }
   }
   abort() { this.aborted = true; this.stop(); }
@@ -66,7 +68,7 @@ export class Scene {
   async seq(steps) {
     for (const s of steps || []) {
       if (this.aborted) throw ABORT;
-      if (Array.isArray(s)) await this.line(s[0], s[1]);
+      if (Array.isArray(s)) { if (s[2] && this.onLine) this.onLine(s[0], s[2]); await this.line(s[0], s[1]); }
       else if (s && s.ask) await this.ask(s);
       else if (s && s.choose) await this.choose(s);
     }

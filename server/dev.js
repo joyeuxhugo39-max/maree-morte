@@ -32,6 +32,7 @@ import { shipOf, shipFits, BERTHS, findBerth } from '../shared/data/ships.js';
 import { ZONES, canStand, zoneAt } from '../shared/world.js';
 import { TILE, SLOTS, DAY_LENGTH, WX, WEATHER_NAMES, clockString, dayFrac, isFullMoon } from '../shared/constants.js';
 import { MAX_LEVEL, GLORY_MAX } from '../shared/formulas.js';
+import { CINEMAS } from '../shared/data/cinemas.js';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const LAB_SLOTS = 3, MAX_FAILS = 5, LOCK_MS = 15 * 60000, CMD_BURST = 30;
@@ -262,6 +263,7 @@ export function installDev(game, { env = process.env, panelFile = path.join(DIR,
     }
     for (const [id, m] of Object.entries(MOBS)) if (isBoss(m) && !m.sea) { out.push({ id: `boss:${id}`, name: `Entrée de ${m.name}`, kind: 'boss', type: id }); out.push({ id: `vaincu:${id}`, name: `${m.name} vaincu`, kind: 'down', type: id }); }
     out.push({ id: 'kraken', name: 'Le réveil du Kraken', kind: 'kraken' }, { id: 'kraken:vaincu', name: 'Le Kraken vaincu', kind: 'krakendown' });
+    for (const [id, c] of Object.entries(CINEMAS)) out.push({ id: `film:${id}`, name: `Mise en scène : ${c.name}`, kind: 'film', film: id }); // lot 4
     return out;
   }
 
@@ -494,13 +496,25 @@ export function installDev(game, { env = process.env, panelFile = path.join(DIR,
         fail('Usage : evenement invasion [lieu] | eruption | horde | fin');
       } },
     // ---- cinématiques
-    { n: 'cine', al: ['cinematic', 'cinematique', 'scene'], cat: 'Cinématiques', u: 'cine <id | liste [texte] | passer>', h: 'Lance (ou relance) une scène de quête ou une cinématique de boss ; « passer » coupe celle en cours. Sur le personnage laboratoire seulement : une scène à choix s’en souvient.', free: (a) => ['liste', 'list', 'passer', 'skip', ''].includes(norm(a[0])),
+    { n: 'cine', al: ['cinematic', 'cinematique', 'scene'], cat: 'Cinématiques', u: 'cine <id | liste [texte] | passer | oublier <scène | tout>>', h: 'Lance (ou relance) une scène de quête ou une cinématique de boss ; « passer » coupe celle en cours. Sur le personnage laboratoire seulement : une scène à choix s’en souvient.', free: (a) => ['liste', 'list', 'passer', 'skip', ''].includes(norm(a[0])),
       run: (p, a) => {
         const k = norm(a[0] || 'liste');
         if (k === 'liste') { const f = norm(a.slice(1).join(' ')); return scenes().filter((c) => !f || norm(c.id).includes(f) || norm(c.name).includes(f)).slice(0, 80).map((c) => `${c.id} — ${c.name}`).join('\n') || 'Aucune.'; }
         if (k === 'passer' || k === 'skip') { game.send(p, { t: 'dev', a: 'cine', skip: 1 }); return 'Cinématique passée.'; }
+        if (k === 'oublier') { const ids = Object.keys(CINEMAS), L = norm(a[1]) === 'tout' ? ids : ids.filter((i) => norm(i) === norm(String(a[1] || '').replace(/^film:/, ''))); if (!L.length) fail(`Usage : cine oublier <${ids.join(' | ')} | tout>`); for (const i of L) p.mem.delete('vu:' + i); return `Oubliée(s) : ${L.join(', ')} — elle(s) se déclenchera(ont) de nouveau.`; }
         const c = scenes().find((x) => norm(x.id) === norm(a.join(' ')));
         if (!c) fail('Cinématique inconnue : « cine liste » pour les voir.');
+        if (c.kind === 'film') { // lot 4 : une scène mise en scène se lance depuis le serveur, dans son lieu, comme en jeu
+          const def = CINEMAS[c.film];
+          if (game.inCinema(p)) game.endCinema(p, 'remplacée');
+          if (def.room) {
+            const r = game.world.rooms.findIndex((q) => q.name === def.room), d = game.world.doors.find((q) => q.room === r && !q.secret);
+            if (r < 0 || !d) fail(`La pièce « ${def.room} » est introuvable.`);
+            if (p.room !== r) game.teleport(p, d.ix, d.iy, { door: d.id });
+          }
+          game.startCinema([p], c.film, { replay: 1 });
+          return `Lecture : ${def.name}${def.room ? ' — ' + def.room : ''} (Échap pour passer).`;
+        }
         game.send(p, { t: 'dev', a: 'cine', c });
         return `Lecture : ${c.name}.`;
       } },

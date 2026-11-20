@@ -348,6 +348,13 @@ body.cine .cinebar { height: 11vh; }
 body.cine #hud, body.cine #topright, body.cine #bottom, body.cine #chat, body.cine #tracker, body.cine #menu-btns, body.cine #toasts, body.cine #lootfeed, body.cine #banner { opacity: 0 !important; }
 #cine-sub { font-size: 20px; color: #f4ead6; text-shadow: 0 2px 0 #000; font-style: italic; letter-spacing: 0.5px; opacity: 0; transition: opacity 0.3s; padding: 0 20px; text-align: center; }
 #cine-sub.on { opacity: 1; }
+/* lot 4 : le fondu au noir et le bouton pour passer une scène */
+#cine-fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 28; }
+#cine-skip { position: fixed; right: 18px; bottom: calc(11vh + 10px); z-index: 29; background: rgba(12, 8, 6, 0.72); color: #e8dcc0; border: 1px solid rgba(201, 162, 76, 0.55); border-radius: 4px; padding: 5px 10px; font: inherit; font-size: 13px; letter-spacing: 0.5px; cursor: pointer; opacity: 0.75; transition: opacity 0.2s; }
+#cine-skip:hover { opacity: 1; }
+#cine-skip span { color: #ffd23a; }
+#cine-skip kbd { font-size: 11px; opacity: 0.7; margin-left: 4px; }
+body.cinema #hud, body.cinema #topright, body.cinema #bottom, body.cinema #chat, body.cinema #tracker, body.cinema #menu-btns, body.cinema #toasts, body.cinema #lootfeed, body.cinema #banner, body.cinema #grp-frames, body.cinema #asks, body.cinema #tuto { opacity: 0 !important; pointer-events: none; }
 #cine-title { position: absolute; left: 0; right: 0; top: 27%; text-align: center; z-index: 27; pointer-events: none; animation: ctin 0.9s ease-out; }
 #cine-name { font-family: var(--title); font-size: 84px; color: #ffe7a0; text-shadow: 0 4px 0 #000, 0 0 40px rgba(255, 110, 50, 0.6); line-height: 1; letter-spacing: 2px; }
 #cine-tag { font-size: 22px; color: #e8dcc0; letter-spacing: 7px; text-transform: uppercase; text-shadow: 0 2px 0 #000, 0 0 12px #000; margin-top: 10px; }

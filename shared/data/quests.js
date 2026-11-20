@@ -702,6 +702,8 @@ export function questState(qid, pq, level) {
 export function npcVisible(def, pq, level) {
   const v = def && def.vis;
   if (!v) return true;
+  if (v.lvl && (level || 1) < v.lvl) return false; // lot 4 : un personnage qui n'approche que les pirates aguerris
+  if (!v.q) return true;
   const ok = (c) => c.s.includes(questState(c.q, pq || {}, level || 1));
   return ok(v) && !(v.not && ok(v.not));
 }

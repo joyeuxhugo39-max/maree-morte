@@ -31,7 +31,7 @@ const mkConn = (ip) => { const c = { ip, msgs: [], send(m) { this.msgs.push(m); 
 const game = new Game({ storage, log: () => {} });
 const D = installDev(game, { env: { DEV_ACCOUNTS: 'Capitaine, Second', DEV_SECRET: SECRET, DEV_TTL_MIN: '30' } });
 await D.ready;
-const login = async (name, ip) => { const c = mkConn(ip); game.addClient(c); game.onMessage(c, { t: 'login', v: 12, name, pass: 'motdepasse' }); await wait(250); const p = game.sessions.get(c).player; return { c, p: () => game.sessions.get(c).player }; };
+const login = async (name, ip) => { const c = mkConn(ip); game.addClient(c); game.onMessage(c, { t: 'login', v: 13, name, pass: 'motdepasse' }); await wait(250); const p = game.sessions.get(c).player; return { c, p: () => game.sessions.get(c).player }; };
 const dev = async (u, m) => { const n = u.c.msgs.length; game.onMessage(u.c, Object.assign({ t: 'dev' }, m)); await wait(m.a === 'cmd' && /^lab/.test(m.c || '') ? 400 : 40); return u.c.msgs.slice(n).filter((x) => x.t === 'dev'); };
 const last = (L) => L[L.length - 1] || {};
 const M = await login('Mousse', '5.5.5.5');
@@ -106,6 +106,13 @@ r = await cmd(C, 'meteo auto'); ok(r.ok && WX.force === null, 'meteo auto');
 r = await cmd(C, 'navire sloop'); ok(r.ok && game.ownShip(L.key) && game.ownShip(L.key).item === 'sloop', 'navire : un sloop armé au quai le plus proche');
 r = await cmd(C, 'cine liste premier'); ok(r.ok && /q:/.test(r.out), 'cine liste');
 const nC = C.c.msgs.length; r = await cmd(C, 'cine boss:boss'); ok(r.ok && C.c.msgs.slice(nC).some((m) => m.a === 'cine' && m.c && m.c.type === 'boss'), 'cine : la cinématique part vers le client');
+{ // lot 4 : une scène mise en scène se lance depuis le serveur, dans son lieu, sur le personnage laboratoire
+  const n0 = C.c.msgs.length; r = await cmd(C, 'cine film:silas_rencontre');
+  const Lp = C.p ? C.p() : L;
+  ok(r.ok && C.c.msgs.slice(n0).some((m) => m.t === 'cinema' && m.a === 'play' && m.id === 'silas_rencontre') && game.world.rooms[Lp.room] && game.world.rooms[Lp.room].name === 'La Sirène Borgne', 'cine film : conduit à la Sirène Borgne, la scène part vers le client');
+  game.cinemaMsg(Lp, { a: 'done', id: 'silas_rencontre' });
+  r = await cmd(C, 'cine oublier tout'); ok(r.ok && !Lp.mem.has('vu:silas_rencontre'), 'cine oublier : la scène se rejouera');
+}
 // le laboratoire reste à l'écart des vrais pirates
 const mp = M.p(); mp.x = L.x + 20; mp.y = L.y; mp.room = L.room; mp.zone = L.zone;
 game.tradeAction(L, 'ask', { name: 'Mousse' }); ok(!game.trades.has(L.id), 'labo → vrai pirate : pas d’échange');

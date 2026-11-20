@@ -382,6 +382,7 @@ const P = {
 const cache = new Map();
 // 0.8 : d'autres modules ajoutent leurs icônes
 export function registerIcons(map) { Object.assign(P, map); }
+export function hasIcon(icon) { return !!P[icon] || /^[wom]:/.test(icon || '') || ['tricorne_big', 'shirt_striped', 'vest', 'captaincoat'].includes(icon); } // lot 4
 export function iconCanvas(icon, tint, scale = 1) {
   const key = icon + '|' + (tint || '') + '|' + scale;
   let c = cache.get(key);

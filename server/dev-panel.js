@@ -139,7 +139,7 @@ export function mount(api) {
   // ------------------------------------------------------------ console et autocomplétion
   const SUBS = {
     lab: ['1', '2', '3', 'sortir', 'reset', 'scenario'], quete: ['liste', 'info', 'demarrer', 'preparer', 'objectif', 'suivante', 'terminer', 'reset'],
-    navire: ['liste', 'reparer', 'ici', 'degager', 'port'], cine: ['liste', 'passer'], temps: ['aube', 'jour', 'midi', 'crepuscule', 'nuit', 'minuit', 'pleine-lune'],
+    navire: ['liste', 'reparer', 'ici', 'degager', 'port'], cine: ['liste', 'passer', 'oublier'], temps: ['aube', 'jour', 'midi', 'crepuscule', 'nuit', 'minuit', 'pleine-lune'],
     meteo: ['clair', 'pluie', 'orage', 'auto'], evenement: ['invasion', 'eruption', 'horde', 'fin'], succes: ['tous', 'retirer'], desequiper: ['weapon', 'gun', 'hat', 'body', 'boots', 'trinket', 'outfit', 'mount', 'tout'],
     invincible: ['600', 'off'], pv: ['max'], energie: ['max'], tp: ['port', 'pnj'],
   };
@@ -201,7 +201,7 @@ export function mount(api) {
   }
   function playCine(m) {
     const now = performance.now() / 1000;
-    if (m.skip) { if (G.scene && G.scene.on) G.scene.abort(); if (G.cine) deps.endCine(G); return; }
+    if (m.skip) { if (G.cinema && G.cinema.locked()) { if (G.scene && G.scene.on) G.scene.abort(); G.cinema.skip(); return; } if (G.scene && G.scene.on) G.scene.abort(); if (G.cine) deps.endCine(G); return; }
     const c = m.c, P = G.player; if (!c || !P) return;
     if (c.path) { // une scène de quête : les répliques sont dans les données du jeu
       let steps = deps.QUESTS[c.q]; for (const k of c.path) steps = steps && steps[k];

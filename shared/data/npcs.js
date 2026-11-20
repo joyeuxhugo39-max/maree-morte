@@ -1,6 +1,16 @@
 import { REMEMBER } from './scenes.js';
 // Personnages non-joueurs de Port-Lanterne et de Havre-des-Brumes.
 export const NPCS = {
+  // lot 4 : Silas Virevent attend à la table isolée de la Sirène Borgne, près de la cheminée (Le Plus Grand Braquage, lot 5)
+  silas: {
+    name: 'Silas Virevent', title: 'Ancien contrebandier', vis: { lvl: 10 },
+    look: { skin: 1, hair: 0, hairStyle: 'queue', beard: 0, top: 'gilet', topCol: 'purple', pants: 'black', boots: 'black', hat: 'plume', hatCol: 'purple' },
+    greet: ['Assieds-toi. Les meilleures affaires se concluent assis.', 'Pile, je gagne. Face, tu perds. C’est pourtant une pièce honnête.', 'Ne regarde pas la porte comme ça : personne n’entre ici sans que je le sache.'],
+    topics: [
+      { q: 'Tu connais tout le monde ?', a: "Bartholomé me doit trois tonneaux, Rosalie un secret, et la capitaine Morgane… une explication. Disons que je connais les gens qu'il faut." },
+      { q: 'Et cette pièce ?', a: "Un doublon de Valdorne. Le seul qu'il ait jamais perdu. Il ne le sait pas encore." },
+    ],
+  },
   morgane: {
     name: 'Capitaine Morgane', title: 'Capitaine de La Mouette Écarlate',
     look: { skin: 0, hair: 2, hairStyle: 'long', top: 'manteau', topCol: 'red', pants: 'black', boots: 'black', hat: 'capitaine', hatCol: 'black' },

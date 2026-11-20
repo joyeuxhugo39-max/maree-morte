@@ -9,7 +9,7 @@ await fs.rm(DIR, { recursive: true, force: true });
 let fails = 0; const ok = (v, m) => { console.log((v ? 'OK  ' : 'FAIL') + ' ' + m); if (!v) fails++; };
 const st = new FileStorage(DIR); const game = new Game({ storage: st, log: () => {} });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-const login = async (name, pass = 'abcd', extra = {}) => { const c = { ip: extra.ip || '1.2.3.4', msgs: [], send(m) { this.msgs.push(m); }, close() { this.closed = true; } }; game.addClient(c); game.onMessage(c, { t: 'login', v: 12, name, pass, ...extra }); await wait(250); const s = game.sessions.get(c); return { c, p: s && s.player }; };
+const login = async (name, pass = 'abcd', extra = {}) => { const c = { ip: extra.ip || '1.2.3.4', msgs: [], send(m) { this.msgs.push(m); }, close() { this.closed = true; } }; game.addClient(c); game.onMessage(c, { t: 'login', v: 13, name, pass, ...extra }); await wait(250); const s = game.sessions.get(c); return { c, p: s && s.player }; };
 const err = (c) => (c.msgs.find((m) => m.t === 'err') || {}).msg || '';
 // version
 { const c = { msgs: [], send(m) { this.msgs.push(m); }, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 7, name: 'Ancien', pass: 'abcd' }); await wait(50); ok(/nouvelle version/.test(err(c)) && c.msgs.some((m) => m.reload), 'client d’une autre version : refusé, invité à recharger'); }
@@ -64,7 +64,7 @@ const a1 = await fetch('http://127.0.0.1:3215/admin/api/status').then((x) => x.s
 const a2 = await fetch('http://127.0.0.1:3215/admin/api/status', { headers: { Authorization: 'Bearer ' + TOKEN } }).then((x) => x.json());
 const page = await fetch('http://127.0.0.1:3215/admin').then((x) => x.text());
 const snaps = await fs.readdir(env.DATA_DIR + '/backups').catch(() => []);
-ok(up && a1 === 403 && a2.version === '1.3.1' && /Capitainerie/.test(page), `console d’administration : 403 sans jeton, état avec (version ${a2.version}, ${a2.players} joueur)`);
+ok(up && a1 === 403 && a2.version === '1.4.0' && /Capitainerie/.test(page), `console d’administration : 403 sans jeton, état avec (version ${a2.version}, ${a2.players} joueur)`);
 ok(snaps.some((n) => n.includes('demarrage')), 'instantané pris au démarrage du serveur');
 srv.kill('SIGTERM'); await wait(800);
 console.log(fails ? `${fails} ÉCHEC(S)` : 'TOUT EST OK');

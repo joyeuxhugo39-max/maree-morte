@@ -169,13 +169,52 @@ export class Renderer {
   resize(w, h) {
     this.lastW = w; this.lastH = h;
     this.baseScale = this.zoom > 0 ? this.zoom : Math.max(1, Math.round(Math.min(w, h) / 400));
-    const scale = Math.max(0.5, (this.baseScale + (this.boost || 0)) * (this.spy ? 0.5 : 1));
+    const scale = this.scaleFor(this.cineZoom || 0);
     this.scale = scale;
     this.W = Math.ceil(w / scale); this.H = Math.ceil(h / scale);
     this.cv.width = this.W; this.cv.height = this.H;
     this.cv.style.width = this.W * scale + 'px'; this.cv.style.height = this.H * scale + 'px';
     this.light.width = this.W; this.light.height = this.H;
     this.ctx.imageSmoothingEnabled = false;
+  }
+  scaleFor(extra) { return Math.max(0.5, (this.baseScale + (this.boost || 0) + extra) * (this.spy ? 0.5 : 1)); } // lot 4 : + le zoom des cinématiques, toujours entier
+  // lot 4 : la caméra, bornée à la pièce (ou à la carte) — partagé par le rendu et le zoom progressif des cinématiques
+  clampCam(cx, cy, W, H, room) {
+    let minX = 0, maxX = MAP_W * TILE - W, minY = 0, maxY = OVER_H * TILE - H;
+    if (room) {
+      const rx0 = (room.x0 - 1) * TILE, rx1 = (room.x0 + room.w + 1) * TILE, ry0 = (room.y0 - 2) * TILE, ry1 = (room.y0 + room.h + 1) * TILE;
+      if (rx1 - rx0 <= W) minX = maxX = Math.round((rx0 + rx1) / 2 - W / 2); else { minX = rx0; maxX = rx1 - W; }
+      if (ry1 - ry0 <= H) minY = maxY = Math.round((ry0 + ry1) / 2 - H / 2); else { minY = ry0; maxY = ry1 - H; }
+    }
+    if (maxX < minX) minX = maxX = Math.round((minX + maxX) / 2);
+    if (maxY < minY) minY = maxY = Math.round((minY + maxY) / 2);
+    return { x: Math.round(Math.max(minX, Math.min(maxX, cx - W / 2))), y: Math.round(Math.max(minY, Math.min(maxY, cy - H / 2))) };
+  }
+  // lot 4 : zoom de cinématique, par paliers ENTIERS (les pixels restent nets). Avec une durée, le passage d'un palier
+  // à l'autre est adouci par une mise à l'échelle CSS de la toile, calculée pour retomber exactement sur l'image suivante.
+  zoomTo(extra, dur = 0) {
+    extra = Math.max(0, extra | 0);
+    const cur = this.cineZoom || 0;
+    if (this.zoomFx) { const z = this.zoomFx; this.zoomFx = null; this.cv.style.transform = ''; if (z.done) z.done(); }
+    if (extra === cur || !this.lastW) { this.cineZoom = extra; return; }
+    const s0 = this.scaleFor(cur), s1 = this.scaleFor(extra);
+    const apply = () => { this.cineZoom = extra; this.resize(this.lastW, this.lastH); };
+    if (!(dur > 0) || this.lastCamX == null) { apply(); return; }
+    const cam0 = { x: this.lastCamX, y: this.lastCamY };
+    const cam1 = this.clampCam(this.cam.x, this.cam.y, Math.ceil(this.lastW / s1), Math.ceil(this.lastH / s1), this.room);
+    // la toile A, mise à l'échelle k = sB / sA autour de O, se superpose exactement à la toile B : O = (camA − camB)·sA·sB / (sA − sB)
+    const org = (a, sa, b, sb) => ({ x: (a.x - b.x) * sa * sb / (sa - sb), y: (a.y - b.y) * sa * sb / (sa - sb) });
+    const t0 = performance.now() / 1000;
+    if (s1 > s0) this.zoomFx = { t0, dur, from: 1, to: s1 / s0, o: org(cam0, s0, cam1, s1), done: apply };
+    else { apply(); this.zoomFx = { t0, dur, from: s0 / s1, to: 1, o: org(cam1, s1, cam0, s0), done: null }; }
+    this.tickZoom(t0);
+  }
+  tickZoom(now) {
+    const z = this.zoomFx; if (!z) return;
+    const k = Math.min(1, (now - z.t0) / z.dur), e = k * k * (3 - 2 * k);
+    if (k >= 1) { this.zoomFx = null; this.cv.style.transform = ''; this.cv.style.transformOrigin = ''; if (z.done) z.done(); return; }
+    this.cv.style.transformOrigin = `${z.o.x.toFixed(2)}px ${z.o.y.toFixed(2)}px`;
+    this.cv.style.transform = `scale(${(z.from + (z.to - z.from) * e).toFixed(4)})`;
   }
   toWorld(sx, sy) { return { x: sx / this.scale + this.camX, y: sy / this.scale + this.camY }; }
   shake(a, t = 0.25) { if (!this.shakeOn) return; this.shakeA = Math.max(this.shakeA, a); this.shakeT = Math.max(this.shakeT, t); }
@@ -204,25 +243,22 @@ export class Renderer {
     const tgt = G.camTarget;
     this.cam.x += (tgt.x - this.cam.x) * Math.min(1, dt * 7);
     this.cam.y += (tgt.y - this.cam.y) * Math.min(1, dt * 7);
-    if (G.snapCam) { this.cam.x = tgt.x; this.cam.y = tgt.y; G.snapCam = false; }
+    if (G.snapCam || this.camExact) { this.cam.x = tgt.x; this.cam.y = tgt.y; G.snapCam = false; } // lot 4 : une cinématique tient la caméra au pixel près
+    this.tickZoom(now);
     let sx = 0, sy = 0;
     if (this.shakeT > 0) { this.shakeT -= dt; sx = (rnd() - 0.5) * this.shakeA * 2; sy = (rnd() - 0.5) * this.shakeA * 2; if (this.shakeT <= 0) this.shakeA = 0; }
     // pièce intérieure ou grotte : la caméra reste dans la pièce
-    const room = G.player && G.room >= 0 ? this.world.rooms[G.room] : null;
+    const vo = this.viewRoom; // lot 4 : une cinématique peut montrer un autre lieu que celui du joueur (-1 : dehors)
+    const room = vo != null ? (vo >= 0 ? this.world.rooms[vo] : null) : G.player && G.room >= 0 ? this.world.rooms[G.room] : null;
     this.room = room;
     // dans une petite pièce, on se rapproche un peu
     const boost = room && this.lastW ? Math.max(0, Math.min(1, Math.floor(Math.min(this.lastW / ((room.w + 2) * TILE), this.lastH / ((room.h + 3) * TILE))) - this.baseScale)) : (G.player && G.player.ship && this.baseScale >= 3 ? -1 : 0); // 1.1 : en mer, on voit plus loin
     if (boost !== (this.boost || 0)) { this.boost = boost; this.resize(this.lastW, this.lastH); return; }
-    let minX = 0, maxX = MAP_W * TILE - W, minY = 0, maxY = OVER_H * TILE - H, rx0 = 0, ry0 = 0, rx1 = 0, ry1 = 0;
-    if (room) {
-      rx0 = (room.x0 - 1) * TILE; rx1 = (room.x0 + room.w + 1) * TILE; ry0 = (room.y0 - 2) * TILE; ry1 = (room.y0 + room.h + 1) * TILE;
-      if (rx1 - rx0 <= W) minX = maxX = Math.round((rx0 + rx1) / 2 - W / 2); else { minX = rx0; maxX = rx1 - W; }
-      if (ry1 - ry0 <= H) minY = maxY = Math.round((ry0 + ry1) / 2 - H / 2); else { minY = ry0; maxY = ry1 - H; }
-    }
-    if (maxX < minX) minX = maxX = Math.round((minX + maxX) / 2);
-    if (maxY < minY) minY = maxY = Math.round((minY + maxY) / 2);
-    const camX = Math.round(Math.max(minX, Math.min(maxX, this.cam.x - W / 2)) + sx);
-    const camY = Math.round(Math.max(minY, Math.min(maxY, this.cam.y - H / 2)) + sy);
+    let rx0 = 0, ry0 = 0, rx1 = 0, ry1 = 0;
+    if (room) { rx0 = (room.x0 - 1) * TILE; rx1 = (room.x0 + room.w + 1) * TILE; ry0 = (room.y0 - 2) * TILE; ry1 = (room.y0 + room.h + 1) * TILE; }
+    const cc = this.clampCam(this.cam.x, this.cam.y, W, H, room);
+    this.lastCamX = cc.x; this.lastCamY = cc.y;
+    const camX = Math.round(cc.x + sx), camY = Math.round(cc.y + sy);
     this.camX = camX; this.camY = camY;
     ctx.save();
     if (this.drunk > 0) { const a = Math.sin(now * 1.7) * 0.025 * this.drunk; ctx.translate(W / 2, H / 2); ctx.rotate(a); ctx.translate(-W / 2, -H / 2); }
@@ -269,7 +305,7 @@ export class Renderer {
     for (const p of props) if (!p.ground) draw.push({ y: p.y, p });
     if (G.structs) for (const st of G.structs.values()) { const x = st.tx * TILE + 8; if (x > camX - 40 && x < camX + W + 40 && st.ty * TILE > camY - 40 && st.ty * TILE < camY + H + 40) draw.push({ y: st.ty * TILE + 15, st }); }
     for (const e of G.ents.values()) if (e.k !== 'd' && e.x > camX - 60 && e.x < camX + W + 60 && e.y > camY - 30 && e.y < camY + H + 60) draw.push({ y: e.y, e });
-    for (const n of G.npcs) if (n.x > camX - 40 && n.x < camX + W + 40 && n.y > camY - 30 && n.y < camY + H + 40) draw.push({ y: n.y, n });
+    for (const n of G.npcs) if (!n.hidden && n.x > camX - 40 && n.x < camX + W + 40 && n.y > camY - 30 && n.y < camY + H + 40) draw.push({ y: n.y, n });
     if (G.player) draw.push({ y: G.player.y, e: G.player });
     if (G.player && G.player.petObj && !G.player.petObj.hidden) draw.push({ y: G.player.petObj.y, pet: G.player.petObj });
     for (const e of G.ents.values()) if (e.k === 'p' && e.petObj && !e.petObj.hidden) draw.push({ y: e.petObj.y, pet: e.petObj });
@@ -339,6 +375,7 @@ export class Renderer {
       this.drawAtmosphere(ctx, G, camX, camY, now, dt, dark);
     } else this.critters.length = 0;
     this.drawLighting(ctx, G, camX, camY, now, dark, f);
+    this.drawGrade(ctx, camX, camY, dt);
     if (room && room.kind === 'underwater') this.drawUnderwaterTop(ctx, now); // 1.0 : sous la mer
     if (!room && dark > 0.2 && isFullMoon(G.worldTime || 0)) { ctx.fillStyle = `rgba(120,18,30,${0.05 * dark})`; ctx.fillRect(0, 0, W, H); } // la pleine lune rougit la nuit
     if (!room) { this.drawCritters(ctx, camX, camY, now, dark, true); this.drawWeather(ctx, G, now, dt, dark); }
@@ -347,9 +384,29 @@ export class Renderer {
     this.drawLabels(ctx, G, draw, camX, camY, now);
     this.drawTexts(ctx, camX, camY, dt);
     if (room) ctx.restore();
-    else if (!G.cine) this.drawObjective(ctx, G, camX, camY, now);
+    else if (!G.cine && !(G.cinema && G.cinema.locked())) this.drawObjective(ctx, G, camX, camY, now); // lot 4 : pas de flèche d'objectif dans une scène
     ctx.restore();
     this.drawBossBar(ctx, G);
+  }
+  // lot 4 : l'étalonnage d'une scène (une teinte qui s'installe doucement) et la vignette d'un gros plan
+  drawGrade(ctx, camX, camY, dt) {
+    const g = this.grade;
+    if (g) {
+      g.a += (g.to - g.a) * Math.min(1, dt / Math.max(0.05, g.tau || 0.6));
+      if (g.a > 0.004) { ctx.globalCompositeOperation = g.mode || 'source-over'; ctx.fillStyle = `rgba(${g.c},${g.a.toFixed(3)})`; ctx.fillRect(0, 0, this.W, this.H); ctx.globalCompositeOperation = 'source-over'; }
+      else if (g.to === 0) this.grade = null;
+    }
+    const v = this.vignette;
+    if (v) {
+      v.a += (v.to - v.a) * Math.min(1, dt / Math.max(0.05, v.tau || 0.6));
+      if (v.a > 0.004) {
+        const o = v.follow ? v.follow() : null, ok = o && isFinite(o.x) && isFinite(o.y), r = v.r || 70;
+        const x = ok ? o.x - camX : this.W / 2, y = ok ? o.y - 14 - camY : this.H / 2;
+        const gr = ctx.createRadialGradient(x, y, r * 0.35, x, y, r * 1.6);
+        gr.addColorStop(0, 'rgba(8,4,12,0)'); gr.addColorStop(1, `rgba(8,4,12,${v.a.toFixed(3)})`);
+        ctx.fillStyle = gr; ctx.fillRect(0, 0, this.W, this.H);
+      } else if (v.to === 0) this.vignette = null;
+    }
   }
   prefetch(c0x, c1x, c0y, c1y) {
     for (let cy = c0y - 1; cy <= c1y + 1; cy++) for (let cx = c0x - 1; cx <= c1x + 1; cx++) {
@@ -508,8 +565,8 @@ export class Renderer {
       ctx.drawImage(fr, Math.round(n.x - 7 - camX), Math.round(n.y - 30 - camY));
       return;
     }
-    const sh = humanSheet(n.look);
-    this.drawBody(ctx, sh.cv, sh, 0, n.dir, Math.round(n.x - sh.ax - camX), Math.round(n.y - sh.ay - camY), 0, this.breath(n.x + n.y, now));
+    const sh = humanSheet(n.look), sit = n.sit ? 4 : 0; // lot 4 : un personnage peut attendre assis (Silas, à sa table)
+    this.drawBody(ctx, sh.cv, sh, 0, n.dir, Math.round(n.x - sh.ax - camX), Math.round(n.y - sh.ay - camY) + sit, sit, sit ? 0 : this.breath(n.x + n.y, now));
   }
   // 1.0 : des guirlandes de lanternes entre les réverbères voisins des villes, au-dessus des rues dégagées
   buildGarlands() {
@@ -1186,6 +1243,19 @@ export class Renderer {
         ctx.setLineDash([]);
         ctx.fillStyle = `rgba(255,230,120,${k})`;
         ctx.fillRect(Math.round(x + Math.cos(f.a) * 14), Math.round(y - 9 + Math.sin(f.a) * 14), 2, 2);
+      } else if (f.kind === 'emo') { // lot 4 : une émotion au-dessus de la tête (!, ?, …, ♪, rire, colère, cœur)
+        this.drawEmo(ctx, f.e, Math.round(x), Math.round(y - (f.h || 36) - Math.min(3, t * 14) + (t < 0.12 ? 2 : 0)), t, Math.min(1, (1 - k) * 5));
+      } else if (f.kind === 'item' && f.mini) { // lot 4 : un petit objet posé sur une table, à l'échelle du décor
+        const drop = Math.max(0, 1 - t / 0.25);
+        ctx.globalAlpha = Math.min(1, (1 - k) * 8, t / 0.15);
+        this.drawMini(ctx, f.mini, Math.round(x), Math.round(y - (f.z || 0) - drop * 4), now, f.glint);
+        ctx.globalAlpha = 1;
+      } else if (f.kind === 'item') { // lot 4 : un objet posé par la mise en scène (sur une table, dans une main)
+        const ic = iconCanvas(f.icon, f.tint), drop = Math.max(0, 1 - t / 0.25);
+        ctx.globalAlpha = Math.min(1, (1 - k) * 8, t / 0.15);
+        ctx.drawImage(ic, Math.round(x - ic.width / 2), Math.round(y - ic.height - (f.z || 0) - drop * 6));
+        if (f.glint && Math.floor(now * 2 + f.x) % 5 === 0) { ctx.fillStyle = '#fff8d0'; ctx.fillRect(Math.round(x + 3), Math.round(y - ic.height - (f.z || 0) + 3), 1, 1); }
+        ctx.globalAlpha = 1;
       } else if (f.kind === 'bubble') {
         const s = textCanvas(f.text, '#2b1d14', null, 1);
         const bw = s.width + 6, bh = s.height + 5, bx = Math.round(x - bw / 2), by = Math.round(y - (f.h || 34) - bh);
@@ -1197,6 +1267,37 @@ export class Renderer {
         ctx.globalAlpha = 1;
       }
     }
+  }
+  // lot 4 : les accessoires de la mise en scène, dessinés à la taille du décor (une icône d'inventaire serait trop grande)
+  drawMini(ctx, kind, x, y, now, glint) {
+    const px = (dx, dy, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x + dx, y + dy, w, h); };
+    if (kind === 'plan') { // un plan déroulé : parchemin, murs tracés à l'encre, une croix rouge
+      px(-6, -4, 12, 7, '#3a2414'); px(-5, -4, 10, 6, '#e8d4a4'); px(-6, -4, 1, 7, '#c8a86a'); px(5, -4, 1, 7, '#c8a86a');
+      px(-4, -3, 4, 1, '#6a4a2a'); px(-4, -3, 1, 3, '#6a4a2a'); px(-1, -1, 4, 1, '#6a4a2a'); px(2, -3, 1, 3, '#6a4a2a'); px(1, -3, 1, 1, '#c8321e'); px(2, -2, 1, 1, '#c8321e');
+    } else if (kind === 'uniforme') { // deux uniformes pliés : drap bleu marine, boutons dorés, un liseré rouge
+      px(-5, -5, 10, 6, '#141a2a'); px(-4, -5, 8, 5, '#2a3a66'); px(-4, -3, 8, 1, '#1e2a4a'); px(-1, -5, 1, 5, '#c8321e'); px(1, -4, 1, 1, '#ffd23a'); px(1, -2, 1, 1, '#ffd23a');
+      px(-4, -6, 8, 1, '#3a4a7a');
+    } else if (kind === 'cle') { // la clé du comptable : du laiton
+      px(-4, -3, 3, 3, '#5a3a0a'); px(-3, -2, 1, 1, '#e8b84a'); px(-1, -2, 5, 1, '#5a3a0a'); px(-1, -2, 5, 1, '#d8a83a'); px(2, -1, 1, 1, '#d8a83a'); px(4, -1, 1, 1, '#d8a83a'); px(-4, -3, 3, 1, '#f2d27a');
+      if (glint && Math.floor(now * 2) % 4 === 0) px(-3, -4, 1, 1, '#fff8d0');
+    } else if (kind === 'piece') { px(-1, -2, 3, 2, '#8a5a0a'); px(-1, -2, 2, 1, '#ffd23a'); }
+  }
+  drawEmo(ctx, e, x, y, t, a) {
+    const px = (dx, dy, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x + dx, y + dy, w, h); };
+    const ink = '#2b1d14', paper = '#f6ecd2';
+    ctx.globalAlpha = a;
+    const w = e === 'rire' ? 13 : e === '…' ? 11 : 9, h = 9, x0 = -(w >> 1);
+    px(x0 - 1, -1, w + 2, h + 2, ink); px(x0, 0, w, h, paper); px(-1, h + 1, 3, 1, ink); px(0, h, 1, 2, paper); px(0, h + 2, 1, 1, ink);
+    const c = e === 'colere' ? '#c8321e' : e === 'coeur' ? '#d8326a' : e === '♪' ? '#2a5aa8' : ink;
+    if (e === '!') { px(-1, 1, 2, 5, c); px(-1, 7, 2, 1, c); }
+    else if (e === '?') { px(-2, 1, 4, 1, c); px(2, 2, 1, 2, c); px(0, 4, 2, 1, c); px(0, 5, 1, 1, c); px(0, 7, 1, 1, c); px(-2, 2, 1, 1, c); }
+    else if (e === '…') { const n = 1 + (Math.floor(t * 3) % 3); for (let i = 0; i < 3; i++) if (i < n) px(-4 + i * 3, 6, 2, 2, c); }
+    else if (e === '♪') { px(1, 1, 1, 5, c); px(2, 1, 2, 1, c); px(3, 2, 1, 1, c); px(-1, 5, 2, 2, c); }
+    else if (e === 'rire') { for (const [dx, dy] of [[-5, 2], [1, 2]]) { px(dx, dy, 1, 5, c); px(dx + 3, dy, 1, 5, c); px(dx + 1, dy + 2, 2, 1, c); } }
+    else if (e === 'colere') { px(-3, 1, 2, 2, c); px(1, 1, 2, 2, c); px(-3, 5, 2, 2, c); px(1, 5, 2, 2, c); px(-1, 3, 2, 2, c); }
+    else if (e === 'coeur') { px(-3, 2, 2, 2, c); px(1, 2, 2, 2, c); px(-3, 3, 6, 2, c); px(-2, 5, 4, 1, c); px(-1, 6, 2, 1, c); }
+    else if (e === 'sueur') { px(2, 1, 2, 2, '#4a8ad8'); px(1, 3, 4, 3, '#4a8ad8'); px(2, 6, 2, 1, '#4a8ad8'); px(-3, 3, 2, 1, c); }
+    ctx.globalAlpha = 1;
   }
   drawProjectiles(ctx, camX, camY, now, dt) {
     for (const [id, p] of this.projs) {
@@ -1538,6 +1639,7 @@ export class Renderer {
       const x = Math.round(o.x - camX);
       if (d.n) {
         const n = d.n;
+        if (n.hidden) continue;
         const top = Math.round(n.y - camY - (n.parrot ? 34 : 30));
         const name = textCanvas(n.name, '#ffe7a0');
         ctx.drawImage(name, x - (name.width >> 1), top - 6);

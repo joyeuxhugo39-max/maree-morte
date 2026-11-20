@@ -1,5 +1,7 @@
 // Effets sonores synthétisés (WebAudio) : aucun fichier audio nécessaire.
 import { Composer } from './music.js';
+// lot 4 : les sons que sait faire play() — les cinématiques vérifient les leurs avec (le test t_cinema40 compare à la liste réelle)
+export const SFX_NAMES = new Set('slash hit crit shot musket boom coin chair paper step laugh pickup level quest hurt groan die click dice roll throw cry drink heal chest dodge summon door deny warn chain creak flap splash bite reel dig forge ach roar victory conch rumble crack seal unlock pin bark horn'.split(' '));
 export class Sfx {
   constructor() {
     this.ctx = null; this.muted = false; this.musicVol = 0.6; this.sfxVol = 1;
@@ -21,7 +23,7 @@ export class Sfx {
   }
   setVolumes(music, sfx) {
     this.musicVol = music; this.sfxVol = sfx;
-    if (this.musicBus) this.musicBus.gain.setTargetAtTime(music * 0.55, this.ctx.currentTime, 0.1);
+    if (this.musicBus) this.musicBus.gain.setTargetAtTime(music * 0.55 * (this.duckK ?? 1), this.ctx.currentTime, 0.1);
     if (this.sfxBus) this.sfxBus.gain.setTargetAtTime(sfx, this.ctx.currentTime, 0.1);
   }
   // ---------------------------------------------------------------- musique
@@ -29,10 +31,41 @@ export class Sfx {
     const c = this.ctx;
     this.musicBus = c.createGain(); this.musicBus.gain.value = this.musicVol * 0.55; this.musicBus.connect(this.master);
     this.composer = new Composer(this);
-    if (this.wantTheme) this.composer.want = this.wantTheme;
+    if (this.wantTheme) this.composer.want = this.files && this.files[this.wantTheme] ? '' : this.wantTheme;
+    if (this.files && this.files[this.wantTheme]) this.playFile(this.files[this.wantTheme]);
     setInterval(() => this.composer.tick(), 90);
   }
-  setTheme(name) { this.wantTheme = name; if (this.composer) this.composer.want = name; }
+  // lot 4 : un thème peut s'éteindre plus ou moins lentement (fade, en secondes) ; un thème inconnu ou vide = le silence.
+  // Point d'intégration : si un vrai fichier audio est enregistré pour ce thème (musicFile), il remplace le compositeur.
+  setTheme(name, fade = null) {
+    if (name === this.wantTheme && fade == null) return;
+    this.wantTheme = name;
+    const file = this.files && this.files[name];
+    if (this.composer) { this.composer.want = file ? '' : name; if (fade != null) this.composer.fadeOut = fade; }
+    this.playFile(file || null, fade);
+  }
+  musicFile(theme, url) { (this.files || (this.files = {}))[theme] = url || null; } // lot 4 : brancher un enregistrement (.ogg, .mp3, .wav)
+  playFile(url, fade) {
+    const c = this.ctx, cur = this.fileNode;
+    if (cur && cur.url === url) return;
+    if (cur) { cur.g.gain.setTargetAtTime(0, c.currentTime, Math.max(0.05, (fade ?? 0.8) / 3)); setTimeout(() => { try { cur.src.stop(); cur.g.disconnect(); } catch (e) { /* */ } }, 4000); this.fileNode = null; }
+    if (!url || !c || !this.musicBus) return;
+    const go = (buf) => {
+      if (this.wantTheme == null || this.files[this.wantTheme] !== url) return; // on a changé d'avis pendant le chargement
+      const src = c.createBufferSource(), g = c.createGain(); src.buffer = buf; src.loop = true;
+      g.gain.value = 0; g.gain.setTargetAtTime(1, c.currentTime + 0.05, 0.6); src.connect(g); g.connect(this.musicBus); src.start();
+      this.fileNode = { url, src, g };
+    };
+    const cache = this.fileBufs || (this.fileBufs = new Map());
+    if (cache.has(url)) return go(cache.get(url));
+    fetch(url).then((r) => r.arrayBuffer()).then((a) => c.decodeAudioData(a)).then((b) => { cache.set(url, b); go(b); })
+      .catch(() => { this.files[Object.keys(this.files).find((k) => this.files[k] === url)] = null; if (this.composer) this.composer.want = this.wantTheme; }); // fichier absent : le compositeur reprend
+  }
+  // lot 4 : baisser la musique (une réplique importante, un silence), puis la rendre
+  duck(k = 1, tau = 0.6) {
+    this.duckK = Math.max(0, Math.min(1, k));
+    if (this.musicBus) this.musicBus.gain.setTargetAtTime(this.musicVol * 0.55 * this.duckK, this.ctx.currentTime, Math.max(0.02, tau));
+  }
   note(dest, midi, t, dur, { type = 'triangle', vol = 0.05, attack = 0.01, release = 0.08, detune = 0, lp = 0, vib = 0 } = {}) {
     const c = this.ctx, o = c.createOscillator(), g = c.createGain();
     o.type = type; o.frequency.value = 440 * Math.pow(2, (midi - 69) / 12); o.detune.value = detune;
@@ -132,6 +165,10 @@ export class Sfx {
       case 'musket': this.hiss(0.3, { f: 900, q: 0.4, vol: 0.32 * v, slide: 0.2, type: 'lowpass' }); this.tone(70, 0.25, { type: 'sine', vol: 0.25 * v, slide: 0.5 }); break;
       case 'boom': this.hiss(0.8, { f: 700, q: 0.3, vol: 0.55 * v, slide: 0.1, type: 'lowpass' }); this.tone(55, 0.7, { type: 'sine', vol: 0.45 * v, slide: 0.4 }); break;
       case 'coin': this.tone(1320, 0.07, { vol: 0.08 * v }); this.tone(1980, 0.12, { vol: 0.07 * v, delay: 0.06 }); break;
+      case 'chair': this.hiss(0.22, { f: 520, q: 2.5, vol: 0.12 * v, slide: 1.6 }); this.tone(180, 0.08, { type: 'triangle', vol: 0.06 * v, delay: 0.18 }); break; // lot 4 : une chaise qu'on recule
+      case 'paper': this.hiss(0.16, { f: 3400, q: 0.7, vol: 0.07 * v, slide: 0.7 }); this.hiss(0.12, { f: 2600, q: 0.7, vol: 0.05 * v, slide: 1.3, delay: 0.14 }); break; // un plan qu'on déroule
+      case 'step': this.tone(95, 0.05, { type: 'sine', vol: 0.07 * v, slide: 0.7 }); this.hiss(0.04, { f: 700, vol: 0.03 * v }); break;
+      case 'laugh': for (let k = 0; k < 4; k++) { const f = 220 + Math.random() * 90; this.tone(f, 0.07, { type: 'square', vol: 0.016 * v, delay: k * 0.13, slide: 0.85 }); this.tone(f * 1.26, 0.06, { type: 'triangle', vol: 0.014 * v, delay: 0.05 + k * 0.13 }); } break; // des rires de taverne
       case 'pickup': this.tone(660, 0.06, { vol: 0.07 * v }); this.tone(990, 0.08, { vol: 0.06 * v, delay: 0.05 }); break;
       case 'level': [523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.22, { vol: 0.09 * v, delay: i * 0.09, type: 'square' })); this.tone(1046, 0.5, { vol: 0.06 * v, delay: 0.36, type: 'triangle' }); break;
       case 'quest': [392, 523, 659, 784].forEach((f, i) => this.tone(f, 0.18, { vol: 0.08 * v, delay: i * 0.1, type: 'triangle' })); break;

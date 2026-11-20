@@ -195,6 +195,7 @@
       <label for="set-zoom">Zoom <select id="set-zoom"><option value="0">Automatique</option><option value="1">×1</option><option value="2">×2</option><option value="3">×3</option><option value="4">×4</option><option value="5">×5</option><option value="6">×6</option></select> <small>(ou la molette)</small></label>
       <label for="set-barre">Barre du navire <select id="set-barre"><option value="simple">Simple : le navire vire vers la direction tenue</option><option value="reel">Réaliste : Q / D tournent la roue</option></select></label>
       <label for="set-shake"><input id="set-shake" type="checkbox"> Tremblements de l'écran</label>
+      <label for="set-cine">Cinématiques <select id="set-cine"><option value="complet">Complètes</option><option value="reduit">Effets réduits : plans coupés au lieu des travellings et des zooms, ni tremblement ni vignette, fondus courts</option></select></label>
       <label for="set-myname"><input id="set-myname" type="checkbox"> Afficher mon nom au-dessus de moi</label>
       <label for="set-global"><input id="set-global" type="checkbox"> Montrer le canal global dans l'onglet « Tout » du chat</label>
       <label for="set-mpsound"><input id="set-mpsound" type="checkbox"> Son à la réception d'un message privé</label>
@@ -247,6 +248,8 @@
   <div id="cine-top" class="cinebar"></div>
   <div id="cine-bot" class="cinebar"><span id="cine-sub"></span></div>
   <div id="cine-title" class="hidden"><div id="cine-name"></div><div id="cine-tag"></div></div>
+  <div id="cine-fade"></div>
+  <button id="cine-skip" class="hidden" title="Passer la scène (Échap)">Passer <span>▸▸</span> <kbd>Échap</kbd></button>
   <div id="ink"></div>
   <div id="lockpick" class="hidden">
     <div class="lp-box">

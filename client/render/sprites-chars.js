@@ -42,6 +42,12 @@ export const CLOTH = {
   orange: [0x6a2c0c, 0x9a4414, 0xc8621e, 0xe8883a],
 };
 export const CLOTH_KEYS = ['red', 'navy', 'green', 'brown', 'purple', 'yellow', 'teal', 'black', 'orange', 'white'];
+// lot 4 : ce que la feuille de personnage sait dessiner (les cinématiques vérifient leurs costumes avec)
+export const LOOK_PARTS = {
+  top: ['chemise', 'armure', 'capitaine', 'gilet', 'haillons', 'manteau', 'rayee', 'squelette', 'tablier', 'vareuse'],
+  hairStyle: ['court', 'chauve', 'hirsute', 'long', 'queue'],
+  hat: ['bandana', 'bec', 'bonnet', 'cagoule', 'capitaine', 'couronne', 'crane', 'foulard', 'morion', 'paille', 'plume', 'tricorne'],
+};
 const GOLDC = [0x8a5a14, 0xc8901e, 0xf0c040, 0xfff0a0];
 const BELT = 0x2e1c10;
 const EYE = 0x1c1424;

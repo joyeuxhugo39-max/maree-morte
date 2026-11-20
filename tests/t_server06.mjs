@@ -4,7 +4,7 @@ import { HOME_PRICE } from '../shared/data/craft.js';
 const store = new Map();
 const game = new Game({ storage: { auth: async (k) => ({ ok: true, data: store.get(k) || null }), save: (k, d) => store.set(k, JSON.parse(JSON.stringify(d))) }, log: () => {} });
 const W = game.world;
-const mk = async (name) => { const c = { msgs: [], send(m) { this.msgs.push(m); }, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 12, name, pass: 'abcd' }); await new Promise((r) => setTimeout(r, 20)); const p = game.sessions.get(c).player; p.c = c; return p; };
+const mk = async (name) => { const c = { msgs: [], send(m) { this.msgs.push(m); }, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 13, name, pass: 'abcd' }); await new Promise((r) => setTimeout(r, 20)); const p = game.sessions.get(c).player; p.c = c; return p; };
 const A = await mk('Alice'), B = await mk('Barbe');
 let fails = 0; const ok = (v, m) => { console.log((v ? 'OK  ' : 'FAIL') + ' ' + m); if (!v) fails++; };
 const tick = (n) => { for (let i = 0; i < n; i++) game.tick(); };

@@ -22,6 +22,7 @@ import { updateCine, cineLocked, endCine, bossIntro, bossDown, krakenIntro, krak
 import { Scene } from './scene.js';
 import { devHook } from './dev-hook.js';
 import { Townsfolk } from './townsfolk.js';
+import { Cinema } from './cinema.js'; // lot 4 : les cinématiques mises en scène
 import { applyTheme } from './render/ui-art.js';
 import { shipOf, hullHalf, toWorld, stations, deckMove, deckOk, nearestDeck, openingAt, insideHull, toLocal, BERTHS, berthPos, RAIL } from '../shared/data/ships.js';
 applyTheme(); // 0.8.1 : parchemin, cadres de bois ferré, fleurons — avant même l'écran d'accueil
@@ -83,7 +84,8 @@ async function boot(hotData = {}) {
   G.renderer.G = G;
   G.allNpcs = G.world.npcs.map((n) => ({ ...n, name: NPCS[n.id].name, look: NPCS[n.id].look, parrot: !!NPCS[n.id].parrot, board: !!NPCS[n.id].board }));
   G.npcs = G.allNpcs.filter((n) => !NPCS[n.id].vis);
-  G.ui = new UI(G); G.scene = new Scene(G);
+  G.ui = new UI(G); G.scene = new Scene(G); G.cinema = new Cinema(G);
+  $('cine-skip').onclick = () => G.cinema.skip();
   devHook(G, { QUESTS, bossIntro, bossDown, krakenIntro, krakenDown, endCine }); // lot 2 : le panneau vient du serveur, après vérification
   G.input = new Input($('view'), () => G.ui.typing());
   const resize = () => G.renderer.resize(innerWidth, innerHeight);
@@ -181,10 +183,12 @@ function onMsg(m) {
     case 'maint': G.maint = m.m; ui.maintenance(m.m); break;
     case 'welcome':
       if (m.rt && G.mode === 'online') { try { sessionStorage.setItem('mm_resume', JSON.stringify({ name: m.lab && G.loginInfo ? G.loginInfo.name : m.name, rt: m.rt, auto: 0 })); } catch (e) { /* */ } } // le labo reprend sur le vrai personnage
+      if (G.cinema) G.cinema.abort('reconnexion');
       start(m, now); if (m.maint) { G.maint = m.maint; ui.maintenance(m.maint); }
       G.dev.onWelcome(m);
       break;
     case 'dev': G.dev.onMessage(m); break;
+    case 'cinema': G.cinema.onMsg(m); break; // lot 4
     case 's': snapshot(m, now); break;
     case 'me': {
       const prev = G.me;
@@ -539,7 +543,7 @@ function onEvent(ev, t) {
     case 'cine': {
       if (!G.player) break;
       const ce = entOf(ev[2]);
-      if (ev[1] === 'boss' && ce) bossIntro(G, ce, ev[3], now);
+      if (ev[1] === 'boss' && ce && !G.cinema.on) bossIntro(G, ce, ev[3], now); // lot 4 : pas par-dessus une scène
       else if (ev[1] === 'bossdown') bossDown(G, ev[3], ev[4], ev[5], now);
       else if (ev[1] === 'krakenrise' && ce) { const e = ce; e.upT = now; e.firstRise = 1; R.shake(7, 1.6); G.sfx.play('roar', 1.2); G.sfx.play('splash'); R.burst(e.x, e.y, 80, { z: 2, col: ['#ffffff', '#d8f6ff', '#9fd8ff'], up: 150, speed: 90, life: 1.1, g: 200 }); }
       else if (ev[1] === 'krakendown') { G.inkUntil = 0; G.pull = null; G.grabUntil = 0; R.inks.length = 0; krakenDown(G, ev[3], ev[4], now); }
@@ -1005,7 +1009,8 @@ function ambience(now) {
   if (now < (G.songUntil || 0)) theme = 'cite'; // une chanson à boire
   if (G.kraken && Math.hypot(G.world.kraken.x - p.x, G.world.kraken.y - p.y) < 560) theme = 'naval';
   if (G.cine && G.cine.theme) theme = G.cine.theme;
-  G.sfx.setTheme(theme);
+  if (G.cinema.theme() != null) theme = G.cinema.theme(); // lot 4 : le thème de la scène (ou son silence)
+  G.sfx.setTheme(theme, G.cinema.takeFade());
   if (G.me && G.me.songs && !G.me.songs.includes(theme) && !(G.songAsked || (G.songAsked = new Set())).has(theme)) { G.songAsked.add(theme); G.send({ t: 'song', k: theme }); } // 1.0 : le carnet d'airs
   const w = weatherAt(G.worldTime);
   G.sfx.rain(G.room >= 0 ? 0 : w.rain);
@@ -1077,7 +1082,7 @@ function frame(now, dt) {
   const mw = R.toWorld(G.input.mouse.x, G.input.mouse.y);
   G.mouseWorld = mw;
   G.aim = Math.atan2(mw.y - (p.y - 9), mw.x - p.x);
-  G.locked = cineLocked(G, now) || !!G.ui.lp || !!G.ui.cf || G.scene.on;
+  G.locked = cineLocked(G, now) || G.cinema.locked() || !!G.ui.lp || !!G.ui.cf || G.scene.on;
   handleKeys(now);
   G.ui.lockpickTick(dt);
   if (G.locked) { /* on regarde */ }
@@ -1085,7 +1090,7 @@ function frame(now, dt) {
   else if (G.input.mouse.left && !(G.me && G.me.dead)) tryAttack(G.aim, now);
   updatePlayer(now, dt);
   interpolate(now, dt);
-  G.interactTarget = findInteract();
+  G.interactTarget = G.cinema.locked() || G.scene.on ? null : findInteract(); // lot 4 : pas d’invite « [E] » pendant une scène
   // zone
   const z = zoneAt(G.world, p.x, p.y);
   if (G.room !== G.lastRoom) {
@@ -1109,7 +1114,7 @@ function frame(now, dt) {
   const dn = G.ui.dialogNpc || G.ui.shopNpc;
   if (dn) { const n = G.npcs.find((q) => q.id === dn); if (n && Math.hypot(n.x - p.x, n.y - p.y) > 80) G.ui.close(); }
   // les PNJ regardent le joueur proche
-  for (const n of G.npcs) { if (n.fixed) continue; const d = Math.hypot(n.x - p.x, n.y - p.y); n.dir = d < 70 ? dirOf(p.x - n.x, p.y - n.y) : 0; }
+  for (const n of G.npcs) { if (n.fixed) continue; const d = Math.hypot(n.x - p.x, n.y - p.y); n.dir = d < 70 ? dirOf(p.x - n.x, p.y - n.y) : (n.dir0 || 0); }
   G.renderer.drunk = G.me && G.me.drunk > 0 ? Math.max(0, 1 - (now - G.meAt) / G.me.drunk) * 1 : 0;
   updateFolk(dt);
   if (now - (G.ambAt || 0) > 0.4) { G.ambAt = now; ambience(now); G.objective = computeObjective(); }
@@ -1121,7 +1126,8 @@ function frame(now, dt) {
   updatePets(now, dt);
   R.petOut = p.pet || '';
   G.ui.ink(now < G.inkUntil);
-  G.camTarget = updateCine(G, now) || G.scene.update() || shipCam(p) || { x: p.x, y: p.y - 12 };
+  const cc = G.cinema.tick(now, dt); // lot 4 : une scène tient la caméra (sauf pendant sa conversation)
+  G.camTarget = cc || (G.cinema.locked() ? null : updateCine(G, now)) || G.scene.update() || shipCam(p) || { x: p.x, y: p.y - 12 };
   R.render(G, now, dt);
   if (!G.tutT || now - G.tutT > 0.25) { G.tutT = now; tutorial(now); }
   G.ui.update(now);
@@ -1132,6 +1138,7 @@ function handleKeys(now) {
     if (ui.typing()) continue;
     if (ui.cf) { if (k.key === 'e' || k.code === 'Enter') ui.confirmEnd(true); else if (k.code === 'Escape') ui.confirmEnd(false); continue; }
     if (ui.lp) { if (k.key === 'e' || k.code === 'Space' || k.code === 'MouseLeft') ui.lockpickPress(); else if (k.code === 'Escape') ui.lockpickEnd(null); continue; }
+    if (G.cinema.locked() && !G.scene.on) { if (k.code === 'Escape') G.cinema.skip(); continue; } // lot 4 : Échap passe la scène
     if (cineLocked(G, now)) { if (k.code === 'Escape' && G.cine.skippable) endCine(G); continue; }
     if (G.scene.on) { G.scene.key(k.code); continue; }
     if (!$('dialog').classList.contains('hidden') && /^Digit[1-9]$/.test(k.code)) { ui.pickChoice(+k.code.slice(5) - 1); continue; }

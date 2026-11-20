@@ -34,7 +34,7 @@ async function fight(id, dodge, n = 1) {
   const W = game.world, def = MOBS[id];
   const P = [];
   for (let i = 0; i < n; i++) {
-    const c = { send() {}, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 12, name: 'Duelliste' + (i + 1), pass: 'abcd' }); await wait(60);
+    const c = { send() {}, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 13, name: 'Duelliste' + (i + 1), pass: 'abcd' }); await wait(60);
     const p = game.sessions.get(c).player;
     p.level = Math.min(30, def.level); p.tut = 99; const gear = bestGear(p.level); for (const s of Object.keys(gear)) p.eq[s] = gear[s]; game.recalc(p); p.hp = p.stats.maxHp; p.en = p.stats.maxEn;
     P.push({ p, budget: 0, rollAt: 0, sideAt: 0, taken: 0 });

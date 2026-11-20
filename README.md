@@ -25,6 +25,35 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Nouveautés de la version 1.4 : les cinématiques mises en scène
+
+- **Un moteur de cinématiques réutilisable** (`client/cinema.js`, scripts dans `shared/data/cinemas.js`).
+  - Caméra : travellings, plans fixes, suivi d'un personnage, coupes, et zooms par paliers entiers (les pixels
+    restent nets ; le passage d'un palier à l'autre est adouci).
+  - Personnages : ils marchent, se tournent, s'assoient et se lèvent, saluent, lancent une pièce, se penchent vers
+    un objet ; des émotions s'affichent au-dessus de leur tête.
+  - Mise en scène : bandes noires, fondus au noir, sous-titres, bulles, titres, étalonnage, vignette d'un gros plan,
+    objets posés sur une table, plans d'un autre lieu que celui du joueur.
+  - Son : un thème par scène, des fondus musicaux, des silences, des bruitages synchronisés.
+- **Confort.** On passe une scène avec Échap ou le bouton « Passer ». Réglage « Effets réduits » : plans coupés
+  au lieu des travellings et des zooms, ni tremblement ni vignette, fondus courts. Caméra, zoom, commandes,
+  musique, personnages et interface sont toujours rendus : à la fin, si l'on passe la scène, si l'on quitte le lieu,
+  si l'on meurt, si l'on se reconnecte, ou si une étape échoue.
+- **En ligne, c'est le serveur qui décide.** Il lance la scène (en entrant dans un lieu, ou depuis une conversation),
+  une seule fois par personnage. Pendant la scène, le spectateur ne peut ni frapper ni être frappé, et les monstres
+  l'ignorent. La protection tombe à la fin, au premier geste, à la déconnexion, ou au plus tard après une durée fixée.
+  Une scène de groupe se joue pour les compagnons présents ; qui arrive en retard ne la voit pas.
+- **Silas Virevent** attend désormais à la table isolée de la Sirène Borgne, près de la cheminée (dès le niveau 10).
+  - La première fois qu'on entre, une scène : il joue avec une pièce, vous remarque, vous fait signe, se lève et
+    vient vous parler. Il propose une affaire ; on accepte ou on refuse, et il s'en souvient.
+  - Si l'on accepte, « Où en est l'affaire ? » joue la préparation : le plan, les uniformes et la clé sur sa table,
+    puis le quartier des Corsaires où vit Octave Valdorne.
+  - La quête « Le Plus Grand Braquage » elle-même arrive au lot suivant.
+- **La taverne vivante.** Des habitués attablés dans les tavernes et les auberges, plus nombreux le soir.
+- **Neuf identités musicales** pour le braquage, dont le leitmotiv de Silas. Comme toute la musique du jeu, elles
+  sont générées par le code : il n'existe aucun fichier audio. Un vrai enregistrement pourra remplacer chacune
+  (`Sfx.musicFile`). Le cahier des charges est dans `rapports/lot4-cinematiques.md`.
+
 ## Nouveautés de la version 1.3 : la qualité, mesurée
 
 - **Les 81 quêtes** sont jouées de bout en bout par un pirate de test, avec les vrais mécanismes du jeu.

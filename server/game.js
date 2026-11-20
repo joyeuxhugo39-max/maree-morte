@@ -35,6 +35,7 @@ import { shipOf, mobShipKind, hullHit as hullPointHit } from '../shared/data/shi
 import { dungeonLogic } from './dungeon.js';
 import { sea } from './sea.js';
 import { seasons } from './seasons.js';
+import { cinema } from './cinema.js'; // lot 4 : qui voit quelle cinématique, et la protection des spectateurs
 import { MEM_KEYS } from '../shared/data/scenes.js';
 import { repLevel, buyPrice, sellPrice } from '../shared/data/places.js';
 import { LEGACY_VALUE, LEGACY_STRUCT, QUEST_ITEM_OLD_VALUE } from '../shared/data/legacy.js';
@@ -128,6 +129,7 @@ export class Game {
     this.tavernInit();
     this.dungeonInit();
     this.seasonsInit();
+    this.cinemaInit();
     this.shipsInit();
     this.seenW = Math.ceil(this.world.W / SEEN_CELL); this.seenH = Math.ceil(this.world.OVER_H / SEEN_CELL); this.seenBytes = Math.ceil(this.seenW * this.seenH / 8);
     this.usedTokens = new Set(); this.fails = new Map(); this.bans = {}; this.reports = []; this.maintenance = null; // 1.0
@@ -194,6 +196,7 @@ export class Game {
     this.players.delete(p.id);
     if (!this.worldPersist) { this.removeBase(p.key); this.removeHome(p.key); }
     for (const m of this.mobs) if (m.target === p.id) m.target = 0;
+    if (p.cine) this.endCinema(p, "déconnexion"); // lot 4 : les autres spectateurs ne l’attendent pas
     if (!quiet) this.broadcastChat(null, `${p.name} a quitté l'archipel.`, 'sys');
     this.log(`[jeu] ${p.name} déconnecté (${this.players.size} en ligne)`);
   }
@@ -250,6 +253,7 @@ export class Game {
       case 'season': this.seasonRoll(); return this.send(p, this.seasonState());
       case 'arena': return this.arenaAction(p, String(m.a), m);
       case 'tav': return this.tavernAction(p, String(m.a), m);
+      case 'cinema': return this.cinemaMsg(p, m); // lot 4
       case 'mem': { const k = String(m.k); if (MEM_KEYS.has(k) && p.mem.size < 200) p.mem.add(k); return; }
       case 'song': { const k = String(m.k), s = HOUSE_MUSIC.find(([x]) => x && x === k); if (!s || p.songs.has(k)) return; p.songs.add(k); p.dirtyMe = true; const n = HOUSE_MUSIC.length - 1; if (p.songs.size >= n) this.unlock(p, 'melomane'); return this.toast(p, `♪ Nouvel air noté dans votre carnet : « ${s[1]} » (${p.songs.size}/${n}). La boîte à musique de votre maison saura le jouer.`, 'quest'); }
       case 'ladder': return this.send(p, { t: 'ladder', top: this.ladderTop(), hist: p.pvpHist, me: [p.honor | 0, Math.floor(p.infamy || 0)] });
@@ -641,7 +645,7 @@ export class Game {
       this.ev(m.x, m.y, ['shout', m.id, 'Feu des âmes ! Coulez-les tous !']);
       return;
     }
-    const valid = (p) => p && !p.dead && p.room === -1 && !SAFE.has(p.zone) && Math.hypot(p.x - m.x, p.y - m.y) < def.aggro * (m.target === p.id ? 1.4 : 1);
+    const valid = (p) => p && !p.dead && p.room === -1 && !SAFE.has(p.zone) && !this.inCinema(p) && Math.hypot(p.x - m.x, p.y - m.y) < def.aggro * (m.target === p.id ? 1.4 : 1);
     let t = m.target ? this.players.get(m.target) : null;
     if (!valid(t)) {
       t = null; m.target = 0;
@@ -754,7 +758,7 @@ export class Game {
     if (m.def.elite && this.players.size) this.broadcastChat(null, `☠ ${m.def.name} rôde à nouveau : ${m.room >= 0 ? this.world.rooms[m.room].name : ZONES[zoneAt(this.world, m.x, m.y)].name}.`, 'night');
   }
   // un mort ne poursuit pas un pirate en zone sûre, dans une autre pièce, ou en mer (sauf s'il tire)
-  mobCanTarget(m, p) { return !p.dead && !SAFE.has(p.zone) && p.room === m.room && (!p.boat || !!m.def.ranged) && !(this.time < (p.smokeUntil || 0) && !m.def.ai); }
+  mobCanTarget(m, p) { return !p.dead && !SAFE.has(p.zone) && !this.inCinema(p) && p.room === m.room && (!p.boat || !!m.def.ranged) && !(this.time < (p.smokeUntil || 0) && !m.def.ai); }
   nearestTarget(m, range) {
     let best = null, bd = range;
     for (const p of this.players.values()) {
@@ -890,7 +894,7 @@ export class Game {
     this.ev(m.x, m.y, ['atk', m.id, +m.atkA.toFixed(2), m.boss ? 2 : 0]);
     const arc = m.boss ? 1.4 : 1.0;
     for (const p of this.players.values()) {
-      if (p.dead || SAFE.has(p.zone) || p.room !== m.room) continue;
+      if (p.dead || SAFE.has(p.zone) || p.room !== m.room || this.inCinema(p)) continue;
       const d = dist(m, p);
       if (d > def.range + 8 + (m.boss ? 6 : 0)) continue;
       const a = Math.atan2(p.y - m.y, p.x - m.x);
@@ -955,7 +959,7 @@ export class Game {
     this.ev(x, y, ['lavabomb', Math.round(x), Math.round(y), +dur.toFixed(2)]);
   }
   // les cibles d'un boss : les pirates proches, dans la même pièce
-  bossTargets(m, r) { return [...this.players.values()].filter((p) => !p.dead && !SAFE.has(p.zone) && p.room === m.room && dist(p, m) < r); }
+  bossTargets(m, r) { return [...this.players.values()].filter((p) => !p.dead && !SAFE.has(p.zone) && !this.inCinema(p) && p.room === m.room && dist(p, m) < r); }
   summonAdds(m, t, type, n, max, line) {
     m.adds = m.adds.filter((a) => a.state !== 'dead' && this.mobs.includes(a));
     if (m.adds.length >= max) return;
@@ -1723,7 +1727,7 @@ export class Game {
   // lot 2 : le personnage laboratoire ne touche jamais aux vrais pirates (échanges, groupes, duels, butin, classements)
   labWall(p, q) { if (!(p && p.lab) && !(q && q.lab)) return false; this.toast(p, 'Personnage laboratoire : il reste à l’écart des vrais pirates (échanges, groupes, duels, butin, propriétés).', 'warn'); return true; }
   damagePlayer(p, raw, src, crit = false, dot = 0) {
-    if (p.dead) return;
+    if (p.dead || this.inCinema(p)) return; // lot 4 : un spectateur de cinématique n'est pas une cible
     if (this.time < p.invulnUntil && !dot) { this.ev(p.x, p.y, ['dodge', p.id]); return; }
     let dmg = dot ? Math.max(1, Math.round(raw)) : mitigate(raw, p.stats.def);
     if (!dot && p.ship) dmg = this.hullHit(p, dmg); // la coque encaisse
@@ -1977,6 +1981,7 @@ export class Game {
 
   onAttack(p, a) {
     if (p.dead || !isFinite(a)) return;
+    if (p.cine) this.endCinema(p, 'action'); // lot 4 : on ne frappe pas depuis une cinématique
     if (p.post) { if (p.post.startsWith('gun')) this.fireGun(p, a); return; } // 1.1 : à son poste
     const cd = p.stats.atkSpeed;
     if ((p.cds.slash || 0) > this.time + 0.04) return;
@@ -2014,6 +2019,7 @@ export class Game {
   onSkill(p, m) {
     const id = String(m.s), sk = SKILLS[id];
     if (!sk || p.dead) return;
+    if (p.cine) this.endCinema(p, 'action'); // lot 4
     if (p.riding) this.dismount(p);
     if (p.level < sk.lvl) return this.toast(p, `${sk.name} : niveau ${sk.lvl} requis.`, 'warn');
     if (p.post) { if (id === 'shot' && p.post.startsWith('gun')) this.fireGun(p, +m.a); return; } // 1.1 : au canon, on tire le canon
@@ -2095,6 +2101,7 @@ export class Game {
     if (p.race) this.raceCheck(p); // 1.0 : le Grand Tour
     const x = +m.x, y = +m.y;
     if (!isFinite(x) || !isFinite(y)) return;
+    if (p.cine && Math.hypot(x - p.x, y - p.y) > 3) this.endCinema(p, 'action'); // lot 4 : qui bouge ne regarde plus
     if (this.time < (p.grabbedUntil || 0)) { p.lastMoveAt = this.time; if (Math.hypot(x - p.x, y - p.y) > 3) this.sendPos(p); return; }
     const dt = Math.min(0.6, this.time - p.lastMoveAt);
     p.lastMoveAt = this.time;
@@ -2190,6 +2197,7 @@ export class Game {
       p.cds.door = this.time + 0.6;
       if (d.secret) this.discover(p, d);
       this.teleport(p, d.ix, d.iy, { door: d.id });
+      this.cinemaOnEnter(p, d.room); // lot 4 : une scène attend peut-être ici
       if (d.dungeon) { this.pushDng(p); this.toast(p, 'Le Bastion Englouti : deux leviers par grille, à tirer ensemble — à plusieurs. Et méfiez-vous de l’Écluse.', 'quest'); }
     }
   }
@@ -3220,7 +3228,7 @@ export class Game {
     if (this.tickCount % 5 === 0) this.updateVolcano();
     if (this.tickCount % 20 === 0) { this.justiceGlobalTick(); this.eventTick(); }
     if (this.tickCount % 1200 === 0) this.seasonRoll(); // une fois par minute : la saison a-t-elle changé ?
-    if (this.tickCount % 5 === 0) { this.arenaTick(); this.dungeonTick(); }
+    if (this.tickCount % 5 === 0) { this.arenaTick(); this.dungeonTick(); this.cinemaTick(); }
     this.shipsTick();
     if (this.tickCount % 40 === 0 && this.players.size > 1) { // les autres pirates sur la carte
       const pl = [...this.players.values()].map((q) => [q.id, q.name, Math.round(q.x), Math.round(q.y), q.room, q.dead ? 1 : 0, this.isWanted(q) ? 1 : 0]);
@@ -3254,7 +3262,7 @@ export class Game {
         if (q === p || !near(q)) continue;
         seen.set(q.id, q.lookVer + 1000 * q.level);
         if (p.known.get(q.id) !== q.lookVer + 1000 * q.level) ent.push(this.entMeta(q, 'p'));
-        const fl = (q.moving ? 1 : 0) | (q.dead ? 2 : 0) | (this.time < q.invulnUntil ? 4 : 0) | (this.time < q.cry ? 8 : 0) | (q.ship ? 16 : 0), hp = Math.round(q.hp / q.stats.maxHp * 100);
+        const fl = (q.moving ? 1 : 0) | (q.dead ? 2 : 0) | (this.time < q.invulnUntil || this.inCinema(q) ? 4 : 0) | (this.time < q.cry ? 8 : 0) | (q.ship ? 16 : 0), hp = Math.round(q.hp / q.stats.maxHp * 100);
         pos.push(q.ship ? [q.id, Math.round(q.lx), Math.round(q.ly), q.dir, fl, hp, q.ship] : [q.id, Math.round(q.x), Math.round(q.y), q.dir, fl, hp]);
       }
       for (const m of this.mobs) {
@@ -3308,3 +3316,4 @@ Object.assign(Game.prototype, shipsLogic); // 1.1 : les vrais navires (à quai, 
 Object.assign(Game.prototype, dungeonLogic); // 1.0 : le Bastion Englouti
 Object.assign(Game.prototype, sea); // 1.0 : les fonds marins
 Object.assign(Game.prototype, seasons); // 1.0 : saisons, concours de pêche, Grand Tour
+Object.assign(Game.prototype, cinema); // lot 4 : les cinématiques

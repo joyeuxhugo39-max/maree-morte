@@ -1575,6 +1575,10 @@ export function generateWorld(seed = 7) {
     if (docks.libertalia) at('passeur_lib', ...dockTile(docks.libertalia));
   }
 
+  { // lot 4 : Silas Virevent, assis à la table isolée de la Sirène Borgne (ajouté en dernier : les autres ne bougent pas)
+    const sb = rooms.find((r) => r.name === 'La Sirène Borgne');
+    if (sb) npcs.push({ id: 'silas', x: (sb.x0 + 13) * TILE + 8, y: (sb.y0 + 4) * TILE + 12, dir: 1, dir0: 1, sit: 1 });
+  }
   // ---------- 13. Points d'apparition des monstres ----------
   const spawnPlan = [
     [Z.BEACH, 'crab', 26], [Z.BEACH, 'zsailor', 12],

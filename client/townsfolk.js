@@ -18,6 +18,7 @@ const LINES = {
   nuit: ['Tout est calme…', 'Qui va là ?', 'Douze coups, et tout va bien !', 'Rentrez chez vous, il est tard.', 'Les morts rôdent hors des murs, restez en ville.'],
   aube: ['Déjà l’aube…', 'Les pêcheurs sont partis.', 'Le café, vite.', 'Encore une nuit sans attaque, Dieu merci.'],
 };
+const PUB = ['À la tienne !', 'Encore une tournée !', 'Ha ! Ha ! Ha !', 'Tu triches, j’en suis sûr.', 'Un rhum, Rosalie !', 'Et le kraken, tu l’as vu, toi ?', 'Chut… on nous écoute.', 'Je te dis qu’il était grand comme une goélette !', 'À la santé des vivants !'];
 const GREET = ['Bonjour, capitaine !', 'Bon vent !', 'Belle lame que vous avez là.', 'Bienvenue en ville.', 'Tiens, un nouveau visage.'];
 
 export class Townsfolk {
@@ -52,6 +53,43 @@ export class Townsfolk {
       }
       for (let c = 0; c < (z === Z.LIBERTALIA ? 4 : z === Z.TOWN ? 3 : 1); c++) { const [cx, cy] = pick(st); this.cats.push({ col: pick(['orange', 'black', 'white']), x: cx, y: cy, tx: cx, ty: cy, dir: 2, moving: false, wait: rng() * 5 }); }
     }
+    this.seatPatrons(); // lot 4 (après les autres : les habitants d'avant ne changent pas)
+  }
+  // lot 4 : la taverne vivante — des habitués attablés dans les tavernes et les auberges, plus nombreux le soir.
+  // Une table où un personnage attend assis (Silas, à la Sirène Borgne) reste à lui.
+  seatPatrons() {
+    const W = this.G.world, rng = mulberry32(777), pick = (a) => a[Math.floor(rng() * a.length)];
+    this.patrons = [];
+    for (const r of W.rooms) {
+      if (r.kind !== 'tavern' && r.kind !== 'auberge') continue;
+      const inR = (o) => o.x >= r.x0 * TILE && o.x < (r.x0 + r.w) * TILE && o.y >= r.y0 * TILE && o.y < (r.y0 + r.h) * TILE;
+      const held = W.npcs.filter((n) => n.sit && inR(n));
+      for (const ch of W.props) {
+        if (ch.type !== 'chaise' || !inR(ch) || held.some((n) => Math.abs(n.y - ch.y) < 8 && Math.abs(n.x - ch.x) <= 2 * TILE + 4)) continue;
+        const look = { skin: Math.floor(rng() * 4), hair: Math.floor(rng() * 7), hairStyle: pick(['court', 'long', 'queue', 'chauve', 'hirsute']), beard: rng() < 0.4 ? 1 + Math.floor(rng() * 2) : 0, top: pick(['chemise', 'rayee', 'gilet', 'vareuse', 'manteau']), topCol: pick(CLOTH_KEYS), pants: pick(['brown', 'navy', 'black']), boots: pick(['brown', 'black']), hat: pick([null, null, 'bandana', 'tricorne', 'bonnet', 'foulard']), hatCol: pick(CLOTH_KEYS) };
+        const f = { k: 'f', id: -5000 - this.patrons.length, x: ch.x, y: ch.y, dir: ch.v ? 1 : 2, dir0: ch.v ? 1 : 2, moving: false, walk: 0, look, lookKey: JSON.stringify(look), weapon: null,
+          sitUntil: Infinity, patron: true, room: r.id, seat: `${r.id}:${Math.floor(ch.x / TILE) - r.x0},${Math.floor(ch.y / TILE) - r.y0}`, stay: rng(), hidden: true };
+        this.folk.push(f); this.patrons.push(f);
+      }
+    }
+  }
+  updatePatrons(now, ph) {
+    const G = this.G;
+    if (G.cinema && G.cinema.on) return; // pendant une scène, la salle ne change pas
+    const share = ph === 'soir' ? 0.95 : ph === 'nuit' ? 0.7 : ph === 'jour' ? 0.45 : 0.15;
+    let here = null;
+    for (const f of this.patrons) {
+      f.hidden = f.stay > share;
+      if (!f.hidden && f.room === G.room) (here || (here = [])).push(f);
+    }
+    if (here && now > (this.pubTalkAt || 0)) {
+      this.pubTalkAt = now + 4 + Math.random() * 5;
+      const f = here[Math.floor(Math.random() * here.length)];
+      const mate = here.find((o) => o !== f && Math.abs(o.y - f.y) < 4 && Math.abs(o.x - f.x) < 40);
+      if (mate && Math.random() < 0.5) { f.dir = mate.x < f.x ? 1 : 2; setTimeout(() => { f.dir = f.dir0; }, 3200); }
+      this.say(f, PUB);
+      if (Math.random() < 0.3) setTimeout(() => G.sfx.play('laugh', 0.35), 900);
+    }
   }
   // où doit être cet habitant, à cette heure ?
   goal(f, ph) {
@@ -66,8 +104,11 @@ export class Townsfolk {
     if (!p) return;
     const f0 = dayFrac(G.worldTime || 0), ph = phaseOf(f0);
     const street = (f) => this.streets.get(f.city);
+    const fo = G.viewFocus || p; // lot 4 : une cinématique peut regarder ailleurs que le joueur
+    if (this.patrons) this.updatePatrons(now, ph);
     for (const f of this.folk) {
-      if (Math.abs(f.x - p.x) > 900 || Math.abs(f.y - p.y) > 700) continue; // loin des regards : rien ne bouge
+      if (f.cine || f.patron) continue; // les acteurs d'une scène et les habitués attablés ont leur propre vie
+      if (Math.abs(f.x - fo.x) > 900 || Math.abs(f.y - fo.y) > 700) continue; // loin des regards : rien ne bouge
       const g = this.goal(f, ph);
       f.lantern = f.role === 'guet' && (ph === 'nuit' || ph === 'soir');
       if (f.hidden) { if (g !== 'maison') { f.hidden = false; f.x = f.home[0]; f.y = f.home[1]; f.tx = f.x; f.ty = f.y + 12; f.wait = 0; } else continue; }
@@ -103,7 +144,7 @@ export class Townsfolk {
     // les conversations : deux habitants proches s'arrêtent et causent ; un passant salue le joueur
     if (now > this.talkAt) {
       this.talkAt = now + 2.5 + Math.random() * 3;
-      const vis = this.folk.filter((f) => !f.hidden && Math.abs(f.x - p.x) < 260 && Math.abs(f.y - p.y) < 170);
+      const vis = this.folk.filter((f) => !f.hidden && !f.cine && !f.patron && Math.abs(f.x - p.x) < 260 && Math.abs(f.y - p.y) < 170);
       for (const a of vis) {
         const b = vis.find((o) => o !== a && Math.hypot(o.x - a.x, o.y - a.y) < 28);
         if (!b || Math.random() < 0.5) continue;
