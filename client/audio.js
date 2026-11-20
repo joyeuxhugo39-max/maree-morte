@@ -15,8 +15,8 @@ export class Sfx {
     this.noise = this.ctx.createBuffer(1, n, this.ctx.sampleRate);
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    this.sfxBus = this.ctx.createGain(); this.sfxBus.gain.value = this.sfxVol; this.sfxBus.connect(this.master); // lot 3 : avant l'ambiance, qui s'y branche
     this.startAmbience();
-    this.sfxBus = this.ctx.createGain(); this.sfxBus.gain.value = this.sfxVol; this.sfxBus.connect(this.master);
     this.startMusic();
   }
   setVolumes(music, sfx) {
@@ -90,7 +90,7 @@ export class Sfx {
     const lfo = c.createOscillator(); lfo.frequency.value = 0.13;
     const lg = c.createGain(); lg.gain.value = 0.035;
     lfo.connect(lg); lg.connect(g.gain);
-    src.connect(lp); lp.connect(g); g.connect(this.master);
+    src.connect(lp); lp.connect(g); g.connect(this.sfxBus || this.master); // lot 3 : l'ambiance suit le volume des effets
     src.start(); lfo.start();
     this.amb = g; this.ambBase = 0.05;
     g.gain.value = this.ambBase;
@@ -139,7 +139,7 @@ export class Sfx {
       case 'groan': { const c = this.ctx, t = c.currentTime, o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter();
         o.type = 'sawtooth'; o.frequency.setValueAtTime(95 + Math.random() * 30, t); o.frequency.linearRampToValueAtTime(70, t + 0.7);
         lp.type = 'lowpass'; lp.frequency.value = 500; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.06 * v, t + 0.15); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
-        o.connect(lp); lp.connect(g); g.connect(this.master); o.start(t); o.stop(t + 0.85); break; }
+        o.connect(lp); lp.connect(g); g.connect(this.sfxBus || this.master); o.start(t); o.stop(t + 0.85); break; } // lot 3 : suit le volume des effets
       case 'die': this.hiss(0.4, { f: 400, vol: 0.18 * v, slide: 0.3, type: 'lowpass' }); this.tone(200, 0.35, { type: 'triangle', vol: 0.1 * v, slide: 0.3 }); break;
       case 'click': this.tone(880, 0.04, { vol: 0.05 * v }); break;
       case 'dice': [0, 0.07, 0.13, 0.22, 0.3].forEach((d, i) => this.tone(900 + i * 140 + Math.random() * 200, 0.03, { type: 'square', vol: 0.05 * v, delay: d })); break;
@@ -153,6 +153,7 @@ export class Sfx {
       case 'summon': this.tone(110, 0.6, { type: 'sawtooth', vol: 0.06 * v, slide: 0.5 }); this.hiss(0.5, { f: 300, vol: 0.12 * v, slide: 2 }); break;
       case 'door': this.tone(240, 0.22, { type: 'sawtooth', vol: 0.035 * v, slide: 0.6 }); this.hiss(0.14, { f: 500, q: 0.6, vol: 0.16 * v, delay: 0.16, type: 'lowpass' }); break;
       case 'deny': this.tone(180, 0.12, { type: 'square', vol: 0.06 * v }); break;
+      case 'warn': this.tone(880, 0.07, { type: 'triangle', vol: 0.05 * v }); this.tone(660, 0.09, { type: 'triangle', vol: 0.045 * v, delay: 0.08 }); break; // lot 3 : une zone dangereuse sous vos pieds
       case 'chain': for (let k = 0; k < 14; k++) { this.tone(1500 + Math.random() * 900, 0.03, { type: 'square', vol: 0.025 * v, delay: k * 0.06 }); this.hiss(0.04, { f: 3800, q: 2, vol: 0.05 * v, delay: k * 0.06 }); } break; // 1.1 : la chaîne d'ancre
       case 'creak': this.tone(70 + Math.random() * 30, 0.5, { type: 'sawtooth', vol: 0.018 * v, attack: 0.12, slide: 1.25 }); this.hiss(0.45, { f: 320, q: 6, vol: 0.05 * v, slide: 1.4 }); break; // le bois qui travaille
       case 'flap': [0, 0.09, 0.2].forEach((d) => this.hiss(0.12, { f: 700, q: 0.7, vol: 0.12 * v, delay: d, type: 'lowpass' })); break; // la toile qui claque

@@ -433,6 +433,10 @@ const entOf = (id) => (id === G.myId ? G.player : G.ents.get(id));
 function nearMe(x, y, r = 300) { const p = G.player; return p && Math.hypot(p.x - x, p.y - y) < r; }
 function vol(x, y) { const p = G.player; if (!p) return 0.5; return Math.max(0, 1 - Math.hypot(p.x - x, p.y - y) / 380); }
 
+// lot 3 : un signal sonore court quand une zone annoncée vous vise (pas plus d'un toutes les 0,6 s)
+const segDist = (px, py, x0, y0, x1, y1) => { const dx = x1 - x0, dy = y1 - y0, L = dx * dx + dy * dy, k = L ? Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / L)) : 0; return Math.hypot(px - (x0 + dx * k), py - (y0 + dy * k)); };
+let warnAt = 0;
+function warnZone(now) { if (now - warnAt < 0.6) return; warnAt = now; G.sfx.play('warn'); }
 function onEvent(ev, t) {
   const R = G.renderer, now = nowS(), me = G.myId;
   const e = typeof ev[1] === 'number' ? entOf(ev[1]) : null;
@@ -497,7 +501,7 @@ function onEvent(ev, t) {
       G.sfx.play('boom', vol(x, y));
       break;
     }
-    case 'tele': R.teles.push({ x: ev[1], y: ev[2], r: ev[3], dur: ev[4], t0: now, style: ev[5] || 0 }); break;
+    case 'tele': R.teles.push({ x: ev[1], y: ev[2], r: ev[3], dur: ev[4], t0: now, style: ev[5] || 0 }); if (ev[4] > 0.3 && G.player && Math.hypot(G.player.x - ev[1], (G.player.y - ev[2]) / 0.7) < ev[3] + 6) warnZone(now); break;
     // 0.8 : trajectoires vivantes (ricochet, boomerang, balle chercheuse), états, éclairs, grappin, montures
     case 'pv': { const p = R.projs.get(ev[1]); if (p) { p.x = ev[2]; p.y = ev[3]; p.vx = Math.cos(ev[4]) * p.speed; p.vy = Math.sin(ev[4]) * p.speed; p.left = ev[5]; } break; }
     case 'pd': R.projs.delete(ev[1]); break;
@@ -524,7 +528,7 @@ function onEvent(ev, t) {
     case 'cloud': { const [, x, y, r, dur] = ev; R.clouds.push({ x, y, r, dur, t0: now }); break; }
     case 'immune': if (e) { R.text(e.x, e.y - 18, 'PROTÉGÉ', '#ffd23a'); if (nearMe(e.x, e.y, 200)) G.sfx.play('forge', 0.35); } break;
     case 'link': if (e) e.link = ev[2] ? now : 0; break;
-    case 'teleL': R.lteles.push({ x0: ev[1], y0: ev[2], x1: ev[3], y1: ev[4], w: ev[5], dur: ev[6], t0: now, style: ev[7] || 0 }); break;
+    case 'teleL': R.lteles.push({ x0: ev[1], y0: ev[2], x1: ev[3], y1: ev[4], w: ev[5], dur: ev[6], t0: now, style: ev[7] || 0 }); if (ev[6] > 0.3 && G.player && segDist(G.player.x, G.player.y, ev[1], ev[2], ev[3], ev[4]) < ev[5] / 2 + 6) warnZone(now); break;
     case 'boomL': {
       const [, x0, y0, x1, y1, w] = ev, L = Math.hypot(x1 - x0, y1 - y0), sea = !G.renderer.room && tileAt(G.world, (x0 + x1) / 2, (y0 + y1) / 2) === T.DEEP;
       for (let d = 6; d < L; d += 12) { const x = x0 + (x1 - x0) * d / L, y = y0 + (y1 - y0) * d / L; R.burst(x, y, sea ? 8 : 5, { z: 2, col: sea ? ['#ffffff', '#d8f6ff', '#9fd8ff'] : ['#d8c8a8', '#a89878', '#ffffff'], up: sea ? 80 : 40, speed: w, life: 0.6, g: 160 }); }

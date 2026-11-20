@@ -261,27 +261,8 @@ export class Renderer {
     if (!room) this.drawShipsBase(ctx, G, camX, camY, now, dt); // 1.1 : les navires (coque, pont)
     // objets tombés au sol
     for (const e of G.ents.values()) if (e.k === 'd') this.drawDrop(ctx, e, camX, camY, now, G);
-    // télégraphes
-    for (let i = this.teles.length - 1; i >= 0; i--) {
-      const t = this.teles[i], k = Math.max(0, (now - t.t0) / t.dur);
-      if (k >= 1) { this.teles.splice(i, 1); continue; }
-      const x = t.x - camX, y = t.y - camY, C = TELE_COL[t.style] || TELE_COL[0];
-      ctx.fillStyle = `rgba(${C[0]},${C[1]},${C[2]},${0.15 + 0.25 * k})`;
-      ctx.beginPath(); ctx.ellipse(x, y, t.r * k, t.r * k * 0.7, 0, 0, TAU); ctx.fill();
-      ctx.strokeStyle = `rgba(${Math.min(255, C[0] + 30)},${Math.min(255, C[1] + 40)},${Math.min(255, C[2] + 30)},${0.6 + 0.4 * Math.sin(now * 20)})`; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.ellipse(x, y, t.r, t.r * 0.7, 0, 0, TAU); ctx.stroke();
-    }
-    for (let i = this.lteles.length - 1; i >= 0; i--) {
-      const t = this.lteles[i], k = Math.max(0, (now - t.t0) / t.dur);
-      if (k >= 1) { this.lteles.splice(i, 1); continue; }
-      const C = TELE_COL[t.style] || TELE_COL[0], L = Math.hypot(t.x1 - t.x0, t.y1 - t.y0);
-      ctx.save(); ctx.translate(t.x0 - camX, t.y0 - camY); ctx.rotate(Math.atan2(t.y1 - t.y0, t.x1 - t.x0));
-      ctx.fillStyle = `rgba(${C[0]},${C[1]},${C[2]},${0.12 + 0.14 * k})`; ctx.fillRect(0, -t.w / 2, L, t.w);
-      ctx.fillStyle = `rgba(${C[0]},${C[1]},${C[2]},${0.2 + 0.3 * k})`; ctx.fillRect(0, -t.w / 2, L * k, t.w);
-      ctx.strokeStyle = `rgba(${Math.min(255, C[0] + 30)},${Math.min(255, C[1] + 40)},${Math.min(255, C[2] + 30)},${0.6 + 0.4 * Math.sin(now * 20)})`; ctx.lineWidth = 1;
-      ctx.strokeRect(0.5, -t.w / 2 + 0.5, L - 1, t.w - 1);
-      ctx.restore();
-    }
+    // télégraphes : le remplissage au sol (les contours se dessinent plus haut, par-dessus la lumière)
+    this.drawTeles(ctx, camX, camY, now, false);
 
     // tri en profondeur
     const draw = [];
@@ -362,6 +343,7 @@ export class Renderer {
     if (!room && dark > 0.2 && isFullMoon(G.worldTime || 0)) { ctx.fillStyle = `rgba(120,18,30,${0.05 * dark})`; ctx.fillRect(0, 0, W, H); } // la pleine lune rougit la nuit
     if (!room) { this.drawCritters(ctx, camX, camY, now, dark, true); this.drawWeather(ctx, G, now, dt, dark); }
     else { this.weather = { rain: 0, storm: 0, kind: 0 }; this.rain.length = 0; }
+    this.drawTeles(ctx, camX, camY, now, true); // lot 3 : les contours des zones dangereuses restent lisibles la nuit et sous la pluie
     this.drawLabels(ctx, G, draw, camX, camY, now);
     this.drawTexts(ctx, camX, camY, dt);
     if (room) ctx.restore();
@@ -1088,6 +1070,41 @@ export class Renderer {
     }
     ctx.globalAlpha = 1;
     if (Math.floor(now * 2 + e.id) % 5 === 0) { ctx.fillStyle = '#fff'; ctx.fillRect(x + 4, y - 10, 1, 1); ctx.fillRect(x + 3, y - 9, 3, 1); ctx.fillRect(x + 4, y - 8, 1, 1); }
+  }
+  // lot 3 : les zones annoncées au sol. Au sol (avant les personnages) : un remplissage qui grandit jusqu'à l'impact.
+  // Par-dessus la lumière et la météo : un contour sombre puis un contour vif de 2 px, qui clignote à l'approche du coup.
+  drawTeles(ctx, camX, camY, now, top) {
+    for (let i = this.teles.length - 1; i >= 0; i--) {
+      const t = this.teles[i], k = Math.max(0, (now - t.t0) / t.dur);
+      if (k >= 1) { if (top) this.teles.splice(i, 1); continue; }
+      const x = t.x - camX, y = t.y - camY, C = TELE_COL[t.style] || TELE_COL[0];
+      if (!top) {
+        ctx.fillStyle = `rgba(${C[0]},${C[1]},${C[2]},${0.2 + 0.18 * k})`; ctx.beginPath(); ctx.ellipse(x, y, t.r, t.r * 0.7, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = `rgba(${C[0]},${C[1]},${C[2]},${0.18 + 0.3 * k})`; ctx.beginPath(); ctx.ellipse(x, y, t.r * k, t.r * k * 0.7, 0, 0, TAU); ctx.fill();
+        continue;
+      }
+      const soon = k > 0.7, a = soon ? 0.75 + 0.25 * Math.sin(now * 32) : 0.85;
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(18,8,4,0.55)'; ctx.beginPath(); ctx.ellipse(x, y, t.r, t.r * 0.7, 0, 0, TAU); ctx.stroke();
+      ctx.lineWidth = 2; ctx.strokeStyle = soon ? `rgba(255,${Math.min(255, C[1] + 70)},${Math.min(255, C[2] + 60)},${a})` : `rgba(${Math.min(255, C[0] + 30)},${Math.min(255, C[1] + 40)},${Math.min(255, C[2] + 30)},${a})`;
+      ctx.beginPath(); ctx.ellipse(x, y, t.r, t.r * 0.7, 0, 0, TAU); ctx.stroke();
+    }
+    for (let i = this.lteles.length - 1; i >= 0; i--) {
+      const t = this.lteles[i], k = Math.max(0, (now - t.t0) / t.dur);
+      if (k >= 1) { if (top) this.lteles.splice(i, 1); continue; }
+      const C = TELE_COL[t.style] || TELE_COL[0], L = Math.hypot(t.x1 - t.x0, t.y1 - t.y0);
+      ctx.save(); ctx.translate(t.x0 - camX, t.y0 - camY); ctx.rotate(Math.atan2(t.y1 - t.y0, t.x1 - t.x0));
+      if (!top) {
+        ctx.fillStyle = `rgba(${C[0]},${C[1]},${C[2]},${0.18 + 0.14 * k})`; ctx.fillRect(0, -t.w / 2, L, t.w);
+        ctx.fillStyle = `rgba(${C[0]},${C[1]},${C[2]},${0.22 + 0.3 * k})`; ctx.fillRect(0, -t.w / 2, L * k, t.w);
+      } else {
+        const soon = k > 0.7, a = soon ? 0.75 + 0.25 * Math.sin(now * 32) : 0.85;
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(18,8,4,0.55)'; ctx.strokeRect(0.5, -t.w / 2 + 0.5, L - 1, t.w - 1);
+        ctx.lineWidth = 2; ctx.strokeStyle = soon ? `rgba(255,${Math.min(255, C[1] + 70)},${Math.min(255, C[2] + 60)},${a})` : `rgba(${Math.min(255, C[0] + 30)},${Math.min(255, C[1] + 40)},${Math.min(255, C[2] + 30)},${a})`;
+        ctx.strokeRect(0.5, -t.w / 2 + 0.5, L - 1, t.w - 1);
+      }
+      ctx.restore();
+    }
+    ctx.lineWidth = 1;
   }
   drawFx(ctx, camX, camY, now, dt) {
     for (let i = this.fx.length - 1; i >= 0; i--) {
