@@ -343,7 +343,7 @@ export class Renderer {
     if (!room && dark > 0.2 && isFullMoon(G.worldTime || 0)) { ctx.fillStyle = `rgba(120,18,30,${0.05 * dark})`; ctx.fillRect(0, 0, W, H); } // la pleine lune rougit la nuit
     if (!room) { this.drawCritters(ctx, camX, camY, now, dark, true); this.drawWeather(ctx, G, now, dt, dark); }
     else { this.weather = { rain: 0, storm: 0, kind: 0 }; this.rain.length = 0; }
-    this.drawTeles(ctx, camX, camY, now, true); // lot 3 : les contours des zones dangereuses restent lisibles la nuit et sous la pluie
+    this.drawTeles(ctx, camX, camY, now, true, dark); // lot 3 : la nuit, une lueur discrète garde les zones lisibles
     this.drawLabels(ctx, G, draw, camX, camY, now);
     this.drawTexts(ctx, camX, camY, dt);
     if (room) ctx.restore();
@@ -1071,22 +1071,34 @@ export class Renderer {
     ctx.globalAlpha = 1;
     if (Math.floor(now * 2 + e.id) % 5 === 0) { ctx.fillStyle = '#fff'; ctx.fillRect(x + 4, y - 10, 1, 1); ctx.fillRect(x + 3, y - 9, 3, 1); ctx.fillRect(x + 4, y - 8, 1, 1); }
   }
-  // lot 3 : les zones annoncées au sol. Au sol (avant les personnages) : un remplissage qui grandit jusqu'à l'impact.
-  // Par-dessus la lumière et la météo : un contour sombre puis un contour vif de 2 px, qui clignote à l'approche du coup.
-  drawTeles(ctx, camX, camY, now, top) {
+  // lot 3 : les zones annoncées au sol, fondues dans le décor. Au sol (avant les personnages) : une teinte posée sur
+  // la texture (mode « multiply » : l'herbe ou le sable restent visibles dessous) et un cœur qui grandit jusqu'au
+  // coup. Par-dessus la lumière : un liseré en pointillés, pixel par pixel, qui se raffermit doucement à l'approche.
+  drawTeles(ctx, camX, camY, now, top, dark = 0) {
+    const tint = (C, a) => `rgba(${C[0]},${C[1]},${C[2]},${a})`;
+    const lite = (C, a) => `rgba(${Math.min(255, C[0] + 40)},${Math.min(255, C[1] + 40)},${Math.min(255, C[2] + 30)},${a})`;
+    const deep = (C, a) => `rgba(${Math.round(C[0] * 0.62)},${Math.round(C[1] * 0.55)},${Math.round(C[2] * 0.5)},${a})`; // comme une ombre teintée
+    const rim = (C, a) => (dark > 0.4 ? lite(C, a) : deep(C, a)); // de jour, le liseré foncé se lit sur le sable clair
     for (let i = this.teles.length - 1; i >= 0; i--) {
       const t = this.teles[i], k = Math.max(0, (now - t.t0) / t.dur);
       if (k >= 1) { if (top) this.teles.splice(i, 1); continue; }
       const x = t.x - camX, y = t.y - camY, C = TELE_COL[t.style] || TELE_COL[0];
       if (!top) {
-        ctx.fillStyle = `rgba(${C[0]},${C[1]},${C[2]},${0.2 + 0.18 * k})`; ctx.beginPath(); ctx.ellipse(x, y, t.r, t.r * 0.7, 0, 0, TAU); ctx.fill();
-        ctx.fillStyle = `rgba(${C[0]},${C[1]},${C[2]},${0.18 + 0.3 * k})`; ctx.beginPath(); ctx.ellipse(x, y, t.r * k, t.r * k * 0.7, 0, 0, TAU); ctx.fill();
+        ctx.save(); ctx.globalCompositeOperation = 'multiply';
+        ctx.fillStyle = deep(C, 0.22 + 0.2 * k); ctx.beginPath(); ctx.ellipse(x, y, t.r, t.r * 0.7, 0, 0, TAU); ctx.fill();
+        ctx.restore();
+        ctx.fillStyle = tint(C, 0.08 + 0.14 * k); ctx.beginPath(); ctx.ellipse(x, y, t.r * k, t.r * k * 0.7, 0, 0, TAU); ctx.fill();
         continue;
       }
-      const soon = k > 0.7, a = soon ? 0.75 + 0.25 * Math.sin(now * 32) : 0.85;
-      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(18,8,4,0.55)'; ctx.beginPath(); ctx.ellipse(x, y, t.r, t.r * 0.7, 0, 0, TAU); ctx.stroke();
-      ctx.lineWidth = 2; ctx.strokeStyle = soon ? `rgba(255,${Math.min(255, C[1] + 70)},${Math.min(255, C[2] + 60)},${a})` : `rgba(${Math.min(255, C[0] + 30)},${Math.min(255, C[1] + 40)},${Math.min(255, C[2] + 30)},${a})`;
-      ctx.beginPath(); ctx.ellipse(x, y, t.r, t.r * 0.7, 0, 0, TAU); ctx.stroke();
+      if (dark > 0.05) { // la nuit : le sol rougeoie à peine, comme des braises (en lumière ajoutée)
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = tint(C, (0.05 + 0.12 * k) * dark); ctx.beginPath(); ctx.ellipse(x, y, t.r, t.r * 0.7, 0, 0, TAU); ctx.fill();
+        ctx.restore();
+      }
+      // le liseré : des points d'un pixel, un sur deux, qui tournent lentement
+      const n = Math.max(12, Math.round(t.r * 1.4)), spin = now * 0.6;
+      ctx.fillStyle = rim(C, Math.min(0.9, 0.3 + 0.4 * k * k + 0.2 * dark));
+      for (let q = 0; q < n; q++) { if (q % 2) continue; const a = q / n * TAU + spin; ctx.fillRect(Math.round(x + Math.cos(a) * t.r), Math.round(y + Math.sin(a) * t.r * 0.7), 1, 1); }
     }
     for (let i = this.lteles.length - 1; i >= 0; i--) {
       const t = this.lteles[i], k = Math.max(0, (now - t.t0) / t.dur);
@@ -1094,17 +1106,16 @@ export class Renderer {
       const C = TELE_COL[t.style] || TELE_COL[0], L = Math.hypot(t.x1 - t.x0, t.y1 - t.y0);
       ctx.save(); ctx.translate(t.x0 - camX, t.y0 - camY); ctx.rotate(Math.atan2(t.y1 - t.y0, t.x1 - t.x0));
       if (!top) {
-        ctx.fillStyle = `rgba(${C[0]},${C[1]},${C[2]},${0.18 + 0.14 * k})`; ctx.fillRect(0, -t.w / 2, L, t.w);
-        ctx.fillStyle = `rgba(${C[0]},${C[1]},${C[2]},${0.22 + 0.3 * k})`; ctx.fillRect(0, -t.w / 2, L * k, t.w);
+        ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = deep(C, 0.2 + 0.18 * k); ctx.fillRect(0, -t.w / 2, L, t.w); ctx.restore();
+        ctx.fillStyle = tint(C, 0.08 + 0.14 * k); ctx.fillRect(0, -t.w / 2, L * k, t.w);
       } else {
-        const soon = k > 0.7, a = soon ? 0.75 + 0.25 * Math.sin(now * 32) : 0.85;
-        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(18,8,4,0.55)'; ctx.strokeRect(0.5, -t.w / 2 + 0.5, L - 1, t.w - 1);
-        ctx.lineWidth = 2; ctx.strokeStyle = soon ? `rgba(255,${Math.min(255, C[1] + 70)},${Math.min(255, C[2] + 60)},${a})` : `rgba(${Math.min(255, C[0] + 30)},${Math.min(255, C[1] + 40)},${Math.min(255, C[2] + 30)},${a})`;
-        ctx.strokeRect(0.5, -t.w / 2 + 0.5, L - 1, t.w - 1);
+        if (dark > 0.05) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = tint(C, (0.05 + 0.12 * k) * dark); ctx.fillRect(0, -t.w / 2, L, t.w); ctx.restore(); }
+        ctx.fillStyle = rim(C, Math.min(0.9, 0.3 + 0.4 * k * k + 0.2 * dark));
+        const off = Math.floor(now * 8) % 4;
+        for (let d = off; d < L; d += 4) { ctx.fillRect(d, -t.w / 2, 1, 1); ctx.fillRect(d, t.w / 2 - 1, 1, 1); }
       }
       ctx.restore();
     }
-    ctx.lineWidth = 1;
   }
   drawFx(ctx, camX, camY, now, dt) {
     for (let i = this.fx.length - 1; i >= 0; i--) {

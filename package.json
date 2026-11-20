@@ -1,6 +1,6 @@
 {
   "name": "maree-morte",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Marée Morte — MMORPG 2D en ligne, pirates contre zombies",
   "type": "module",
   "main": "server/index.js",

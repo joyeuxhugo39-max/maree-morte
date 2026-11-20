@@ -136,12 +136,15 @@ trois fois :
 ## 3d. Lisibilité, interface, son, performance
 
 - **Les zones dangereuses se voyaient mal.** Leur remplissage était pâle, leur contour faisait 1 pixel, et elles
-  étaient assombries la nuit avec le sol. Elles sont maintenant dessinées en deux passes :
-  - au sol, un remplissage plus dense ;
-  - par-dessus la lumière et la météo, un contour sombre puis un contour vif de 2 pixels, qui clignote dans les
-    derniers instants.
-
-  Captures de Grand-Feu comparées avant et après, de jour comme de nuit sous la pluie.
+  étaient assombries la nuit avec le sol.
+  - En 1.3.0, je les avais dessinées avec un contour épais qui clignotait. Il était lisible, mais trop visible et laid,
+    comme tu l'as remarqué.
+  - En 1.3.1, elles se fondent dans le décor. Au sol, une teinte d'ombre posée sur la texture, en mode multiply : le
+    sable et l'herbe restent visibles dessous. Un cœur grandit jusqu'au coup.
+  - Leur bord est un fin liseré en pointillés, pixel par pixel : foncé le jour, clair la nuit. Il se raffermit
+    doucement à l'approche, sans clignoter.
+  - La nuit, une lueur de braises, à peine visible.
+  - Captures de Grand-Feu : son anneau de fausses lumières, de jour et de nuit sous la pluie.
 - **Tailles d'écran** (1024 × 768, 1280 × 720, 1366 × 768, 1920 × 1080). En 1024 de large, la discussion cachait
   les deux premières cases de la barre d'action, et le bandeau du navire touchait la discussion. Elle se règle
   maintenant sur la place disponible, et le bandeau sur la discussion : plus aucun chevauchement aux quatre tailles.

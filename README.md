@@ -45,7 +45,9 @@ tient les morts à distance.
   - Les tromblons sont ramenés à leur juste mesure.
   - Le coup critique compte dans la normalisation des armes.
 - **Lisibilité.**
-  - Les zones dangereuses ont un contour net, visible de nuit et sous la pluie, qui clignote juste avant le coup.
+  - Les zones dangereuses se fondent dans le décor. Le jour, une ombre teintée sur le sol et un fin liseré en
+    pointillés ; la nuit, une lueur discrète de braises. Elles se raffermissent doucement à l'approche du coup
+    (1.3.1).
   - Un signal sonore prévient quand une zone vous vise.
   - L'interface tient en 1024 × 768.
   - L'ambiance suit le volume des effets.
