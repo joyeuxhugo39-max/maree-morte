@@ -15,7 +15,7 @@ export class Scene {
   // joue une suite d'étapes, puis propose les choix de fin (s'il y en a) ; renvoie le choix retenu (ou null si l'on a quitté)
   // lot 4 : opts.actor — l'acteur d'une cinématique qui incarne le PNJ (la caméra le cadre) ; opts.onLine(qui, { g, e }) — ses gestes
   async play(npcId, steps, end = null, opts = {}) {
-    const G = this.G, n = opts.actor || G.npcs.find((q) => q.id === npcId) || G.allNpcs.find((q) => q.id === npcId);
+    const G = this.G, n = opts.actor || (opts.alone ? null : G.npcs.find((q) => q.id === npcId) || G.allNpcs.find((q) => q.id === npcId)); // lot 5 : alone, le personnage n'est pas dans la pièce (on ne cadre que le joueur)
     if (this.on) this.stop();
     this.on = true; this.aborted = false; this.npcId = npcId; this.npc = n; this.onLine = opts.onLine || null;
     G.ui.close(true);

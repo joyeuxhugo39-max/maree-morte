@@ -662,6 +662,14 @@ function mobSheet2(kind, L) {
 }
 
 export const MOB_LOOKS = {
+  // lot 5 : les vivants du braquage
+  douanier: { skin: 1, hair: 2, hairStyle: 'court', top: 'vareuse', topCol: 'navy', pants: 'navy', boots: 'black', hat: 'tricorne', hatCol: 'navy', seed: 21 },
+  garde_valdorne: { skin: 0, hair: 1, hairStyle: 'court', beard: 1, top: 'manteau', topCol: 'navy', pants: 'white', boots: 'black', hat: 'morion', seed: 22 },
+  vengeur_liste: { skin: 1, hair: 1, hairStyle: 'queue', beard: 2, top: 'manteau', topCol: 'black', pants: 'brown', boots: 'black', hat: 'tricorne', hatCol: 'black', seed: 31 }, // lot 5 : un capitaine vendu par la liste
+  homme_de_main: { skin: 2, hair: 3, hairStyle: 'hirsute', beard: 1, top: 'rayee', topCol: 'red', pants: 'navy', boots: 'brown', hat: 'bandana', hatCol: 'black', seed: 23 },
+  crabe_egout: { crab: [0x161c16, 0x283424, 0x40503a, 0x627452, 0x8e9e72] },
+  silas_fuyard: { skin: 1, hair: 0, hairStyle: 'queue', top: 'gilet', topCol: 'purple', pants: 'black', boots: 'black', hat: 'plume', hatCol: 'purple', seed: 24 },
+  silas_boss: { skin: 1, hair: 0, hairStyle: 'queue', top: 'gilet', topCol: 'purple', pants: 'black', boots: 'black', hat: 'plume', hatCol: 'purple', seed: 24 },
   zsailor: { skin: 'zombie', undead: 1, hair: 1, hairStyle: 'hirsute', top: 'rayee', pants: 'navy', boots: 'brown', eyeCol: 0xffe14a, seed: 3, hat: 'bonnet', hatCol: 'red' },
   buccaneer: { skin: 'zombie', undead: 1, hair: 0, top: 'haillons', topCol: 'red', pants: 'black', boots: 'black', eyeCol: 0xff5a3a, eye: 'patch', hat: 'bandana', hatCol: 'black', beard: 1, seed: 2 },
   ghoul: { skin: 'ghoul', undead: 1, hunch: 1, hair: 4, hairStyle: 'hirsute', top: 'haillons', topCol: 'grey', pants: 'grey', boots: 'grey', eyeCol: 0xd28aff, claws: 1, seed: 4 },

@@ -35,7 +35,7 @@ ok(!over.length, `armes : aucune n’écrase les autres de sa tranche de niveaux
 const grunts = Object.values(MOBS).filter((m) => !m.elite && !m.boss && !m.title && !m.sea && !m.ship && m.xp);
 const mobXp = (L) => med(grunts.filter((m) => Math.abs(m.level - L) <= 1).map((m) => m.xp)) || 100;
 const order = []; const seen = new Set(); const visit = (id) => { if (seen.has(id)) return; seen.add(id); for (const r of QUESTS[id].requires || []) visit(r); order.push(id); };
-for (const id of QUEST_ORDER.filter((q) => !QUESTS[q].repeat && (!q.startsWith('a3_fin_') || q === 'a3_fin_apaiser') && q !== 'fin_fanfaron').sort((a, b) => (QUESTS[a].level || 1) - (QUESTS[b].level || 1))) visit(id);
+for (const id of QUEST_ORDER.filter((q) => !QUESTS[q].repeat && (!q.startsWith('a3_fin_') || q === 'a3_fin_apaiser') && (!q.startsWith('br_fin_') || q === 'br_fin_garder') && q !== 'fin_fanfaron').sort((a, b) => (QUESTS[a].level || 1) - (QUESTS[b].level || 1))) visit(id);
 const qf = (ahead) => (ahead <= 1 ? 1 : ahead === 2 ? 0.6 : ahead === 3 ? 0.35 : ahead === 4 ? 0.2 : 0.12); // la règle du serveur (turnIn)
 let L = 1, xp = 0, kills = 0; const gaps = [];
 const gain = (n) => { if (L >= MAX_LEVEL) return; xp += n; while (L < MAX_LEVEL && xp >= xpToNext(L)) { xp -= xpToNext(L); L++; } };
@@ -54,7 +54,7 @@ ok(!loop, `aucun achat-revente gagnant${loop ? ' — ' + loop : ''}`);
 // ---------- butin des boss : chacun donne quelque chose, et un objet très rare ne l'est pas au point d'être introuvable
 const dry = [], tooRare = [];
 for (const [id, m] of Object.entries(MOBS)) {
-  if (!(m.boss || m.elite || m.title) || m.sea) continue;
+  if (!(m.boss || m.elite || m.title) || m.sea || m.heist === 'fuyard') continue; // lot 5 : Silas en fuite ne se combat pas
   if (!(m.loot || []).length && !(m.gold && m.gold[1] > 0)) dry.push(id);
   for (const [item, ch] of m.loot || []) if (ITEMS[item] && !ITEMS[item].quest && ch < 0.02) tooRare.push(`${id}:${item} ${ch}`);
 }

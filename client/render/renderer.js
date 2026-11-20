@@ -264,7 +264,7 @@ export class Renderer {
     if (this.drunk > 0) { const a = Math.sin(now * 1.7) * 0.025 * this.drunk; ctx.translate(W / 2, H / 2); ctx.rotate(a); ctx.translate(-W / 2, -H / 2); }
 
     if (room) {
-      ctx.fillStyle = '#07050b'; ctx.fillRect(-20, -20, W + 40, H + 40);
+      ctx.fillStyle = room.kind === 'toits' ? '#0c1426' : room.kind === 'pont' ? '#0b2236' : '#07050b'; ctx.fillRect(-20, -20, W + 40, H + 40); // lot 5 : au-dessus des toits, le ciel
       ctx.save(); ctx.beginPath(); ctx.rect(rx0 - camX, ry0 - camY, rx1 - rx0, ry1 - ry0); ctx.clip();
     } else this.drawWater(ctx, camX, camY, now, dark);
     // sol
@@ -302,7 +302,7 @@ export class Renderer {
 
     // tri en profondeur
     const draw = [];
-    for (const p of props) if (!p.ground) draw.push({ y: p.y, p });
+    for (const p of props) if (!p.ground && !(p.heistBar != null && !(G.heist && G.heist.bars[p.heistBar]))) draw.push({ y: p.y, p }); // lot 5 : une barricade ne se voit que dressée
     if (G.structs) for (const st of G.structs.values()) { const x = st.tx * TILE + 8; if (x > camX - 40 && x < camX + W + 40 && st.ty * TILE > camY - 40 && st.ty * TILE < camY + H + 40) draw.push({ y: st.ty * TILE + 15, st }); }
     for (const e of G.ents.values()) if (e.k !== 'd' && e.x > camX - 60 && e.x < camX + W + 60 && e.y > camY - 30 && e.y < camY + H + 60) draw.push({ y: e.y, e });
     for (const n of G.npcs) if (!n.hidden && n.x > camX - 40 && n.x < camX + W + 40 && n.y > camY - 30 && n.y < camY + H + 40) draw.push({ y: n.y, n });
@@ -381,6 +381,7 @@ export class Renderer {
     if (!room) { this.drawCritters(ctx, camX, camY, now, dark, true); this.drawWeather(ctx, G, now, dt, dark); }
     else { this.weather = { rain: 0, storm: 0, kind: 0 }; this.rain.length = 0; }
     this.drawTeles(ctx, camX, camY, now, true, dark); // lot 3 : la nuit, une lueur discrète garde les zones lisibles
+    if (G.heist) G.heist.drawCones(ctx, camX, camY, now, dark); // lot 5 : la lanterne des gardes, là où porte leur regard
     this.drawLabels(ctx, G, draw, camX, camY, now);
     this.drawTexts(ctx, camX, camY, dt);
     if (room) ctx.restore();
@@ -1257,13 +1258,21 @@ export class Renderer {
         if (f.glint && Math.floor(now * 2 + f.x) % 5 === 0) { ctx.fillStyle = '#fff8d0'; ctx.fillRect(Math.round(x + 3), Math.round(y - ic.height - (f.z || 0) + 3), 1, 1); }
         ctx.globalAlpha = 1;
       } else if (f.kind === 'bubble') {
-        const s = textCanvas(f.text, '#2b1d14', null, 1);
+        if (!f.lines) { // lot 5 : une longue réplique passe à la ligne (une bulle d'une ligne débordait de l'écran)
+          const out = []; let cur = '';
+          const W0 = String(f.text).split(' '), W = [];
+          for (const w of W0) { if (W.length && /^[?!:;»]+$/.test(w)) W[W.length - 1] += ' ' + w; else W.push(w); } // « ? » ne reste pas seul en bout de bulle
+          for (const w of W) { if (cur && (cur + ' ' + w).length > 30) { out.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; }
+          if (cur) out.push(cur);
+          f.lines = out.map((l) => textCanvas(l, '#2b1d14', null, 1));
+        }
+        const L = f.lines, lh = L[0].height + 1, s = { width: Math.max(...L.map((c) => c.width)), height: lh * L.length - 1 };
         const bw = s.width + 6, bh = s.height + 5, bx = Math.round(x - bw / 2), by = Math.round(y - (f.h || 34) - bh);
         ctx.globalAlpha = Math.min(1, (1 - k) * 4);
         ctx.fillStyle = '#f6ecd2'; ctx.fillRect(bx, by, bw, bh); ctx.fillStyle = '#2b1d14';
         ctx.fillRect(bx, by - 1, bw, 1); ctx.fillRect(bx, by + bh, bw, 1); ctx.fillRect(bx - 1, by, 1, bh); ctx.fillRect(bx + bw, by, 1, bh);
         ctx.fillStyle = '#f6ecd2'; ctx.fillRect(Math.round(x) - 1, by + bh, 3, 2); ctx.fillStyle = '#2b1d14'; ctx.fillRect(Math.round(x), by + bh + 2, 1, 1);
-        ctx.drawImage(s, bx + 3, by + 2);
+        L.forEach((c, i) => ctx.drawImage(c, Math.round(x - c.width / 2), by + 2 + i * lh));
         ctx.globalAlpha = 1;
       }
     }

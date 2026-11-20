@@ -3,7 +3,7 @@ import { REMEMBER } from './scenes.js';
 export const NPCS = {
   // lot 4 : Silas Virevent attend à la table isolée de la Sirène Borgne, près de la cheminée (Le Plus Grand Braquage, lot 5)
   silas: {
-    name: 'Silas Virevent', title: 'Ancien contrebandier', vis: { lvl: 10 },
+    name: 'Silas Virevent', title: 'Ancien contrebandier',
     look: { skin: 1, hair: 0, hairStyle: 'queue', beard: 0, top: 'gilet', topCol: 'purple', pants: 'black', boots: 'black', hat: 'plume', hatCol: 'purple' },
     greet: ['Assieds-toi. Les meilleures affaires se concluent assis.', 'Pile, je gagne. Face, tu perds. C’est pourtant une pièce honnête.', 'Ne regarde pas la porte comme ça : personne n’entre ici sans que je le sache.'],
     topics: [
@@ -347,7 +347,51 @@ Object.assign(NPCS, {
   musicien: { name: 'Gaétan', title: 'Violoneux des rues', look: { skin: 0, hair: 3, hairStyle: 'long', top: 'gilet', topCol: 'red', pants: 'navy', boots: 'brown', hat: 'paille' },
     greet: ['♪ Libertalia, cité sans maître, ses rues sont larges, ses cœurs aussi... ♪', 'Une pièce, une chanson. Deux pièces, je m’arrête.', '♪ Malo le Rouge voulait une couronne... on la lui a fondue en canons... ♪'] },
 });
+// lot 5 : Le Plus Grand Braquage de Port-Lanterne
+const SILAS_LOOK = NPCS.silas.look;
+Object.assign(NPCS, {
+  brechet: { name: 'Anatole Bréchet', title: 'Comptable d’Octave Valdorne',
+    look: { skin: 0, hair: 4, hairStyle: 'chauve', beard: 0, top: 'gilet', topCol: 'black', pants: 'black', boots: 'black' },
+    greet: ['Hm ? Je compte. Revenez quand j’aurai fini. C’est-à-dire jamais.', 'Valdorne me paie au sou près. Je bois au sou près.', 'Les dés, au moins, ne trichent pas. Eux.'],
+    topics: [
+      { q: 'Vous travaillez pour Valdorne ?', a: "Vingt-deux ans de colonnes et de chiffres. Je sais ce qu'il possède mieux que lui. Il ne sait pas ce que je bois." },
+      { q: 'Cette clé à votre ceinture ?', a: "Ça ? Ça ne vous regarde pas. Et ça ne quitte pas ma ceinture. Sauf pour aller au lit. Et encore." },
+    ] },
+  lafleur: { name: 'Corvin Lafleur', title: 'Architecte',
+    look: { skin: 0, hair: 3, hairStyle: 'long', top: 'chemise', topCol: 'white', pants: 'brown', boots: 'brown', hat: 'foulard', hatCol: 'teal' },
+    greet: ['Ne touchez à rien : tout est à l’échelle.', 'Un mur porteur ne se discute pas. Un prix, si.', 'J’ai bâti la moitié des belles maisons du port. Et je les connais toutes par cœur.'],
+    topics: [
+      { q: 'Vous avez bâti la demeure de Valdorne ?', a: "Ma plus belle commande. Et la pire : il a voulu des murs épais comme des remparts et une salle des archives sans fenêtre. J'ai tout de même mis une fenêtre. Ne le dites pas." },
+    ] },
+  valdorne: { name: 'Octave Valdorne', title: 'Négociant', vis: { lvl: 17 },
+    look: { skin: 0, hair: 4, hairStyle: 'court', beard: 2, top: 'capitaine', topCol: 'red', pants: 'black', boots: 'black', hat: 'tricorne', hatCol: 'black' },
+    greet: ['Bienvenue sous mon toit. Ne touchez pas aux tableaux, ils valent plus que votre navire.', 'Le commerce, mon ami, c’est savoir qui doit quoi à qui.', 'Ma vente commencera bientôt. Prenez un verre en attendant.'],
+    topics: [
+      { q: 'Que vendez-vous ce soir ?', a: "Des curiosités. Des cartes. Des secrets bien rangés. Tout ce qui a un prix — c'est-à-dire tout." },
+    ] },
+  ferrant: { name: 'Capitaine Ferrant', title: 'Invité, un peu gris', vis: { lvl: 17 },
+    look: { skin: 2, hair: 1, hairStyle: 'hirsute', beard: 1, top: 'capitaine', topCol: 'navy', pants: 'navy', boots: 'black', hat: 'capitaine', hatCol: 'navy' },
+    greet: ['Encore un verre ! Valdorne paie, Valdorne paie toujours !', 'Vous êtes qui, vous ? Vous avez une tête de quelqu’un.', 'Ma femme danse trop bien. Avec trop de monde.'],
+    topics: [] },
+  corail: { name: 'Madame Corail', title: 'Marchande des Sept Courants',
+    look: { skin: 3, hair: 2, hairStyle: 'long', top: 'gilet', topCol: 'teal', pants: 'white', boots: 'brown', hat: 'foulard', hatCol: 'orange' },
+    greet: ['Bienvenue sur la seule île que les cartes ont oubliée.', 'Si vous êtes ici, c’est que Silas vous aime bien. Ou qu’il vous doit beaucoup.', 'Ici, pas de Douane. Rien que des courants.'],
+    shop: ['rhum_vieux', 'longue_vue', 'carte_tresor', 'fumigene', 'grog'],
+    topics: [
+      { q: 'Comment êtes-vous arrivée ici ?', a: "Par les Sept Courants, comme vous. Il y a trente ans. Je n'ai jamais trouvé de raison de repartir." },
+    ] },
+  silas_geole: { name: 'Silas Virevent', title: 'Prisonnier', look: SILAS_LOOK, vis: { q: 'br_fin_denoncer', s: ['done'] },
+    greet: ['Tiens, mon geôlier préféré. Tu viens me voir pourrir ?', 'Valdorne vendra ta liste à un autre, tu sais. Il y aura toujours un autre Silas.', 'J’aurais fait pareil. Enfin… j’ai fait pareil.'],
+    topics: [{ q: 'Des regrets ?', a: "Un seul : t'avoir choisi. Tu étais trop bon. C'est rare, chez nous." }] },
+});
+NPCS.fouine.shop.push('des_pipes'); // lot 5 : pour tricher aux dés avec Bréchet
+// Silas ne reste à sa table que tant qu'il n'a pas fui (fin A) ni été livré (fin B)
+NPCS.silas.vis = { lvl: 17, notDone: ['br_fin_garder', 'br_fin_denoncer'] };
 for (const id of ['passeur', 'passeur_havre', 'passeur_rade', 'passeur_anse']) NPCS[id].shop.push('billet_libertalia');
 NPCS.passeur.shop.push('radeau', 'ane');
 // 1.0 : ce dont chacun se souvient de vous (voir scenes.js)
 for (const [id, lines] of Object.entries(REMEMBER)) if (NPCS[id]) NPCS[id].remember = lines;
+// lot 5 : ce qu'on se rappelle du Plus Grand Braquage
+NPCS.silas.remember = [['m:br_route', 'Associé ! Une caisse ou deux pour Madame Corail ? Les courants sont calmes, ce soir.'], ...(NPCS.silas.remember || [])];
+NPCS.fouine.remember = [['m:br_denonce', 'Toi. Tu as vendu des noms à Valdorne. On n’oublie pas ça, sur les quais. Mes crochets restent à vendre… pour les autres.'], ...(NPCS.fouine.remember || [])];
+if (NPCS.vif_quai) NPCS.vif_quai.remember = [['m:br_denonce', 'Il paraît que tu travailles pour Valdorne, maintenant. Dommage. Je t’aimais bien.'], ...(NPCS.vif_quai.remember || [])];

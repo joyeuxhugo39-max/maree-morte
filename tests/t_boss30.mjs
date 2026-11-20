@@ -26,7 +26,7 @@ function bestGear(level) {
   }
   return out;
 }
-const BOSSES = Object.entries(MOBS).filter(([id, m]) => (m.boss || m.elite || m.title) && !m.sea && !m.ship && id !== 'frere_rouille').map(([id]) => id);
+const BOSSES = Object.entries(MOBS).filter(([id, m]) => (m.boss || m.elite || m.title) && !m.sea && !m.ship && id !== 'frere_rouille' && !m.heist).map(([id]) => id); // lot 5 : Silas en fuite ne se combat pas
 
 async function fight(id, dodge, n = 1) {
   const store = new Map();
@@ -34,7 +34,7 @@ async function fight(id, dodge, n = 1) {
   const W = game.world, def = MOBS[id];
   const P = [];
   for (let i = 0; i < n; i++) {
-    const c = { send() {}, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 13, name: 'Duelliste' + (i + 1), pass: 'abcd' }); await wait(60);
+    const c = { send() {}, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 14, name: 'Duelliste' + (i + 1), pass: 'abcd' }); await wait(60);
     const p = game.sessions.get(c).player;
     p.level = Math.min(30, def.level); p.tut = 99; const gear = bestGear(p.level); for (const s of Object.keys(gear)) p.eq[s] = gear[s]; game.recalc(p); p.hp = p.stats.maxHp; p.en = p.stats.maxEn;
     P.push({ p, budget: 0, rollAt: 0, sideAt: 0, taken: 0 });
@@ -42,7 +42,7 @@ async function fight(id, dodge, n = 1) {
   // le boss : à sa place dans le monde s'il y en a un, sinon là où il apparaît d'ordinaire
   let m = game.mobs.find((q) => q.type === id && q.state !== 'dead');
   let twin = null;
-  if (!m) { const at = id === 'ame_anselme' ? [W.wreck.x * 16 + 60, W.wreck.y * 16 + 8] : null; if (!at) return { id, err: 'absent du monde' }; m = game.addMob(id, at[0], at[1], true); m.event = true; m.sunproof = true; }
+  if (!m) { const at = id === 'ame_anselme' ? [W.wreck.x * 16 + 60, W.wreck.y * 16 + 8] : id === 'silas_boss' ? [W.heist.silasDeck.x, W.heist.silasDeck.y] : null; if (!at) return { id, err: 'absent du monde' }; m = game.addMob(id, at[0], at[1], true); m.event = true; m.sunproof = true; if (id === 'silas_boss') { m.heistBoss = 1; game.hs.boss = m; } } // lot 5 : Silas, sur le pont de La Mouche d'Or
   if (def.ai === 'frere') twin = game.mobs.find((q) => q !== m && q.type === def.twin);
   for (const q of game.mobs) if (q !== m && q !== twin && q.state !== 'dead' && Math.hypot(q.x - m.x, q.y - m.y) < 500) { q.state = 'dead'; q.deadUntil = Infinity; } // seuls face au boss
   const place = (p, x, y) => { if (!canStand(W, x, y) || roomIdAt(W, x, y) !== m.room) return false; p.x = x; p.y = y; p.room = m.room; p.zone = zoneAt(W, x, y); return true; };

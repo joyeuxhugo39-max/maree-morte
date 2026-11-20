@@ -63,14 +63,15 @@ const plays = (p, n0, id) => p.c.msgs.slice(n0).filter((m) => m.t === 'cinema' &
 const SB = W.rooms.findIndex((r) => r.name === 'La Sirène Borgne'), door = W.doors.find((d) => d.room === SB);
 const outside = (p) => { game.teleport(p, door.ox, door.oy + 6, {}); p.cds.door = 0; };
 const enter = (p) => { outside(p); say(p, { t: 'door', id: door.id }); };
-ok(!npcVisible(NPCS.silas, {}, 9) && npcVisible(NPCS.silas, {}, 10), 'Silas ne se montre qu’aux pirates de niveau 10 et plus');
-ok(W.npcs[W.npcs.length - 1].id === 'silas' && W.rooms[roomIdAt(W, W.npcs.at(-1).x, W.npcs.at(-1).y)].name === 'La Sirène Borgne', 'Silas est assis dans la Sirène Borgne (ajouté en dernier : le monde d’avant ne bouge pas)');
+ok(!npcVisible(NPCS.silas, {}, 16) && npcVisible(NPCS.silas, {}, 17), 'Silas ne se montre qu’aux pirates de niveau 17 et plus (lot 5 : le niveau du braquage)');
+const si = W.npcs.findIndex((n) => n.id === 'silas');
+ok(si === 63 && W.rooms[roomIdAt(W, W.npcs[si].x, W.npcs[si].y)].name === 'La Sirène Borgne', 'Silas est assis dans la Sirène Borgne (ajouté après les 63 personnages d’avant : le monde d’avant ne bouge pas)');
 
-const A = await login('Ambroise', 9);
+const A = await login('Ambroise', 16);
 let n0 = A.c.msgs.length; enter(A);
-ok(A.room === SB && !plays(A, n0).length && !A.cine, 'niveau 9 : on entre à la Sirène Borgne, aucune scène');
-outside(A); A.level = 10; n0 = A.c.msgs.length; enter(A);
-ok(plays(A, n0, 'silas_rencontre').length === 1 && game.inCinema(A) && A.mem.has('vu:silas_rencontre'), 'niveau 10 : en entrant, le serveur lance « Rencontre avec Silas » et s’en souvient');
+ok(A.room === SB && !plays(A, n0).length && !A.cine, 'niveau 16 : on entre à la Sirène Borgne, aucune scène');
+outside(A); A.level = 17; n0 = A.c.msgs.length; enter(A);
+ok(plays(A, n0, 'silas_rencontre').length === 1 && game.inCinema(A) && A.mem.has('vu:silas_rencontre'), 'niveau 17 : en entrant, le serveur lance « Rencontre avec Silas » et s’en souvient');
 // la protection : ni coups ni cible
 A.invulnUntil = 0; const hp = A.hp; game.damagePlayer(A, 50, null); ok(A.hp === hp, 'spectateur : les coups ne portent pas (sans même l’esquive du réveil)');
 const mob = game.mobs.find((m) => m.state !== 'dead' && !m.def.sea) || game.mobs[0];
@@ -94,24 +95,25 @@ for (let k = 0; k < 20 * (CINEMAS.silas_rencontre.maxDur + 2); k++) game.tick();
 ok(!A.cine, `sans réponse du client, la protection s’éteint seule après ${CINEMAS.silas_rencontre.maxDur} s`);
 
 // ---------- 4. la scène demandée depuis une conversation
-const B = await login('Bertille', 12);
+const B = await login('Bertille', 18);
 const silas = game.npcPos.get('silas');
 const near = (p) => { game.teleport(p, silas.x - 24, silas.y + 10, {}); };
 near(B); n0 = B.c.msgs.length; say(B, { t: 'cinema', a: 'ask', id: 'silas_preparation' });
-ok(!plays(B, n0).length, 'la préparation : refusée tant qu’on n’a pas dit oui à Silas');
-say(B, { t: 'mem', k: 'silas_oui' }); ok(B.mem.has('silas_oui') && MEM_KEYS.has('silas_non'), 'les réponses à Silas sont des souvenirs reconnus par le serveur');
-outside(B); n0 = B.c.msgs.length; say(B, { t: 'cinema', a: 'ask', id: 'silas_preparation' }); ok(!plays(B, n0).length, 'loin de Silas : refusée');
-near(B); B.lastHurt = game.time; n0 = B.c.msgs.length; say(B, { t: 'cinema', a: 'ask', id: 'silas_preparation' }); ok(!plays(B, n0).length, 'en plein combat : refusée (« Pas maintenant »)');
-B.lastHurt = -99; n0 = B.c.msgs.length; say(B, { t: 'cinema', a: 'ask', id: 'silas_preparation' }); ok(plays(B, n0, 'silas_preparation').length === 1, 'près de Silas, après avoir dit oui : la préparation se joue');
-n0 = B.c.msgs.length; say(B, { t: 'cinema', a: 'ask', id: 'silas_preparation' }); ok(!plays(B, n0).length, 'pas deux scènes à la fois');
-say(B, { t: 'cinema', a: 'done', id: 'silas_preparation' });
+ok(!plays(B, n0).length, 'la préparation ne se demande pas depuis le client (lot 5 : elle se joue au retour des préparatifs)');
+say(B, { t: 'mem', k: 'silas_oui' }); ok(B.mem.has('silas_oui') && MEM_KEYS.has('silas_non') && B.quests.br_preparatifs && B.quests.br_preparatifs.s === 'active', 'les réponses à Silas sont des souvenirs reconnus par le serveur ; « oui » lance les préparatifs');
+CINEMAS.test_ask = { name: 'Essai demandé', room: 'La Sirène Borgne', trigger: { talk: 'silas', mem: 'silas_oui' }, maxDur: 10, steps: [{ at: 0, do: 'release' }] };
+outside(B); n0 = B.c.msgs.length; say(B, { t: 'cinema', a: 'ask', id: 'test_ask' }); ok(!plays(B, n0).length, 'une scène demandée : loin du personnage, refusée');
+near(B); B.lastHurt = game.time; n0 = B.c.msgs.length; say(B, { t: 'cinema', a: 'ask', id: 'test_ask' }); ok(!plays(B, n0).length, 'en plein combat : refusée (« Pas maintenant »)');
+B.lastHurt = -99; n0 = B.c.msgs.length; say(B, { t: 'cinema', a: 'ask', id: 'test_ask' }); ok(plays(B, n0, 'test_ask').length === 1, 'près du personnage, conditions remplies : elle se joue');
+n0 = B.c.msgs.length; say(B, { t: 'cinema', a: 'ask', id: 'test_ask' }); ok(!plays(B, n0).length, 'pas deux scènes à la fois');
+say(B, { t: 'cinema', a: 'done', id: 'test_ask' }); delete CINEMAS.test_ask;
 n0 = B.c.msgs.length; say(B, { t: 'cinema', a: 'ask', id: 'silas_rencontre' }); ok(!plays(B, n0).length, 'une scène « d’entrée » ne se demande pas depuis le client');
 n0 = B.c.msgs.length; say(B, { t: 'cinema', a: 'ask', id: 'nimporte_quoi' }); ok(!plays(B, n0).length, 'une scène inconnue non plus');
 
 // ---------- 5. une scène de groupe : qui la voit, le retardataire, la déconnexion
 CINEMAS.test_groupe = { name: 'Essai de groupe', room: 'La Sirène Borgne', group: true, trigger: { enter: 'La Sirène Borgne' }, maxDur: 20, steps: [{ at: 0, do: 'release' }] };
 game.cinemaRoom.set('test_groupe', SB);
-const C1 = await login('Corentine', 12), C2 = await login('Clovis', 12), C3 = await login('Capucine', 12), D = await login('Dagobert', 12);
+const C1 = await login('Corentine', 18), C2 = await login('Clovis', 18), C3 = await login('Capucine', 18), D = await login('Dagobert', 18);
 for (const p of [C1, C2, C3, D]) for (const id of Object.keys(CINEMAS)) if (id !== 'test_groupe') p.mem.add('vu:' + id);
 say(C1, { t: 'soc', a: 'invite', name: 'Clovis' }); say(C2, { t: 'soc', a: 'accept', name: 'Corentine' });
 say(C1, { t: 'soc', a: 'invite', name: 'Capucine' }); say(C3, { t: 'soc', a: 'accept', name: 'Corentine' });
@@ -134,9 +136,9 @@ game.logout(C2); ok(ended2 === 'déconnexion', 'il se déconnecte : on ne l’at
 delete CINEMAS.test_groupe; game.cinemaRoom.delete('test_groupe');
 
 // ---------- 6. la mémoire survit à la sauvegarde
-const E = await login('Eulalie', 12);
+const E = await login('Eulalie', 18);
 enter(E); say(E, { t: 'cinema', a: 'done', id: 'silas_rencontre' }); say(E, { t: 'mem', k: 'silas_non' });
-game.logout(E); const E2 = await login('Eulalie', 12);
+game.logout(E); const E2 = await login('Eulalie', 18);
 ok(E2.mem.has('vu:silas_rencontre') && E2.mem.has('silas_non') && !E2.cine, 'après reconnexion : scène vue, refus retenu, aucune protection résiduelle');
 ok(SILAS_PITCH.some((s) => s.choose), 'la rencontre finit sur une vraie décision');
 console.log(fails ? `${fails} ÉCHEC(S)` : 'TOUT EST OK');

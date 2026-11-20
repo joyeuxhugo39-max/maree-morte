@@ -363,6 +363,9 @@ body.cinema #hud, body.cinema #topright, body.cinema #bottom, body.cinema #chat,
 @keyframes ctin { 0% { opacity: 0; transform: scale(1.3); } 100% { opacity: 1; transform: none; } }
 #ink { position: absolute; inset: 0; pointer-events: none; z-index: 24; opacity: 0; transition: opacity 0.7s; background: radial-gradient(ellipse at 24% 30%, rgba(4, 2, 10, 0.9) 0 9%, transparent 21%), radial-gradient(ellipse at 76% 24%, rgba(4, 2, 10, 0.88) 0 8%, transparent 19%), radial-gradient(ellipse at 66% 76%, rgba(4, 2, 10, 0.9) 0 10%, transparent 23%), radial-gradient(ellipse at 14% 78%, rgba(4, 2, 10, 0.85) 0 7%, transparent 17%), radial-gradient(ellipse at 90% 58%, rgba(4, 2, 10, 0.85) 0 6%, transparent 15%), radial-gradient(ellipse at 50% 50%, transparent 0 30%, rgba(6, 4, 14, 0.5) 75%); }
 #ink.on { opacity: 1; }
+/* lot 5 : la poudre aux yeux de Silas — un voile pâle qui retombe */
+#powder { position: absolute; inset: 0; pointer-events: none; z-index: 24; opacity: 0; transition: opacity 1.2s; background: radial-gradient(ellipse at 50% 46%, rgba(236, 228, 210, 0.25) 0 12%, rgba(236, 228, 210, 0.82) 46%, rgba(220, 212, 196, 0.94) 100%); }
+#powder.on { opacity: 1; transition: opacity 0.2s; }
 #lockpick, #confirm { position: absolute; inset: 0; z-index: 45; display: flex; align-items: center; justify-content: center; background: rgba(8, 4, 2, 0.45); }
 .lp-box, .cf-box { background: var(--parch); color: var(--ink); border: 3px solid #1a0e06; border-radius: 4px; box-shadow: inset 0 0 0 3px var(--wood3), inset 0 0 0 5px var(--wood1), 0 0 0 2px #6b4426, 0 10px 30px rgba(0, 0, 0, 0.55); padding: 16px 22px; min-width: 380px; max-width: 92vw; text-align: center; }
 .lp-title { font-family: var(--title); font-size: 36px; line-height: 1; }

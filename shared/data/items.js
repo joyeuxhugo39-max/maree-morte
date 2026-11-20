@@ -331,6 +331,19 @@ Object.assign(ITEMS, {
 // les trophées de boss : objets de collection irremplaçables (jamais volés), à exposer chez soi
 for (const [boss, [id, name, desc]] of Object.entries(TROPHIES)) ITEMS[id] = { home: 1, name, place: 't_' + id, value: 1500, rarity: 3, unique: 1, trophy: boss, icon: 'f_trophy', desc: desc + ' Trophée de boss : à exposer chez vous.' };
 
+// ------------------------------------------------------------ lot 5 : Le Plus Grand Braquage de Port-Lanterne
+Object.assign(ITEMS, {
+  uniforme_garde: { name: 'Uniforme de la garde de Valdorne', quest: 1, value: 0, icon: 'captaincoat', tint: 'navy', desc: 'Drap bleu, boutons dorés. Dans une demeure, personne ne regarde un garde.' },
+  plan_demeure: { name: 'Plan de la demeure de Valdorne', quest: 1, value: 0, icon: 'map', tint: 'gold', desc: 'Trois portes, deux rondes, une seule salle des archives. Corvin Lafleur l’a tracé lui-même.' },
+  cle_comptable: { name: 'Clé du comptable', quest: 1, value: 0, icon: 'key', desc: 'Celle d’Anatole Bréchet. Elle ouvre le coffre central de la salle des archives.' },
+  des_pipes: { name: 'Dés pipés', value: 40, icon: 'dice', desc: 'Lestés de plomb : le six sort plus souvent qu’il ne devrait. À ne pas montrer de trop près.' },
+  carte_sept_courants: { name: 'Carte des Sept Courants', value: 2200, rarity: 3, unique: 1, icon: 'map', tint: 'gold', desc: 'Un passage caché entre les récifs, chiffré à la main. Sans la clé de lecture, une belle carte. Avec, une fortune.' },
+  liste_valdorne: { name: 'Liste de Valdorne', value: 1800, rarity: 2, unique: 1, icon: 'map', desc: 'Les noms des capitaines qui commercent en secret avec Port-Lanterne, et la position de leur flotte. Un receleur la paierait cher.' },
+  caisse_contrebande: { name: 'Caisse de contrebande', value: 0, icon: 'crate_i', desc: 'Des épices et du tabac sans timbre de la Douane. Madame Corail, sur l’Île aux Sept Courants, en donne un bon prix.' },
+});
+W('rapiere_valdorne', { name: 'Rapière de Valdorne', atk: 22, speed: 0.34, reach: 34, arc: 0.55, crit: 0.15, rarity: 2, value: 2600, unique: 1, form: { k: 'blade', len: 16, w: 1, tip: 'point', guard: 'basket', bl: 'silver', hi: 'gold', gu: 'gold', anim: 'thrust' }, desc: 'Le cadeau d’un négociant reconnaissant. Une estocade précise ; la garde porte ses armes.' });
+F('pistolets_virevent', { name: 'Pistolets de Virevent', gun: 13, value: 2400, rarity: 2, cdMul: 1.05, shot: { n: 2, spread: 0.16, range: 175, speed: 320 }, form: { k: 'gun', type: 'pistol', len: 8, barrels: 2, metal: 'gold', wood: 'ebony' }, desc: 'La paire de Silas. Deux balles en éventail, comme il les tirait sur son pont.' });
+
 // ------------------------------------------------------------ 1.0 : niveaux requis, rôles et équilibrage des armes
 // niveau requis pour s'équiper — explicite (it.lvl) ou déduit de la valeur ; les montures sont plus accessibles
 const REQ_STEPS = [[20, 1], [60, 2], [120, 4], [250, 6], [500, 8], [900, 11], [1600, 14], [2600, 17], [4200, 20], [7000, 23], [10000, 26]];

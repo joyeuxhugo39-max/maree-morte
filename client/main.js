@@ -23,6 +23,7 @@ import { Scene } from './scene.js';
 import { devHook } from './dev-hook.js';
 import { Townsfolk } from './townsfolk.js';
 import { Cinema } from './cinema.js'; // lot 4 : les cinématiques mises en scène
+import { Heist } from './heist.js'; // lot 5 : Le Plus Grand Braquage
 import { applyTheme } from './render/ui-art.js';
 import { shipOf, hullHalf, toWorld, stations, deckMove, deckOk, nearestDeck, openingAt, insideHull, toLocal, BERTHS, berthPos, RAIL } from '../shared/data/ships.js';
 applyTheme(); // 0.8.1 : parchemin, cadres de bois ferré, fleurons — avant même l'écran d'accueil
@@ -67,7 +68,7 @@ const G = {
     return mk;
   },
   // les PNJ d'une histoire n'apparaissent qu'à leur étape
-  refreshNpcs() { G.npcs = G.allNpcs.filter((n) => npcVisible(NPCS[n.id], G.quests || {}, G.me ? G.me.lvl : 1)); },
+  refreshNpcs() { G.npcs = G.allNpcs.filter((n) => npcVisible(NPCS[n.id], G.quests || {}, G.me ? G.me.lvl : 1) && n.id !== G.npcAway); }, // lot 5 : Bréchet peut être sorti prendre l'air
   npcReady(id) { return QUEST_ORDER.some((qid) => QUESTS[qid].turnin === id && G.ui.questStateOf(qid) === 'ready'); },
   useSkill: (id, fromUI) => useSkill(id, fromUI),
   inHome: () => !!myHomeRoom(),
@@ -189,6 +190,7 @@ function onMsg(m) {
       break;
     case 'dev': G.dev.onMessage(m); break;
     case 'cinema': G.cinema.onMsg(m); break; // lot 4
+    case 'heist': if (G.heist) G.heist.onMsg(m); break; // lot 5
     case 's': snapshot(m, now); break;
     case 'me': {
       const prev = G.me;
@@ -444,6 +446,7 @@ function warnZone(now) { if (now - warnAt < 0.6) return; warnAt = now; G.sfx.pla
 function onEvent(ev, t) {
   const R = G.renderer, now = nowS(), me = G.myId;
   const e = typeof ev[1] === 'number' ? entOf(ev[1]) : null;
+  if (G.heist && G.heist.onEvent(ev, now)) return; // lot 5 : gardes, architecte, poudre, barils
   switch (ev[0]) {
     case 'atk': {
       if (!e || ev[1] === me) break;
@@ -721,6 +724,7 @@ function interact() {
     G.pendingTalk = { npc: t.id, scenes };
     G.send({ t: 'talk', npc: t.id });
   }
+  else if (t.kind === 'hspot') G.heist.use(t.i); // lot 5
   else if (t.kind === 'prop') G.send({ t: 'open', id: t.id });
   else if (t.kind === 'drop') G.send({ t: 'pick', id: t.id });
   else if (t.kind === 'harvest') G.send({ t: 'harvest', id: t.id });
@@ -796,6 +800,7 @@ function findInteract() {
   if (G.room < 0) for (const b of BERTHS) { const [bx, by] = berthPos(b), d = Math.hypot(bx - p.x, by - p.y); if (d < 34 && d < bd) { bd = d; best = { kind: 'berth', b, x: bx, y: by - 16, h: 14, verb: 'Armer un navire' }; } }
   if (best) return best;
   for (const n of G.npcs) { const d = Math.hypot(n.x - p.x, n.y - p.y); if (d < INTERACT_RANGE && d < bd) { bd = d; best = { kind: 'npc', id: n.id, x: n.x, y: n.y, h: n.parrot ? 34 : 30 }; } }
+  { const hs = G.heist && G.heist.spotNear(p); if (hs && hs.d - 6 < bd) { bd = hs.d; best = { kind: 'hspot', i: hs.s.id, x: hs.s.x, y: hs.s.y - 4, h: 16, verb: hs.s.label }; } } // lot 5 : le décor du braquage
   for (const c of G.world.chests) { const d = Math.hypot(c.x - p.x, c.y - p.y); if (d < 30 && d < bd) { bd = d; best = { kind: 'prop', id: c.id, x: c.x, y: c.y, h: 18 }; } }
   for (const pr of G.world.props) if (pr.type === 'tonnelet') { const d = Math.hypot(pr.x - p.x, pr.y - p.y); if (d < 30 && d < bd) { bd = d; best = { kind: 'prop', id: pr.id, x: pr.x, y: pr.y, h: 16 }; } }
   for (const e of G.ents.values()) if (e.k === 'd') { const d = Math.hypot(e.x - p.x, e.y - p.y); if (d < 24 && d < bd) { bd = d; best = { kind: 'drop', id: e.id, x: e.x, y: e.y, h: 14 }; } }
@@ -1019,8 +1024,8 @@ function ambience(now) {
   G.weatherK = k;
 }
 // 1.0 : les habitants et leur journée (voir townsfolk.js)
-function initFolk() { G.town = new Townsfolk(G); }
-function updateFolk(dt) { if (G.town) G.town.update(dt, performance.now() / 1000); }
+function initFolk() { G.town = new Townsfolk(G); G.heist = new Heist(G); }
+function updateFolk(dt) { if (G.town) G.town.update(dt, performance.now() / 1000); if (G.heist) G.heist.update(dt, performance.now() / 1000); }
 const TITLE_PATH = [[150, 104], [124, 112], [100, 118], [96, 86], [108, 54], [126, 26], [80, 60], [44, 92], [33, 72], [30, 32], [60, 40], [112, 80], [150, 96]];
 // 1.0 : le tutoriel — les gestes de base, un par un, puis des conseils qui n'arrivent qu'au bon moment
 const TUTO = [
@@ -1126,6 +1131,7 @@ function frame(now, dt) {
   updatePets(now, dt);
   R.petOut = p.pet || '';
   G.ui.ink(now < G.inkUntil);
+  G.ui.powder(now < (G.powderUntil || 0)); // lot 5 : la poudre de Silas
   const cc = G.cinema.tick(now, dt); // lot 4 : une scène tient la caméra (sauf pendant sa conversation)
   G.camTarget = cc || (G.cinema.locked() ? null : updateCine(G, now)) || G.scene.update() || shipCam(p) || { x: p.x, y: p.y - 12 };
   R.render(G, now, dt);

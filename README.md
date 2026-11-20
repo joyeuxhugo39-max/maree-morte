@@ -25,6 +25,42 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Nouveautés de la version 1.5 : le Plus Grand Braquage de Port-Lanterne
+
+Une quête exceptionnelle, du niveau 18 au niveau 21, seul ou jusqu'à cinq. Silas Virevent, à la Sirène Borgne,
+propose l'affaire dès le niveau 17.
+
+- **Les préparatifs, chacun par plusieurs chemins.**
+  - Deux uniformes à l'entrepôt de la Douane : se faufiler, assommer un douanier par derrière, ou se battre. Les
+    gardes ont un regard, une lueur de lanterne au sol ; le soupçon monte avant l'alerte.
+  - Le plan de la demeure, chez l'architecte Corvin Lafleur : le soudoyer, lui rendre service (sa cave aux crabes),
+    ou crocheter le tiroir de son bureau quand il a le dos tourné.
+  - La clé du coffre, à la ceinture du comptable Anatole Bréchet : le battre aux dés, tricher avec des dés pipés,
+    lui faire les poches, ou le provoquer pour qu'il sorte en oubliant son manteau.
+  - En groupe, ce qu'un compagnon réussit compte pour tous.
+- **La demeure d'Octave Valdorne**, le soir de la vente : une réception animée, une galerie gardée, la salle des
+  archives. Trois manières d'y arriver, qui pèsent sur la suite sans jamais bloquer :
+  - l'uniforme (infiltration) ;
+  - la bagarre du capitaine Ferrant (manipulation) ;
+  - la force.
+- **La trahison.** Dans le coffre, le registre de Valdorne : le dernier nom est celui de Silas. Il prend tout et file
+  par la fenêtre. On choisit tout de suite : le poursuivre, récupérer la carte, ou détruire le registre.
+- **La poursuite.** Silas court vraiment sur les toits et saute les ruelles. On le suit par les toits, par les
+  ruelles ou par la ville. S'il atteint La Mouche d'Or avant vous, son équipage vous attend.
+- **Le combat sur le pont de La Mouche d'Or**, en trois phases :
+  - le duel : éventail de tirs, esquive, fente, poudre aveuglante ;
+  - le pont en feu : barricades, barils de poudre, hommes de main, canons pour faire sauter les barricades ;
+  - la rapière seule : Silas tente de fuir en chaloupe.
+- **Trois fins, qui s'excluent :**
+  - **tout garder** : doublons, la carte, la liste, titre « Le Casse du Siècle » ;
+  - **dénoncer Silas** : la Rapière de Valdorne et l'estime des marchands ; mais les pirates de la liste deviennent
+    vos ennemis et vous tendent des embuscades hors des zones sûres ;
+  - **faire équipe**, si Silas a confiance en vous : titre « Complice de Virevent », la route secrète de l'île aux
+    Sept Courants et sa contrebande.
+- **Sept scènes** (moteur de la 1.4) et **neuf thèmes musicaux**, générés par le code : il n'existe aucun fichier
+  audio.
+- Détail, durées mesurées et estimées, limites honnêtes : `rapports/lot5-braquage.md`.
+
 ## Nouveautés de la version 1.4 : les cinématiques mises en scène
 
 - **Un moteur de cinématiques réutilisable** (`client/cinema.js`, scripts dans `shared/data/cinemas.js`).
@@ -48,7 +84,7 @@ tient les morts à distance.
     vient vous parler. Il propose une affaire ; on accepte ou on refuse, et il s'en souvient.
   - Si l'on accepte, « Où en est l'affaire ? » joue la préparation : le plan, les uniformes et la clé sur sa table,
     puis le quartier des Corsaires où vit Octave Valdorne.
-  - La quête « Le Plus Grand Braquage » elle-même arrive au lot suivant.
+  - La quête « Le Plus Grand Braquage » elle-même est arrivée en 1.5 (voir plus haut).
 - **La taverne vivante.** Des habitués attablés dans les tavernes et les auberges, plus nombreux le soir.
 - **Neuf identités musicales** pour le braquage, dont le leitmotiv de Silas. Comme toute la musique du jeu, elles
   sont générées par le code : il n'existe aucun fichier audio. Un vrai enregistrement pourra remplacer chacune

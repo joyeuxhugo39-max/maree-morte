@@ -255,6 +255,7 @@ export const shipsLogic = {
   },
   shipPhysics(sh, dt) {
     const S = this.spec(sh), B = ITEMS[sh.item].boat, maxV = this.shipMaxSpeed(sh);
+    if (this.heistCurrent) this.heistCurrent(sh, dt, [this.shipOwner(sh), ...[...this.players.values()].filter((q) => q.ship === sh.id)]); // lot 5 : les Sept Courants
     // la barre : la roue tourne tant qu'on la pousse, et reste où on la laisse
     const helm = sh.posts.helm && sh.ctl[sh.posts.helm];
     if (helm && helm[0]) sh.rud = clamp(sh.rud + helm[0] * S.rud * dt, -1, 1);

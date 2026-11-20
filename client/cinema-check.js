@@ -3,6 +3,7 @@
 // contre leur atlas, les lieux contre le monde. Les assets prévus pour plus tard (def.needs) sont listés comme manquants
 // tant qu'ils n'existent pas, avec ce qui les remplace en attendant.
 import { CINEMAS, THEMES, SILAS_PITCH, SILAS_AGAIN } from '../shared/data/cinemas.js';
+import { TRAHISON, CONCLUSION, FIN_LINES } from '../shared/data/braquage.js';
 import { NPCS } from '../shared/data/npcs.js';
 import { SFX_NAMES } from './audio.js';
 import { STYLES } from './music.js';
@@ -13,7 +14,8 @@ export const VERBS = new Set(['bars', 'fade', 'title', 'sub', 'say', 'grade', 'v
 export const GESTURES = new Set(['wave', 'dance', 'flip', 'reach', 'atk', 'coin']);
 export const EMOS = new Set(['!', '?', '…', '♪', 'rire', 'colere', 'coeur', 'sueur']);
 export const MINIS = new Set(['plan', 'uniforme', 'cle', 'piece']); // les accessoires dessinés par Renderer.drawMini
-const LINES = { pitch: SILAS_PITCH, again: SILAS_AGAIN };
+const LINES = { pitch: SILAS_PITCH, again: SILAS_AGAIN, trahison: TRAHISON, conclusion: CONCLUSION, choix: [['me', '…']], ...FIN_LINES }; // lot 5
+const ENDS = new Set(['trahison', 'fin']); // les choix de fin de conversation (client/heist.js)
 
 function checkLook(look, where, out) {
   if (!look) return out.push(`${where} : aucun costume`);
@@ -38,16 +40,16 @@ export function checkCinema(id, world = null) {
     if (!VERBS.has(s.do)) { errors.push(`${at} : verbe inconnu`); continue; }
     if (s.at < last - 1e-9) errors.push(`${at} : étapes dans le désordre`);
     last = s.at;
-    if (s.do === 'spawn') actors.add(s.id);
+    if (s.do === 'spawn') { actors.add(s.id); if (s.lookOf && !NPCS[s.lookOf]) errors.push(`${at} : costume de « ${s.lookOf} » inconnu`); else if (s.lookOf) checkLook(NPCS[s.lookOf].look, `${at} ${s.id}`, errors); }
     const ref = (r) => { if (typeof r === 'string' && r !== 'player' && !actors.has(r)) errors.push(`${at} : acteur « ${r} » inconnu`); };
     ref(s.id); ref(s.who); ref(s.actor);
     if (s.to && typeof s.to === 'object' && s.to.actor) ref(s.to.actor);
     if (s.do === 'sfx' && !SFX_NAMES.has(s.name)) missing.push({ kind: 'son', id: s.name, where: at, fallback: 'silence' });
-    if (s.do === 'theme' && s.name && !STYLES[s.name]) missing.push({ kind: 'musique', id: s.name, where: at, fallback: 'silence' });
+    if (s.do === 'theme' && s.name && !String(s.name).startsWith('$') && !STYLES[s.name]) missing.push({ kind: 'musique', id: s.name, where: at, fallback: 'silence' });
     if (s.do === 'item' && (s.mini ? !MINIS.has(s.mini) : !hasIcon(s.icon))) missing.push({ kind: s.mini ? 'accessoire' : 'icône', id: s.mini || s.icon, where: at, fallback: 'map' });
     if ((s.do === 'gesture' || s.do === 'coin') && !GESTURES.has(s.g || 'coin')) errors.push(`${at} : geste « ${s.g} » inconnu`);
     if (s.do === 'emo' && !EMOS.has(s.e)) errors.push(`${at} : émotion « ${s.e} » inconnue`);
-    if (s.do === 'talk') { if (!LINES[s.lines]) errors.push(`${at} : conversation « ${s.lines} » introuvable`); if (!NPCS[s.npc]) errors.push(`${at} : PNJ « ${s.npc} » inconnu`); }
+    if (s.do === 'talk') { if (!String(s.lines).startsWith('$') && !LINES[s.lines]) errors.push(`${at} : conversation « ${s.lines} » introuvable`); if (s.end && !ENDS.has(s.end)) errors.push(`${at} : choix « ${s.end} » introuvable`); if (!NPCS[s.npc]) errors.push(`${at} : PNJ « ${s.npc} » inconnu`); }
     if (s.do === 'release') locked = false;
   }
   if (locked) errors.push('la scène ne rend jamais la main (aucune étape « release »)');
@@ -57,7 +59,7 @@ export function checkCinema(id, world = null) {
     const there = n.kind === 'icône' ? hasIcon(n.id) : n.kind === 'lieu' ? !!(world && world.rooms.some((r) => r.key === n.id || r.name === n.id)) : n.kind === 'musique' ? !!STYLES[n.id] : false;
     if (!there) missing.push({ kind: n.kind, id: n.id, where: `prévu au lot ${n.lot}`, fallback: n.fallback });
   }
-  for (const s of def.steps) if (s.do === 'theme' && s.name && THEMES[s.name] && !THEMES[s.name].file) missing.push({ kind: 'enregistrement', id: s.name, where: 'musique', fallback: 'musique générée par le code (client/music.js)' });
+  for (const s of def.steps) if (s.do === 'theme' && s.name && THEMES[s.name] && !THEMES[s.name].file && !missing.some((m) => m.kind === 'enregistrement' && m.id === s.name)) missing.push({ kind: 'enregistrement', id: s.name, where: 'musique', fallback: 'musique générée par le code (client/music.js)' });
   return { errors, missing };
 }
 export function checkAll(world = null) { return Object.fromEntries(Object.keys(CINEMAS).map((id) => [id, checkCinema(id, world)])); }

@@ -9,7 +9,7 @@ await fs.rm(DIR, { recursive: true, force: true });
 let fails = 0; const ok = (v, m) => { console.log((v ? 'OK  ' : 'FAIL') + ' ' + m); if (!v) fails++; };
 const st = new FileStorage(DIR); let game = new Game({ storage: st, log: () => {} });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-const login = async (g, name) => { const c = { msgs: [], send(m) { this.msgs.push(m); }, close() {} }; g.addClient(c); g.onMessage(c, { t: 'login', v: 13, name, pass: 'abcd' }); await wait(250); const p = g.sessions.get(c).player; p.c = c; return p; };
+const login = async (g, name) => { const c = { msgs: [], send(m) { this.msgs.push(m); }, close() {} }; g.addClient(c); g.onMessage(c, { t: 'login', v: 14, name, pass: 'abcd' }); await wait(250); const p = g.sessions.get(c).player; p.c = c; return p; };
 const W = game.world;
 ok(W.plots.length === 39 && W.plots.slice(29).every((pl) => PROPERTY[pl.cat]), `39 propriétés, dont 10 nouvelles : ${[...new Set(W.plots.map((p) => p.cat))].join(', ')}`);
 const at = (g, p, k) => { const d = g.world.doors[g.world.plots[k].door]; p.x = d.ox; p.y = d.oy + 10; p.room = -1; p.zone = zoneAt(g.world, p.x, p.y); };

@@ -107,7 +107,7 @@ export class Townsfolk {
     const fo = G.viewFocus || p; // lot 4 : une cinématique peut regarder ailleurs que le joueur
     if (this.patrons) this.updatePatrons(now, ph);
     for (const f of this.folk) {
-      if (f.cine || f.patron) continue; // les acteurs d'une scène et les habitués attablés ont leur propre vie
+      if (f.cine || f.patron || f.crowd != null) continue; // les acteurs d'une scène, les habitués attablés et les invités de Valdorne ont leur propre vie
       if (Math.abs(f.x - fo.x) > 900 || Math.abs(f.y - fo.y) > 700) continue; // loin des regards : rien ne bouge
       const g = this.goal(f, ph);
       f.lantern = f.role === 'guet' && (ph === 'nuit' || ph === 'soir');
@@ -144,7 +144,7 @@ export class Townsfolk {
     // les conversations : deux habitants proches s'arrêtent et causent ; un passant salue le joueur
     if (now > this.talkAt) {
       this.talkAt = now + 2.5 + Math.random() * 3;
-      const vis = this.folk.filter((f) => !f.hidden && !f.cine && !f.patron && Math.abs(f.x - p.x) < 260 && Math.abs(f.y - p.y) < 170);
+      const vis = this.folk.filter((f) => !f.hidden && !f.cine && !f.patron && f.crowd == null && Math.abs(f.x - p.x) < 260 && Math.abs(f.y - p.y) < 170);
       for (const a of vis) {
         const b = vis.find((o) => o !== a && Math.hypot(o.x - a.x, o.y - a.y) < 28);
         if (!b || Math.random() < 0.5) continue;

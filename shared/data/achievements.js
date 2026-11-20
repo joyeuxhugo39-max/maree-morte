@@ -56,4 +56,7 @@ export const ACHIEVEMENTS = {
   citoyen: { name: 'Cité Libre', desc: 'Franchir les portes de Libertalia.', title: 'Citoyen de Libertalia' },
   libertalia: { name: 'Corsaire de la Reine', desc: 'Renvoyer le Roi sans Couronne dans sa tombe.', title: 'Corsaire de la Reine' },
   flambeur: { name: 'Flambeur', desc: 'Gagner 10 parties de dés à La Bourse aux Dés.', title: 'Flambeur' },
+  // lot 5 : Le Plus Grand Braquage — deux des trois fins donnent un titre (la troisième, de l'équipement et l'estime des marchands)
+  casse_siecle: { name: 'Le Casse du Siècle', desc: 'Le Plus Grand Braquage : tout garder, la carte et les noms.', title: 'Le Casse du Siècle' },
+  complice_virevent: { name: 'Complice de Virevent', desc: 'Le Plus Grand Braquage : faire équipe avec Silas, malgré tout.', title: 'Complice de Virevent' },
 };

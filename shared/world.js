@@ -2,11 +2,12 @@
 // (collisions, apparitions) et par le client (rendu, prédiction).
 import { TILE, MAP_W as W, MAP_H as H, OVER_H, T } from './constants.js';
 import { mulberry32, hash2, valueNoise, fbm, shuffle } from './rng.js';
+import { buildHeist } from './heist-world.js'; // lot 5 : le monde du Plus Grand Braquage
 
 export const Z = { SEA: 0, TOWN: 1, BEACH: 2, PLAINS: 3, JUNGLE: 4, RUINS: 5, SWAMP: 6, WRECK: 7, HAVRE: 8, CRANE: 9, ILOT: 10, INTERIOR: 11, CAVE: 12, GOUFFRE: 13,
   RADE: 14, COLLINES: 15, PENDUS: 16, SIRENES: 17, ANSE: 18, OSSEMENTS: 19, QUARANTAINE: 20, VOLCAN: 21, DAMNES: 22, BRUMES: 23, ERMITE: 24,
-  LIBERTALIA: 25, BASFONDS: 26, HAUTS: 27, CANNAIES: 28, BAIE: 29, MANGROVE: 30, ECARLATE: 31 };
-export const SAFE = new Set([1, 8, 11, 14, 18, 25]);
+  LIBERTALIA: 25, BASFONDS: 26, HAUTS: 27, CANNAIES: 28, BAIE: 29, MANGROVE: 30, ECARLATE: 31, HEIST: 32, SEPT: 33 };
+export const SAFE = new Set([1, 8, 11, 14, 18, 25, 33]); // lot 5 : l'île aux Sept Courants est un comptoir
 export const ZONES = [
   { name: 'Haute mer', lvl: 'Eaux profondes' },
   { name: 'Port-Lanterne', lvl: 'Zone sûre', safe: true },
@@ -41,6 +42,8 @@ export const ZONES = [
   { name: 'Baie des Naufrageurs', lvl: 'Niveaux 18-24' },
   { name: 'Mangrove des Contrebandiers', lvl: 'Niveaux 16-22' },
   { name: 'Jungle Écarlate', lvl: 'Niveaux 22-26' },
+  { name: 'Le Plus Grand Braquage', lvl: 'Niveaux 18-21' }, // lot 5 : l'entrepôt, la demeure, les toits, La Mouche d'Or
+  { name: 'Île aux Sept Courants', lvl: 'Zone sûre', safe: true }, // lot 5 : hors des cartes
 ];
 
 // Propriétés partagées des décors. solid = bloque le déplacement (sur sa tuile de base).
@@ -1756,7 +1759,10 @@ export function generateWorld(seed = 7) {
     }
     if (at) { const b = addProp('cloche_marine', at[0], at[1], bells.length, 0, -2); bells.push({ x: b.x, y: b.y + 8, prop: b.id }); }
   }
+  // lot 5 : Le Plus Grand Braquage — pièces, façades, personnages et décors ajoutés en tout dernier
+  const heist = buildHeist({ W, tiles, zones, solid, occ, idx, inMap, alloc, rooms, doors, props, addProp, npcs, roomGrid, sail, waterDist, stampPath })();
   const OUT = {
+    heist,
     block: new Uint8Array(N), // constructions des joueurs : 1 bloque tout, 2 bloque les morts
     islandOf, islands, // 1.0 : chaque case de terre connaît son île
     doorOwner: new Map(), rooms, doors, sail, roomGrid, havre: HC, havreDock, OVER_H,

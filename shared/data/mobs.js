@@ -190,3 +190,18 @@ mob('amiral_englouti', { name: 'L’Amiral Englouti', level: 24, hp: 6500, dmg: 
 mob('roi_ys', { name: 'Gradlon, roi d’Ys-la-Noyée', level: 27, hp: 7600, dmg: 44, speed: 34, aggro: 220, leash: 340, range: 30, atkCd: 1.4, windup: 0.55, xp: 4200, gold: [520, 800], r: 14, respawn: 900, elite: 1, big: 1, swims: 1, groan: 1,
   ai: 'gradlon', phases: [0.5], title: 'Le roi qui dort sous la mer', weapon: ['bigsaber', 'gold'], loot: [['trident_orage', 0.18, 1, 1], ['harpon_abysses', 0.15, 1, 1], ['habit_gouverneur', 0.06, 1, 1], ['rhum_vieux', 1, 1, 3]] });
 MOBS.galion_fantome.loot.push(['spectre_brumes', 0.03, 1, 1]); // 1.0 : un navire légendaire
+// lot 5 : Le Plus Grand Braquage. Les gardes sont des vivants, menés par server/heist.js : ils font leur ronde,
+// regardent, s'inquiètent, donnent l'alerte — ils ne se battent que si l'on est vu (ou si on les attaque de face).
+mob('douanier', { name: 'Douanier', level: 18, hp: 540, dmg: 26, speed: 44, range: 22, atkCd: 1.25, windup: 0.42, xp: 80, gold: [4, 12], aggro: 0, leash: 400, respawn: 99999,
+  heist: 'garde', weapon: ['saber', 'steel'], loot: [] });
+mob('garde_valdorne', { name: 'Garde de Valdorne', level: 19, hp: 620, dmg: 34, speed: 46, range: 22, atkCd: 1.2, windup: 0.42, xp: 95, gold: [6, 14], aggro: 0, leash: 600, respawn: 99999,
+  heist: 'garde', weapon: ['saber', 'steel'], loot: [] });
+mob('homme_de_main', { name: 'Homme de main de Silas', level: 19, hp: 660, dmg: 34, speed: 50, range: 22, atkCd: 1.15, windup: 0.4, xp: 110, gold: [8, 18], aggro: 200, leash: 2000, respawn: 99999,
+  weapon: ['saber', 'rust'], loot: [] });
+mob('crabe_egout', { name: 'Crabe d’égout', level: 18, hp: 240, dmg: 22, speed: 46, range: 16, atkCd: 1.1, windup: 0.35, xp: 45, gold: [0, 4], aggro: 140, leash: 200, respawn: 99999, r: 8, loot: [] });
+mob('vengeur_liste', { name: 'Capitaine de la liste', level: 21, hp: 720, dmg: 30, speed: 52, range: 22, atkCd: 1.2, windup: 0.42, xp: 0, gold: [0, 0], aggro: 320, leash: 900, respawn: 99999,
+  weapon: ['saber', 'rust'], loot: [] }); // fin B : les embuscades (server/heist.js, heistVengeance)
+mob('silas_fuyard', { name: 'Silas Virevent', level: 20, hp: 1, dmg: 0, speed: 0, range: 0, xp: 0, gold: [0, 0], aggro: 0, leash: 9e9, respawn: 99999, heist: 'fuyard', title: 'En fuite', loot: [] });
+mob('silas_boss', { name: 'Silas Virevent', level: 20, hp: 8400, dmg: 34, speed: 54, aggro: 240, leash: 2000, range: 26, atkCd: 1.05, windup: 0.38, xp: 3600, gold: [260, 420], r: 9, respawn: 99999,
+  elite: 1, ai: 'silas', phases: [0.65, 0.25], title: 'Le filou de La Mouche d’Or', weapon: ['saber', 'silver'], regroupLine: 'On ne quitte pas mon pont comme ça !',
+  loot: [['pistolets_virevent', 0.3, 1, 1], ['rhum_vieux', 0.6, 1, 2]] });

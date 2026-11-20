@@ -46,6 +46,12 @@ const WALLS = {
   arene: { up: 'bricks', U: [0x2a2224, 0x3e3234, 0x524446, 0x665658, 0x7c6a6a], N: [0x1a1416, 0x2a2224, 0x3a3032, 0x4a3e40, 0x5c4e50], F: [0x2e2a2c, 0x45403f, 0x5a5452, 0x6e6863, 0x857e76] },
   couture: { up: 'plaster', U: [0x6a5a7a, 0x84729a, 0x9a88ae, 0xb09ec2, 0xc8b8d6], N: [0x2a1a3a, 0x3a2650, 0x4a3264, 0x5a4078, 0x6c4e8c], F: [0x3a2416, 0x55361f, 0x6b4527, 0x80552f, 0x96663a] },
   receleur: { up: 'planks', U: [0x24180e, 0x362416, 0x48301c, 0x5a3c24, 0x6c4a2c], N: [0x140c06, 0x24180e, 0x342214, 0x442c1a, 0x563820], F: [0x24180e, 0x362416, 0x48301c, 0x5a3c24, 0x6c4a2c] },
+  // lot 5 : les lieux du braquage
+  entrepot: { up: 'planks', U: [0x2a1e14, 0x3c2c1e, 0x4e3a28, 0x604832, 0x74583e], N: [0x18100a, 0x281c12, 0x38281a, 0x483422, 0x5a422c], F: [0x2e2218, 0x42321f, 0x564228, 0x6a5232, 0x7e623c] },
+  demeure: { up: 'plaster', U: [0x6a2a32, 0x8a3a42, 0xa44a50, 0xbc5e62, 0xd47878], N: [0x2a1418, 0x3e1c22, 0x52242c, 0x662e36, 0x7c3a42], F: [0x3a2014, 0x542c1a, 0x6c3a22, 0x84482a, 0x9c5834] },
+  cellier: { up: 'bricks', U: [0x221c1a, 0x322a26, 0x423834, 0x524642, 0x625650], N: [0x141010, 0x201a18, 0x2c2420, 0x382e2a, 0x463a34], F: [0x2e2a2c, 0x45403f, 0x5a5452, 0x6e6863, 0x857e76] },
+  toits: { up: 'bricks', U: [0x3a2620, 0x52342a, 0x6a4434, 0x82543e, 0x9a6648], N: [0x1c1210, 0x2a1c18, 0x3a2620, 0x4a3028, 0x5c3c32], F: [0x7a2a1e, 0x9a3a28, 0xb84c32, 0xd0623e, 0xe47a4e] },
+  pont: { up: 'planks', U: [0x3a2414, 0x4e321c, 0x624026, 0x784e30, 0x8e5e3a], N: [0x1e140c, 0x2c1e12, 0x3c2a1a, 0x4c3622, 0x5e442c], F: [0x5a3a22, 0x74502e, 0x8a6038, 0xa07244, 0xb88652] },
   chantier: { up: 'planks', U: [0x4a3220, 0x66462c, 0x7e5838, 0x966a44, 0xae7e52], N: [0x2a1a0e, 0x3e2816, 0x553820, 0x6b482a, 0x845a36], F: [0x5a3a22, 0x74502e, 0x8a6038, 0xa07244, 0xb88652] },
 };
 const isFloor = (t) => t === T.FLOOR || t === T.STONEF;
@@ -98,6 +104,7 @@ function reefRock(wx, wy, lx, ly, at) {
   if (ny > 0.35 && d > r * 0.6 && valueNoise(wx / 2, wy / 5, 173) > 0.58) col = 0x3a7a52; // des algues au pied
   return col;
 }
+const NO_DECO = new Set(['pont', 'toits', 'cellier']); // lot 5
 export class Terrain {
   constructor(world) {
     this.w = world;
@@ -358,6 +365,7 @@ export class Terrain {
           const tx = wx >> 4, ty = wy >> 4, rid = W.roomGrid[ty * MAP_W + tx], room = rid >= 0 ? W.rooms[rid] : null;
           const kind = room ? room.kind : 'house';
           if (kind === 'cave') { col = this.caveFloor(wx, wy, lx, ly, at, room); col = mix(col, 0x9aa8b0, 0.12 + (wy & 15) / 16 * 0.3); break; }
+          if (kind === 'toits' && t === T.FLOOR) { col = this.roofTiles(wx, wy); break; } // lot 5 : des tuiles rouges, rangée après rangée
           const S = WALLS[kind] || WALLS.house;
           const stone = t === T.STONEF || (t === T.EXIT && kind === 'forge');
           col = stone ? this.flagstone(wx, wy, PAL[T.STONEF]) : this.planks(wx, wy, S.F);
@@ -453,6 +461,16 @@ export class Terrain {
     ctx.putImageData(img, 0, 0);
     return cv;
   }
+  // lot 5 : les tuiles des toits de Port-Lanterne — des écailles de terre cuite, chaque rangée décalée d'une demi-tuile
+  roofTiles(wx, wy) {
+    const P = WALLS.toits.F, row = Math.floor(wy / 6), rv = wy - row * 6, off = row % 2 ? 4 : 0, u = (wx + off) % 8;
+    let k = 3 - (rv === 5 ? 2 : rv >= 4 ? 1 : 0);
+    if (u === 0 || (rv >= 3 && (u === 1 || u === 7))) k = Math.max(0, k - 2); // le joint, et l'arrondi de la tuile
+    if (rv === 0) k = Math.min(4, k + 1);
+    if (hash2(row, Math.floor((wx + off) / 8), 191) > 0.82) k = Math.max(0, k - 1); // une tuile plus vieille que les autres
+    if (hash2(Math.floor(wx / 64), Math.floor(wy / 48), 193) > 0.7) return mix(P[k], 0x3a2a24, 0.18); // la mousse et la suie par plaques
+    return P[k];
+  }
   planks(wx, wy, P) {
     const row = Math.floor(wy / 6), rv = wy - row * 6;
     const off = Math.floor(hash2(row, 7, 131) * 40);
@@ -487,16 +505,22 @@ export class Terrain {
     for (const [dx, dy, dd] of RING3) if (at(lx + dx, ly + dy) === T.CWALL) { col = shade(col, 0.55 + dd * 0.13); break; }
     return col;
   }
-  wallFace(wx, wy, d, room, tx) {
+  wallFace(wx, wy, d, room, tx) { // NO_DECO : ni fenêtre ni tableau au pont d'un navire, sur les toits, dans une cave
     const S = WALLS[room ? room.kind : 'house'] || WALLS.house, N = S.N, U = S.U;
     if (d <= 2) return N[0];
     if (d <= 11) { const px = wx % 12; if (d === 11) return N[4]; if (d === 3) return N[1]; return px === 0 ? N[0] : px === 1 ? N[3] : N[2]; }
     if (d <= 13) return d === 13 ? 0xb07a48 : 0x6f482a;
+    if (room && room.kind === 'pont') { // lot 5 : le pont d'un navire n'a pas de mur, mais un bastingage : la lisse, les jambettes, et la mer derrière
+      if (d >= 26) return d === 26 ? 0xa07244 : d === 27 ? 0x74502e : 0x0b2236;
+      if (d >= 22) { const u2 = wx % 10; return u2 < 2 ? (d === 22 ? 0x8a6038 : 0x5a3a22) : 0x0b2236; }
+      if (d === 21) return 0xb88652;
+      if (d === 20) return 0x8a6038;
+    }
     if (d >= 30) return d === 30 ? 0x3a2414 : 0x1a100a;
     // décor accroché au mur (fenêtre, tableau, carte) sur certaines colonnes
     const fy = room ? room.y0 : 0, h = hash2(tx, fy, 175);
     const u = wx & 15;
-    if (room && h > 0.7 && tx > room.x0 && tx < room.x0 + room.w - 1 && d >= 16 && d <= 27 && u >= 3 && u <= 12) {
+    if (room && !NO_DECO.has(room.kind) && h > 0.7 && tx > room.x0 && tx < room.x0 + room.w - 1 && d >= 16 && d <= 27 && u >= 3 && u <= 12) {
       const kind = Math.floor(hash2(tx, fy, 176) * 3);
       const fr = u === 3 || u === 12 || d === 16 || d === 27;
       if (kind === 0) { // fenêtre

@@ -280,6 +280,7 @@ export class UI {
   }
   cineSub(text) { const el = $('cine-sub'); if (!text) { el.classList.remove('on'); return; } el.textContent = text; el.classList.add('on'); }
   ink(on) { if (on !== this.inkOn) { this.inkOn = on; $('ink').classList.toggle('on', !!on); } }
+  powder(on) { if (on !== this.powderOn) { this.powderOn = on; $('powder').classList.toggle('on', !!on); } } // lot 5
   confirm(html, yes) {
     this.close();
     $('cf-text').innerHTML = html; $('confirm').classList.remove('hidden'); this.cf = yes || (() => {});
@@ -287,10 +288,10 @@ export class UI {
   }
   confirmEnd(ok) { const f = this.cf; this.cf = null; $('confirm').classList.add('hidden'); if (ok && f) f(); }
   // trois goupilles : arrêter l'aiguille dans le vert, trois fois de suite
-  lockpick(name, lock, done) {
+  lockpick(name, lock, done, sub = null) { // lot 5 : sub — un tiroir, une poche…
     this.close();
     $('lockpick').classList.remove('hidden');
-    $('lp-sub').textContent = `Maison de ${name}` + (lock ? ` · serrure renforcée (${lock}/2)` : '');
+    $('lp-sub').textContent = sub || `Maison de ${name}` + (lock ? ` · serrure renforcée (${lock}/2)` : '');
     $('lp-pins').innerHTML = '<div class="lp-pin"></div><div class="lp-pin"></div><div class="lp-pin"></div>';
     const st = this.lp = { n: 0, pos: 0, dir: 1, speed: 0.85 + lock * 0.3, zone: [0, 0], done };
     st.newZone = () => { const w = Math.max(0.08, 0.25 - lock * 0.05 - st.n * 0.035), a = 0.08 + Math.random() * (0.84 - w); st.zone = [a, a + w]; $('lp-zone').style.left = (a * 100) + '%'; $('lp-zone').style.width = (w * 100) + '%'; };
@@ -720,8 +721,8 @@ export class UI {
   // lot 4 : Silas Virevent — la proposition (si l'on n'a pas encore dit oui), puis la préparation, jouée en cinématique
   silasChoices(ch) {
     const G = this.G, mem = G.mem || new Set(), talk = (key) => { this.close(); G.scene.play('silas', key === 'pitch' ? SILAS_PITCH : SILAS_AGAIN, null); };
-    if (mem.has('silas_oui')) ch.unshift({ label: '« Où en est l’affaire ? »', cls: 'q', go: () => { this.close(); G.send({ t: 'cinema', a: 'ask', id: 'silas_preparation' }); } });
-    else if (!mem.has('vu:silas_rencontre')) ch.unshift({ label: '« On m’a dit que tu cherchais quelqu’un. »', cls: 'q', go: () => { G.mem.add('vu:silas_rencontre'); G.send({ t: 'mem', k: 'vu:silas_rencontre' }); talk('pitch'); } });
+    if (this.questStateOf('br_preparatifs') !== 'available' || mem.has('silas_oui')) return; // lot 5 : l'affaire est lancée (voir client/heist.js)
+    if (!mem.has('vu:silas_rencontre')) ch.unshift({ label: '« On m’a dit que tu cherchais quelqu’un. »', cls: 'q', go: () => { G.mem.add('vu:silas_rencontre'); G.send({ t: 'mem', k: 'vu:silas_rencontre' }); talk('pitch'); } });
     else ch.unshift({ label: mem.has('silas_non') ? '« Ton affaire tient toujours ? »' : '« Tu voulais me parler ? »', cls: 'q', go: () => talk(mem.has('silas_non') ? 'again' : 'pitch') });
   }
   // 1.0 : ce dont un personnage se souvient — vos quêtes, vos choix, vos exploits
@@ -745,7 +746,7 @@ export class UI {
         if (q.sceneDone) { this.close(); G.scene.play(npcId, q.sceneDone, [{ label: 'Recevoir la récompense', cls: 'go', go: () => G.send({ t: 'qt', q: qid }) }]); return; }
         this.say(q.done, [{ label: 'Recevoir la récompense', cls: 'done', go: () => { G.send({ t: 'qt', q: qid }); this.close(); } }]);
       } });
-      else if (q.giver === npcId && s === 'available') ch.push({ label: `! ${q.name}`, cls: 'q', go: () => {
+      else if (q.giver === npcId && s === 'available' && !q.hideOffer) ch.push({ label: `! ${q.name}`, cls: 'q', go: () => {
         if (q.scene) { // 0.8 : la proposition se joue en vraie conversation, puis on décide
           this.close();
           G.scene.play(npcId, q.scene, [{ label: `Accepter : « ${q.name} »`, cls: 'go', go: () => G.send({ t: 'qa', q: qid }) }, { label: 'Pas maintenant…', go: () => this.openDialog(npcId, true) }]);
@@ -756,6 +757,7 @@ export class UI {
       else if ((q.turnin === npcId || q.giver === npcId) && s === 'active') ch.push({ label: `… ${q.name}`, go: () => this.say(q.progress, [{ label: 'Compris.', go: () => this.dialogMain(npcId) }]) });
     }
     if (npcId === 'silas') this.silasChoices(ch); // lot 4
+    if (this.G.heist) this.G.heist.dialog(npcId, ch, this); // lot 5 : le braquage (architecte, comptable, Ferrant, Corail…)
     if (N.shop) ch.push({ label: '🛒 Voir la marchandise', go: () => this.openShop(npcId) });
     if (N.dice) ch.push({ label: '🎲 Jouer aux dés', cls: 'q', go: () => this.diceMenu(npcId) });
     const np = (this.G.npcs || []).find((q) => q.id === npcId), npr = np ? roomIdAt(this.G.world, np.x, np.y) : -1;
@@ -1156,7 +1158,8 @@ export class UI {
     for (let i = 0; i < N; i++) { const id = isl[i]; if (id && !revealed[id] && this.isSeenTile(i % MAP_W, (i / MAP_W) | 0)) revealed[id] = 1; }
     this.revealed = revealed;
     const D = new Uint8Array(N);
-    for (let i = 0; i < N; i++) D[i] = isl[i] && !revealed[isl[i]] ? 0 : 12;
+    const Z7 = W.zones, route = this.G.mem && this.G.mem.has('br_route'); // lot 5 : l'île aux Sept Courants n'est sur aucune carte
+    for (let i = 0; i < N; i++) D[i] = (isl[i] && !revealed[isl[i]]) || (Z7[i] === 33 && !route) ? 0 : 12;
     for (let y = 0; y < OVER_H; y++) for (let x = 0; x < MAP_W; x++) { const i = y * MAP_W + x; let v = D[i]; if (!v) continue; if (x > 0) v = Math.min(v, D[i - 1] + 1); if (y > 0) v = Math.min(v, D[i - MAP_W] + 1); D[i] = v; }
     for (let y = OVER_H - 1; y >= 0; y--) for (let x = MAP_W - 1; x >= 0; x--) { const i = y * MAP_W + x; let v = D[i]; if (!v) continue; if (x < MAP_W - 1) v = Math.min(v, D[i + 1] + 1); if (y < OVER_H - 1) v = Math.min(v, D[i + MAP_W] + 1); D[i] = v; }
     const c = this.fogCv || (this.fogCv = document.createElement('canvas')); c.width = MAP_W; c.height = OVER_H;
@@ -1179,11 +1182,11 @@ export class UI {
     for (let r = 0; r <= 22; r += 2) for (let a = 0; a < 16; a++) { const x = Math.round(tx + Math.cos(a / 16 * 6.283) * r), y = Math.round(ty + Math.sin(a / 16 * 6.283) * r); if (x < 0 || y < 0 || x >= MAP_W || y >= OVER_H) continue; const id = L[y * MAP_W + x]; if (id) return !this.revealed[id]; }
     return false;
   }
-  onFog(tx, ty) { return !!(this.revealed && this.G.world.islandOf[ty * MAP_W + tx] && !this.revealed[this.G.world.islandOf[ty * MAP_W + tx]]); }
+  onFog(tx, ty) { if (this.G.world.zones[ty * MAP_W + tx] === 33 && !(this.G.mem && this.G.mem.has('br_route'))) return true; return !!(this.revealed && this.G.world.islandOf[ty * MAP_W + tx] && !this.revealed[this.G.world.islandOf[ty * MAP_W + tx]]); }
   // position sur l'archipel (dans un bâtiment : sa porte)
   mapPos() {
     const G = this.G, p = G.player;
-    if (G.room >= 0) { const d = G.world.doors.find((q) => q.room === G.room); if (d) return { x: d.ox, y: d.oy }; }
+    if (G.room >= 0) { const d = G.world.doors.find((q) => q.room === G.room); if (d) return { x: d.ox, y: d.oy }; const r = G.world.rooms[G.room]; if (r.anchor) return r.anchor; const d2 = r.anchorRoom != null && G.world.doors.find((q) => q.room === r.anchorRoom); if (d2) return { x: d2.ox, y: d2.oy }; }
     return { x: p.x, y: p.y };
   }
   drawMini() {

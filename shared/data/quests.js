@@ -3,6 +3,7 @@
 import { Z } from '../world.js';
 import { OLD_SCENES } from './scenes.js';
 import { ACTE3, DONJONS } from './acte3.js';
+import { BRAQUAGE } from './braquage.js'; // lot 5
 
 export const QUESTS = {
   premier_pas: {
@@ -685,6 +686,7 @@ QUESTS.prime_lib_naufrageurs = primeLib('Prime : naufrageurs', 'naufrageur', 10,
 QUESTS.prime_lib_gardes = primeLib('Prime : gardes maudits', 'garde_maudit', 10, 21, 4400, 850, 'Gardes maudits du fort abattus');
 QUESTS.prime_lib_goules = primeLib('Prime : goules écarlates', 'goule_ecarlate', 10, 23, 5000, 950, 'Goules écarlates abattues');
 Object.assign(QUESTS, ACTE3, DONJONS); // 1.0 : Acte III — La Flamme et la Marée ; le Bastion Englouti
+Object.assign(QUESTS, BRAQUAGE); // lot 5 : Le Plus Grand Braquage de Port-Lanterne
 export const QUEST_ORDER = Object.keys(QUESTS);
 
 // état d'une quête pour un joueur : 'locked' | 'available' | 'active' | 'ready' | 'done'
@@ -703,6 +705,7 @@ export function npcVisible(def, pq, level) {
   const v = def && def.vis;
   if (!v) return true;
   if (v.lvl && (level || 1) < v.lvl) return false; // lot 4 : un personnage qui n'approche que les pirates aguerris
+  if (v.notDone && v.notDone.some((q) => QUESTS[q] && questState(q, pq || {}, level || 1) === 'done')) return false; // lot 5 : il est parti
   if (!v.q) return true;
   const ok = (c) => c.s.includes(questState(c.q, pq || {}, level || 1));
   return ok(v) && !(v.not && ok(v.not));

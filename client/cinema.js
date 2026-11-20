@@ -7,7 +7,8 @@ import { CINEMAS, SILAS_PITCH, SILAS_AGAIN, THEMES } from '../shared/data/cinema
 import { NPCS } from '../shared/data/npcs.js';
 import { TILE } from '../shared/constants.js';
 
-const LINES = { pitch: SILAS_PITCH, again: SILAS_AGAIN };
+const LINES = { pitch: SILAS_PITCH, again: SILAS_AGAIN }; // les conversations ; d'autres modules en ajoutent (client/heist.js)
+export const CINE_LINES = LINES, CINE_ENDS = {}, CINE_THEMES = {};
 const ease = (k) => { k = Math.max(0, Math.min(1, k)); return k * k * (3 - 2 * k); };
 const dirOf = (dx, dy) => (Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 1 : 2) : (dy < 0 ? 3 : 0));
 const nowS = () => performance.now() / 1000;
@@ -27,7 +28,7 @@ export class Cinema {
   onMsg(m) {
     if (m.a === 'play') {
       if (this.G.mem) this.G.mem.add('vu:' + m.id);
-      this.start(m.id, { seed: m.seed, n: m.n });
+      this.start(m.id, { seed: m.seed, n: m.n, opts: m.opts });
     }
   }
   // ------------------------------------------------------------------ démarrage
@@ -42,6 +43,7 @@ export class Cinema {
       id, def, roomId, room, t: 0, last: nowS(), started: nowS(), idx: 0, locked: true, paused: false, waiting: roomId >= 0 && G.room !== roomId,
       steps: def.steps.map((s, i) => ({ ...s, i })).sort((a, b) => a.at - b.at || a.i - b.i),
       actors: new Map(), taken: [], items: new Map(), cam: null, follow: null, theme: null, sent: false, faced: new Map(), seed: opts.seed || 1,
+      opts: opts.opts || {}, vars: {},
     };
     G.ui.close(true);
     G.ui.cine(true);
@@ -63,8 +65,10 @@ export class Cinema {
       n.hidden = true; c.taken.push(n);
       e = { k: 'f', id: -9000 - c.actors.size, x: n.x, y: n.y, dir: n.dir0 ?? n.dir ?? 0, look: NPCS[a.npc].look, lookKey: 'npc:' + a.npc, moving: false, walk: 0, sitUntil: n.sit ? Infinity : 0, cine: true, npc: n, voice: voiceOf(a.npc) };
     } else {
-      const p = this.at(a.at || [0, 0]);
-      e = { k: 'f', id: -9000 - c.actors.size, x: p.x, y: p.y, dir: a.dir || 0, look: a.look, lookKey: JSON.stringify(a.look), moving: false, walk: 0, sitUntil: a.sit ? Infinity : 0, cine: true, voice: voiceOf(aid) };
+      const P0 = a.pos !== undefined ? a.pos : a.at; // une apparition en cours de scène : « pos » (« at » est son instant)
+      const p = P0 === 'opts' ? { x: c.opts.x || G.player.x, y: c.opts.y || G.player.y } : this.at(P0 || [0, 0]);
+      const look = a.lookOf ? NPCS[a.lookOf].look : a.look;
+      e = { k: 'f', id: -9000 - c.actors.size, x: p.x, y: p.y, dir: a.dir || 0, look, lookKey: JSON.stringify(look), moving: false, walk: 0, sitUntil: a.sit ? Infinity : 0, cine: true, voice: voiceOf(a.lookOf || aid) };
     }
     c.actors.set(aid, e); G.folk.push(e);
   }
@@ -83,12 +87,14 @@ export class Cinema {
     if (typeof ref === 'string') return c.actors.get(ref) || null;
     if (ref.seat) { const k = `${c.roomId}:${ref.seat[0]},${ref.seat[1]}`; return G.folk.find((f) => f.seat === k && !f.hidden) || null; } // un client attablé (s'il est là à cette heure)
     if (ref.npc) return G.npcs.find((n) => n.id === ref.npc) || null;
+    if (ref.mob) { for (const e of G.ents.values()) if (e.type === ref.mob && !e.dyingT) return e; return null; } // lot 5 : un monstre bien réel (Silas sur son pont)
+    if (ref.crowd != null) return G.folk.find((f) => f.crowd === ref.crowd && !f.hidden) || null; // lot 5 : un invité de la réception
     return null;
   }
   target(spec) { // où regarde la caméra (centre de l'image)
     if (!spec) return null;
     if (spec === 'player' || spec.player) { const p = this.G.player; return { x: p.x, y: p.y - 12 }; }
-    if (spec.actor) { const e = this.who(spec.actor); return e ? { x: e.x + (spec.dx || 0), y: e.y + (spec.dy ?? -12) } : null; }
+    if (spec.actor || spec.npc || spec.mob) { const e = this.who(spec.actor || spec); return e ? { x: e.x + (spec.dx || 0), y: e.y + (spec.dy ?? -12) } : null; }
     if (spec.tile) return this.at(spec.tile);
     if (spec.world) return { x: spec.world[0] * TILE + 8, y: spec.world[1] * TILE + 8 };
     if (spec.between) { const [a, b] = spec.between.map((w) => this.who(w)).filter(Boolean); if (!a) return null; if (!b) return { x: a.x, y: a.y - 12 }; return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - 14 }; }
@@ -154,6 +160,7 @@ export class Cinema {
   // ------------------------------------------------------------------ les étapes
   run(s, now, ff = false) {
     const G = this.G, R = G.renderer, c = this.cur, red = this.reduced(), ui = G.ui;
+    if (s.when && c.vars.fin !== s.when) return; // lot 5 : une étape propre à un choix
     const real = nowS();
     switch (s.do) {
       case 'bars': if (!ff) ui.cine(!!s.on); break;
@@ -171,7 +178,7 @@ export class Cinema {
         const to = this.target(s.to); if (!to) break;
         const from = c.camPos || { x: R.cam.x, y: R.cam.y };
         const dur = ff || red ? 0 : s.dur || 0;
-        c.follow = null; c.cam = { from, to, spec: s.to, live: !!s.to.actor || !!s.to.between, t0: real, dur };
+        c.follow = null; c.cam = { from, to, spec: s.to, live: !!(s.to.actor || s.to.between || s.to.mob), t0: real, dur };
         if (!dur) { c.camPos = to; G.snapCam = true; }
         if (s.room === -1 || R.viewRoom === -1) G.viewFocus = to;
         break; }
@@ -205,7 +212,7 @@ export class Cinema {
         const f = { kind: 'item', icon: s.icon, tint: s.tint, mini: s.mini, x: p.x, y: p.y, z: s.z || 0, glint: s.glint, dur: 1e9 };
         R.addFx(f); if (ff) f.t0 -= 1; c.items.set(s.key, f);
         break; }
-      case 'theme': c.theme = s.name || ''; G.sfx.setTheme(c.theme, s.fade ?? (THEMES[s.name] ? 1.0 : 0.8)); break;
+      case 'theme': { const nm = String(s.name || '').startsWith('$') ? (CINE_THEMES[c.vars[s.name.slice(1)]] || c.theme || '') : s.name || ''; c.theme = nm; G.sfx.setTheme(nm, s.fade ?? (THEMES[nm] ? 1.0 : 0.8)); break; }
       case 'sfx': if (!ff) G.sfx.play(s.name, s.vol ?? 1); break;
       case 'duck': G.sfx.duck(s.k ?? 1, ff ? 0.05 : (s.dur || 1) / 3); break;
       case 'talk': if (!ff) this.talk(s); break;
@@ -231,8 +238,11 @@ export class Cinema {
     const G = this.G, c = this.cur, actor = s.actor ? c.actors.get(s.actor) : null;
     c.paused = true;
     if (actor && actor.path && actor.path.length) { const last = actor.path[actor.path.length - 1]; actor.x = last[0]; actor.y = last[1]; actor.path = null; actor.moving = false; }
-    const steps = LINES[s.lines] || [];
-    G.scene.play(s.npc, steps, null, { actor, onLine: (who, x) => { if (who !== 'npc' || !actor || !this.cur) return; if (x.g) this.gesture(actor, x.g, x); if (x.e) G.renderer.addFx({ kind: 'emo', e: x.e, follow: () => actor, dur: 1.4, h: 36 }); } })
+    const key = String(s.lines || ''), L = key.startsWith('$') ? LINES[c.vars[key.slice(1)]] : LINES[key];
+    const steps = typeof L === 'function' ? L(G, c) : L || [];
+    const end = s.end && CINE_ENDS[s.end] ? CINE_ENDS[s.end](G, c, this) : null;
+    if (end && end.timeout) setTimeout(() => { if (this.cur === c && G.scene.on && G.scene.choices) { const b = document.getElementById('sc-choices').children[end.def || 0]; if (b) b.click(); } }, end.timeout * 1000);
+    G.scene.play(s.npc, steps, end ? end.list : null, { actor, alone: !actor, onLine: (who, x) => { if (who !== 'npc' || !actor || !this.cur) return; if (x.g) this.gesture(actor, x.g, x); if (x.e) G.renderer.addFx({ kind: 'emo', e: x.e, follow: () => actor, dur: 1.4, h: 36 }); } })
       .then(() => { if (this.cur === c) { c.paused = false; c.last = nowS(); } });
   }
   sub(who, text) {

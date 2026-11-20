@@ -27,7 +27,7 @@ export const cinema = {
       if (p.recallAt) p.recallAt = 0;
       p.cine = { id, until, run };
       p.mem.add('vu:' + id);
-      this.send(p, { t: 'cinema', a: 'play', id, seed: run.seed, n: watch.length, replay: opts.replay ? 1 : 0 });
+      this.send(p, { t: 'cinema', a: 'play', id, seed: run.seed, n: watch.length, replay: opts.replay ? 1 : 0, opts: opts.opts || null });
     }
     this.cinemaRuns.add(run);
     this.log(`[cinéma] ${id} : ${watch.map((p) => p.name).join(', ')}`);

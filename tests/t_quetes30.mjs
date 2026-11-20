@@ -16,7 +16,7 @@ let fails = 0; const ok = (v, m) => { console.log((v ? 'OK  ' : 'FAIL') + ' ' + 
 const store = new Map();
 const game = new Game({ storage: { auth: async (k) => ({ ok: true, data: store.get(k) || null }), save: (k, d) => store.set(k, JSON.parse(JSON.stringify(d))) }, log: () => {} });
 const W = game.world, wait = (ms) => new Promise((r) => setTimeout(r, ms));
-const login = async (name) => { const c = { msgs: [], send(m) { this.msgs.push(m); if (this.msgs.length > 400) this.msgs.splice(0, 200); }, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 13, name, pass: 'abcd' }); await wait(80); const p = game.sessions.get(c).player; p.c = c; return p; };
+const login = async (name) => { const c = { msgs: [], send(m) { this.msgs.push(m); if (this.msgs.length > 400) this.msgs.splice(0, 200); }, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 14, name, pass: 'abcd' }); await wait(80); const p = game.sessions.get(c).player; p.c = c; return p; };
 const toasts = (p, n0) => p.c.msgs.slice(n0).filter((m) => m.t === 'toast').map((m) => m.msg);
 
 // ------------------------------------------------------------ outils de déplacement
@@ -151,7 +151,7 @@ spawnHow.kraken = (p) => { // comme en jeu : sur le pont d'un navire, au-dessus 
 };
 const order = []; const seen = new Set();
 const visit = (id) => { if (seen.has(id)) return; seen.add(id); for (const r of QUESTS[id].requires || []) visit(r); order.push(id); };
-for (const id of QUEST_ORDER) visit(id);
+for (const id of QUEST_ORDER) if (!id.startsWith('br_')) visit(id); // lot 5 : Le Plus Grand Braquage se joue dans t_braquage50 (gardes, toits, poursuite, combat)
 const report = {}, branches = [];
 for (const qid of order) {
   if ([].concat(QUESTS[qid].excl || []).some((x) => P.quests[x])) { branches.push(qid); continue; }
@@ -198,6 +198,7 @@ const scBad = []; let lines = 0;
 const scCheck = (steps, where) => { if (!Array.isArray(steps)) return scBad.push(where); for (const st of steps) { lines++; if (Array.isArray(st)) { if (typeof st[1] !== 'string' || !st[1].trim() || (!['npc', 'me'].includes(st[0]) && !NPCS[st[0]])) scBad.push(where + ' : ' + st[0]); } else if (st && st.ask) st.ask.forEach((a) => { if (!a.q) scBad.push(where + ' : question vide'); scCheck(a.a, where); }); else if (st && st.choose) st.choose.forEach((c) => { if (!c.q) scBad.push(where + ' : choix vide'); if (c.a) scCheck(c.a, where); }); else scBad.push(where + ' : étape inconnue'); } };
 for (const id of QUEST_ORDER) { const q = QUESTS[id]; if (q.scene) scCheck(q.scene, id); if (q.sceneDone) scCheck(q.sceneDone, id + ' (fin)'); q.goals.forEach((g, i) => { if (g.scene) scCheck(g.scene, `${id} (objectif ${i + 1})`); }); }
 ok(!scBad.length, `conversations : ${lines} répliques bien formées${scBad.length ? ' — ' + scBad.slice(0, 5).join(', ') : ''}`);
-const story = QUEST_ORDER.filter((id) => !QUESTS[id].repeat), silent = story.filter((id) => !QUESTS[id].scene && !QUESTS[id].sceneDone);
+// lot 5 : les conversations du braquage sont dans ses scènes (shared/data/cinemas.js)
+const story = QUEST_ORDER.filter((id) => !QUESTS[id].repeat && !id.startsWith('br_')), silent = story.filter((id) => !QUESTS[id].scene && !QUESTS[id].sceneDone);
 ok(!silent.length, `chaque quête d’histoire a une conversation jouée (${story.length - silent.length}/${story.length})${silent.length ? ' — ' + silent.join(', ') : ''}`);
 console.log(fails ? `${fails} ÉCHEC(S)` : 'TOUT EST OK'); process.exit(0);
