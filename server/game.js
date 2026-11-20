@@ -98,6 +98,11 @@ const BOSS_LINES = {
   brasier: [null, 'LE VOLCAN SE RÉVEILLE !', 'TOUT BRÛLERA !'],
   frere: [null, 'Tu vas le regretter !'],
   vespere: [null, 'Vous osez profaner ma crypte ?', 'La Couronne ne quittera pas ma tête !', 'Si je tombe, la mer tombera avec moi !'],
+  // lot 3 : quatre boss qui n'avaient pas de combat à eux
+  mangrove: [null, 'La marée monte… et elle a soif.', 'Je boirai jusqu’à la dernière goutte !'],
+  grandfeu: [null, 'Vous voyez ces lumières ? Elles mènent toutes au fond.', 'Que tout l’archipel brûle comme un phare !'],
+  tyran: [null, 'Libertalia n’a qu’un roi, et il ne meurt pas.', 'Rendez-moi ma COURONNE !'],
+  gradlon: [null, 'J’ai ouvert les portes de la mer. Je peux les rouvrir.'],
 };
 // distance d'un point à un segment
 const segDist = (px, py, x0, y0, x1, y1) => {
@@ -687,7 +692,8 @@ export class Game {
   // Fer et Rouille : tant qu'ils se tiennent côte à côte, leurs armures se renvoient les coups
   updateLink(m) {
     const tw = m.twinRef || (m.twinRef = this.mobs.find((o) => o !== m && o.type === m.def.twin && o.room === m.room));
-    const linked = !!tw && tw.state !== 'dead' && !tw.fallen && dist(m, tw) < 150;
+    // lot 3 : le bouclier ne tient que face à plusieurs pirates (on les sépare à deux) ; seul, on ne reste jamais bloqué
+    const linked = !!tw && tw.state !== 'dead' && !tw.fallen && dist(m, tw) < 150 && this.bossTargets(m, m.def.aggro + 60).length > 1;
     if (linked !== !!m.linked) { m.linked = linked; this.ev(m.x, m.y, ['link', m.id, linked ? 1 : 0]); if (linked && m.state === 'chase') this.ev(m.x, m.y, ['shout', m.id, 'Ensemble, on est invincibles !']); }
     if (linked) m.shieldUntil = this.time + 0.3;
   }
@@ -813,12 +819,21 @@ export class Game {
       } else if (m.state === 'chase') {
         const t = this.players.get(m.target);
         const leashed = Math.hypot(m.x - m.sx, m.y - m.sy) > def.leash;
+        // lot 3 : un boss entraîné trop loin, alors qu'on se bat encore dans son repaire, regagne sa place sans guérir
+        // ni oublier ses phases ; il ne se remet à neuf que si tout le monde a fui ou est tombé
+        if (m.regroup) { const d = this.stepMob(m, m.sx, m.sy, speed * 1.3); m.windup = 0; if (d < 24) m.regroup = false; continue; }
+        if (leashed && this.bossLike(m) && [...this.players.values()].some((q) => this.mobCanTarget(m, q) && Math.hypot(q.x - m.sx, q.y - m.sy) < def.leash + 40)) {
+          m.regroup = true; m.dash = null; m.leap = null; m.drink = null; m.pauseUntil = 0;
+          this.ev(m.x, m.y, ['shout', m.id, def.regroupLine || 'Revenez dans mon repaire, si vous l’osez !']);
+          continue;
+        }
         if (!t || !this.mobCanTarget(m, t) || leashed) {
           const other = !leashed && this.nearestTarget(m, def.aggro);
-          if (other) m.target = other.id; else { m.state = 'return'; m.target = 0; m.windup = 0; m.dash = null; m.leap = null; m.pauseUntil = 0; this.despawnAdds(m); }
+          if (other) m.target = other.id; else { m.state = 'return'; m.target = 0; m.windup = 0; m.dash = null; m.leap = null; m.drink = null; m.regroup = false; m.pauseUntil = 0; this.despawnAdds(m); }
           continue;
         }
         const d = dist(m, t);
+        if (m.drink) { m.moving = false; this.mangroveDrink(m); continue; } // lot 3 : elle boit la marée, immobile
         if (m.pauseUntil > this.time) { m.moving = false; continue; }
         if (m.dash) { this.updateDash(m); continue; }
         if (m.leap) { this.updateLeap(m); continue; }
@@ -1164,6 +1179,75 @@ export class Game {
         } else if (P >= 2 && ready('sum', 18)) this.summonAdds(m, t, 'calcine', 2, 3, 'Mes ouailles, debout !');
         break;
       }
+      // ---------------------------------------------------------- lot 3 : quatre combats reconnaissables
+      case 'mangrove': { // La Reine de la Mangrove : la vase, les racines, et la marée qu'elle boit
+        if (ready('bog', 7)) { // des flaques de vase empoisonnée sous chaque pirate, qui restent
+          for (const p of this.bossTargets(m, 260)) { const x = p.x, y = p.y; this.tele(x, y, 26, 1.1, 18, m, 9); this.later(1.1, () => { if (m.state !== 'dead') this.addCloud(x, y, 26, 6, 9); }); }
+          this.ev(m.x, m.y, ['shout', m.id, 'La vase vous gardera.']);
+        } else if (P >= 1 && ready('roots', 10)) { // les racines jaillissent en éventail vers sa cible
+          const a = Math.atan2(t.y - m.y, t.x - m.x);
+          for (const o of [-0.45, 0, 0.45]) this.lineTele(m.x, m.y, m.x + Math.cos(a + o) * 210, m.y + Math.sin(a + o) * 210, 18, 1.1, 34, m, 9);
+          this.ev(m.x, m.y, ['shout', m.id, 'Racines, prenez-les !']);
+        } else if (P >= 1 && ready('drink', 20)) { // elle boit la marée : frappez-la fort pour l'interrompre
+          m.drink = { until: now + 3, next: now + 0.5, ref: m.hp, taken: 0 }; m.windup = 0; m.moving = false;
+          // pas de cercle au sol (il ferait fuir) : c'est le moment de frapper, pas de reculer
+          this.ev(m.x, m.y, ['shout', m.id, 'Je bois la marée… (frappez-la pour l’interrompre !)']);
+        } else if (P >= 2 && ready('sum', 16)) this.summonAdds(m, t, 'drowned', 2, 3, 'Mes noyés, sortez de la vase !');
+        break;
+      }
+      case 'grandfeu': { // Grand-Feu : lanternes, traînée de feu, et le cercle des fausses lumières
+        if (ready('lantern', 6)) { // une lanterne lancée sur chaque pirate : l'impact, puis le sol qui brûle
+          for (const p of this.bossTargets(m, 260)) { const x = p.x, y = p.y; this.tele(x, y, 24, 1.2, 30, m, 3); for (let k = 1; k <= 2; k++) this.later(1.2 + 0.7 * (k - 1), () => { if (m.state !== 'dead') this.tele(x, y, 22, 0.7, 14, m, 3); }); }
+          this.ev(m.x, m.y, ['shout', m.id, 'Une lanterne pour vous éclairer !']);
+        } else if (P >= 1 && ready('lights', 12)) { // les fausses lumières : un anneau avec une seule brèche, et le feu au centre
+          const gap = Math.floor(Math.random() * 10);
+          for (let k = 0; k < 10; k++) { if (k === gap) continue; const a = k / 10 * Math.PI * 2; this.tele(m.x + Math.cos(a) * 85, m.y + Math.sin(a) * 66, 30, 2.0, 40, m, 5); }
+          this.tele(m.x, m.y, 62, 2.0, 40, m, 5); m.pauseUntil = now + 2.0;
+          this.ev(m.x, m.y, ['shout', m.id, 'Suivez la lumière… la bonne !']);
+        } else if (P >= 1 && ready('dash', 9)) { // la ruée : elle laisse une traînée de feu
+          const a = Math.atan2(t.y - m.y, t.x - m.x), x0 = m.x, y0 = m.y;
+          this.startDash(m, t, 170, 270, 36);
+          for (let k = 1; k <= 4; k++) this.later(1.3, () => { if (m.state !== 'dead') this.tele(x0 + Math.cos(a) * 40 * k, y0 + Math.sin(a) * 40 * k, 20, 1.0, 16, m, 3); });
+          this.ev(m.x, m.y, ['shout', m.id, 'Par le feu et l’écume !']);
+        } else if (P >= 2 && ready('sum', 16)) this.summonAdds(m, t, 'naufrageur', 2, 3, 'Allumez les feux, les gars !');
+        break;
+      }
+      case 'tyran': { // Le Roi sans Couronne : décrets en croix, éclats de la couronne, et le saut du trône
+        const S = m.def.shouts || {};
+        if (ready('guard', 14)) this.summonAdds(m, t, m.def.adds || 'garde_maudit', 2, 4, S.sum || 'Ma garde !');
+        else if (ready('decree', 7)) { // un décret en croix, centré sur sa cible
+          const cx = t.x, cy = t.y;
+          this.lineTele(cx - 110, cy, cx + 110, cy, 22, 1.1, 40, m, 5); this.lineTele(cx, cy - 86, cx, cy + 86, 22, 1.1, 40, m, 5);
+          this.ev(m.x, m.y, ['shout', m.id, S.line || 'À genoux devant votre roi !']);
+        } else if (P >= 1 && ready('shards', 10)) { // la couronne brisée : une spirale d'éclats
+          for (let k = 0; k < 12; k++) { const a = k * 0.9, r = 30 + k * 12; this.tele(m.x + Math.cos(a) * r, m.y + Math.sin(a) * r * 0.8, 18, 0.8 + k * 0.12, 32, m, 5); }
+          this.ev(m.x, m.y, ['shout', m.id, 'Voyez ce qu’il reste de ma couronne !']);
+        } else if (P >= 2 && ready('slam', 11)) { // il bondit sur sa cible ; l'onde frappe à l'arrivée
+          const tx = t.x, ty = t.y;
+          if (canStand(this.world, tx, ty, true) && roomIdAt(this.world, tx, ty) === m.room && dist(m, t) > 30) {
+            m.leap = { x0: m.x, y0: m.y, x1: tx, y1: ty, at: now, until: now + 1.0 };
+            this.tele(tx, ty, 64, 1.0, 46, m, 5); this.ev(m.x, m.y, ['leap', m.id, Math.round(tx), Math.round(ty), 1.0]);
+            this.ev(m.x, m.y, ['shout', m.id, S.charge || 'Libertalia est à MOI !']);
+          }
+        }
+        break;
+      }
+      case 'gradlon': { // Gradlon, roi d'Ys : les cloches, qui vident les poumons ; le trident ; la porte de la mer
+        if (ready('bells', 9)) { // deux anneaux : rester contre lui, ou très loin ; et chaque volée vide l'air
+          for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; this.tele(m.x + Math.cos(a) * 90, m.y + Math.sin(a) * 72, 28, 1.4, 34, m, 7); }
+          for (let k = 0; k < 16; k++) { const a = (k + 0.5) / 16 * Math.PI * 2; this.tele(m.x + Math.cos(a) * 150, m.y + Math.sin(a) * 118, 28, 2.0, 34, m, 7); }
+          for (const p of this.bossTargets(m, 400)) if (this.seaRoom && this.seaRoom(p) && p.air > 0) { p.air = Math.max(1, p.air - Math.round(this.airMax(p) * 0.2)); p.dirtyMe = true; this.toast(p, 'Les cloches d’Ys vous vident les poumons ! Cherchez les bulles.', 'warn'); }
+          this.ev(m.x, m.y, ['shout', m.id, '♪ Dong… dong… ♪ Entendez les cloches d’Ys !']);
+        } else if (ready('trident', 6)) { // le trident : trois pointes en éventail
+          const a = Math.atan2(t.y - m.y, t.x - m.x);
+          for (const o of [-0.3, 0, 0.3]) this.lineTele(m.x, m.y - 6, m.x + Math.cos(a + o) * 160, m.y - 6 + Math.sin(a + o) * 160, 16, 0.9, 34, m, 7);
+        } else if (P >= 1 && ready('gate', 12)) { // la porte de la mer : un large courant
+          const a = Math.atan2(t.y - m.y, t.x - m.x);
+          this.lineTele(m.x, m.y, m.x + Math.cos(a) * 240, m.y + Math.sin(a) * 240, 44, 1.2, 40, m, 7);
+          this.ev(m.x, m.y, ['shout', m.id, 'Que s’ouvrent les portes de la mer !']); m.pauseUntil = now + 1.0;
+        } else if (P >= 1 && ready('sum', 15)) this.summonAdds(m, t, 'drowned', 2, 3, 'Ma cour, levez-vous !');
+        break;
+      }
       case 'noye': { // Capitaine Noyé
         if (ready('gey', 6)) {
           for (const p of this.bossTargets(m, 240)) { this.tele(p.x, p.y, 22, 1.1, 26, m, 7); for (let k = 0; k < 2; k++) this.tele(p.x + rand(-34, 34), p.y + rand(-26, 26), 22, 1.3, 26, m, 7); }
@@ -1176,6 +1260,17 @@ export class Game {
         break;
       }
     }
+  }
+  // lot 3 : la Reine de la Mangrove boit la marée (2,5 % de PV par demi-seconde, trois secondes) ; les coups
+  // portés pendant ce temps comptent : 6 % de ses PV, et elle s'étrangle, sonnée deux secondes
+  mangroveDrink(m) {
+    const D = m.drink, now = this.time;
+    if (m.state === 'dead') { m.drink = null; return false; }
+    D.taken += Math.max(0, D.ref - m.hp); D.ref = m.hp;
+    if (D.taken >= m.maxHp * 0.06) { m.drink = null; m.pauseUntil = now + 2; this.ev(m.x, m.y, ['shout', m.id, 'Aaargh ! Vous… osez ?']); return true; }
+    if (now >= D.next) { D.next = now + 0.5; const h = Math.min(m.maxHp - m.hp, m.maxHp * 0.025); m.hp += h; D.ref = m.hp; this.ev(m.x, m.y, ['heal', m.id, Math.round(h)]); } // « +N » en vert au-dessus d'elle
+    if (now >= D.until) m.drink = null;
+    return true;
   }
   // ------------------------------------------------------------ le Kraken
   seaPoint(cx, cy, r) {

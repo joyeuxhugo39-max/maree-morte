@@ -43,7 +43,7 @@ export const MOBS = {
     loot: [['couronne_crabe', 0.3, 1, 1], ['collier_requin', 0.2, 1, 1], ['carte_dechiree', 0.5, 1, 1], ['rhum', 0.5, 1, 2]],
   },
   goule_alpha: {
-    name: 'Goule Alpha', level: 7, hp: 650, dmg: 18, speed: 60, aggro: 120, leash: 260, range: 22, atkCd: 0.85, windup: 0.3,
+    name: 'Goule Alpha', level: 7, hp: 650, dmg: 18, speed: 60, aggro: 120, leash: 260, range: 22, atkCd: 0.85, windup: 0.38, // lot 3 : 0,3 s était à la limite des réflexes
     xp: 270, gold: [75, 135], r: 13, respawn: 420, elite: 1, base: 'ghoul',
     loot: [['sabre_abordage', 0.12, 1, 1], ['bandana_noir', 0.3, 1, 1], ['carte_dechiree', 0.8, 1, 2], ['amulette_lanterne', 0.08, 1, 1]],
   },
@@ -160,13 +160,13 @@ mob('garde_maudit', { name: 'Garde maudit du Fort', level: 21, hp: 520, dmg: 34,
 mob('goule_ecarlate', { name: 'Goule écarlate', level: 23, hp: 640, dmg: 40, speed: 60, range: 16, atkCd: 0.85, windup: 0.25, xp: 330, gold: [24, 51], night: 1,
   loot: [['os_maudit', 0.4, 1, 2], ['collier_vaudou', 0.003, 1, 1]] });
 mob('reine_mangrove', { name: 'La Reine de la Mangrove', level: 22, hp: 3900, dmg: 38, speed: 38, aggro: 170, leash: 260, range: 150, atkCd: 1.7, windup: 0.55, xp: 2100, gold: [260, 420], r: 13, respawn: 600, elite: 1, big: 1, swims: 1,
-  ranged: { speed: 150, life: 1.4, kind: 'curse' }, keep: 90, title: 'Celle qui boit la marée',
+  ranged: { speed: 150, life: 1.4, kind: 'curse' }, keep: 90, title: 'Celle qui boit la marée', ai: 'mangrove', phases: [0.6, 0.3],
   loot: [['tenue_vaudou', 0.2, 1, 1], ['baton_vaudou', 0.15, 1, 1], ['antidote', 1, 2, 4]] });
 mob('capitaine_naufrageur', { name: 'Grand-Feu, capitaine des naufrageurs', level: 24, hp: 4400, dmg: 42, speed: 40, aggro: 160, leash: 260, range: 30, atkCd: 1.4, windup: 0.55, xp: 2500, gold: [300, 480], r: 13, respawn: 600, elite: 1, big: 1, groan: 1,
-  title: 'Celui qui allume les fausses lumières', weapon: ['bigsaber', 'steel'], burnHit: 0.25,
+  title: 'Celui qui allume les fausses lumières', weapon: ['bigsaber', 'steel'], burnHit: 0.25, ai: 'grandfeu', phases: [0.6, 0.3],
   loot: [['tenue_chasseur', 0.2, 1, 1], ['longue_vue', 0.5, 1, 1], ['lanterne_naufrageur', 1, 2, 3]] });
 mob('roi_sans_couronne', { name: 'Le Roi sans Couronne', level: 28, hp: 16000, dmg: 60, speed: 38, aggro: 180, leash: 260, range: 32, atkCd: 1.3, windup: 0.5, xp: 7000, gold: [800, 1300], r: 14, respawn: 900, elite: 1, big: 1,
-  ai: 'general', adds: 'garde_maudit', phases: [0.66, 0.33], title: 'Premier tyran de Libertalia', weapon: ['bigsaber', 'gold'],
+  ai: 'tyran', adds: 'garde_maudit', phases: [0.66, 0.33], title: 'Premier tyran de Libertalia', weapon: ['bigsaber', 'gold'],
   shouts: { sum: 'Ma garde ! Défendez votre roi !', line: 'À genoux devant votre roi !', charge: 'Libertalia est à MOI !', volley: 'Feu sur les traîtres !' },
   loot: [['sabre_midas', 0.08, 1, 1], ['habit_gouverneur', 0.2, 1, 1], ['couronne_brisee', 1, 1, 1]] });
 // navires ennemis : ils patrouillent, canonnent les bateaux, et coulent
@@ -188,5 +188,5 @@ mob('amiral_englouti', { name: 'L’Amiral Englouti', level: 24, hp: 6500, dmg: 
   ai: 'amiral', phases: [0.5, 0.25], title: 'Seigneur du Bastion', weapon: ['bigsaber', 'steel'], loot: [['harpon_abysses', 0.18, 1, 1], ['sabre_jumeaux', 0.12, 1, 1], ['uniforme_marine', 0.15, 1, 1], ['rhum_vieux', 1, 1, 3]] });
 // 1.0 : le roi noyé de la cité engloutie d'Ys
 mob('roi_ys', { name: 'Gradlon, roi d’Ys-la-Noyée', level: 27, hp: 7600, dmg: 44, speed: 34, aggro: 220, leash: 340, range: 30, atkCd: 1.4, windup: 0.55, xp: 4200, gold: [520, 800], r: 14, respawn: 900, elite: 1, big: 1, swims: 1, groan: 1,
-  ai: 'noye', phases: [0.5], title: 'Le roi qui dort sous la mer', weapon: ['bigsaber', 'gold'], loot: [['trident_orage', 0.18, 1, 1], ['harpon_abysses', 0.15, 1, 1], ['habit_gouverneur', 0.06, 1, 1], ['rhum_vieux', 1, 1, 3]] });
+  ai: 'gradlon', phases: [0.5], title: 'Le roi qui dort sous la mer', weapon: ['bigsaber', 'gold'], loot: [['trident_orage', 0.18, 1, 1], ['harpon_abysses', 0.15, 1, 1], ['habit_gouverneur', 0.06, 1, 1], ['rhum_vieux', 1, 1, 3]] });
 MOBS.galion_fantome.loot.push(['spectre_brumes', 0.03, 1, 1]); // 1.0 : un navire légendaire
