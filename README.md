@@ -25,6 +25,31 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Nouveautés de la version 1.3 : la qualité, mesurée
+
+- **Les 81 quêtes** sont jouées de bout en bout par un pirate de test, avec les vrais mécanismes du jeu.
+  - « Marchandise discrète » devient faisable en solo : les flibustiers des collines de la Rade portent des
+    coffrets à bijoux.
+  - « Les épreuves de la Fosse » se terminent dans la Fosse, en tenant cinq vagues.
+  - « Le roi qui dort sous la mer » a sa conversation.
+- **Quatre boss ont un vrai combat.**
+  - La Reine de la Mangrove boit la marée : frappez-la pour l'interrompre.
+  - Grand-Feu allume un anneau de fausses lumières qui n'a qu'une brèche.
+  - Le Roi sans Couronne lance ses décrets en croix et une spirale d'éclats.
+  - Les cloches de Gradlon vident l'air de vos poumons.
+- **Plus de combats bloqués.**
+  - Les Frères Ferrailleurs ne sont invincibles côte à côte que face à plusieurs pirates.
+  - Un boss entraîné hors de son repaire y retourne sans guérir.
+- **Équilibrage.**
+  - Une quête faite avec beaucoup d'avance rapporte moins d'expérience, et c'est affiché.
+  - Les tromblons sont ramenés à leur juste mesure.
+  - Le coup critique compte dans la normalisation des armes.
+- **Lisibilité.**
+  - Les zones dangereuses ont un contour net, visible de nuit et sous la pluie, qui clignote juste avant le coup.
+  - Un signal sonore prévient quand une zone vous vise.
+  - L'interface tient en 1024 × 768.
+  - L'ambiance suit le volume des effets.
+
 ## Nouveautés de la version 1.2 : partir en mer sans se perdre, et un atelier de test
 
 - **Partir depuis la barre seule.** À la barre, Z ou Espace : l'équipage lève l'ancre et hisse la voile. Espace

@@ -1,6 +1,6 @@
 # Lot 3 — Refonte qualité : quêtes, boss, équilibrage, lisibilité
 
-Branche de travail : `dossier-global`. Rien n'est encore publié.
+Publié en version 1.3.0 le 20 novembre 2026 : `main`, GitHub Pages et la page claude.ai.
 
 **Méthode.** Tout a été mesuré par des programmes qui jouent avec les vrais mécanismes du jeu, puis corrigé, puis
 re-mesuré. Il n'y a pas eu de test par un humain : le ressenti reste à confirmer en jouant. Chaque mesure est
