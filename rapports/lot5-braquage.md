@@ -1,6 +1,6 @@
 # Lot 5 — Le Plus Grand Braquage de Port-Lanterne
 
-Publié en version 1.5.0 le 20 novembre 2026 : `main`, GitHub Pages et la page claude.ai.
+Publié en version 1.5.0 le 20 novembre 2026 : `main`, GitHub Pages et la page claude.ai (version 18).
 
 Une quête exceptionnelle, du niveau 18 au niveau 21, seul ou jusqu'à cinq. On croit faire un cambriolage. On découvre
 qu'on a été manipulé. On rattrape celui qui nous a trahis, puis on décide de son sort.
