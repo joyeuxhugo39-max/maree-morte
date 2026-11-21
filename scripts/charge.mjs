@@ -2,6 +2,7 @@
 // N pirates simulés se promènent, frappent et roulent ; on mesure la durée du tour (budget : 50 ms) et le débit réseau.
 import { Game } from '../server/game.js';
 import { canStand } from '../shared/world.js';
+import { PROTOCOL } from '../shared/constants.js';
 const N = +process.argv[2] || 10, SECS = +process.argv[3] || 20;
 const game = new Game({ storage: { auth: async () => ({ ok: true, data: null }), save: () => {} }, log: () => {} });
 const W = game.world; const bots = []; let bytes = 0, msgs = 0;
@@ -9,7 +10,7 @@ const W = game.world; const bots = []; let bytes = 0, msgs = 0;
 const spots = [W.spawnPoint, { x: W.libertalia.x * 16, y: (W.libertalia.y + 3) * 16 }, { x: W.rade.x * 16, y: (W.rade.y + 4) * 16 }, { x: W.anse.x * 16, y: (W.anse.y + 3) * 16 }, { x: 100 * 16, y: 116 * 16 }, { x: 470 * 16, y: 360 * 16 }];
 for (let i = 0; i < N; i++) {
   const c = { send(m) { msgs++; bytes += JSON.stringify(m).length; }, close() {} };
-  game.addClient(c); game.onMessage(c, { t: 'login', v: 10, name: 'Bot' + i, pass: 'abcd' });
+  game.addClient(c); game.onMessage(c, { t: 'login', v: PROTOCOL, name: 'Bot' + i, pass: 'abcd' });
   bots.push({ c, i });
 }
 await new Promise((r) => setTimeout(r, 300));
@@ -27,5 +28,5 @@ for (let k = 0; k < ticks; k++) {
   const t0 = performance.now(); game.tick(); const ms = performance.now() - t0; total += ms; worst = Math.max(worst, ms);
 }
 const kbps = bytes / SECS / 1024 / N;
-console.log(`${String(N).padStart(2)} pirates : tour moyen ${(total / ticks).toFixed(2)} ms (budget 50 ms), pire ${worst.toFixed(1)} ms, réseau ${kbps.toFixed(1)} Ko/s par pirate, ${Math.round(msgs / SECS / N)} messages/s par pirate, mémoire ${Math.round(process.memoryUsage().heapUsed / 1048576)} Mo`);
+console.log(`${String(N).padStart(2)} pirates (${game.players.size} connectés) : tour moyen ${(total / ticks).toFixed(2)} ms (budget 50 ms), pire ${worst.toFixed(1)} ms, réseau ${kbps.toFixed(1)} Ko/s par pirate, ${Math.round(msgs / SECS / N)} messages/s par pirate, mémoire ${Math.round(process.memoryUsage().heapUsed / 1048576)} Mo`);
 process.exit(0);

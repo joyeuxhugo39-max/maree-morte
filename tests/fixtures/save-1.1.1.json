@@ -1,0 +1,235 @@
+{
+ "from": "1.1.1",
+ "expect": {
+  "v": "1.1.1",
+  "mem": [
+   "origine_naufrage",
+   "origine_fuite",
+   "origine_tresor"
+  ],
+  "level": 16,
+  "gold": 23456,
+  "xp": 1234,
+  "inv": [
+   [
+    "banane",
+    10
+   ],
+   [
+    "sabre_rouille",
+    1
+   ],
+   [
+    "sabre_rouille",
+    1
+   ],
+   [
+    "noix_coco",
+    1
+   ],
+   [
+    "poisson_grille",
+    1
+   ]
+  ],
+  "eq": {
+   "weapon": "coutelas",
+   "gun": null,
+   "hat": "bandana",
+   "body": "chemise",
+   "boots": null,
+   "trinket": null,
+   "outfit": null
+  },
+  "done": [
+   "premier_pas",
+   "pinces",
+   "matelots",
+   "tonnelet",
+   "os_lanterne",
+   "marais"
+  ],
+  "act": [
+   "canonniers",
+   "maree_morte"
+  ]
+ },
+ "data": {
+  "friends": [],
+  "blocked": [],
+  "tradeLog": [],
+  "rep": {},
+  "inf": 0,
+  "jail": 0,
+  "hon": 0,
+  "pvph": [],
+  "glory": 0,
+  "gxp": 0,
+  "ship": null,
+  "deck": null,
+  "songs": [
+   "day"
+  ],
+  "mem": [
+   "origine_naufrage",
+   "origine_fuite",
+   "origine_tresor"
+  ],
+  "hulls": {},
+  "fishRec": {},
+  "sv": 10,
+  "held": [],
+  "seen": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOAAAAAAAAAAAAAAAAAAAfAAAAAAAAAAAAAAAAAAAfAAAAAAAAAAAAAAAAAAAfAAAAAAAAAAAAAAAAAAAOAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "st": {
+   "time": 0,
+   "boss": 0,
+   "gin": 0,
+   "gout": 0,
+   "sea": 0,
+   "deaths": 0,
+   "quests": 0,
+   "since": 1795259469191
+  },
+  "kc": {
+   "crabe": 42
+  },
+  "met": [],
+  "col": [
+   "banane",
+   "sabre_rouille",
+   "coutelas",
+   "bandana",
+   "noix_coco",
+   "poisson_grille"
+  ],
+  "tut": 99,
+  "name": "Vieillemain",
+  "look": {
+   "skin": 0,
+   "hair": 1,
+   "hairStyle": "court",
+   "beard": 0,
+   "topCol": "red",
+   "pants": "brown",
+   "top": "chemise"
+  },
+  "level": 16,
+  "xp": 1234,
+  "gold": 23456,
+  "hp": 90,
+  "inv": [
+   {
+    "id": "banane",
+    "n": 10
+   },
+   {
+    "id": "sabre_rouille",
+    "n": 1
+   },
+   {
+    "id": "sabre_rouille",
+    "n": 1
+   },
+   null,
+   {
+    "id": "noix_coco",
+    "n": 1
+   },
+   {
+    "id": "poisson_grille",
+    "n": 1
+   },
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null
+  ],
+  "eq": {
+   "weapon": "coutelas",
+   "gun": null,
+   "hat": "bandana",
+   "body": "chemise",
+   "boots": null,
+   "trinket": null,
+   "outfit": null
+  },
+  "quests": {
+   "premier_pas": {
+    "s": "done",
+    "prog": []
+   },
+   "pinces": {
+    "s": "done",
+    "prog": []
+   },
+   "matelots": {
+    "s": "done",
+    "prog": []
+   },
+   "tonnelet": {
+    "s": "done",
+    "prog": []
+   },
+   "os_lanterne": {
+    "s": "done",
+    "prog": []
+   },
+   "marais": {
+    "s": "done",
+    "prog": []
+   },
+   "canonniers": {
+    "s": "active",
+    "prog": [
+     0
+    ]
+   },
+   "maree_morte": {
+    "s": "active",
+    "prog": [
+     0
+    ]
+   }
+  },
+  "track": [],
+  "chests": {},
+  "x": 2408,
+  "y": 1576,
+  "kills": 0,
+  "upg": {},
+  "treasure": null,
+  "ach": {},
+  "title": null,
+  "cnt": {
+   "crab": 0,
+   "fish": 0,
+   "ships": 0,
+   "horde": 0,
+   "dice": 0
+  },
+  "respawnAt": null,
+  "found": [],
+  "boat": null,
+  "pk": 0,
+  "caches": {},
+  "zs": [],
+  "pet": null,
+  "home": null,
+  "base": null,
+  "saved": 1795259469273
+ }
+}

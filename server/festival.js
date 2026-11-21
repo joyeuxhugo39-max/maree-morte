@@ -771,7 +771,7 @@ export const festival = {
       this.festBroadcast();
     }
     this.canonTick(); this.showTick(); this.duelTickFest(); this.rentalTick();
-    if (this.fs.ed.open) for (const p of this.players.values()) if (!p.dead && p.mem && !p.mem.has('vu:fete_accueil') && this.festSafe(p) && !this.inCinema(p) && !p.ship && this.tickCount - (p.festSeenAt || 0) > 40) { p.festSeenAt = this.tickCount; this.startCinema([p], 'fete_accueil'); } // la première fois sur la plage en fête
+    if (this.fs.ed.open) for (const p of this.players.values()) if (!p.dead && p.mem && !p.mem.has('vu:fete_accueil') && ((p.tut | 0) >= 99 || p.level >= 3) && this.festSafe(p) && !this.inCinema(p) && !p.ship && this.tickCount - (p.festSeenAt || 0) > 40) { p.festSeenAt = this.tickCount; this.startCinema([p], 'fete_accueil'); } // la première fois sur la plage en fête (lot 8 : pas avant la fin du tutoriel d'un pirate tout neuf)
     if (this.tickCount % 40 === 0) this.festCalm();
   },
 };

@@ -307,4 +307,11 @@ game.teleport(P14, F.gabier.start.x, F.gabier.start.y, {}); P14.room = F.rooms.g
 game.logout(P14); await wait(20); const P14b = await login('Hortense');
 ok(P14b.room === -1, 'reconnecté depuis une salle d’épreuve : on revient sur la plage');
 
+// ---------------- 15. lot 8 : un pirate tout neuf fait d'abord son tutoriel, la scène d'accueil vient après
+const N15 = await login('Isidore', 1); N15.tut = 0; N15.mem.delete('vu:fete_accueil'); N15.festSeenAt = 0;
+const bx = F.stage.cx, by = F.stage.cy + 40; game.teleport(N15, bx, by, {}); tick(60);
+ok(!game.inCinema(N15), 'pendant le tutoriel, pas de scène d’accueil du festival');
+N15.tut = 99; N15.festSeenAt = 0; tick(60);
+ok(game.inCinema(N15) && N15.cine && N15.cine.id === 'fete_accueil', 'le tutoriel fini, Mira l’accueille');
+
 console.log(fails ? `${fails} ÉCHEC(S)` : 'TOUT EST OK'); process.exit(fails ? 1 : 0);

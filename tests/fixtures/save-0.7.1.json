@@ -1,0 +1,181 @@
+{
+ "from": "0.7.1",
+ "expect": {
+  "v": "0.7.1",
+  "mem": [],
+  "level": 16,
+  "gold": 23456,
+  "xp": 1234,
+  "inv": [
+   [
+    "banane",
+    10
+   ],
+   [
+    "sabre_rouille",
+    1
+   ],
+   [
+    "sabre_rouille",
+    1
+   ],
+   [
+    "noix_coco",
+    1
+   ],
+   [
+    "poisson_grille",
+    1
+   ]
+  ],
+  "eq": {
+   "weapon": "coutelas",
+   "gun": null,
+   "hat": "bandana",
+   "body": "chemise",
+   "boots": null,
+   "trinket": null,
+   "outfit": null
+  },
+  "done": [
+   "premier_pas",
+   "pinces",
+   "matelots",
+   "tonnelet",
+   "os_lanterne",
+   "marais"
+  ],
+  "act": [
+   "canonniers",
+   "maree_morte"
+  ]
+ },
+ "data": {
+  "name": "Vieillemain",
+  "look": {
+   "skin": 0,
+   "hair": 1,
+   "hairStyle": "court",
+   "beard": 0,
+   "topCol": "red",
+   "pants": "brown",
+   "top": "chemise"
+  },
+  "level": 16,
+  "xp": 1234,
+  "gold": 23456,
+  "hp": 90,
+  "inv": [
+   {
+    "id": "banane",
+    "n": 10
+   },
+   {
+    "id": "sabre_rouille",
+    "n": 1
+   },
+   {
+    "id": "sabre_rouille",
+    "n": 1
+   },
+   null,
+   {
+    "id": "noix_coco",
+    "n": 1
+   },
+   {
+    "id": "poisson_grille",
+    "n": 1
+   },
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null
+  ],
+  "eq": {
+   "weapon": "coutelas",
+   "gun": null,
+   "hat": "bandana",
+   "body": "chemise",
+   "boots": null,
+   "trinket": null,
+   "outfit": null
+  },
+  "quests": {
+   "premier_pas": {
+    "s": "done",
+    "prog": []
+   },
+   "pinces": {
+    "s": "done",
+    "prog": []
+   },
+   "matelots": {
+    "s": "done",
+    "prog": []
+   },
+   "tonnelet": {
+    "s": "done",
+    "prog": []
+   },
+   "os_lanterne": {
+    "s": "done",
+    "prog": []
+   },
+   "marais": {
+    "s": "done",
+    "prog": []
+   },
+   "canonniers": {
+    "s": "active",
+    "prog": [
+     0
+    ]
+   },
+   "maree_morte": {
+    "s": "active",
+    "prog": [
+     0
+    ]
+   }
+  },
+  "chests": {},
+  "x": 2408,
+  "y": 1576,
+  "kills": 0,
+  "upg": {},
+  "treasure": null,
+  "ach": {},
+  "title": null,
+  "cnt": {
+   "crab": 0,
+   "fish": 0,
+   "ships": 0,
+   "horde": 0
+  },
+  "respawnAt": null,
+  "found": [],
+  "boat": null,
+  "pk": 0,
+  "caches": {},
+  "zs": [],
+  "pet": null,
+  "home": null,
+  "base": null,
+  "saved": 1795259466382
+ }
+}

@@ -25,6 +25,20 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Version 1.6.1 : la livraison validée
+
+Le dernier lot du dossier global : tout le projet est revérifié et livré.
+
+- Les tests : 32 suites, le vrai serveur Node avec deux navigateurs, le changement d'hôte, la navigation, quatre
+  tailles d'écran, la performance, le braquage et le festival en entier.
+- La migration de vraies sauvegardes des versions 0.7.1, 0.8.1, 1.1.1 et 1.5.0, sans aucune perte, et le retour en
+  arrière.
+- Deux corrections :
+  - un pirate tout neuf fait d'abord son tutoriel, avant la scène d'accueil du festival ;
+  - le test de charge mesure de nouveau un vrai serveur.
+- Procédure de déploiement et de retour en arrière, tests détaillés, état de la musique et des assets, problèmes
+  restants : `rapports/lot8-validation.md`.
+
 ## Nouveautés de la version 1.6 : la Nuit des Mille Voiles
 
 Chaque semaine, du jeudi midi au lundi midi (UTC), Port-Lanterne fait la fête sur la plage des Os Blanchis :
