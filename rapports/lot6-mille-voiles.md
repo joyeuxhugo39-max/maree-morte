@@ -1,6 +1,6 @@
 # Lot 6 — La Nuit des Mille Voiles
 
-Publié en version 1.6.0 le 21 novembre 2026 : `main`, GitHub Pages et la page claude.ai.
+Publié en version 1.6.0 le 21 novembre 2026 : `main`, GitHub Pages et la page claude.ai (version 19).
 
 Chaque semaine, Port-Lanterne fait la fête. Du jeudi midi au lundi midi (midi UTC), la plage
 des Os Blanchis se couvre de fanions et de lampions. Une scène s'y dresse, avec ses musiciens, ainsi que des stands et
