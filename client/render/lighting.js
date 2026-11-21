@@ -76,6 +76,7 @@ export const lighting = {
       for (const l of this.lights) {
         if (l.x < camX - 160 || l.x > camX + W + 160 || l.y < camY - 160 || l.y > camY + H + 160) continue;
         if (l.win && (dark < 0.25 || room)) continue;
+        if (l.fest && !G.festOn) continue; // lot 6
         const fl = l.flicker ? 1 + Math.sin(now * 9 + l.x) * 0.04 + Math.sin(now * 23 + l.y) * 0.03 : 1;
         const c = LIGHT_COL[l.c] || LIGHT_COL.warm;
         add(l.x, l.y, l.r * (l.soft ? 1.15 : 1.55) * fl, c, l.win ? 0.62 : l.soft ? 0.5 : 1);

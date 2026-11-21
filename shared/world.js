@@ -3,11 +3,12 @@
 import { TILE, MAP_W as W, MAP_H as H, OVER_H, T } from './constants.js';
 import { mulberry32, hash2, valueNoise, fbm, shuffle } from './rng.js';
 import { buildHeist } from './heist-world.js'; // lot 5 : le monde du Plus Grand Braquage
+import { buildFest } from './festival-world.js'; // lot 6 : la Nuit des Mille Voiles
 
 export const Z = { SEA: 0, TOWN: 1, BEACH: 2, PLAINS: 3, JUNGLE: 4, RUINS: 5, SWAMP: 6, WRECK: 7, HAVRE: 8, CRANE: 9, ILOT: 10, INTERIOR: 11, CAVE: 12, GOUFFRE: 13,
   RADE: 14, COLLINES: 15, PENDUS: 16, SIRENES: 17, ANSE: 18, OSSEMENTS: 19, QUARANTAINE: 20, VOLCAN: 21, DAMNES: 22, BRUMES: 23, ERMITE: 24,
-  LIBERTALIA: 25, BASFONDS: 26, HAUTS: 27, CANNAIES: 28, BAIE: 29, MANGROVE: 30, ECARLATE: 31, HEIST: 32, SEPT: 33 };
-export const SAFE = new Set([1, 8, 11, 14, 18, 25, 33]); // lot 5 : l'île aux Sept Courants est un comptoir
+  LIBERTALIA: 25, BASFONDS: 26, HAUTS: 27, CANNAIES: 28, BAIE: 29, MANGROVE: 30, ECARLATE: 31, HEIST: 32, SEPT: 33, FETE: 34, LICE: 35 };
+export const SAFE = new Set([1, 8, 11, 14, 18, 25, 33, 34]); // lot 5 : l'île aux Sept Courants est un comptoir ; lot 6 : le parcours du gabier
 export const ZONES = [
   { name: 'Haute mer', lvl: 'Eaux profondes' },
   { name: 'Port-Lanterne', lvl: 'Zone sûre', safe: true },
@@ -44,6 +45,8 @@ export const ZONES = [
   { name: 'Jungle Écarlate', lvl: 'Niveaux 22-26' },
   { name: 'Le Plus Grand Braquage', lvl: 'Niveaux 18-21' }, // lot 5 : l'entrepôt, la demeure, les toits, La Mouche d'Or
   { name: 'Île aux Sept Courants', lvl: 'Zone sûre', safe: true }, // lot 5 : hors des cartes
+  { name: 'Le Parcours du gabier', lvl: 'Nuit des Mille Voiles', safe: true }, // lot 6 : le festival
+  { name: 'La Lice des Capitaines', lvl: 'Duels amicaux : personne n’y meurt' }, // lot 6 : on s'y bat, mais on n'y meurt pas
 ];
 
 // Propriétés partagées des décors. solid = bloque le déplacement (sur sa tuile de base).
@@ -69,6 +72,8 @@ export const PROPS = {
   // 0.8 : Libertalia
   cite: { solid: 1 }, propriete: { solid: 1 }, rempart: { solid: 1 }, tour: { solid: 1 }, porte_cite: {}, fontaine: { solid: 1 }, statue: { solid: 1 }, linge: {}, drapeau: { solid: 1 }, canne: {}, jtree_r: { solid: 1 }, paletuvier: { solid: 1 },
   divan: { solid: 1 }, rideau: { solid: 1 }, table_jeu: { solid: 1 }, stalle: { solid: 1 }, trone: { solid: 1 }, banniere: { solid: 1 }, gradin: { solid: 1 }, lanterne_r: { solid: 1 },
+  // lot 6 : la Nuit des Mille Voiles (rien ne bloque : la fête finie, la plage redevient la plage)
+  estrade: { ground: 1 }, stand_fete: {}, tente_lice: {}, arche_fete: {}, mat_fete: {}, lampion: {}, canon_fete: {}, bouee: {}, mat_epave: {},
 };
 
 const idx = (x, y) => y * W + x;
@@ -1761,8 +1766,9 @@ export function generateWorld(seed = 7) {
   }
   // lot 5 : Le Plus Grand Braquage — pièces, façades, personnages et décors ajoutés en tout dernier
   const heist = buildHeist({ W, tiles, zones, solid, occ, idx, inMap, alloc, rooms, doors, props, addProp, npcs, roomGrid, sail, waterDist, stampPath })();
+  const fest = buildFest({ W, H, OVER_H, tiles, zones, solid, occ, idx, inMap, alloc, rooms, doors, props, addProp, npcs, roomGrid })(); // lot 6 : après le braquage (aucun identifiant ne bouge)
   const OUT = {
-    heist,
+    heist, fest,
     block: new Uint8Array(N), // constructions des joueurs : 1 bloque tout, 2 bloque les morts
     islandOf, islands, // 1.0 : chaque case de terre connaît son île
     doorOwner: new Map(), rooms, doors, sail, roomGrid, havre: HC, havreDock, OVER_H,

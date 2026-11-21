@@ -4,6 +4,7 @@
 // tant qu'ils n'existent pas, avec ce qui les remplace en attendant.
 import { CINEMAS, THEMES, SILAS_PITCH, SILAS_AGAIN } from '../shared/data/cinemas.js';
 import { TRAHISON, CONCLUSION, FIN_LINES } from '../shared/data/braquage.js';
+import { MIRA } from '../shared/data/festival.js';
 import { NPCS } from '../shared/data/npcs.js';
 import { SFX_NAMES } from './audio.js';
 import { STYLES } from './music.js';
@@ -14,7 +15,7 @@ export const VERBS = new Set(['bars', 'fade', 'title', 'sub', 'say', 'grade', 'v
 export const GESTURES = new Set(['wave', 'dance', 'flip', 'reach', 'atk', 'coin']);
 export const EMOS = new Set(['!', '?', '…', '♪', 'rire', 'colere', 'coeur', 'sueur']);
 export const MINIS = new Set(['plan', 'uniforme', 'cle', 'piece']); // les accessoires dessinés par Renderer.drawMini
-const LINES = { pitch: SILAS_PITCH, again: SILAS_AGAIN, trahison: TRAHISON, conclusion: CONCLUSION, choix: [['me', '…']], ...FIN_LINES }; // lot 5
+const LINES = { pitch: SILAS_PITCH, again: SILAS_AGAIN, trahison: TRAHISON, conclusion: CONCLUSION, choix: [['me', '…']], ...FIN_LINES, mira_welcome: MIRA.welcome }; // lot 5 ; lot 6
 const ENDS = new Set(['trahison', 'fin']); // les choix de fin de conversation (client/heist.js)
 
 function checkLook(look, where, out) {

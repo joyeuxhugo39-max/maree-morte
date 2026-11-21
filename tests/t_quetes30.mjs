@@ -16,7 +16,7 @@ let fails = 0; const ok = (v, m) => { console.log((v ? 'OK  ' : 'FAIL') + ' ' + 
 const store = new Map();
 const game = new Game({ storage: { auth: async (k) => ({ ok: true, data: store.get(k) || null }), save: (k, d) => store.set(k, JSON.parse(JSON.stringify(d))) }, log: () => {} });
 const W = game.world, wait = (ms) => new Promise((r) => setTimeout(r, ms));
-const login = async (name) => { const c = { msgs: [], send(m) { this.msgs.push(m); if (this.msgs.length > 400) this.msgs.splice(0, 200); }, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 14, name, pass: 'abcd' }); await wait(80); const p = game.sessions.get(c).player; p.c = c; return p; };
+const login = async (name) => { const c = { msgs: [], send(m) { this.msgs.push(m); if (this.msgs.length > 400) this.msgs.splice(0, 200); }, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 15, name, pass: 'abcd' }); await wait(80); const p = game.sessions.get(c).player; p.c = c; return p; };
 const toasts = (p, n0) => p.c.msgs.slice(n0).filter((m) => m.t === 'toast').map((m) => m.msg);
 
 // ------------------------------------------------------------ outils de déplacement

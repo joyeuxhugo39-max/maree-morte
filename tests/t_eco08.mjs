@@ -13,7 +13,7 @@ const mkGame = (opts = {}) => {
   const game = new Game({ storage, log: () => {} });
   return { game, store };
 };
-const join = async (game, name) => { const c = { msgs: [], send(m) { this.msgs.push(m); }, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 14, name, pass: 'abcd' }); await new Promise((r) => setTimeout(r, 30)); const p = game.sessions.get(c).player; p.c = c; return p; };
+const join = async (game, name) => { const c = { msgs: [], send(m) { this.msgs.push(m); }, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 15, name, pass: 'abcd' }); await new Promise((r) => setTimeout(r, 30)); const p = game.sessions.get(c).player; p.c = c; return p; };
 const put = (game, p, x, y) => { p.x = x; p.y = y; p.zone = zoneAt(game.world, x, y); p.room = roomIdAt(game.world, x, y); };
 // ---------- 1. données : plus de matériaux, tout ce qui se fabriquait s'achète
 ok(!Object.values(ITEMS).some((it) => it.mat || it.tool === 'axe' || it.tool === 'pick'), 'plus aucun matériau ni outil de récolte');

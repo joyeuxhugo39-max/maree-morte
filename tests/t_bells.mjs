@@ -2,7 +2,7 @@ import { Game } from '../server/game.js';
 import { zoneAt, roomIdAt } from '../shared/world.js';
 let fails = 0; const ok = (v, m) => { console.log((v ? 'OK  ' : 'FAIL') + ' ' + m); if (!v) fails++; };
 const game = new Game({ storage: { auth: async () => ({ ok: true, data: null }), save() {} }, log: () => {} });
-const W = game.world; const c = { msgs: [], send(m) { this.msgs.push(m); }, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 14, name: 'Sonneur', pass: 'abcd' }); await new Promise((r) => setTimeout(r, 60));
+const W = game.world; const c = { msgs: [], send(m) { this.msgs.push(m); }, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 15, name: 'Sonneur', pass: 'abcd' }); await new Promise((r) => setTimeout(r, 60));
 const A = game.sessions.get(c).player; const put = (x, y) => { A.x = x; A.y = y; A.zone = zoneAt(W, x, y); A.room = roomIdAt(W, x, y); };
 ok(W.bells.length === 3, 'trois cloches marines');
 const g0 = A.gold;

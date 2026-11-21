@@ -18,6 +18,7 @@ import { hash2 } from '../../shared/rng.js';
 import { extend06, petSheets, drawTentacle } from './sprites-06.js';
 import { extend07 } from './sprites-07.js';
 import { extend08, citeSprite, proprieteSprite, extendProps08 } from './sprites-cite.js';
+import { extendFete } from './sprites-fete.js'; // lot 6 : les décors de la Nuit des Mille Voiles
 import { volcanoGen, makePuffs, makeSplats } from './sprites-volcan.js';
 import './sprites-08.js';
 import { raceCourse } from '../../shared/data/seasons.js';
@@ -99,7 +100,7 @@ export class Renderer {
     this.water = makeWaterLayers();
     this.env = buildEnvSprites();
     this.structSpr = buildStructSprites(this.env);
-    extend06(this.env, this.structSpr); extend07(this.env); extend08(this.env); extendProps08(this.structSpr); this.pets = petSheets(); this.tentacle = drawTentacle;
+    extend06(this.env, this.structSpr); extend07(this.env); extend08(this.env); extendFete(this.env); extendProps08(this.structSpr); this.pets = petSheets(); this.tentacle = drawTentacle;
     // le volcan se peint en tâche de fond, un peu à chaque image (ou d'un coup si l'on arrive devant)
     this.volcJob = world.volcano ? volcanoGen(world.volcano) : null; this.volc = null; this.volcanAlpha = 1;
     this.puffs = world.volcano ? makePuffs() : null; this.plume = [];
@@ -150,6 +151,7 @@ export class Renderer {
       p.spr = s;
       p.ground = !!(PROPS[p.type] && PROPS[p.type].ground);
       if (!s) continue;
+      const nl0 = this.lights.length; // lot 6 : les lumières d'un décor du festival ne brillent que pendant une édition
       const ox = p.x - s.ax, oy = p.y - s.ay;
       if (s.light) { // 1.0 : les réverbères des villes éclairent plus large ; on y tend des guirlandes
         const town = p.y < OVER_H * TILE && SAFE.has(zoneAt(this.world, p.x, p.y));
@@ -163,6 +165,7 @@ export class Renderer {
       if (s.lights) for (const [lx, ly] of s.lights) this.lights.push({ x: ox + lx, y: oy + ly, r: 40, c: 'warm', flicker: 1 });
       if (p.type === 'forge') this.lights.push({ x: ox + s.w - 28, y: oy + s.h - 8, r: 60, c: 'warm', flicker: 1 });
       if (p.type === 'lighthouse') { this.lighthouse = { x: ox + s.light[0], y: oy + s.light[1] }; }
+      if (p.fest) for (let k = nl0; k < this.lights.length; k++) this.lights[k].fest = 1;
     }
     this.buildGarlands();
   }
@@ -264,7 +267,7 @@ export class Renderer {
     if (this.drunk > 0) { const a = Math.sin(now * 1.7) * 0.025 * this.drunk; ctx.translate(W / 2, H / 2); ctx.rotate(a); ctx.translate(-W / 2, -H / 2); }
 
     if (room) {
-      ctx.fillStyle = room.kind === 'toits' ? '#0c1426' : room.kind === 'pont' ? '#0b2236' : '#07050b'; ctx.fillRect(-20, -20, W + 40, H + 40); // lot 5 : au-dessus des toits, le ciel
+      ctx.fillStyle = room.kind === 'toits' ? '#0c1426' : room.kind === 'pont' || room.kind === 'gabier' ? '#0b2236' : '#07050b'; ctx.fillRect(-20, -20, W + 40, H + 40); // lot 5 : au-dessus des toits, le ciel
       ctx.save(); ctx.beginPath(); ctx.rect(rx0 - camX, ry0 - camY, rx1 - rx0, ry1 - ry0); ctx.clip();
     } else this.drawWater(ctx, camX, camY, now, dark);
     // sol
@@ -291,18 +294,19 @@ export class Renderer {
     }
     // décors au sol
     const depl = (p) => G.depleted && (G.depleted.get(p.id) || 0) > now;
-    for (const p of props) if (p.ground && !depl(p)) ctx.drawImage(p.spr.cv, Math.round(p.x - p.spr.ax - camX), Math.round(p.y - p.spr.ay - camY));
+    for (const p of props) if (p.ground && !depl(p) && !(p.fest && !G.festOn)) ctx.drawImage(p.spr.cv, Math.round(p.x - p.spr.ax - camX), Math.round(p.y - p.spr.ay - camY));
     this.drawGroundMarks(ctx, G, camX, camY, now);
     this.drawSeaFx(ctx, G, camX, camY, now);
     if (!room) this.drawShipsBase(ctx, G, camX, camY, now, dt); // 1.1 : les navires (coque, pont)
     // objets tombés au sol
     for (const e of G.ents.values()) if (e.k === 'd') this.drawDrop(ctx, e, camX, camY, now, G);
+    if (!room && G.fest) G.fest.drawGround(ctx, camX, camY, now); // lot 6 : le coffre déterré, à ras du sol
     // télégraphes : le remplissage au sol (les contours se dessinent plus haut, par-dessus la lumière)
     this.drawTeles(ctx, camX, camY, now, false);
 
     // tri en profondeur
     const draw = [];
-    for (const p of props) if (!p.ground && !(p.heistBar != null && !(G.heist && G.heist.bars[p.heistBar]))) draw.push({ y: p.y, p }); // lot 5 : une barricade ne se voit que dressée
+    for (const p of props) if (!p.ground && !(p.heistBar != null && !(G.heist && G.heist.bars[p.heistBar])) && !(p.fest && !G.festOn)) draw.push({ y: p.y, p }); // lot 5 : une barricade ne se voit que dressée ; lot 6 : le festival, pendant une édition
     if (G.structs) for (const st of G.structs.values()) { const x = st.tx * TILE + 8; if (x > camX - 40 && x < camX + W + 40 && st.ty * TILE > camY - 40 && st.ty * TILE < camY + H + 40) draw.push({ y: st.ty * TILE + 15, st }); }
     for (const e of G.ents.values()) if (e.k !== 'd' && e.x > camX - 60 && e.x < camX + W + 60 && e.y > camY - 30 && e.y < camY + H + 60) draw.push({ y: e.y, e });
     for (const n of G.npcs) if (!n.hidden && n.x > camX - 40 && n.x < camX + W + 40 && n.y > camY - 30 && n.y < camY + H + 40) draw.push({ y: n.y, n });
@@ -369,6 +373,7 @@ export class Renderer {
     if (!room) this.drawDiveSpots(ctx, G, camX, camY, now); // 1.0 : les bulles des sites de plongée
     if (!room && G.race) this.drawRace(ctx, G, camX, camY, now); // 1.0 : les portes du Grand Tour
     if (!room) this.drawGarlands(ctx, camX, camY, now, dark, false);
+    if (G.fest) G.fest.drawWorld(ctx, camX, camY, now, dark, room); // lot 6 : fanions, cibles, obstacles, bouées
     if (!room) {
       this.updateCritters(G, camX, camY, now, dt, dark);
       this.drawCritters(ctx, camX, camY, now, dark, false);
@@ -382,6 +387,7 @@ export class Renderer {
     else { this.weather = { rain: 0, storm: 0, kind: 0 }; this.rain.length = 0; }
     this.drawTeles(ctx, camX, camY, now, true, dark); // lot 3 : la nuit, une lueur discrète garde les zones lisibles
     if (G.heist) G.heist.drawCones(ctx, camX, camY, now, dark); // lot 5 : la lanterne des gardes, là où porte leur regard
+    if (G.fest) G.fest.drawGlow(ctx, camX, camY, now, dark, room); // lot 6 : les feux d'artifice, par-dessus la nuit
     this.drawLabels(ctx, G, draw, camX, camY, now);
     this.drawTexts(ctx, camX, camY, dt);
     if (room) ctx.restore();

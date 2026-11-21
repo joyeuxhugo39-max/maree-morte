@@ -242,7 +242,7 @@ export class Cinema {
     const steps = typeof L === 'function' ? L(G, c) : L || [];
     const end = s.end && CINE_ENDS[s.end] ? CINE_ENDS[s.end](G, c, this) : null;
     if (end && end.timeout) setTimeout(() => { if (this.cur === c && G.scene.on && G.scene.choices) { const b = document.getElementById('sc-choices').children[end.def || 0]; if (b) b.click(); } }, end.timeout * 1000);
-    G.scene.play(s.npc, steps, end ? end.list : null, { actor, alone: !actor, onLine: (who, x) => { if (who !== 'npc' || !actor || !this.cur) return; if (x.g) this.gesture(actor, x.g, x); if (x.e) G.renderer.addFx({ kind: 'emo', e: x.e, follow: () => actor, dur: 1.4, h: 36 }); } })
+    G.scene.play(s.npc, steps, end ? end.list : null, { actor, alone: !actor && !G.npcs.some((n) => n.id === s.npc && G.player && Math.hypot(n.x - G.player.x, n.y - G.player.y) < 360), onLine: (who, x) => { if (who !== 'npc' || !actor || !this.cur) return; if (x.g) this.gesture(actor, x.g, x); if (x.e) G.renderer.addFx({ kind: 'emo', e: x.e, follow: () => actor, dur: 1.4, h: 36 }); } })
       .then(() => { if (this.cur === c) { c.paused = false; c.last = nowS(); } });
   }
   sub(who, text) {

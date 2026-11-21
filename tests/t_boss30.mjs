@@ -26,7 +26,7 @@ function bestGear(level) {
   }
   return out;
 }
-const BOSSES = Object.entries(MOBS).filter(([id, m]) => (m.boss || m.elite || m.title) && !m.sea && !m.ship && id !== 'frere_rouille' && !m.heist).map(([id]) => id); // lot 5 : Silas en fuite ne se combat pas
+const BOSSES = Object.entries(MOBS).filter(([id, m]) => (m.boss || m.elite || m.title) && !m.sea && !m.ship && id !== 'frere_rouille' && !m.heist && !m.fest).map(([id]) => id); // lot 6 : les champions de la Lice se testent dans t_festival60 // lot 5 : Silas en fuite ne se combat pas
 
 async function fight(id, dodge, n = 1) {
   const store = new Map();
@@ -34,7 +34,7 @@ async function fight(id, dodge, n = 1) {
   const W = game.world, def = MOBS[id];
   const P = [];
   for (let i = 0; i < n; i++) {
-    const c = { send() {}, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 14, name: 'Duelliste' + (i + 1), pass: 'abcd' }); await wait(60);
+    const c = { send() {}, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 15, name: 'Duelliste' + (i + 1), pass: 'abcd' }); await wait(60);
     const p = game.sessions.get(c).player;
     p.level = Math.min(30, def.level); p.tut = 99; const gear = bestGear(p.level); for (const s of Object.keys(gear)) p.eq[s] = gear[s]; game.recalc(p); p.hp = p.stats.maxHp; p.en = p.stats.maxEn;
     P.push({ p, budget: 0, rollAt: 0, sideAt: 0, taken: 0 });

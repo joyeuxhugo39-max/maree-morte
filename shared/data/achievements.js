@@ -59,4 +59,19 @@ export const ACHIEVEMENTS = {
   // lot 5 : Le Plus Grand Braquage — deux des trois fins donnent un titre (la troisième, de l'équipement et l'estime des marchands)
   casse_siecle: { name: 'Le Casse du Siècle', desc: 'Le Plus Grand Braquage : tout garder, la carte et les noms.', title: 'Le Casse du Siècle' },
   complice_virevent: { name: 'Complice de Virevent', desc: 'Le Plus Grand Braquage : faire équipe avec Silas, malgré tout.', title: 'Complice de Virevent' },
+  // lot 6 : La Nuit des Mille Voiles
+  fete_carnet: { name: 'Le carnet complet', desc: 'La Nuit des Mille Voiles : les six tampons dans une même édition.', title: 'Héros du festival' },
+  fete_course: { name: 'Mille Voiles', desc: 'Gagner la Course des Mille Voiles devant tout le monde, rivaux compris.', title: 'Héros des Mille Voiles' },
+  fete_canonnier: { name: 'Canonnier d’or', desc: 'Trente points en une manche du concours de canonniers.', title: 'Canonnier d’or' },
+  fete_taverne: { name: 'Roi de la taverne', desc: 'Dix-huit points au défi des tavernes de Barnabé.', title: 'Roi de la taverne' },
+  fete_gabier: { name: 'Gabier volant', desc: 'Le parcours du gabier en 45 secondes ou moins.', title: 'Gabier volant' },
+  fete_maitre: { name: 'Maître d’armes du festival', desc: 'Vaincre les trois champions de la Lice des Capitaines.', title: 'Maître d’armes' },
+  fete_heros: { name: 'Champion de la semaine', desc: 'Premier du classement de la course, une semaine de festival.', title: 'Champion des Mille Voiles' },
+  fete_podium: { name: 'Sur le podium', desc: 'Premier du classement d’une épreuve, une semaine de festival.' },
+  fete_mouette_or: { name: 'La Mouette d’or', desc: 'Secret du festival : toucher la cible dorée du concours de canonniers.' },
+  fete_bouteille: { name: 'La bouteille du phare', desc: 'Secret du festival : un mot de la grand-mère Bellécume.' },
+  fete_passe: { name: 'La Passe des Brisants', desc: 'Secret du festival : la lanterne cachée entre les récifs, pendant la course.' },
+  fete_valse: { name: 'La Valse sous les étoiles', desc: 'Secret du festival : danser sur la scène pendant le bouquet final.', title: 'Valseur des étoiles' },
+  fete_fetard: { name: 'Fêtard de Port-Lanterne', desc: 'Acheté au comptoir de Zéphyrine.', title: 'Fêtard de Port-Lanterne' },
+  fete_ame: { name: 'Âme de la fête', desc: 'Acheté au comptoir de Zéphyrine.', title: 'Âme de la fête' },
 };

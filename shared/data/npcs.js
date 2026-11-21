@@ -395,3 +395,39 @@ for (const [id, lines] of Object.entries(REMEMBER)) if (NPCS[id]) NPCS[id].remem
 NPCS.silas.remember = [['m:br_route', 'Associé ! Une caisse ou deux pour Madame Corail ? Les courants sont calmes, ce soir.'], ...(NPCS.silas.remember || [])];
 NPCS.fouine.remember = [['m:br_denonce', 'Toi. Tu as vendu des noms à Valdorne. On n’oublie pas ça, sur les quais. Mes crochets restent à vendre… pour les autres.'], ...(NPCS.fouine.remember || [])];
 if (NPCS.vif_quai) NPCS.vif_quai.remember = [['m:br_denonce', 'Il paraît que tu travailles pour Valdorne, maintenant. Dommage. Je t’aimais bien.'], ...(NPCS.vif_quai.remember || [])];
+// lot 6 : La Nuit des Mille Voiles. `fest` : présent seulement pendant une édition (Mira et Zéphyrine restent toute l'année)
+Object.assign(NPCS, {
+  mira: { name: 'Mira Bellécume', title: 'Organisatrice de la Nuit des Mille Voiles',
+    look: { skin: 1, hair: 5, hairStyle: 'long', top: 'capitaine', topCol: 'purple', pants: 'white', boots: 'brown', hat: 'plume', hatCol: 'orange' },
+    greet: ['La fête, c’est sérieux. Très sérieux. Presque autant que le rhum.', 'Ma grand-mère disait : on ne bat pas la Marée Morte avec des canons, on la bat avec des chansons.', 'Vous avez votre carnet ? Montrez-moi vos tampons !'],
+    topics: [
+      { q: 'Qu’est-ce que la Nuit des Mille Voiles ?', a: 'Le jour où Port-Lanterne a survécu à sa première Marée Morte, tous les navires du port ont hissé leurs voiles, même les barques, même les draps. Mille voiles. Depuis, chaque semaine, on recommence.' },
+      { q: 'Comment gagne-t-on des jetons ?', a: 'Aux six épreuves ! La première réussite de la semaine vaut un tampon et beaucoup de jetons ; après, on en gagne un peu chaque fois, jusqu’à une certaine heure… que je ne vous dirai pas. Et chaque nuit, le spectacle en donne aussi.' },
+      { q: 'Et votre grand-mère ?', a: 'Elle a caché un coffre quelque part dans le port, avec des énigmes partout. Je ne l’ai jamais ouvert moi-même : je préfère regarder les autres chercher.' },
+    ] },
+  zephyrine: { name: 'Zéphyrine Pompon', title: 'Comptoir des jetons du festival',
+    look: { skin: 0, hair: 2, hairStyle: 'queue', top: 'gilet', topCol: 'yellow', pants: 'brown', boots: 'brown', hat: 'foulard', hatCol: 'purple' },
+    greet: ['Des voiles, des pavillons, des tenues ! Tout se paie en jetons du festival.', 'Les jetons, je les garde d’une semaine à l’autre. Comme les secrets.'],
+    topics: [{ q: 'Que vendez-vous ?', a: 'Des parures : rien qui frappe plus fort, tout ce qui brille plus fort. Les voiles et les pavillons vont sur vos navires, les tenues sur vous, les émotes… sur vous aussi, en dansant.' }] },
+  anselin: { name: 'Anselin', title: 'Maître de la Course des Mille Voiles', fest: 1,
+    look: { skin: 2, hair: 3, hairStyle: 'court', beard: 2, top: 'vareuse', topCol: 'navy', pants: 'white', boots: 'black', hat: 'capitaine', hatCol: 'navy' },
+    greet: ['Pas de navire ? Je vous prête un cotre. Le vent, lui, est gratuit.', 'Huit bouées, une ligne, et toute la mer entre les deux.'],
+    topics: [{ q: 'Comment se court la course ?', a: 'On s’inscrit, et le départ est donné trente secondes plus tard, pour tous ceux qui sont inscrits. Franchissez la ligne au sud de la jetée, passez les bouées dans l’ordre, revenez par la ligne. Les courants vous aident ou vous freinent ; lisez la mer. Votre propre navire ? Il court en temps compensé : plus il est rapide, plus son temps est majoré.' }] },
+  gaston: { name: 'Gaston Mèche', title: 'Chef canonnier du festival', fest: 1,
+    look: { skin: 1, hair: 4, hairStyle: 'chauve', beard: 1, top: 'chemise', topCol: 'red', pants: 'brown', boots: 'black', hat: 'bonnet', hatCol: 'red' },
+    greet: ['Trois canons, trois couloirs. Visez devant ce qui bouge.', 'Les mouettes de bois valent trois points. Les vraies, rien : on ne tire pas sur les vraies.'],
+    topics: [{ q: 'Comment joue-t-on ?', a: 'Approchez-vous d’un canon et appuyez sur E. Pendant quarante-cinq secondes, visez à la souris et cliquez : le boulet met un instant à tomber, alors visez là où la cible SERA. Huit points, et vous avez votre tampon.' }] },
+  pimprenelle: { name: 'Pimprenelle', title: 'Gabière, gardienne du parcours', fest: 1,
+    look: { skin: 0, hair: 1, hairStyle: 'queue', top: 'rayee', topCol: 'navy', pants: 'white', boots: 'brown', hat: 'bandana', hatCol: 'teal' },
+    greet: ['Sautez, grimpez, glissez. Et ne vous arrêtez pas devant les tonneaux : ils, eux, ne s’arrêtent pas.', 'Mon record ? Quarante et une secondes. Mais j’ai triché : je connais le parcours.'],
+    topics: [{ q: 'Comment se fait le parcours ?', a: 'Entrez par mon stand, prenez le départ au panneau : le chrono part à la ligne. Sautez le bras d’eau, filez sur le long quai entre les tonneaux qui roulent, balancez-vous à la corde, grimpez au mât, glissez le long de l’étai, passez sous la bôme, traversez la planche, et sonnez la cloche. Touché ? Retour au dernier point de reprise, pas plus.' }] },
+  barnabe: { name: 'Barnabé Tire-Bouchon', title: 'Maître du défi des tavernes', fest: 1,
+    look: { skin: 2, hair: 2, hairStyle: 'hirsute', beard: 2, top: 'tablier', topCol: 'white', pants: 'brown', boots: 'brown', hat: 'bonnet', hatCol: 'green' },
+    greet: ['Trois jeux, une soirée ! Les dés, les chopes, le bouchon.', 'Approchez ! Ici, on perd tout, sauf sa bonne humeur.'],
+    topics: [{ q: 'Quels sont les trois jeux ?', a: 'Les dés : trois dés, deux relances, et vous battez les miens. Les chopes : elles s’allument une à une, répétez la suite. Le bouchon : quand je crie « Tirez ! », vous tirez. Pas avant !' }] },
+  escarmouche: { name: 'Maître d’armes Escarmouche', title: 'Gardien de la Lice des Capitaines', fest: 1,
+    look: { skin: 1, hair: 4, hairStyle: 'court', beard: 1, top: 'armure', topCol: 'black', pants: 'black', boots: 'black', hat: 'morion', hatCol: 'black' },
+    greet: ['Dans la Lice, personne ne meurt. L’orgueil, parfois.', 'Un champion, ou un ami : choisissez votre adversaire.'],
+    topics: [{ q: 'Les règles de la Lice ?', a: 'Le premier touché pour de bon perd : il reste debout, il garde tout. Trois champions vous attendent, l’un après l’autre ; ou défiez un pirate présent dans la Lice. Personne ne peut vous frapper ici, sauf votre adversaire.' }] },
+});
+

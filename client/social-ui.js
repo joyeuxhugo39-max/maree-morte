@@ -168,6 +168,7 @@ export const social = {
     const el = document.createElement('div'); el.className = 'ask'; el.dataset.k = key;
     if (m.kind === 'pari') return this.askBet(m);
     const txt = m.kind === 'duel' ? `<b>${esc(m.from)}</b> vous défie en duel dans la Fosse${m.bet ? ` — mise : <b>${m.bet} doublons</b> chacun` : ''}.<small>On ne meurt pas dans la Fosse ; le vainqueur emporte les mises (moins 5 %).</small>`
+      : m.kind === 'fduel' ? `<b>${esc(m.from)}</b> vous défie dans la Lice des Capitaines.<small>Un duel amical : le premier touché perd, personne ne meurt, rien ne se perd.</small>`
       : m.kind === 'groupe' ? `<b>${esc(m.from)}</b> vous invite dans son groupe.<small>Expérience partagée et +10 % par compagnon proche.</small>`
       : m.kind === 'equipage' ? `<b>${esc(m.from)}</b> vous invite à rejoindre l’équipage <b>« ${esc(m.crew)} »</b> [${esc(m.tag)}].`
         : `<b>${esc(m.from)}</b> vous propose un échange.<small>Rien ne change de mains avant votre double confirmation.</small>`;
@@ -178,6 +179,7 @@ export const social = {
       if (m.kind === 'groupe') G.send({ t: 'soc', a: yes ? 'accept' : 'decline', name: m.from });
       else if (m.kind === 'equipage') { if (yes) G.send({ t: 'crew', a: 'accept' }); }
       else if (m.kind === 'duel') G.send({ t: 'arena', a: yes ? 'accept' : 'decline' });
+      else if (m.kind === 'fduel') G.send({ t: 'fest', a: 'duel', c: yes ? 'accepter' : 'refuser' }); // lot 6
       else G.send({ t: 'trade', a: yes ? 'accept' : 'decline' });
     };
     el.querySelector('.ok').onclick = () => done(true);

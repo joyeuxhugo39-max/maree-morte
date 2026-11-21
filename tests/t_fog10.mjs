@@ -5,7 +5,7 @@ let fails = 0; const ok = (v, m) => { console.log((v ? 'OK  ' : 'FAIL') + ' ' + 
 const store = new Map();
 const game = new Game({ storage: { auth: async (k) => ({ ok: true, data: store.get(k) || null }), save: (k, d) => store.set(k, JSON.parse(JSON.stringify(d))) }, log: () => {} });
 const W = game.world; const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-const login = async (name) => { const c = { msgs: [], send(m) { this.msgs.push(m); }, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 14, name, pass: 'abcd' }); await wait(80); const p = game.sessions.get(c).player; p.c = c; return p; };
+const login = async (name) => { const c = { msgs: [], send(m) { this.msgs.push(m); }, close() {} }; game.addClient(c); game.onMessage(c, { t: 'login', v: 15, name, pass: 'abcd' }); await wait(80); const p = game.sessions.get(c).player; p.c = c; return p; };
 const cellsOf = (p) => { let n = 0; for (const b of p.seen) for (let k = 0; k < 8; k++) if (b & (1 << k)) n++; return n; };
 const seenIsland = (p, isl) => { for (let y = isl.y0; y <= isl.y1; y++) for (let x = isl.x0; x <= isl.x1; x++) if (W.islandOf[y * W.W + x] === isl.id) { const c = Math.floor(y / 8) * game.seenW + Math.floor(x / 8); if (p.seen[c >> 3] & (1 << (c & 7))) return true; } return false; };
 const lib = W.islands[W.islandOf[(W.libertalia.y + 3) * W.W + W.libertalia.x] - 1];

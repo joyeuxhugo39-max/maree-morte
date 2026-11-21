@@ -205,3 +205,9 @@ mob('silas_fuyard', { name: 'Silas Virevent', level: 20, hp: 1, dmg: 0, speed: 0
 mob('silas_boss', { name: 'Silas Virevent', level: 20, hp: 8400, dmg: 34, speed: 54, aggro: 240, leash: 2000, range: 26, atkCd: 1.05, windup: 0.38, xp: 3600, gold: [260, 420], r: 9, respawn: 99999,
   elite: 1, ai: 'silas', phases: [0.65, 0.25], title: 'Le filou de La Mouche d’Or', weapon: ['saber', 'silver'], regroupLine: 'On ne quitte pas mon pont comme ça !',
   loot: [['pistolets_virevent', 0.3, 1, 1], ['rhum_vieux', 0.6, 1, 2]] });
+// lot 6 : les champions de la Lice des Capitaines (la Nuit des Mille Voiles). Leurs PV et leurs coups sont recalculés à la
+// mesure du challenger (server/festival.js) ; ils ne visent que lui ; vaincus, ils s'inclinent (ni butin, ni mort).
+mob('champion_bosco', { name: 'Bosco le Rieur', level: 10, hp: 400, dmg: 20, speed: 50, range: 22, atkCd: 1.25, windup: 0.45, xp: 0, gold: [0, 0], aggro: 400, leash: 600, respawn: 99999, title: 'Champion de la Lice', weapon: ['saber', 'rust'], loot: [], fest: 1 });
+mob('champion_escarmouche', { name: 'Dame Escarmouche', level: 15, hp: 500, dmg: 24, speed: 58, range: 24, atkCd: 1.0, windup: 0.36, xp: 0, gold: [0, 0], aggro: 400, leash: 600, respawn: 99999, title: 'Championne de la Lice', weapon: ['saber', 'silver'], loot: [], fest: 1 });
+mob('champion_fanfaron', { name: 'Le Capitaine Fanfaron', level: 20, hp: 600, dmg: 28, speed: 52, range: 26, atkCd: 0.95, windup: 0.34, xp: 0, gold: [0, 0], aggro: 400, leash: 600, respawn: 99999, title: 'Champion de la Lice', weapon: ['saber', 'gold'], loot: [], fest: 1 });
+

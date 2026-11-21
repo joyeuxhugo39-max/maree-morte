@@ -37,6 +37,7 @@ import { sea } from './sea.js';
 import { seasons } from './seasons.js';
 import { cinema } from './cinema.js'; // lot 4 : qui voit quelle cinématique, et la protection des spectateurs
 import { heist, DISGUISE } from './heist.js'; // lot 5 : Le Plus Grand Braquage
+import { festival } from './festival.js'; // lot 6 : la Nuit des Mille Voiles
 import { MEM_KEYS } from '../shared/data/scenes.js';
 import { repLevel, buyPrice, sellPrice } from '../shared/data/places.js';
 import { LEGACY_VALUE, LEGACY_STRUCT, QUEST_ITEM_OLD_VALUE } from '../shared/data/legacy.js';
@@ -182,6 +183,7 @@ export class Game {
     this.refunds = new Map(); // 0.8 : ce que valaient les bases et les matériaux, en attendant que leur pirate revienne
     if (this.worldPersist && storage.loadWorld) Promise.resolve(storage.loadWorld()).then((w) => this.importWorld(w)).catch((e) => this.log('[monde] chargement impossible', e && e.message));
     this.heistInit(); // lot 5 : les gardes du braquage, après tous les autres monstres
+    this.festInit(); // lot 6 : le festival (son calendrier, son classement)
   }
 
   // ------------------------------------------------------------ connexions
@@ -194,6 +196,7 @@ export class Game {
   logout(p, quiet = false) {
     if (!this.players.has(p.id)) return;
     this.socialLogout(p);
+    if (p.fest) this.festLogout(p); // lot 6 : manche, course, duel s'arrêtent proprement
     this.save(p);
     this.shipLogout(p);
     this.players.delete(p.id);
@@ -258,6 +261,7 @@ export class Game {
       case 'tav': return this.tavernAction(p, String(m.a), m);
       case 'cinema': return this.cinemaMsg(p, m); // lot 4
       case 'heist': return this.heistMsg(p, m); // lot 5
+      case 'fest': return this.festMsg(p, m); // lot 6
       case 'mem': { const k = String(m.k); if (MEM_KEYS.has(k) && p.mem.size < 200) p.mem.add(k); if (k === 'silas_oui' || k === 'silas_avance') this.heistAccept(p, k === 'silas_avance'); return; }
       case 'song': { const k = String(m.k), s = HOUSE_MUSIC.find(([x]) => x && x === k); if (!s || p.songs.has(k)) return; p.songs.add(k); p.dirtyMe = true; const n = HOUSE_MUSIC.length - 1; if (p.songs.size >= n) this.unlock(p, 'melomane'); return this.toast(p, `♪ Nouvel air noté dans votre carnet : « ${s[1]} » (${p.songs.size}/${n}). La boîte à musique de votre maison saura le jouer.`, 'quest'); }
       case 'ladder': return this.send(p, { t: 'ladder', top: this.ladderTop(), hist: p.pvpHist, me: [p.honor | 0, Math.floor(p.infamy || 0)] });
@@ -273,6 +277,7 @@ export class Game {
         const k = String(m.k);
         if (!['danse', 'salut', 'doigt', 'salto'].includes(k) || p.dead || (p.cds.emote || 0) > this.time) return;
         p.cds.emote = this.time + 1.2;
+        if (k === 'danse') this.festDance(p); // lot 6 : danser sur la scène pendant le bouquet final
         return this.ev(p.x, p.y, ['emote', p.id, k]);
       }
       case 'place': return this.place(p, m.slot | 0, m.tx | 0, m.ty | 0);
@@ -350,6 +355,7 @@ export class Game {
       lab: lab ? lab.labSlot : 0,
     });
     this.send(p, this.heistState(p)); // lot 5 : barricades, comptable absent, archives fermées
+    this.festLogin(p); // lot 6 : le carnet du festival, l'édition en cours
     if (!lab) this.broadcastChat(null, `${p.name} accoste à Port-Lanterne.`, 'sys');
     this.socialLogin(p);
     this.justiceLogin(p);
@@ -476,6 +482,7 @@ export class Game {
     this.shipLoad(p, d);
     this.seasonsLoad(p, d);
     p.heist = this.heistLoad(d && d.heist); // lot 5 : où l'on en est du braquage
+    p.fest = this.festLoad(d && d.fest); p.fx = null; // lot 6 : jetons, carnet, parures (champ facultatif)
     p.mem = new Set(d && Array.isArray(d.mem) ? d.mem.filter((k) => MEM_KEYS.has(k)) : []); // 1.0 : les choix qui comptent
     p.songs = new Set(['day', ...(d && Array.isArray(d.songs) ? d.songs.filter((k) => HOUSE_MUSIC.some(([x]) => x && x === k)) : [])]);
     if (d) {
@@ -544,7 +551,7 @@ export class Game {
     this.applyRefund(p);
   }
   serialize(p) {
-    return { ...(p.heldF || {}), ...this.socialSave(p), ...this.justiceSave(p), ...this.shipSave(p), songs: [...(p.songs || [])], mem: [...(p.mem || [])], heist: this.heistSave(p), hulls: p.hulls, fishRec: p.fishRec, sv: SAVE_VERSION, held: p.held || [], seen: p.seen ? b64(p.seen) : undefined, st: p.st, kc: p.kc, met: p.met ? [...p.met] : [], col: p.col ? [...p.col] : [], tut: p.tut, name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: { ...(p.heldQ || {}), ...p.quests }, track: p.track || [], chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: { ...(p.heldA || {}), ...p.ach }, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
+    return { ...(p.heldF || {}), ...this.socialSave(p), ...this.justiceSave(p), ...this.shipSave(p), songs: [...(p.songs || [])], mem: [...(p.mem || [])], heist: this.heistSave(p), fest: this.festSave(p), hulls: p.hulls, fishRec: p.fishRec, sv: SAVE_VERSION, held: p.held || [], seen: p.seen ? b64(p.seen) : undefined, st: p.st, kc: p.kc, met: p.met ? [...p.met] : [], col: p.col ? [...p.col] : [], tut: p.tut, name: p.name, look: p.base, level: p.level, xp: p.xp, gold: p.gold, hp: Math.round(p.hp), inv: p.inv, eq: p.eq, quests: { ...(p.heldQ || {}), ...p.quests }, track: p.track || [], chests: p.chests, x: Math.round(p.x), y: Math.round(p.y), kills: p.kills, upg: p.upg, treasure: p.treasure, ach: { ...(p.heldA || {}), ...p.ach }, title: p.title, cnt: p.cnt, respawnAt: p.respawnAt, found: [...p.found], boat: null, pk: p.pk, caches: p.caches, zs: [...p.zs], pet: p.pet, home: this.worldPersist ? undefined : this.exportHome(p.key), base: this.worldPersist ? undefined : this.exportBase(p.key), saved: Date.now() };
   }
   save(p) {
     p.lastSave = this.time;
@@ -562,6 +569,7 @@ export class Game {
     p.stats = computeStats(p.level, p.eq, p.upg, !!p.riding, this.activeBuffs(p), p.glory);
     const L = displayLook(p.base, p.eq);
     if (p.heist && p.heist.disguise) Object.assign(L, DISGUISE); // lot 5 : en uniforme de la garde de Valdorne
+    else { const fl = this.festLook && p.fest && this.festLook(p); if (fl) Object.assign(L, fl); } // lot 6 : une tenue du festival (parure, sans force)
     if (JSON.stringify(L) !== JSON.stringify(p.look)) { p.look = L; p.lookVer++; }
     if (p.hp > p.stats.maxHp) p.hp = p.stats.maxHp;
     p.dirtyMe = true;
@@ -765,7 +773,7 @@ export class Game {
     if (m.def.elite && this.players.size) this.broadcastChat(null, `☠ ${m.def.name} rôde à nouveau : ${m.room >= 0 ? this.world.rooms[m.room].name : ZONES[zoneAt(this.world, m.x, m.y)].name}.`, 'night');
   }
   // un mort ne poursuit pas un pirate en zone sûre, dans une autre pièce, ou en mer (sauf s'il tire)
-  mobCanTarget(m, p) { return !p.dead && !SAFE.has(p.zone) && !this.inCinema(p) && p.room === m.room && (!p.boat || !!m.def.ranged) && !(this.time < (p.smokeUntil || 0) && !m.def.ai); }
+  mobCanTarget(m, p) { return (!m.only || m.only === p.id) && !p.dead && !(this.festSafe && this.festSafe(p)) && !SAFE.has(p.zone) && !this.inCinema(p) && p.room === m.room && (!p.boat || !!m.def.ranged) && !(this.time < (p.smokeUntil || 0) && !m.def.ai); }
   nearestTarget(m, range) {
     let best = null, bd = range;
     for (const p of this.players.values()) {
@@ -893,7 +901,7 @@ export class Game {
   }
   resolveMobAttack(m, t, night) {
     const def = m.def;
-    const dmg = def.dmg * (night ? (isFullMoon(this.worldTime) ? 1.3 : 1.15) : 1) * rand(0.9, 1.1);
+    const dmg = def.dmg * (m.dmgMul || 1) * (night ? (isFullMoon(this.worldTime) ? 1.3 : 1.15) : 1) * rand(0.9, 1.1); // lot 6 : dmgMul (un champion de la Lice)
     if (def.ranged) {
       const sp = def.ranged.speed;
       this.spawnProj(m.x, m.y - 9, m.atkA, sp, sp * def.ranged.life, dmg, 'm', m.id, def.ranged.kind || 'ball', 0, false, false, def.ranged.splash ? { msplash: def.ranged.splash } : null);
@@ -1592,6 +1600,7 @@ export class Game {
     if (def.elite && !m.event && !def.sea && !m.dev) this.broadcastChat(null, `⚔ ${killer.name} a terrassé ${def.name} !`, 'boss');
     if (m.type === 'roi_squelette') for (const pid of m.tags.keys()) { const q = this.players.get(pid); if (q) this.unlock(q, 'roi_os'); }
     if (m.heistCrab || m.type === 'silas_boss') this.heistKill(m, killer); // lot 5
+    if (m.fest && this.festKill(m, killer)) return; // lot 6 : un champion de la Lice s'incline (pas de butin)
     if (m.summoned && !m.event && !m.bossEvent && !m.horde && !m.dev) return;
     if (m.dev && !(killer && killer.lab)) return; // lot 2 : un monstre du laboratoire ne rapporte rien aux vrais pirates
     let top = killer, topD = 0;
@@ -1735,7 +1744,7 @@ export class Game {
     }
   }
   // JcJ : partout, sauf dans les zones sûres (villes, intérieurs)
-  canPvp(a, b) { return !!a && !!b && a !== b && !a.dead && !b.dead && !!a.lab === !!b.lab && !SAFE.has(a.zone) && !SAFE.has(b.zone) && a.room === b.room && this.pvpAllowed(a, b); }
+  canPvp(a, b) { const fp = a && b && a !== b ? this.festPvp(a, b) : null; if (fp !== null) return fp && !!a.lab === !!b.lab; return !!a && !!b && a !== b && !a.dead && !b.dead && !!a.lab === !!b.lab && !SAFE.has(a.zone) && !SAFE.has(b.zone) && a.room === b.room && this.pvpAllowed(a, b); }
   // lot 2 : le personnage laboratoire ne touche jamais aux vrais pirates (échanges, groupes, duels, butin, classements)
   labWall(p, q) { if (!(p && p.lab) && !(q && q.lab)) return false; this.toast(p, 'Personnage laboratoire : il reste à l’écart des vrais pirates (échanges, groupes, duels, butin, propriétés).', 'warn'); return true; }
   damagePlayer(p, raw, src, crit = false, dot = 0) {
@@ -1748,6 +1757,7 @@ export class Game {
     if (src && src.key && src !== p && !!src.lab !== !!p.lab) return; // lot 2 : jamais de coups entre labo et vrais pirates
     if (src && src.key && src !== p) { p.lastPvp = this.time; src.lastPvp = this.time; this.onPvpHit(p, src); }
     this.ev(p.x, p.y, dot ? ['dmg', p.id, dmg, 0, src ? src.id : 0, dot] : ['dmg', p.id, dmg, crit ? 1 : 0, src ? src.id : 0]);
+    if (p.hp <= 0 && this.festKnock(p)) return; // lot 6 : dans la Lice, on est mis à terre
     if (p.hp <= 0) this.killPlayer(p, src);
   }
   killPlayer(p, src) {
@@ -2304,6 +2314,7 @@ export class Game {
       return this.toast(p, `Serrure renforcée posée (niveau ${h.lock}/2).`, 'quest');
     }
     if (it.use.conch) return this.blowConch(p, i);
+    if (it.use.fusee) return this.festRocket(p); // lot 6 : une fusée de fête
     if (it.use.travel) {
       const dest = this.world.docks && this.world.docks[it.use.travel];
       if (!dest || this.jailBlocks(p)) return;
@@ -3245,6 +3256,8 @@ export class Game {
     if (this.tickCount % 1200 === 0) this.seasonRoll(); // une fois par minute : la saison a-t-elle changé ?
     if (this.tickCount % 5 === 0) { this.arenaTick(); this.dungeonTick(); this.cinemaTick(); }
     if (this.tickCount % 10 === 0) this.heistTick();
+    if (this.tickCount % 10 === 0) this.festTick(); // lot 6
+    if (this.tickCount % 2 === 0) { this.gabTick(); this.raceTick(); } // lot 6 : le chrono du gabier, les bouées de la course
     this.shipsTick();
     if (this.tickCount % 40 === 0 && this.players.size > 1) { // les autres pirates sur la carte
       const pl = [...this.players.values()].map((q) => [q.id, q.name, Math.round(q.x), Math.round(q.y), q.room, q.dead ? 1 : 0, this.isWanted(q) ? 1 : 0]);
@@ -3334,3 +3347,4 @@ Object.assign(Game.prototype, sea); // 1.0 : les fonds marins
 Object.assign(Game.prototype, seasons); // 1.0 : saisons, concours de pêche, Grand Tour
 Object.assign(Game.prototype, cinema); // lot 4 : les cinématiques
 Object.assign(Game.prototype, heist); // lot 5 : le braquage
+Object.assign(Game.prototype, festival); // lot 6 : la Nuit des Mille Voiles

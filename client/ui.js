@@ -758,6 +758,7 @@ export class UI {
     }
     if (npcId === 'silas') this.silasChoices(ch); // lot 4
     if (this.G.heist) this.G.heist.dialog(npcId, ch, this); // lot 5 : le braquage (architecte, comptable, Ferrant, Corail…)
+    if (this.G.fest) this.G.fest.dialog(npcId, ch, this); // lot 6 : la Nuit des Mille Voiles
     if (N.shop) ch.push({ label: '🛒 Voir la marchandise', go: () => this.openShop(npcId) });
     if (N.dice) ch.push({ label: '🎲 Jouer aux dés', cls: 'q', go: () => this.diceMenu(npcId) });
     const np = (this.G.npcs || []).find((q) => q.id === npcId), npr = np ? roomIdAt(this.G.world, np.x, np.y) : -1;
@@ -778,6 +779,21 @@ export class UI {
     for (const t of N.topics || []) ch.push({ label: t.q, go: () => this.say(t.a, [{ label: 'Autre chose…', go: () => this.dialogMain(npcId) }, { label: 'Au revoir.', go: () => this.close() }]) });
     ch.push({ label: 'Au revoir.', go: () => this.close() });
     this.say(greet, ch);
+  }
+
+  // lot 6 : une boîte de dialogue sans PNJ (un objet du décor qui « parle » : un cadenas, une inscription)
+  openThing(name, title, glyph) {
+    this.close();
+    this.dialogNpc = null;
+    $('dialog').classList.remove('hidden');
+    $('dlg-name').textContent = name; $('dlg-title').textContent = title || '';
+    const pc = $('dlg-portrait'), x = pc.getContext('2d');
+    x.clearRect(0, 0, pc.width, pc.height); x.imageSmoothingEnabled = false;
+    if (glyph === 'cadenas') { // un petit cadenas de laiton
+      x.fillStyle = '#6b4a22'; x.fillRect(6, 2, 8, 2); x.fillRect(5, 3, 2, 6); x.fillRect(13, 3, 2, 6);
+      x.fillStyle = '#c9962f'; x.fillRect(3, 8, 14, 10); x.fillStyle = '#f2c14a'; x.fillRect(4, 9, 12, 3);
+      x.fillStyle = '#3a2410'; x.fillRect(9, 12, 2, 4); x.fillRect(8, 12, 4, 2);
+    }
   }
 
   // ------------------------------------------------------------ 1.1 : armer un navire à quai

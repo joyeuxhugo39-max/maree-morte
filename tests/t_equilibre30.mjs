@@ -54,7 +54,7 @@ ok(!loop, `aucun achat-revente gagnant${loop ? ' — ' + loop : ''}`);
 // ---------- butin des boss : chacun donne quelque chose, et un objet très rare ne l'est pas au point d'être introuvable
 const dry = [], tooRare = [];
 for (const [id, m] of Object.entries(MOBS)) {
-  if (!(m.boss || m.elite || m.title) || m.sea || m.heist === 'fuyard') continue; // lot 5 : Silas en fuite ne se combat pas
+  if (!(m.boss || m.elite || m.title) || m.sea || m.heist === 'fuyard' || m.fest) continue; // lot 5 : Silas en fuite ne se combat pas ; lot 6 : les champions de la Lice (des duels de fête, sans butin)
   if (!(m.loot || []).length && !(m.gold && m.gold[1] > 0)) dry.push(id);
   for (const [item, ch] of m.loot || []) if (ITEMS[item] && !ITEMS[item].quest && ch < 0.02) tooRare.push(`${id}:${item} ${ch}`);
 }

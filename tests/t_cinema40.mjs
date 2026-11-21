@@ -36,9 +36,9 @@ const verbsUsed = new Set(Object.values(CINEMAS).flatMap((c) => c.steps.map((s) 
 const engine = fs.readFileSync('../client/cinema.js', 'utf8');
 ok([...VERBS].every((v) => engine.includes(`case '${v}':`)), `le moteur sait jouer chacun des ${VERBS.size} verbes (${verbsUsed.size} servent déjà)`);
 
-// ---------- 2. les neuf identités musicales : générées par le code, jamais de fichier prétendu
+// ---------- 2. les identités musicales : générées par le code, jamais de fichier prétendu (neuf au lot 5, quatre de plus au lot 6 : le festival)
 const nine = Object.keys(THEMES);
-ok(nine.length === 9 && nine.every((k) => STYLES[k]), `neuf identités, chacune un style du compositeur : ${nine.join(', ')}`);
+ok(nine.length === 13 && nine.every((k) => STYLES[k]) && ['fete', 'epreuves', 'mille_voiles', 'fete_nuit'].every((k) => nine.includes(k)), `treize identités, chacune un style du compositeur : ${nine.join(', ')}`);
 ok(nine.every((k) => THEMES[k].file === null), 'aucun fichier audio n’est déclaré (il n’en existe pas)');
 let bad = 0, sig = 0; const modes = {};
 for (const k of nine) for (let s = 1; s <= 6; s++) {

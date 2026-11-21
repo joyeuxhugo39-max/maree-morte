@@ -496,6 +496,19 @@ export function installDev(game, { env = process.env, panelFile = path.join(DIR,
         fail('Usage : evenement invasion [lieu] | eruption | horde | fin');
       } },
     // ---- cinématiques
+    // lot 6 : la Nuit des Mille Voiles — ouvrir ou fermer une édition (pour tout le serveur), lancer le spectacle, des jetons de test
+    { n: 'fete', al: ['festival', 'mille'], cat: 'Festival', u: 'fete <etat | ouvrir | fermer | auto | spectacle | jetons <n> | course>', h: 'La Nuit des Mille Voiles : forcer l’ouverture ou la fermeture (pour tout le serveur, jusqu’à « auto »), lancer le spectacle tout de suite, donner des jetons au personnage laboratoire, ou ouvrir une course.', free: (a) => ['etat', ''].includes(norm(a[0] || '')),
+      run: (p, a) => {
+        const k = norm(a[0] || 'etat'), E = game.fs.ed;
+        if (k === 'etat') return `Édition ${E.key} (${E.variant + 1}/3) — ${E.open ? 'ouverte' : 'fermée'}${game.fs.force ? ` (forcée : ${game.fs.force})` : ''}. ${game.fs.races.size} course(s), ${game.fs.rounds.size} canon(s) occupé(s)${game.fs.show ? ', spectacle en cours' : ''}. Jetons de ${p.name} : ${p.fest.tok}.`;
+        if (k === 'ouvrir' || k === 'open') { game.fs.force = 'open'; game.festTick(); return 'La Nuit des Mille Voiles est ouverte (forcée, pour tout le serveur).'; }
+        if (k === 'fermer' || k === 'close') { game.fs.force = 'closed'; game.festTick(); return 'La Nuit des Mille Voiles est fermée (forcée, pour tout le serveur).'; }
+        if (k === 'auto') { game.fs.force = null; game.festTick(); return 'Le festival suit de nouveau son calendrier (jeudi midi → lundi midi).'; }
+        if (k === 'spectacle' || k === 'show') { if (!game.festOpen()) fail('Le festival est fermé : « fete ouvrir » d’abord.'); game.fs.show = null; game.showStart(Math.floor(game.worldTime / 960) + 1000, true); return 'Le spectacle commence.'; }
+        if (k === 'jetons') { const n = int(a[1], NaN); if (!(n >= 0 && n <= 5000)) fail('Entre 0 et 5000.'); p.fest.tok = n; p.dirtyMe = true; game.festPush(p); return `${p.name} a ${n} jetons du festival.`; }
+        if (k === 'course') { if (!game.festOpen()) fail('Le festival est fermé.'); game.raceJoin(p); return 'Inscrit à la prochaine course (si vous êtes près d’Anselin ou sur votre navire, sur la ligne).'; }
+        fail('Usage : fete <etat | ouvrir | fermer | auto | spectacle | jetons <n> | course>');
+      } },
     { n: 'cine', al: ['cinematic', 'cinematique', 'scene'], cat: 'Cinématiques', u: 'cine <id | liste [texte] | passer | oublier <scène | tout>>', h: 'Lance (ou relance) une scène de quête ou une cinématique de boss ; « passer » coupe celle en cours. Sur le personnage laboratoire seulement : une scène à choix s’en souvient.', free: (a) => ['liste', 'list', 'passer', 'skip', ''].includes(norm(a[0])),
       run: (p, a) => {
         const k = norm(a[0] || 'liste');

@@ -665,6 +665,9 @@ export const MOB_LOOKS = {
   // lot 5 : les vivants du braquage
   douanier: { skin: 1, hair: 2, hairStyle: 'court', top: 'vareuse', topCol: 'navy', pants: 'navy', boots: 'black', hat: 'tricorne', hatCol: 'navy', seed: 21 },
   garde_valdorne: { skin: 0, hair: 1, hairStyle: 'court', beard: 1, top: 'manteau', topCol: 'navy', pants: 'white', boots: 'black', hat: 'morion', seed: 22 },
+  champion_bosco: { skin: 2, hair: 2, hairStyle: 'hirsute', beard: 2, top: 'rayee', topCol: 'red', pants: 'brown', boots: 'brown', hat: 'bandana', hatCol: 'yellow', seed: 41 }, // lot 6 : les champions de la Lice
+  champion_escarmouche: { skin: 0, hair: 1, hairStyle: 'long', top: 'capitaine', topCol: 'teal', pants: 'black', boots: 'black', hat: 'plume', hatCol: 'teal', seed: 42 },
+  champion_fanfaron: { skin: 1, hair: 4, hairStyle: 'court', beard: 1, top: 'capitaine', topCol: 'yellow', pants: 'white', boots: 'black', hat: 'capitaine', hatCol: 'red', seed: 43 },
   vengeur_liste: { skin: 1, hair: 1, hairStyle: 'queue', beard: 2, top: 'manteau', topCol: 'black', pants: 'brown', boots: 'black', hat: 'tricorne', hatCol: 'black', seed: 31 }, // lot 5 : un capitaine vendu par la liste
   homme_de_main: { skin: 2, hair: 3, hairStyle: 'hirsute', beard: 1, top: 'rayee', topCol: 'red', pants: 'navy', boots: 'brown', hat: 'bandana', hatCol: 'black', seed: 23 },
   crabe_egout: { crab: [0x161c16, 0x283424, 0x40503a, 0x627452, 0x8e9e72] },

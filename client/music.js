@@ -48,6 +48,39 @@ SIG.silasWar = { meter: 16, root: 62, chords: [[38, 'm'], [43, 'M'], [38, 'm'], 
   mel: mel([[74, 2], [77, 2], [76, 2], [74, 6], [69, 4], [71, 2], [74, 2], [79, 6], [77, 2], [76, 4], [77, 2], [76, 2], [74, 2], [73, 2], [74, 8],
     [72, 6], [76, 2], [79, 6], [76, 2], [74, 2], [77, 2], [82, 6], [81, 2], [79, 4], [81, 6], [76, 2], [73, 6], [69, 2], [74, 2], [77, 2], [81, 2], [79, 2], [77, 4], [76, 4], [74, 12], [0, 4]]) };
 
+// lot 6 : la Nuit des Mille Voiles — quatre thèmes écrits à la main, chacun en deux parties (S, puis T), entre lesquelles
+// le compositeur glisse des sections nouvelles à chaque fois : on reconnaît l'air, on ne l'entend jamais deux fois pareil.
+//  - « Port-Lanterne en fête » : une gigue en ré majeur, violon et accordéon, guitare et percussions ;
+//  - « Les épreuves » : un reel rapide en la mixolydien, pour la compétition ;
+//  - « Mille Voiles » : l'hymne de la course, large et cuivré, en ré majeur, une mélodie qu'on fredonne en sortant ;
+//  - « La fête ne finit jamais » : une valse douce en fa majeur, pour le spectacle et les nuits sur la plage.
+SIG.fete = { meter: 6, root: 62, mode: 'major', chords: [[38, 'M'], [43, 'M'], [38, 'M'], [45, 'M'], [38, 'M'], [43, 'M'], [45, 'M'], [38, 'M']],
+  mel: mel([[69, 1], [74, 1], [78, 1], [81, 2], [78, 1], [79, 1], [78, 1], [76, 1], [74, 2], [71, 1], [69, 1], [74, 1], [78, 1], [81, 1], [83, 1], [81, 1], [79, 2], [76, 1], [76, 3],
+    [78, 1], [79, 1], [81, 1], [83, 2], [81, 1], [79, 1], [78, 1], [76, 1], [78, 2], [74, 1], [76, 1], [78, 1], [79, 1], [81, 1], [79, 1], [76, 1], [74, 3], [74, 2], [0, 1]]) };
+SIG.fete2 = { meter: 6, root: 62, mode: 'major', chords: [[38, 'M'], [43, 'M'], [38, 'M'], [40, 'm'], [38, 'M'], [43, 'M'], [45, 'M'], [38, 'M']],
+  mel: mel([[86, 2], [85, 1], [83, 1], [81, 2], [83, 1], [81, 1], [79, 1], [78, 2], [76, 1], [78, 1], [81, 1], [86, 1], [85, 2], [81, 1], [83, 3], [81, 2], [0, 1],
+    [86, 2], [85, 1], [83, 1], [81, 1], [79, 1], [78, 1], [79, 1], [81, 1], [83, 2], [79, 1], [81, 1], [78, 1], [76, 1], [79, 1], [78, 1], [76, 1], [74, 4], [0, 2]]) };
+SIG.epreuves = { meter: 16, root: 69, mode: 'mixo', chords: [[45, 'M'], [43, 'M'], [45, 'M'], [43, 'M'], [45, 'M'], [43, 'M'], [38, 'M'], [45, 'M']],
+  mel: mel([[81, 2], [76, 2], [73, 2], [76, 2], [81, 2], [83, 2], [85, 2], [81, 2], [79, 2], [76, 2], [74, 2], [76, 2], [79, 4], [83, 2], [79, 2],
+    [81, 2], [76, 2], [73, 2], [76, 2], [81, 2], [85, 2], [88, 2], [85, 2], [86, 2], [83, 2], [79, 2], [83, 2], [81, 6], [0, 2],
+    [88, 2], [85, 2], [81, 2], [85, 2], [86, 2], [83, 2], [79, 2], [83, 2], [85, 2], [81, 2], [76, 2], [81, 2], [83, 2], [79, 2], [74, 2], [79, 2],
+    [81, 2], [83, 2], [85, 2], [86, 2], [88, 2], [86, 2], [85, 2], [83, 2], [81, 6], [76, 2], [81, 4], [0, 4]]) };
+SIG.epreuves2 = { meter: 16, root: 69, mode: 'mixo', chords: [[38, 'M'], [45, 'M'], [43, 'M'], [45, 'M'], [38, 'M'], [45, 'M'], [43, 'M'], [45, 'M']],
+  mel: mel([[86, 4], [85, 2], [83, 2], [81, 4], [78, 4], [81, 2], [83, 2], [85, 4], [88, 8], [79, 4], [81, 2], [83, 2], [86, 4], [83, 4], [85, 6], [83, 2], [81, 8],
+    [86, 2], [88, 2], [86, 2], [85, 2], [83, 2], [81, 2], [78, 2], [81, 2], [85, 2], [83, 2], [81, 2], [79, 2], [76, 4], [79, 4], [83, 2], [81, 2], [79, 2], [78, 2], [79, 4], [83, 4], [81, 12], [0, 4]]) };
+SIG.mille = { meter: 16, root: 62, mode: 'major', chords: [[38, 'M'], [45, 'M'], [43, 'M'], [38, 'M'], [47, 'm'], [40, 'm'], [45, 'M'], [38, 'M']],
+  mel: mel([[74, 4], [69, 2], [74, 2], [78, 6], [76, 2], [74, 4], [73, 2], [71, 2], [69, 8], [71, 4], [73, 2], [74, 2], [76, 6], [78, 2], [79, 4], [78, 2], [76, 2], [78, 8],
+    [81, 6], [79, 2], [78, 4], [74, 4], [79, 6], [78, 2], [76, 4], [71, 4], [73, 4], [74, 2], [76, 2], [81, 4], [73, 4], [74, 12], [0, 4]]) };
+SIG.mille2 = { meter: 16, root: 62, mode: 'major', chords: [[38, 'M'], [43, 'M'], [40, 'm'], [45, 'M'], [47, 'm'], [43, 'M'], [45, 'M'], [38, 'M']],
+  mel: mel([[78, 4], [79, 2], [81, 2], [83, 6], [81, 2], [79, 4], [78, 2], [76, 2], [74, 8], [76, 4], [78, 2], [79, 2], [81, 6], [74, 2], [83, 4], [81, 2], [79, 2], [81, 8],
+    [86, 6], [85, 2], [83, 4], [81, 4], [83, 6], [81, 2], [79, 4], [76, 4], [78, 4], [76, 2], [74, 2], [76, 4], [73, 4], [74, 12], [0, 4]]) };
+SIG.nuit = { meter: 6, root: 65, mode: 'major', chords: [[41, 'M'], [36, 'M'], [43, 'm'], [36, 'M'], [41, 'M'], [36, 'M'], [34, 'M'], [41, 'M']],
+  mel: mel([[72, 2], [69, 1], [72, 1], [77, 2], [76, 3], [74, 1], [72, 2], [70, 2], [67, 1], [70, 1], [76, 2], [74, 4], [72, 2],
+    [69, 2], [72, 1], [77, 1], [81, 2], [79, 3], [77, 1], [76, 2], [74, 2], [76, 1], [77, 1], [79, 1], [76, 1], [77, 6]]) };
+SIG.nuit2 = { meter: 6, root: 65, mode: 'major', chords: [[41, 'M'], [34, 'M'], [41, 'M'], [36, 'M'], [34, 'M'], [36, 'M'], [36, 'M'], [41, 'M']],
+  mel: mel([[77, 2], [76, 1], [74, 1], [72, 2], [74, 3], [72, 1], [70, 2], [69, 2], [70, 1], [72, 1], [74, 2], [72, 4], [69, 2],
+    [70, 2], [74, 1], [79, 1], [77, 2], [76, 3], [74, 1], [72, 2], [69, 2], [72, 1], [76, 1], [74, 1], [76, 1], [77, 6]]) };
+
 // ---- styles : ce qui change d'une ambiance à l'autre
 const R6 = {
   calmA: [[3, 3], [2, 1, 3], [3, 2, 1], [2, 1, 2, 1], [4, 2], [6]], calmB: [[2, 1, 2, 1], [1, 1, 1, 3], [3, 1, 1, 1], [2, 1, 3]],
@@ -93,6 +126,15 @@ export const STYLES = {
     leads: ['choir', 'flute'], comps: ['strum'], perc: 'folk', intro: 2, rest: [25, 50], sig: null, level: 0.72, fadeIn: 1.6 },
   fin_complice: { meter: 6, step: [0.16, 0.172], modes: ['major'], mroots: [62], forms: [['A', 'B', 'A']], rhyA: R6.liveA, rhyB: R6.liveB, rhyRun: R6.run,
     leads: ['whistle', 'pluck'], comps: ['oompah', 'strum'], perc: 'jig', intro: 1, rest: [20, 40], sig: SIG.silasMaj, sigForm: ['S', 'A', 'S'], sigChance: 1, level: 0.85, fadeIn: 1.0 },
+  // lot 6 : la Nuit des Mille Voiles (aucun fichier audio : de la musique générée par le code, sur des airs écrits à la main)
+  fete: { meter: 6, step: [0.148, 0.16], modes: ['major'], mroots: [62], forms: [['A', 'A', 'B', 'A'], ['A', 'B', 'A', 'C']], rhyA: R6.liveA, rhyB: R6.liveB, rhyRun: R6.run,
+    leads: ['fiddle', 'accordion', 'whistle'], comps: ['oompah', 'strum'], perc: 'jig', intro: 2, rest: [6, 16], sig: SIG.fete, sig2: SIG.fete2, sigForm: ['S', 'T', 'A', 'S', 'B', 'T', 'S'], sigChance: 0.85, level: 0.85, fadeIn: 1.0 },
+  epreuves: { meter: 16, step: [0.082, 0.088], modes: ['mixo'], mroots: [69], forms: [['A', 'B', 'A', 'C']], rhyA: R16.B, rhyB: R16.run, rhyRun: R16.run,
+    leads: ['fiddle', 'whistle', 'accordion'], comps: ['reel'], perc: 'reel', intro: 1, rest: [3, 8], sig: SIG.epreuves, sig2: SIG.epreuves2, sigForm: ['S', 'A', 'T', 'B', 'S', 'C'], sigChance: 0.9, level: 0.95, fadeIn: 0.5 },
+  mille_voiles: { meter: 16, step: [0.104, 0.11], modes: ['major'], mroots: [62], forms: [['A', 'B', 'A', 'C']], rhyA: R16.A, rhyB: R16.B, rhyRun: R16.run,
+    leads: ['brass', 'choir', 'fiddle'], comps: ['anthem'], perc: 'march', intro: 1, rest: null, sig: SIG.mille, sig2: SIG.mille2, sigForm: ['S', 'T', 'A', 'S', 'B', 'T', 'S'], sigChance: 1, level: 1.0 },
+  fete_nuit: { meter: 6, step: [0.24, 0.268], modes: ['major'], mroots: [65], forms: [['A', 'B', 'A'], ['A', 'A', 'B', 'A']], rhyA: R6.menuetA, rhyB: R6.menuetB, rhyRun: R6.menuetRun,
+    leads: ['flute', 'pluck', 'accordion'], comps: ['strum', 'menuet'], perc: 'folk', intro: 2, rest: [10, 24], sig: SIG.nuit, sig2: SIG.nuit2, sigForm: ['S', 'A', 'T', 'B', 'S'], sigChance: 0.9, level: 0.7, fadeIn: 1.8 },
   // nappes d'ambiance : la nuit et les marais ne chantent pas, ils respirent
   night: { ambient: 'night', play: [45, 80], rest: [30, 70] },
   swamp: { ambient: 'swamp', play: [40, 70], rest: [25, 60] },
@@ -181,6 +223,8 @@ const COMP = {
   arp(e, s, c) { e(s, 'bass', c.bass, 5, 0.8); [0, 1, 2, 1, 2, 1].forEach((i, k) => e(s + k, 'harp', c.triad[i], 1.2, k === 0 || k === 3 ? 0.8 : 0.5)); },
   drive(e, s, c) { for (let k = 0; k < 6; k++) e(s + k, 'drive', k === 2 || k === 5 ? c.bass + 7 : c.bass, 0.8, 1); for (const k of [0, 3]) for (const n of c.triad) e(s + k, 'stab', n, 1.6, 0.9); },
   menuet(e, s, c) { e(s, 'bass', c.bass, 2, 0.8); for (const k of [2, 4]) for (const n of c.triad) e(s + k, 'harp', n + 12, 1.4, k === 2 ? 0.65 : 0.5); }, // lot 4 : un, deux, trois
+  reel(e, s, c) { for (const k of [0, 4, 8, 12]) e(s + k, 'bass', k % 8 ? c.bass + 7 : c.bass, 3, k ? 0.75 : 0.95); for (const k of [2, 6, 10, 14]) for (const n of c.triad) e(s + k, 'stab', n, 1.4, 0.75); }, // lot 6 : le reel (les épreuves)
+  anthem(e, s, c) { e(s, 'bass', c.bass, 8, 1); e(s + 8, 'bass', c.bass + 7, 8, 0.85); for (const n of c.triad) e(s, 'pad', n + 12, 16, 0.9); for (let k = 0; k < 16; k += 4) for (const n of c.triad) e(s + k, 'stab', n, 2.6, k ? 0.6 : 0.85); }, // lot 6 : l'hymne (la course)
   hold(e, s, c) { e(s, 'bass', c.bass, 6, 0.55); for (const n of c.triad) e(s, 'pad', n, 6, 0.9); }, // lot 4 : des accords tenus, presque immobiles
   war(e, s, c) { for (let k = 0; k < 16; k += 2) e(s + k, 'drive', k % 8 === 4 ? c.bass + 12 : k % 8 === 6 ? c.bass + 7 : c.bass, 1.5, 1); for (let k = 0; k < 16; k += 2) e(s + k, 'stab', c.triad[(k / 2) % 3] + 12, 1.1, 0.9); for (const n of c.triad) e(s, 'pad', n, 15, 1); },
 };
@@ -191,6 +235,8 @@ const PERC = {
   jig(e, s, b, fill) { e(s, 'kick', 0, 0, 0.85); e(s + 3, 'snare', 0, 0, 0.5); for (let k = 0; k < 6; k++) e(s + k, 'shake', 0, 0, k % 3 === 0 ? 0.9 : 0.45); if (fill) for (let k = 3; k < 6; k++) e(s + k, 'snare', 0, 0, 0.3 + k * 0.08); },
   battle(e, s, b, fill) { e(s, 'taiko', 0, 0, 1); e(s + 3, 'taiko', 0, 0, 0.75); e(s + 2, 'tom', 0, 0, 0.5); e(s + 5, 'tom', 0, 0, 0.5); e(s + 3, 'snare', 0, 0, 0.7); for (let k = 0; k < 6; k++) e(s + k, 'shake', 0, 0, 0.6); if (fill) for (let k = 3; k < 6; k++) e(s + k, 'snare', 0, 0, 0.4 + k * 0.1); },
   war(e, s, b, fill) { for (const k of [0, 3, 6, 8, 11, 14]) e(s + k, 'taiko', 0, 0, k === 0 ? 1 : k === 8 ? 0.85 : 0.55); e(s + 4, 'snare', 0, 0, 0.7); e(s + 12, 'snare', 0, 0, 0.7); for (let k = 0; k < 16; k += 2) e(s + k, 'shake', 0, 0, 0.6); if (fill) for (let k = 12; k < 16; k++) e(s + k, 'tom', 0, 0, 0.5 + (k - 12) * 0.12); },
+  reel(e, s, b, fill) { e(s, 'kick', 0, 0, 0.9); e(s + 8, 'kick', 0, 0, 0.75); e(s + 4, 'snare', 0, 0, 0.55); e(s + 12, 'snare', 0, 0, 0.6); for (let k = 0; k < 16; k += 2) e(s + k, 'shake', 0, 0, k % 4 ? 0.4 : 0.75); if (fill) for (let k = 13; k < 16; k++) e(s + k, 'snare', 0, 0, 0.35 + (k - 13) * 0.12); }, // lot 6
+  march(e, s, b, fill) { e(s, 'taiko', 0, 0, 1); e(s + 8, 'taiko', 0, 0, 0.8); for (const k of [4, 12]) e(s + k, 'snare', 0, 0, 0.6); for (let k = 0; k < 16; k += 2) e(s + k, 'shake', 0, 0, 0.4); if (fill) for (let k = 12; k < 16; k++) e(s + k, 'snare', 0, 0, 0.3 + (k - 12) * 0.15); }, // lot 6
   siege(e, s, b, fill) { e(s, 'taiko', 0, 0, 1); e(s + 8, 'taiko', 0, 0, 0.8); e(s + 12, 'tom', 0, 0, 0.55); if (b % 2) e(s + 14, 'taiko', 0, 0, 0.55); for (let k = 0; k < 16; k += 4) e(s + k, 'shake', 0, 0, 0.7); if (fill) for (let k = 12; k < 16; k++) e(s + k, 'snare', 0, 0, 0.4 + (k - 12) * 0.1); },
 };
 
@@ -209,7 +255,7 @@ export function makePiece(name, seed, prevRoot = 0, first = true) {
     chord: (r) => { let bass = broot + sem(mod7(r)); if (bass > broot + 8) bass -= 12; const raise = minor && mod7(r) === 4; return { bass, triad: [r, r + 2, r + 4].map((d, i) => mroot - 12 + sem(d) + (raise && i === 1 ? 1 : 0)) }; },
   };
   const form = useSig ? S.sigForm : pick(S.forms, rnd), secs = {}, count = {};
-  for (const L of form) if (!secs[L]) secs[L] = L === 'S' ? sigSection(S.sig, mroot - S.sig.root) : genSection(P, L, rnd);
+  for (const L of form) if (!secs[L]) secs[L] = L === 'S' ? sigSection(S.sig, mroot - S.sig.root) : L === 'T' ? sigSection(S.sig2 || S.sig, mroot - (S.sig2 || S.sig).root) : genSection(P, L, rnd); // lot 6 : T, la seconde partie d'un air écrit
   const lead1 = pick(S.leads, rnd), others = S.leads.filter((x) => x !== lead1), lead2 = others.length ? pick(others, rnd) : lead1;
   const comp = COMP[pick(S.comps, rnd)], perc = PERC[S.perc], M = S.meter;
   const ev = [], e = (s, v, n, d, vol = 1) => ev.push([s, v, n, d, vol]);
@@ -242,6 +288,7 @@ export const VOICE = {
   pluck: (a, g, n, t, d, v) => { a.note(g, n, t, Math.min(d, 0.16), { type: 'triangle', vol: 0.055 * v, attack: 0.004, release: 0.34 }); a.note(g, n + 12, t, 0.05, { type: 'square', vol: 0.007 * v, lp: 2600, attack: 0.003, release: 0.2 }); },
   brass: (a, g, n, t, d, v) => { a.note(g, n, t, d, { type: 'sawtooth', vol: 0.024 * v, lp: 1700, attack: 0.035 }); a.note(g, n - 12, t, d, { type: 'square', vol: 0.015 * v, lp: 1200, attack: 0.035 }); },
   choir: (a, g, n, t, d, v) => { a.note(g, n, t, d, { type: 'triangle', vol: 0.034 * v, attack: 0.1, release: 0.2, vib: 4.5 }); a.note(g, n - 12, t, d, { type: 'sine', vol: 0.03 * v, attack: 0.12, release: 0.2 }); a.note(g, n, t, d, { type: 'sawtooth', vol: 0.008 * v, lp: 1400, attack: 0.1, detune: -7 }); },
+  accordion: (a, g, n, t, d, v) => { a.note(g, n, t, d, { type: 'square', vol: 0.011 * v, lp: 1900, attack: 0.04, release: 0.1, vib: 5.2 }); a.note(g, n, t, d, { type: 'sawtooth', vol: 0.008 * v, lp: 1500, detune: 7, attack: 0.05, release: 0.1 }); a.note(g, n - 12, t, d, { type: 'square', vol: 0.004 * v, lp: 900, attack: 0.05 }); }, // lot 6 : deux anches et un bourdon
   harm: (a, g, n, t, d, v) => a.note(g, n, t, d, { type: 'triangle', vol: 0.024 * v, attack: 0.03, release: 0.12 }),
   bass: (a, g, n, t, d, v) => a.note(g, n, t, d, { type: 'triangle', vol: 0.07 * v }),
   drive: (a, g, n, t, d, v) => a.note(g, n, t, d, { type: 'sawtooth', vol: 0.032 * v, lp: 750 }),

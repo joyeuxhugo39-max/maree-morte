@@ -89,6 +89,8 @@ export const shipsLogic = {
   // ------------------------------------------------------------ monter, descendre, marcher sur le pont
   canBoard(p, sh) {
     if (sh.own === p.key) return true;
+    if (sh.ghost) return false; // lot 6 : un rival de la course
+    if (sh.rental) { if (sh.rental === p.key) return true; const r = [...this.players.values()].find((q) => q.key === sh.rental); return !!(r && this.mates(p, r)); } // lot 6 : un cotre de location
     const o = this.shipOwner(sh);
     if (o && this.mates(p, o)) return true;
     if (sh.crewId && p.crew === sh.crewId) return true;
@@ -216,7 +218,7 @@ export const shipsLogic = {
       if (sh.sinkT) continue;
       live.push(sh);
       const x0 = sh.x, y0 = sh.y;
-      this.shipPhysics(sh, DT);
+      if (sh.ghost) this.festGhost(sh, DT); else this.shipPhysics(sh, DT); // lot 6 : un rival de la course suit son chemin
       const moved = Math.hypot(sh.x - x0, sh.y - y0);
       for (const id of sh.crew) {
         const q = this.players.get(id);
@@ -228,12 +230,13 @@ export const shipsLogic = {
       if (this.tickCount % 20 === 0) {
         const max = this.hullMax(sh.item);
         if (this.time - sh.hitAt > 10 && sh.hull < max * 0.5) { sh.hull = Math.min(Math.round(max * 0.5), sh.hull + 1); const o = this.shipOwner(sh); if (o) { o.hulls[sh.item] = sh.hull; o.dirtyMe = true; } }
-        if (!sh.crew.size && !sh.oid && this.time - sh.emptySince > DESPAWN) this.ships.delete(sh.id);
+        if (!sh.crew.size && !sh.oid && !sh.ghost && !sh.race && this.time - sh.emptySince > DESPAWN) this.ships.delete(sh.id);
       }
     }
     // les navires se heurtent entre eux
     for (let i = 0; i < live.length; i++) for (let j = i + 1; j < live.length; j++) {
       const A = live[i], B = live[j], SA = this.spec(A), SB = this.spec(B);
+      if ((A.race && B.race) || A.ghost || B.ghost) continue; // lot 6 : dans la course, personne ne bloque personne
       if (Math.hypot(A.x - B.x, A.y - B.y) > (SA.L + SB.L) / 2 + 4) continue;
       const o = shipOverlap(A, SA, B, SB);
       if (!o) continue;
@@ -256,6 +259,7 @@ export const shipsLogic = {
   shipPhysics(sh, dt) {
     const S = this.spec(sh), B = ITEMS[sh.item].boat, maxV = this.shipMaxSpeed(sh);
     if (this.heistCurrent) this.heistCurrent(sh, dt, [this.shipOwner(sh), ...[...this.players.values()].filter((q) => q.ship === sh.id)]); // lot 5 : les Sept Courants
+    if (this.festCurrent) this.festCurrent(sh, dt); // lot 6 : les courants et les vents de la course
     // la barre : la roue tourne tant qu'on la pousse, et reste où on la laisse
     const helm = sh.posts.helm && sh.ctl[sh.posts.helm];
     if (helm && helm[0]) sh.rud = clamp(sh.rud + helm[0] * S.rud * dt, -1, 1);
@@ -279,7 +283,7 @@ export const shipsLogic = {
     // la vitesse : le long de la coque (u), en travers (la dérive, l)
     const c = Math.cos(sh.a), s = Math.sin(sh.a);
     let u = sh.vx * c + sh.vy * s, l = -sh.vx * s + sh.vy * c;
-    const vt = sh.anchor ? 0 : sh.sail * maxV * windFactor(sh.a, this.wind.a) * this.wind.s;
+    const vt = sh.anchor ? 0 : sh.sail * maxV * windFactor(sh.a, this.wind.a) * this.wind.s * (sh.windMul || 1);
     const tau = sh.anchor === 2 ? 0.9 : sh.anchor === 1 ? 1.8 : u < vt ? S.tau : S.tau * 1.5;
     u += (vt - u) * (1 - Math.exp(-dt / tau));
     l *= Math.exp(-dt / S.lat);
@@ -440,7 +444,7 @@ export const shipsLogic = {
     if (pr.kind !== 'cball') return null;
     const own = pr.team === 'p' ? this.players.get(pr.owner) : null;
     for (const sh of this.ships.values()) {
-      if (sh.sinkT || pr.fromShip === sh.id || (own && own.ship === sh.id)) continue;
+      if (sh.sinkT || sh.race || sh.ghost || pr.fromShip === sh.id || (own && own.ship === sh.id)) continue; // lot 6 : les boulets traversent les voiliers de la course
       const S = this.spec(sh);
       if (Math.abs(sh.x - pr.x) > S.L / 2 + 8 || Math.abs(sh.y - pr.y) > S.L / 2 + 8) continue;
       const [lx, ly] = toLocal(sh, pr.x, pr.y + 8);
@@ -460,7 +464,7 @@ export const shipsLogic = {
   },
   pointOnShip(x, y) { for (const sh of this.ships.values()) { if (sh.sinkT) continue; const S = this.spec(sh); if (Math.abs(sh.x - x) > S.L / 2 + 4 || Math.abs(sh.y - y) > S.L / 2 + 4) continue; const [lx, ly] = toLocal(sh, x, y); if (Math.abs(lx) < S.L / 2 && insideHull(S, lx, ly, 2)) return sh; } return null; },
   // ------------------------------------------------------------ réseau, sauvegarde, connexion
-  shipMeta(sh) { const o = this.shipOwner(sh); return { id: sh.id, k: 's', kind: sh.kind, item: sh.item, name: ITEMS[sh.item].name, own: sh.ownName, cw: o && o.crew && this.crews.get(o.crew) ? this.crews.get(o.crew).tag : '', hmax: this.hullMax(sh.item) }; },
+  shipMeta(sh) { const o = this.shipOwner(sh); return { id: sh.id, k: 's', kind: sh.kind, item: sh.item, name: ITEMS[sh.item].name, own: sh.ownName, cw: o && o.crew && this.crews.get(o.crew) ? this.crews.get(o.crew).tag : '', hmax: this.hullMax(sh.item), pal: sh.pal || undefined, cos: sh.cos || undefined, race: sh.race ? 1 : 0 }; },
   shipLine(sh) { return [sh.id, Math.round(sh.x * 10), Math.round(sh.y * 10), Math.round(sh.a * 1000), Math.round(sh.u), Math.round(sh.sail * 100), Math.round(sh.rud * 100), sh.anchor * 100 + Math.round(sh.anchorP * 99), Math.round(sh.hull), sh.sinkT ? 1 : 0, Math.round(Math.hypot(sh.vx, sh.vy))]; },
   shipSave(p) {
     const sh = this.ownShip(p.key), on = this.myShip(p);

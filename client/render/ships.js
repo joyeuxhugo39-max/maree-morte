@@ -232,6 +232,7 @@ export const shipRender = {
     }
   },
   drawRig(ctx, s, S, P, camX, camY, now, wind) {
+    if (s.cos) P = { ...P, sail: s.cos.s || P.sail, flag: s.cos.f ?? P.flag }; // lot 6 : les voiles et le pavillon du festival
     const pr = (lx, ly, z) => this.shipProj(s, lx, ly, z, camX, camY);
     const f = Math.max(0, Math.min(1, s.sail == null ? 0 : s.sail)), rel = Math.cos(wind[0] - s.a), lat = Math.sin(wind[0] - s.a);
     const flut = f > 0.05 && rel < -0.35 ? Math.sin(now * 17 + s.id) * 0.9 : 0; // face au vent, la toile faseye
@@ -275,6 +276,16 @@ export const shipRender = {
     for (let k = 3; k >= 1; k--) { const t = k / 3, w = Math.sin(now * 9 - k * 1.3 + s.id) * 1.2 * t; ctx.lineTo(ft[0] + dx * L * t - dy * w, ft[1] + dy * L * t * 0.6 + dx * w + 1.5 * (1 - t) + 1); }
     ctx.closePath(); ctx.fill();
     if (S.shape === 'ship') { ctx.fillStyle = 'rgba(240,236,220,0.9)'; ctx.fillRect(Math.round(ft[0] + dx * 3), Math.round(ft[1] + dy * 2), 1, 1); }
+    // lot 6 : une guirlande de lampions ou de fanions, du beaupré au plus haut mât
+    if (s.cos && s.cos.d) {
+      const a = bs ? tip : pr(S.L / 2 - 4, 0, 3), b = pr(tm.x, 0, tm.h * 0.95), n = 9, cols = ['#e8564a', '#f2c14a', '#5a8ad6', '#7ae07a', '#e88aff'];
+      for (let i = 1; i < n; i++) {
+        const t = i / n, x = Math.round(a[0] + (b[0] - a[0]) * t), y = Math.round(a[1] + (b[1] - a[1]) * t + Math.sin(t * Math.PI) * 3);
+        ctx.fillStyle = cols[(i + s.id) % cols.length];
+        if (s.cos.d === 'fanions') { ctx.beginPath(); ctx.moveTo(x - 2, y); ctx.lineTo(x + 2, y); ctx.lineTo(x, y + 3); ctx.fill(); }
+        else { ctx.fillRect(x - 1, y, 2, 2); if (this.darkNow > 0.3) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5 * this.darkNow; ctx.drawImage(this.glows.warm, x - 6, y - 5, 12, 12); ctx.restore(); } }
+      }
+    }
   },
   // une voile carrée : la vergue en travers, la toile qui descend avec la voilure et se gonfle vers l'avant
   squareSail(ctx, pr, mx, hs, z0, z1, f, belly, sail, dark, wood) {

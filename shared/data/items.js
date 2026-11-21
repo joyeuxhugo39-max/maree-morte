@@ -331,6 +331,11 @@ Object.assign(ITEMS, {
 // les trophées de boss : objets de collection irremplaçables (jamais volés), à exposer chez soi
 for (const [boss, [id, name, desc]] of Object.entries(TROPHIES)) ITEMS[id] = { home: 1, name, place: 't_' + id, value: 1500, rarity: 3, unique: 1, trophy: boss, icon: 'f_trophy', desc: desc + ' Trophée de boss : à exposer chez vous.' };
 
+// ------------------------------------------------------------ lot 6 : La Nuit des Mille Voiles
+Object.assign(ITEMS, {
+  cotre_fete: { name: 'Cotre des Mille Voiles', boat: { kind: 'sloop', speed: 128 }, value: 0, quest: 1, icon: 'sloop_i', desc: 'Le cotre de location de la course : Anselin le prête à qui s’inscrit. Il retourne au port après l’arrivée.' },
+  fusee_fete: { name: 'Fusée de fête', use: { fusee: 1 }, value: 0, icon: 'fusee', desc: 'Un feu d’artifice : allumez-la, et regardez le ciel. (Zéphyrine en vend, contre des jetons du festival.)' },
+});
 // ------------------------------------------------------------ lot 5 : Le Plus Grand Braquage de Port-Lanterne
 Object.assign(ITEMS, {
   uniforme_garde: { name: 'Uniforme de la garde de Valdorne', quest: 1, value: 0, icon: 'captaincoat', tint: 'navy', desc: 'Drap bleu, boutons dorés. Dans une demeure, personne ne regarde un garde.' },

@@ -52,6 +52,8 @@ const WALLS = {
   cellier: { up: 'bricks', U: [0x221c1a, 0x322a26, 0x423834, 0x524642, 0x625650], N: [0x141010, 0x201a18, 0x2c2420, 0x382e2a, 0x463a34], F: [0x2e2a2c, 0x45403f, 0x5a5452, 0x6e6863, 0x857e76] },
   toits: { up: 'bricks', U: [0x3a2620, 0x52342a, 0x6a4434, 0x82543e, 0x9a6648], N: [0x1c1210, 0x2a1c18, 0x3a2620, 0x4a3028, 0x5c3c32], F: [0x7a2a1e, 0x9a3a28, 0xb84c32, 0xd0623e, 0xe47a4e] },
   pont: { up: 'planks', U: [0x3a2414, 0x4e321c, 0x624026, 0x784e30, 0x8e5e3a], N: [0x1e140c, 0x2c1e12, 0x3c2a1a, 0x4c3622, 0x5e442c], F: [0x5a3a22, 0x74502e, 0x8a6038, 0xa07244, 0xb88652] },
+  gabier: { up: 'planks', U: [0x3a2414, 0x4e321c, 0x624026, 0x784e30, 0x8e5e3a], N: [0x1e140c, 0x2c1e12, 0x3c2a1a, 0x4c3622, 0x5e442c], F: [0x5a3a22, 0x74502e, 0x8a6038, 0xa07244, 0xb88652] }, // lot 6 : le parcours du gabier (des quais et des ponts)
+  lice: { up: 'planks', U: [0x6a1418, 0x8a1c22, 0xc0302e, 0xe8564a, 0xf6efe0], N: [0x3a0a0e, 0x5a1016, 0x6a1418, 0x8a1c22, 0xa82a2e], F: [0xb89a68, 0xc8aa78, 0xd8bc8a, 0xe6cc9a, 0xf0dcae] }, // lot 6 : la Lice (toile rayée)
   chantier: { up: 'planks', U: [0x4a3220, 0x66462c, 0x7e5838, 0x966a44, 0xae7e52], N: [0x2a1a0e, 0x3e2816, 0x553820, 0x6b482a, 0x845a36], F: [0x5a3a22, 0x74502e, 0x8a6038, 0xa07244, 0xb88652] },
 };
 const isFloor = (t) => t === T.FLOOR || t === T.STONEF;
@@ -104,7 +106,7 @@ function reefRock(wx, wy, lx, ly, at) {
   if (ny > 0.35 && d > r * 0.6 && valueNoise(wx / 2, wy / 5, 173) > 0.58) col = 0x3a7a52; // des algues au pied
   return col;
 }
-const NO_DECO = new Set(['pont', 'toits', 'cellier']); // lot 5
+const NO_DECO = new Set(['pont', 'toits', 'cellier', 'gabier', 'lice']); // lot 5 ; lot 6
 export class Terrain {
   constructor(world) {
     this.w = world;
@@ -360,7 +362,11 @@ export class Terrain {
           col = P[k];
           break;
         }
-        case T.VOID: col = 0x07050b; break;
+        case T.VOID: {
+          const rid = W.roomGrid[(wy >> 4) * MAP_W + (wx >> 4)];
+          col = rid >= 0 && W.rooms[rid].kind === 'gabier' ? this.harbour(wx, wy) : 0x07050b; // lot 6 : l'eau du port, entre les quais du gabier
+          break;
+        }
         case T.FLOOR: case T.STONEF: case T.EXIT: {
           const tx = wx >> 4, ty = wy >> 4, rid = W.roomGrid[ty * MAP_W + tx], room = rid >= 0 ? W.rooms[rid] : null;
           const kind = room ? room.kind : 'house';
@@ -391,6 +397,7 @@ export class Terrain {
           if (isFloor(below1)) { d = (ty + 1) * TILE - wy; rid = W.roomGrid[(ty + 1) * MAP_W + tx]; }
           else if (below1 === T.IWALL && isFloor(below2)) { d = (ty + 2) * TILE - wy; rid = W.roomGrid[(ty + 2) * MAP_W + tx]; }
           if (d > 0) col = this.wallFace(wx, wy, d, rid >= 0 ? W.rooms[rid] : null, tx);
+          else if (W.roomGrid[ty * MAP_W + tx] >= 0 && W.rooms[W.roomGrid[ty * MAP_W + tx]].kind === 'gabier') col = this.harbour(wx, wy);
           else {
             col = hash2(wx >> 1, wy >> 1, 181) > 0.85 ? 0x22170f : 0x1a1210;
             const up1 = this.tileT(tx, ty - 1), fy = wy & 15;
@@ -462,6 +469,20 @@ export class Terrain {
     return cv;
   }
   // lot 5 : les tuiles des toits de Port-Lanterne — des écailles de terre cuite, chaque rangée décalée d'une demi-tuile
+  harbour(wx, wy) { // lot 6 : l'eau sombre du port, des rides, et l'ombre portée des quais
+    const P = [0x0a2a40, 0x0e3450, 0x123e5e, 0x1d5476, 0x7aa8c4];
+    const n = valueNoise(wx / 18, wy / 9, 211);
+    let k = n > 0.64 ? 2 : n > 0.36 ? 1 : 0;
+    const rip = (wy + Math.floor(valueNoise(wx / 22, wy / 6, 212) * 5)) % 9;
+    if (rip === 0 && valueNoise(wx / 16, wy / 16, 213) > 0.5) k = 3;
+    if (hash2(wx, wy, 214) > 0.996) k = 4;
+    let col = P[k];
+    const tx = wx >> 4, ty = wy >> 4, fx = wx & 15, fy = wy & 15, up = this.tileT(tx, ty - 1);
+    if (isFloor(up) || up === T.EXIT) { if (fy < 3) return fy === 0 ? 0x5a3a22 : fy === 1 ? 0x3e2814 : 0x2a1a0e; if (fy < 8) col = mix(col, 0x04101a, 0.5 - (fy - 3) * 0.09); }
+    if (isFloor(this.tileT(tx - 1, ty)) && fx < 3) col = mix(col, 0x04101a, 0.45 - fx * 0.12);
+    if (isFloor(this.tileT(tx + 1, ty)) && fx > 12) col = mix(col, 0x04101a, 0.45 - (15 - fx) * 0.12);
+    return col;
+  }
   roofTiles(wx, wy) {
     const P = WALLS.toits.F, row = Math.floor(wy / 6), rv = wy - row * 6, off = row % 2 ? 4 : 0, u = (wx + off) % 8;
     let k = 3 - (rv === 5 ? 2 : rv >= 4 ? 1 : 0);
@@ -510,7 +531,8 @@ export class Terrain {
     if (d <= 2) return N[0];
     if (d <= 11) { const px = wx % 12; if (d === 11) return N[4]; if (d === 3) return N[1]; return px === 0 ? N[0] : px === 1 ? N[3] : N[2]; }
     if (d <= 13) return d === 13 ? 0xb07a48 : 0x6f482a;
-    if (room && room.kind === 'pont') { // lot 5 : le pont d'un navire n'a pas de mur, mais un bastingage : la lisse, les jambettes, et la mer derrière
+    if (room && room.kind === 'lice') { const st = Math.floor(wx / 6) % 2; return d >= 30 ? 0x2a0a0e : st ? (d > 24 ? 0xa82a2e : 0xc0302e) : (d > 24 ? 0xd8cfbc : 0xf2eadc); } // lot 6 : la toile rayée de la Lice
+    if (room && (room.kind === 'pont' || room.kind === 'gabier')) { // lot 5 : le pont d'un navire n'a pas de mur, mais un bastingage : la lisse, les jambettes, et la mer derrière
       if (d >= 26) return d === 26 ? 0xa07244 : d === 27 ? 0x74502e : 0x0b2236;
       if (d >= 22) { const u2 = wx % 10; return u2 < 2 ? (d === 22 ? 0x8a6038 : 0x5a3a22) : 0x0b2236; }
       if (d === 21) return 0xb88652;

@@ -24,6 +24,7 @@ import { devHook } from './dev-hook.js';
 import { Townsfolk } from './townsfolk.js';
 import { Cinema } from './cinema.js'; // lot 4 : les cinématiques mises en scène
 import { Heist } from './heist.js'; // lot 5 : Le Plus Grand Braquage
+import { Festival } from './festival.js'; // lot 6 : la Nuit des Mille Voiles
 import { applyTheme } from './render/ui-art.js';
 import { shipOf, hullHalf, toWorld, stations, deckMove, deckOk, nearestDeck, openingAt, insideHull, toLocal, BERTHS, berthPos, RAIL } from '../shared/data/ships.js';
 applyTheme(); // 0.8.1 : parchemin, cadres de bois ferré, fleurons — avant même l'écran d'accueil
@@ -68,7 +69,7 @@ const G = {
     return mk;
   },
   // les PNJ d'une histoire n'apparaissent qu'à leur étape
-  refreshNpcs() { G.npcs = G.allNpcs.filter((n) => npcVisible(NPCS[n.id], G.quests || {}, G.me ? G.me.lvl : 1) && n.id !== G.npcAway); }, // lot 5 : Bréchet peut être sorti prendre l'air
+  refreshNpcs() { G.npcs = G.allNpcs.filter((n) => npcVisible(NPCS[n.id], G.quests || {}, G.me ? G.me.lvl : 1) && n.id !== G.npcAway && !(NPCS[n.id] && NPCS[n.id].fest && !G.festOn)); }, // lot 5 ; lot 6 : les gens du festival, pendant une édition // lot 5 : Bréchet peut être sorti prendre l'air
   npcReady(id) { return QUEST_ORDER.some((qid) => QUESTS[qid].turnin === id && G.ui.questStateOf(qid) === 'ready'); },
   useSkill: (id, fromUI) => useSkill(id, fromUI),
   inHome: () => !!myHomeRoom(),
@@ -191,6 +192,7 @@ function onMsg(m) {
     case 'dev': G.dev.onMessage(m); break;
     case 'cinema': G.cinema.onMsg(m); break; // lot 4
     case 'heist': if (G.heist) G.heist.onMsg(m); break; // lot 5
+    case 'fest': if (G.fest) G.fest.onMsg(m); break; // lot 6
     case 's': snapshot(m, now); break;
     case 'me': {
       const prev = G.me;
@@ -447,6 +449,7 @@ function onEvent(ev, t) {
   const R = G.renderer, now = nowS(), me = G.myId;
   const e = typeof ev[1] === 'number' ? entOf(ev[1]) : null;
   if (G.heist && G.heist.onEvent(ev, now)) return; // lot 5 : gardes, architecte, poudre, barils
+  if (G.fest && G.fest.onEvent(ev, now)) return; // lot 6 : fusées, arrivées de la course, émotes du festival
   switch (ev[0]) {
     case 'atk': {
       if (!e || ev[1] === me) break;
@@ -725,6 +728,7 @@ function interact() {
     G.send({ t: 'talk', npc: t.id });
   }
   else if (t.kind === 'hspot') G.heist.use(t.i); // lot 5
+  else if (t.kind === 'fspot') G.fest.use(t.i); // lot 6
   else if (t.kind === 'prop') G.send({ t: 'open', id: t.id });
   else if (t.kind === 'drop') G.send({ t: 'pick', id: t.id });
   else if (t.kind === 'harvest') G.send({ t: 'harvest', id: t.id });
@@ -801,6 +805,7 @@ function findInteract() {
   if (best) return best;
   for (const n of G.npcs) { const d = Math.hypot(n.x - p.x, n.y - p.y); if (d < INTERACT_RANGE && d < bd) { bd = d; best = { kind: 'npc', id: n.id, x: n.x, y: n.y, h: n.parrot ? 34 : 30 }; } }
   { const hs = G.heist && G.heist.spotNear(p); if (hs && hs.d - 6 < bd) { bd = hs.d; best = { kind: 'hspot', i: hs.s.id, x: hs.s.x, y: hs.s.y - 4, h: 16, verb: hs.s.label }; } } // lot 5 : le décor du braquage
+  { const fs = G.fest && G.fest.spotNear(p); if (fs && fs.d - 6 < bd) { bd = fs.d; best = { kind: 'fspot', i: fs.s.id, x: fs.s.x, y: fs.s.y - 4, h: 16, verb: fs.s.label }; } } // lot 6 : le festival
   for (const c of G.world.chests) { const d = Math.hypot(c.x - p.x, c.y - p.y); if (d < 30 && d < bd) { bd = d; best = { kind: 'prop', id: c.id, x: c.x, y: c.y, h: 18 }; } }
   for (const pr of G.world.props) if (pr.type === 'tonnelet') { const d = Math.hypot(pr.x - p.x, pr.y - p.y); if (d < 30 && d < bd) { bd = d; best = { kind: 'prop', id: pr.id, x: pr.x, y: pr.y, h: 16 }; } }
   for (const e of G.ents.values()) if (e.k === 'd') { const d = Math.hypot(e.x - p.x, e.y - p.y); if (d < 24 && d < bd) { bd = d; best = { kind: 'drop', id: e.id, x: e.x, y: e.y, h: 14 }; } }
@@ -1008,6 +1013,7 @@ function ambience(now) {
   if (G.night && isFullMoon(G.worldTime)) for (const e of G.ents.values()) if (e.horde && !e.dyingT && Math.hypot(e.x - p.x, e.y - p.y) < 300) { G.epicUntil = now + 8; break; }
   for (const e of G.ents.values()) if (e.k === 'm' && !e.dyingT && MOBS[e.type] && MOBS[e.type].ship && Math.hypot(e.x - p.x, e.y - p.y) < 420) G.seaFight = Math.max(G.seaFight || 0, now + 6);
   if (p.ship && now < G.seaFight) theme = 'naval';
+  { const ft = G.fest && G.fest.theme(now); if (ft && !(p.ship && now < G.seaFight)) theme = ft; } // lot 6 : les quatre thèmes du festival
   if (now < (G.eruptUntil || 0) && G.zone === Z.VOLCAN) G.epicUntil = Math.max(G.epicUntil || 0, now + 4); // l'éruption : musique de bataille
   if (G.wevt && G.wevt.wave && G.player && Math.hypot(G.wevt.x - G.player.x, G.wevt.y - G.player.y) < 520) G.epicUntil = Math.max(G.epicUntil || 0, now + 4); // l'invasion : musique de bataille
   if (now < (G.epicUntil || 0)) theme = 'epic';
@@ -1024,8 +1030,8 @@ function ambience(now) {
   G.weatherK = k;
 }
 // 1.0 : les habitants et leur journée (voir townsfolk.js)
-function initFolk() { G.town = new Townsfolk(G); G.heist = new Heist(G); }
-function updateFolk(dt) { if (G.town) G.town.update(dt, performance.now() / 1000); if (G.heist) G.heist.update(dt, performance.now() / 1000); }
+function initFolk() { G.town = new Townsfolk(G); G.heist = new Heist(G); G.fest = new Festival(G); }
+function updateFolk(dt) { if (G.town) G.town.update(dt, performance.now() / 1000); if (G.heist) G.heist.update(dt, performance.now() / 1000); if (G.fest) G.fest.update(dt, performance.now() / 1000); }
 const TITLE_PATH = [[150, 104], [124, 112], [100, 118], [96, 86], [108, 54], [126, 26], [80, 60], [44, 92], [33, 72], [30, 32], [60, 40], [112, 80], [150, 96]];
 // 1.0 : le tutoriel — les gestes de base, un par un, puis des conseils qui n'arrivent qu'au bon moment
 const TUTO = [
@@ -1092,7 +1098,7 @@ function frame(now, dt) {
   G.ui.lockpickTick(dt);
   if (G.locked) { /* on regarde */ }
   else if (G.build) { updateBuild(); if (G.input.mouse.left && !G.buildClickHeld) { G.buildClickHeld = true; placeHovered(); } if (!G.input.mouse.left) G.buildClickHeld = false; }
-  else if (G.input.mouse.left && !(G.me && G.me.dead)) tryAttack(G.aim, now);
+  else if (G.input.mouse.left && !(G.me && G.me.dead)) { if (G.fest && G.fest.aiming()) G.fest.fire(now); else tryAttack(G.aim, now); } // lot 6 : au canon du concours, le clic tire
   updatePlayer(now, dt);
   interpolate(now, dt);
   G.interactTarget = G.cinema.locked() || G.scene.on ? null : findInteract(); // lot 4 : pas d’invite « [E] » pendant une scène
@@ -1133,7 +1139,7 @@ function frame(now, dt) {
   G.ui.ink(now < G.inkUntil);
   G.ui.powder(now < (G.powderUntil || 0)); // lot 5 : la poudre de Silas
   const cc = G.cinema.tick(now, dt); // lot 4 : une scène tient la caméra (sauf pendant sa conversation)
-  G.camTarget = cc || (G.cinema.locked() ? null : updateCine(G, now)) || G.scene.update() || shipCam(p) || { x: p.x, y: p.y - 12 };
+  G.camTarget = cc || (G.cinema.locked() ? null : updateCine(G, now)) || G.scene.update() || (G.fest && G.fest.camera()) || shipCam(p) || { x: p.x, y: p.y - 12 }; // lot 6 : au canon, la caméra cadre le couloir de tir
   R.render(G, now, dt);
   if (!G.tutT || now - G.tutT > 0.25) { G.tutT = now; tutorial(now); }
   G.ui.update(now);
@@ -1148,6 +1154,7 @@ function handleKeys(now) {
     if (cineLocked(G, now)) { if (k.code === 'Escape' && G.cine.skippable) endCine(G); continue; }
     if (G.scene.on) { G.scene.key(k.code); continue; }
     if (!$('dialog').classList.contains('hidden') && /^Digit[1-9]$/.test(k.code)) { ui.pickChoice(+k.code.slice(5) - 1); continue; }
+    if (k.code === 'Escape' && G.fest && G.fest.panelOpen()) { G.fest.closePanel(); continue; } // lot 6
     if (k.code === 'Escape') { if (G.build && !ui.open) stopBuild(); else ui.close(); continue; }
     if (ui.open === 'tavern' && k.code === 'Space') { ui.armTap(); continue; } // le bras de fer
     if (G.post && G.post.k === 'helm' && k.code === 'Space') { cycleSail(); continue; } // lot 1 : la voilure, depuis la barre
@@ -1161,6 +1168,7 @@ function handleKeys(now) {
     if (k.key === 'h') { ui.toggle('help'); continue; }
     if (k.key === 'k') { ui.toggle('ach'); continue; }
     if (k.key === 'o') { ui.toggle('codex'); continue; }
+    if (k.key === 'n' && G.fest) { G.fest.togglePanel(); continue; } // lot 6 : le carnet de la Nuit des Mille Voiles
     if (k.key === 'p') { ui.toggle('crew'); continue; }
     if (k.key === 'r') { if (G.me && !G.me.dead) G.send({ t: 'fish', a: +G.aim.toFixed(3) }); continue; }
     if (k.key === 'e') { interact(); continue; }
@@ -1171,6 +1179,7 @@ function handleKeys(now) {
       case 'Digit3': emote('salut'); break;
       case 'Digit4': emote('doigt'); break;
       case 'Digit5': emote('salto'); break;
+      case 'Digit6': case 'Digit7': case 'Digit8': case 'Digit9': if (G.fest) G.fest.emoteKey(+k.code.slice(5)); break; // lot 6 : les émotes du festival
       case 'Space': case 'ShiftLeft': useSkill('roll'); break;
     }
   }

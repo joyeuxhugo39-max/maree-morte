@@ -16,6 +16,11 @@ export const THEMES = {
   fin_garder: { name: 'Le Casse du Siècle', file: null, use: 'Conclusion A : tout garder (lot 5)' },
   fin_denoncer: { name: 'Justice de Port-Lanterne', file: null, use: 'Conclusion B : dénoncer Silas (lot 5)' },
   fin_complice: { name: 'Complices', file: null, use: 'Conclusion C : faire équipe (lot 5)' },
+  // lot 6 : les quatre identités de la Nuit des Mille Voiles (générées par le code, sur des airs écrits à la main)
+  fete: { name: 'Port-Lanterne en fête', file: null, use: 'Le festival : la plage, la place, la jetée (lot 6)' },
+  epreuves: { name: 'Les épreuves', file: null, use: 'Pendant une épreuve du festival (lot 6)' },
+  mille_voiles: { name: 'Mille Voiles', file: null, use: 'La Course des Mille Voiles (lot 6)' },
+  fete_nuit: { name: 'La fête ne finit jamais', file: null, use: 'Le spectacle de la nuit, la détente (lot 6)' },
 };
 
 // la conversation qui suit la rencontre : les questions libres, puis la décision (Silas s'en souviendra)
@@ -288,6 +293,26 @@ export const CINEMAS = {
       { at: 3.0, do: 'walk', id: 'silas', path: [[33, 7]], speed: 60, when: 'garder' },
       { at: 3.0, do: 'emo', who: 'silas', e: '…', dur: 2, when: 'denoncer' },
       { at: 7.0, do: 'remove', id: 'silas' },
+    ],
+  },
+  // lot 6 — l'accueil de la Nuit des Mille Voiles : un travelling sur le port décoré, puis Mira se présente. Court : la fête attend.
+  fete_accueil: {
+    name: 'La Nuit des Mille Voiles', quest: 'La Nuit des Mille Voiles', maxDur: 16,
+    actors: {},
+    steps: [
+      { at: 0, do: 'bars', on: true },
+      { at: 0, do: 'theme', name: 'fete', fade: 1.0 },
+      { at: 0, do: 'cam', to: { world: [150, 127] }, dur: 0 },
+      { at: 0.3, do: 'cam', to: { world: [150, 104] }, dur: 4.2 }, // de la jetée à la place, sous les fanions
+      { at: 0.8, do: 'title', name: 'La Nuit des Mille Voiles', tag: 'Port-Lanterne en fête' },
+      { at: 3.6, do: 'title', name: null },
+      { at: 4.6, do: 'cam', to: { world: [138, 113] }, dur: 2.2 }, // la scène et ses musiciens
+      { at: 5.0, do: 'sub', text: 'Des lampions sur la jetée, des fanions de mât en mât, une scène sur la plage : Port-Lanterne fait la fête.' },
+      { at: 8.2, do: 'sub', text: '' },
+      { at: 8.4, do: 'cam', to: { npc: 'mira', dy: -8 }, dur: 1.2 },
+      { at: 9.0, do: 'emo', who: { npc: 'mira' }, e: '♪', dur: 1.6 },
+      { at: 9.8, do: 'talk', npc: 'mira', lines: 'mira_welcome' },
+      { at: 10.0, do: 'release' },
     ],
   },
 };

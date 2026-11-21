@@ -25,6 +25,35 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Nouveautés de la version 1.6 : la Nuit des Mille Voiles
+
+Chaque semaine, du jeudi midi au lundi midi (UTC), Port-Lanterne fait la fête sur la plage des Os Blanchis :
+fanions, lampions, une scène et ses musiciens, des stands, une foule qui danse. Mira Bellécume, l'organisatrice, vous
+accueille. Tout se joue seul, rien n'est nécessaire pour progresser, et la plage est une zone sûre pendant la fête.
+
+- **Cinq épreuves**, chacune avec un tampon dans le carnet du festival :
+  - le **Concours de canonniers** : 45 secondes pour toucher les cibles qui dérivent dans le port ;
+  - la **Chasse au trésor** de la grand-mère Bellécume : quatre indices dans la ville, puis un cadenas à symboles ;
+  - le **Défi des tavernes** avec Barnabé : les dés, la mémoire des chopes, les réflexes au « Tirez ! » ;
+  - le **Parcours du gabier** : des quais au chrono, avec des tonneaux qui roulent, une bôme, la corde et le grand
+    mât ;
+  - le **Duel des capitaines** dans la Lice, contre un champion ou un autre pirate : on se relève toujours, rien ne
+    se perd.
+- **La Course des Mille Voiles** :
+  - un cotre de location pour chacun ;
+  - huit bouées, des courants, du vent, une nappe de brume et des épaves ;
+  - trois équipages rivaux, et personne ne bloque personne ;
+  - un faux départ coûte dix secondes.
+- **Le spectacle de chaque soir** : le discours de Mira, des feux d'artifice et une foule qui danse. Rien n'est
+  imposé : on regarde, on danse, on tire ses propres fusées.
+- **Des jetons**, à dépenser au comptoir de Zéphyrine. Vingt parures : voiles et pavillons pour son navire, tenues,
+  émotes, guirlandes de lampions, titres. Il y a aussi un **classement de la semaine**, récompensé, et **quatre
+  secrets**.
+- **Trois éditions qui tournent** (Lampions, Mouettes, Étoiles), avec chacune ses règles et une parure exclusive.
+- **Quatre thèmes musicaux**, générés par le code (il n'existe aucun fichier audio) : « Port-Lanterne en fête »,
+  « Les épreuves », « Mille Voiles » et « La fête ne finit jamais ».
+- Détail, durées mesurées, tests et limites : `rapports/lot6-mille-voiles.md`.
+
 ## Nouveautés de la version 1.5 : le Plus Grand Braquage de Port-Lanterne
 
 Une quête exceptionnelle, du niveau 18 au niveau 21, seul ou jusqu'à cinq. Silas Virevent, à la Sirène Borgne,
@@ -472,6 +501,9 @@ shared/            code commun au serveur et au client
   constants.js     constantes, cycle jour/nuit
   formulas.js      statistiques, expérience, apparence
   data/            objets, monstres, quêtes (et leurs scènes), PNJ, compétences, mobilier (craft.js), anciens objets remboursés (legacy.js)
+  heist-world.js   les lieux du Plus Grand Braquage (1.5)
+  festival-world.js  la plage en fête, le Parcours du gabier et la Lice (1.6)
+  fest-sim.js      la simulation partagée du festival : cibles, tonneaux, chemin des rivaux (1.6)
 server/
   game.js          simulation autoritaire (IA, combat, butin, quêtes, boutiques, chat)
   social.js        chat, amis, groupes, équipages, échanges
@@ -482,6 +514,8 @@ server/
   naval.js         coques, chantier naval
   ships.js         les navires (1.1) : armement à quai, physique, pont, postes, canons, naufrage
   dungeon.js       le Bastion Englouti
+  heist.js         le Plus Grand Braquage (1.5)
+  festival.js      la Nuit des Mille Voiles : épreuves, course, spectacle, jetons, classement (1.6)
   sea.js           plongée et air
   seasons.js       concours de pêche, Grand Tour, podiums
   db.js            comptes, sauvegardes, instantanés
@@ -495,6 +529,8 @@ client/
   social-ui.js     chat, compagnons, échanges
   tavern-ui.js     mini-jeux de taverne
   townsfolk.js     habitants des villes
+  heist.js         le braquage côté écran : regards des gardes, mini-jeux (1.5)
+  festival.js      le festival côté écran : visée, mini-jeux, course, feux d'artifice, carnet (1.6)
   render/ships.js  le dessin des navires (coque, pont, mâture, voiles, sillage)
   render/lighting.js  la lumière (carte de lumière colorée, ambiances, halos, vignettage)
   scene.js         dialogues cinématiques (portraits, répliques, questions au choix)
