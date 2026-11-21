@@ -25,6 +25,15 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Version 1.6.4 : des ateliers et des quais habités (lot 4)
+
+- Onze nouveaux meubles, dessinés par le code selon la charte : foin, sacs de grain, planches, alambic, seau, meule,
+  tabouret, cordage, filet à sécher, casier à homards.
+- La forge, l'armurerie, les écuries, les chantiers, l'apothicairerie et la capitainerie se reconnaissent à leur
+  mobilier.
+- Les quais de cinq villes gardent quelques traces de vie, posées au sol (rien ne bloque).
+- Rapport : `rapports/mv4-architecture-mobilier.md`.
+
 ## Version 1.6.3 : des paysages plus naturels (lot 3)
 
 - Plus de bords en escalier : les raccords entre les sols deviennent de vraies diagonales et ondulent entre deux sols

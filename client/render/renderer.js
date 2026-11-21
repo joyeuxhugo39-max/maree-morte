@@ -25,6 +25,7 @@ import { raceCourse } from '../../shared/data/seasons.js';
 import { mountSheet } from './sprites-mounts.js';
 import { shipRender } from './ships.js'; // 1.1 : les vrais navires
 import { lighting } from './lighting.js'; // finition : la lumière en couleur
+import { extendMobilier } from './sprites-mobilier.js'; // monde vivant, lot 4 : le mobilier des métiers
 import { drawVue } from './vue.js'; // monde vivant, lot 2 : la surcouche de vérification
 import { BERTHS, berthPos, MOB_SHIP } from '../../shared/data/ships.js';
 
@@ -112,7 +113,7 @@ export class Renderer {
     this.water = makeWaterLayers();
     this.env = buildEnvSprites();
     this.structSpr = buildStructSprites(this.env);
-    extend06(this.env, this.structSpr); extend07(this.env); extend08(this.env); extendFete(this.env); extendProps08(this.structSpr); this.pets = petSheets(); this.tentacle = drawTentacle;
+    extend06(this.env, this.structSpr); extend07(this.env); extend08(this.env); extendFete(this.env); extendMobilier(this.env); extendProps08(this.structSpr); this.pets = petSheets(); this.tentacle = drawTentacle;
     // le volcan se peint en tâche de fond, un peu à chaque image (ou d'un coup si l'on arrive devant)
     this.volcJob = world.volcano ? volcanoGen(world.volcano) : null; this.volc = null; this.volcanAlpha = 1;
     this.puffs = world.volcano ? makePuffs() : null; this.plume = [];

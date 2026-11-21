@@ -4,6 +4,7 @@ import { TILE, MAP_W as W, MAP_H as H, OVER_H, T } from './constants.js';
 import { mulberry32, hash2, valueNoise, fbm, shuffle } from './rng.js';
 import { buildHeist } from './heist-world.js'; // lot 5 : le monde du Plus Grand Braquage
 import { buildFest } from './festival-world.js'; // lot 6 : la Nuit des Mille Voiles
+import { buildMobilier } from './mobilier-world.js'; // monde vivant, lot 4 : le mobilier des métiers
 
 export const Z = { SEA: 0, TOWN: 1, BEACH: 2, PLAINS: 3, JUNGLE: 4, RUINS: 5, SWAMP: 6, WRECK: 7, HAVRE: 8, CRANE: 9, ILOT: 10, INTERIOR: 11, CAVE: 12, GOUFFRE: 13,
   RADE: 14, COLLINES: 15, PENDUS: 16, SIRENES: 17, ANSE: 18, OSSEMENTS: 19, QUARANTAINE: 20, VOLCAN: 21, DAMNES: 22, BRUMES: 23, ERMITE: 24,
@@ -74,6 +75,8 @@ export const PROPS = {
   divan: { solid: 1 }, rideau: { solid: 1 }, table_jeu: { solid: 1 }, stalle: { solid: 1 }, trone: { solid: 1 }, banniere: { solid: 1 }, gradin: { solid: 1 }, lanterne_r: { solid: 1 },
   // lot 6 : la Nuit des Mille Voiles (rien ne bloque : la fête finie, la plage redevient la plage)
   estrade: { ground: 1 }, stand_fete: {}, tente_lice: {}, arche_fete: {}, mat_fete: {}, lampion: {}, canon_fete: {}, bouee: {}, mat_epave: {},
+  // monde vivant, lot 4 : le mobilier des métiers et les traces de vie des quais (cordage, filet, casier : on passe dessus)
+  foin: { solid: 1 }, sacs: { solid: 1 }, planches: { solid: 1 }, alambic: { solid: 1 }, meule: { solid: 1 }, seau: {}, tabouret: {}, cordage: { ground: 1 }, filet_sol: { ground: 1 }, casier: {},
 };
 
 const idx = (x, y) => y * W + x;
@@ -1767,8 +1770,9 @@ export function generateWorld(seed = 7) {
   // lot 5 : Le Plus Grand Braquage — pièces, façades, personnages et décors ajoutés en tout dernier
   const heist = buildHeist({ W, tiles, zones, solid, occ, idx, inMap, alloc, rooms, doors, props, addProp, npcs, roomGrid, sail, waterDist, stampPath })();
   const fest = buildFest({ W, H, OVER_H, tiles, zones, solid, occ, idx, inMap, alloc, rooms, doors, props, addProp, npcs, roomGrid })(); // lot 6 : après le braquage (aucun identifiant ne bouge)
+  const mobilier = buildMobilier({ W, H, OVER_H, tiles, zones, solid, occ, idx, inMap, rooms, doors, props, addProp, npcs, roomGrid, festBox: { x0: 120, x1: 172, y0: 94, y1: 128 } }); // monde vivant, lot 4 : en tout dernier
   const OUT = {
-    heist, fest,
+    heist, fest, mobilier,
     block: new Uint8Array(N), // constructions des joueurs : 1 bloque tout, 2 bloque les morts
     islandOf, islands, // 1.0 : chaque case de terre connaît son île
     doorOwner: new Map(), rooms, doors, sail, roomGrid, havre: HC, havreDock, OVER_H,
