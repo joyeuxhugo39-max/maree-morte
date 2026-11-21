@@ -25,6 +25,21 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Version 1.6.2 : vers un monde vivant (lots 1 et 2)
+
+Début du dossier « Finalisation du monde et de la direction artistique ».
+
+- **Audit** : 33 zones et 90 pièces inventoriées, une fiche de traitement par lieu, la vie des villes mesurée, la
+  charte graphique (grille, échelle entière, contours, palettes par matériau, lumière, animation, interface, effets).
+  Rapport : `rapports/mv1-audit-charte.md`.
+- **Fondations** :
+  - la longue-vue garde des pixels nets ;
+  - une surcouche de vérification (`?vue=1`, puis F9) montre grille, collisions, ancrages, routines des habitants,
+    lumières et coût du rendu ;
+  - un garde-fou automatique empêche les prochains lots de déplacer l'ancien monde ou de murer quoi que ce soit.
+
+  Rapport : `rapports/mv2-fondations.md`.
+
 ## Version 1.6.1 : la livraison validée
 
 Le dernier lot du dossier global : tout le projet est revérifié et livré.

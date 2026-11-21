@@ -26,6 +26,7 @@ import { Cinema } from './cinema.js'; // lot 4 : les cinématiques mises en scè
 import { Heist } from './heist.js'; // lot 5 : Le Plus Grand Braquage
 import { Festival } from './festival.js'; // lot 6 : la Nuit des Mille Voiles
 import { applyTheme } from './render/ui-art.js';
+import { vueWanted } from './render/vue.js'; // monde vivant, lot 2 : la surcouche de vérification (?vue=1, puis F9)
 import { shipOf, hullHalf, toWorld, stations, deckMove, deckOk, nearestDeck, openingAt, insideHull, toLocal, BERTHS, berthPos, RAIL } from '../shared/data/ships.js';
 applyTheme(); // 0.8.1 : parchemin, cadres de bois ferré, fleurons — avant même l'écran d'accueil
 
@@ -47,6 +48,7 @@ const HIT_COL = {
 };
 
 const G = {
+  vueAllowed: vueWanted(), vueOn: vueWanted(), // monde vivant, lot 2 : la surcouche de vérification
   world: null, renderer: null, ui: null, input: null, sfx: new Sfx(), net: null, mode: null,
   myId: 0, me: null, meAt: 0, inv: [], eq: {}, quests: {}, chests: {}, base: null,
   player: null, ents: new Map(), ships: new Map(), post: null, myShip: null, wind: [0.6, 0.9], npcs: [], worldTime: 0, online: 1, ping: 0,
@@ -1147,6 +1149,7 @@ function frame(now, dt) {
 function handleKeys(now) {
   const ui = G.ui;
   for (const k of G.input.takePressed()) {
+    if (k.code === 'F9' && G.vueAllowed) { G.vueOn = !G.vueOn; continue; }
     if (ui.typing()) continue;
     if (ui.cf) { if (k.key === 'e' || k.code === 'Enter') ui.confirmEnd(true); else if (k.code === 'Escape') ui.confirmEnd(false); continue; }
     if (ui.lp) { if (k.key === 'e' || k.code === 'Space' || k.code === 'MouseLeft') ui.lockpickPress(); else if (k.code === 'Escape') ui.lockpickEnd(null); continue; }

@@ -1,6 +1,6 @@
 # Lot 8 — Validation et livraison finale
 
-Version **1.6.1**, publiée le 21 novembre 2026 : `main`, GitHub Pages et la page claude.ai.
+Version **1.6.1**, publiée le 21 novembre 2026 : `main`, GitHub Pages et la page claude.ai (version 20).
 
 C'est le dernier lot du dossier global. Il ne refait pas les lots précédents : il vérifie l'ensemble, corrige ce que
 la vérification a trouvé, et livre le projet.

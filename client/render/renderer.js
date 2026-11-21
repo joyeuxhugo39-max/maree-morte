@@ -25,6 +25,7 @@ import { raceCourse } from '../../shared/data/seasons.js';
 import { mountSheet } from './sprites-mounts.js';
 import { shipRender } from './ships.js'; // 1.1 : les vrais navires
 import { lighting } from './lighting.js'; // finition : la lumière en couleur
+import { drawVue } from './vue.js'; // monde vivant, lot 2 : la surcouche de vérification
 import { BERTHS, berthPos, MOB_SHIP } from '../../shared/data/ships.js';
 
 const TAU = Math.PI * 2;
@@ -180,7 +181,11 @@ export class Renderer {
     this.light.width = this.W; this.light.height = this.H;
     this.ctx.imageSmoothingEnabled = false;
   }
-  scaleFor(extra) { return Math.max(0.5, (this.baseScale + (this.boost || 0) + extra) * (this.spy ? 0.5 : 1)); } // lot 4 : + le zoom des cinématiques, toujours entier
+  scaleFor(extra) { // monde vivant, lot 2 : toujours un nombre entier de pixels d'écran par pixel du monde (la longue-vue aussi)
+    const k = this.baseScale + (this.boost || 0) + extra;
+    if (!this.spy) return Math.max(1, k);
+    return k >= 2 ? Math.max(1, Math.floor(k / 2)) : 0.5; // la longue-vue : moitié du zoom, arrondie à l'entier (sur un très petit écran, ½ reste net)
+  } // lot 4 : + le zoom des cinématiques, toujours entier
   // lot 4 : la caméra, bornée à la pièce (ou à la carte) — partagé par le rendu et le zoom progressif des cinématiques
   clampCam(cx, cy, W, H, room) {
     let minX = 0, maxX = MAP_W * TILE - W, minY = 0, maxY = OVER_H * TILE - H;
@@ -239,6 +244,7 @@ export class Renderer {
 
   // ---------------------------------------------------------------- rendu
   render(G, now, dt) {
+    const t0 = G.vueOn ? performance.now() : 0;
     const ctx = this.ctx, W = this.W, H = this.H;
     const f = dayFrac(G.worldTime || 0), dark = darkness(f);
     this.darkNow = dark;
@@ -392,6 +398,11 @@ export class Renderer {
     this.drawTexts(ctx, camX, camY, dt);
     if (room) ctx.restore();
     else if (!G.cine && !(G.cinema && G.cinema.locked())) this.drawObjective(ctx, G, camX, camY, now); // lot 4 : pas de flèche d'objectif dans une scène
+    if (G.vueOn) { // monde vivant, lot 2 : la surcouche de vérification, dans le repère du monde
+      const st = this.vueStats || (this.vueStats = { avg: 0, max: 0, n: 0 });
+      drawVue(ctx, G, this, camX, camY, W, H, props);
+      st.ms = performance.now() - t0; st.avg = st.avg * 0.95 + st.ms * 0.05; st.n++; if (st.n % 120 === 0) st.max = 0; st.max = Math.max(st.max, st.ms);
+    }
     ctx.restore();
     this.drawBossBar(ctx, G);
   }
