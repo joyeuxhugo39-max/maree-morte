@@ -17,10 +17,11 @@ import { humanSheet, SKINS, HAIRS, CLOTH, CLOTH_KEYS, FW, FH, mobSheet, portrait
 import { MINI_COL } from './render/terrain.js';
 import { social } from './social-ui.js';
 import { tavernUI } from './tavern-ui.js';
-import { KNOT, windName, BERTHS, berthPos } from '../shared/data/ships.js';
+import { KNOT, windName, BERTHS, berthPos, shipOf, stations, rigFactor, GUN_RELOAD, SHIPS, SHIP_HULL, SHIP_TRAITS, RIG_NAMES, LOOKS } from '../shared/data/ships.js';
 import { PLACES, REP_LEVELS, repLevel, placeOf, buyPrice, sellPrice, taxOf, discountOf } from '../shared/data/places.js';
 
 const $ = (id) => document.getElementById(id);
+const TAU = Math.PI * 2;
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const hex = (c) => '#' + c.toString(16).padStart(6, '0');
 const STYLE_NAMES = { court: 'Court', long: 'Long', queue: 'Queue', chauve: 'Chauve', hirsute: 'Hirsute' };
@@ -817,11 +818,90 @@ export class UI {
       ch.push({ label: `⛵ ${armed ? 'Faire revenir' : 'Armer'} : ${it.name}${it.boat.cannon ? ` (${it.boat.cannon} canon${it.boat.cannon > 1 ? 's' : ''} par bord)` : ''}`, cls: 'q', go: () => { G.send({ t: 'ship', item: s.id }); this.close(); } });
     }
     if (G.myShip) ch.push({ label: '⚓ Ranger mon navire au port', go: () => { G.send({ t: 'ship', a: 'stow' }); this.close(); } });
+    if (seen.size) ch.push({ label: '📜 Fiches et couleurs de mes navires', go: () => this.openShips() }); // 1.9
     ch.push({ label: 'Plus tard.', go: () => this.close() });
     this.say(seen.size ? 'Une place à quai vous attend. Quel navire armer ? Il apparaîtra amarré, ancre au fond et voiles ferlées ; on y monte à pied, par la passerelle. (Un seul navire à vous dans l’archipel : en armer un autre fait rentrer le premier.)'
       : 'Vous n’avez pas encore de navire. Les charpentiers de marine en vendent : Corentin, sur le quai de Port-Lanterne, a des barques ; Joseph, des radeaux.', ch);
   }
-  // le tableau de bord du navire : coque, barre, voilure, ancre, vent et vitesse, et ce que fait le poste tenu
+  // 1.9 : les fiches des navires (forces et faiblesses, côte à côte) et leurs couleurs (pavillon, voiles, liston,
+  // fanaux) — cosmétiques, gratuites, vues de tous ; aucune n'améliore le navire
+  openShips() {
+    const G = this.G;
+    this.close();
+    let el = $('panel-ships');
+    if (!el) {
+      el = document.createElement('div'); el.id = 'panel-ships'; el.className = 'panel hidden';
+      el.innerHTML = '<div class="panel-head"><h2>Vos navires</h2><button class="x">✕</button></div><div class="ps-body"><div id="ps-cards"></div><h3>Les couleurs de votre navire <small>(vues de tous, gratuites)</small></h3><div id="ps-look"></div></div>';
+      document.body.appendChild(el); el.querySelector('.x').onclick = () => this.close();
+    }
+    el.classList.remove('hidden'); this.open = 'ships';
+    const own = [...new Set((G.inv || []).filter((q) => q && ITEMS[q.id] && ITEMS[q.id].boat && SHIPS[ITEMS[q.id].boat.kind]).map((q) => q.id))];
+    const all = Object.keys(ITEMS).filter((id) => ITEMS[id].boat && SHIPS[ITEMS[id].boat.kind] && !ITEMS[id].quest);
+    const maxV = Math.max(...all.map((id) => ITEMS[id].boat.speed)), maxH = Math.max(...Object.values(SHIP_HULL));
+    const bar = (lbl, v, txt) => `<div class="ps-bar"><i>${lbl}</i><b><s style="width:${Math.round(Math.max(0.04, Math.min(1, v)) * 100)}%"></s></b><em>${txt}</em></div>`;
+    $('ps-cards').innerHTML = (own.length ? own : all).map((id) => {
+      const it = ITEMS[id], k = it.boat.kind, S = SHIPS[k], up = rigFactor(S, 0, Math.PI * 2 / 3), man = (S.turn / 0.95) * 0.6 + (1.7 / S.tau) * 0.4;
+      const posts = stations(S).filter((q) => ['helm', 'sails', 'cap', 'fix'].includes(q.k)).length + (it.boat.cannon || 0) * 2, armed = G.myShip && G.myShip.item === id;
+      return `<div class="ps-card${armed ? ' on' : ''}"><h4>${esc(it.name)}${armed ? ' <small>· armé</small>' : ''}</h4><p class="ps-rig">${RIG_NAMES[S.rig] || ''} · ${S.masts.length} mât${S.masts.length > 1 ? 's' : ''} · ${Math.round(S.L / 16 * 4)} brasses</p>`
+        + bar('Vitesse', it.boat.speed / maxV, `${Math.round(it.boat.speed / KNOT)} nœuds`)
+        + bar('Au près', up * it.boat.speed / maxV, up >= 0.75 ? 'remonte bien' : up >= 0.55 ? 'correct' : 'peine')
+        + bar('Manœuvre', man, S.turn >= 0.6 ? 'vif' : S.turn >= 0.45 ? 'honnête' : 'lourd')
+        + bar('Coque', SHIP_HULL[k] / maxH, `${SHIP_HULL[k]} points`)
+        + bar('Canons', (it.boat.cannon || 0) / 4, it.boat.cannon ? `${it.boat.cannon} par bord` : 'aucun')
+        + `<p class="ps-crew">Postes : ${posts} · matelots du bord : ${S.hands || 0}${S.oar ? ' · avirons' : ''}</p>`
+        + `<ul>${(SHIP_TRAITS[k] || []).map((t) => `<li class="plus">${esc(t)}</li>`).join('')}${(SHIP_TRAITS[k + 'No'] || []).map((t) => `<li class="moins">${esc(t)}</li>`).join('')}</ul></div>`;
+    }).join('') + (own.length ? '' : '<p class="ps-note">Vous n’avez pas encore de navire : voici ceux de l’archipel.</p>');
+    this.renderShipLook();
+  }
+  renderShipLook() {
+    const G = this.G, cur = (G.me && G.me.shipLook) || {}, NAMES = { flag: 'Pavillon', sail: 'Voiles', trim: 'Liston', lant: 'Fanaux' };
+    const SW = { noir: '#141418', sabres: '#141418', ecarlate: '#b02a26', blanc: '#f2eee0', marchand: 'linear-gradient(#c23a34 0 33%,#f2eee0 33% 66%,#c23a34 66%)', equipage: '#2a8a4a', nature: '#d2c6a2', ecru: '#e6dcbc', azur: '#3a7ab8', rayee: 'repeating-linear-gradient(90deg,#e6dcbc 0 4px,#b22824 4px 7px)', bois: '#ab7643', or: '#f2c14a', rouge: '#c23a34', bleu: '#3a6ab8', vert: '#3a8a4a', ambre: '#ffe08a' };
+    const SWC = { sail: { noir: '#26222a', ecarlate: '#c23a34' }, trim: { blanc: '#f0e8d8' }, lant: { rouge: '#ff9a8a', vert: '#b0ffb8', bleu: '#b0d4ff' } };
+    $('ps-look').innerHTML = Object.keys(LOOKS).map((cat) => `<div class="ps-row"><i>${NAMES[cat]}</i>${Object.entries(LOOKS[cat]).map(([k, lbl]) => `<button data-c="${cat}" data-k="${k}" class="${(cur[cat] || '') === k ? 'on' : ''}" title="${esc(lbl)}"><span style="background:${(SWC[cat] && SWC[cat][k]) || SW[k] || '#888'}"></span>${esc(lbl.replace(/^(Pavillon|Voiles|Liston|Fanaux|Toile) /, ''))}</button>`).join('')}<button data-c="${cat}" data-k="" class="${cur[cat] ? '' : 'on'}">d’origine</button></div>`).join('')
+      + (G.myShip ? '' : '<p class="ps-note">Armez un navire pour le voir changer de couleurs.</p>');
+    for (const b of $('ps-look').querySelectorAll('button')) b.onclick = () => {
+      const look = { ...((G.me && G.me.shipLook) || {}) };
+      if (b.dataset.k) look[b.dataset.c] = b.dataset.k; else delete look[b.dataset.c];
+      G.send({ t: 'shiplook', look }); if (G.me) G.me.shipLook = look; this.renderShipLook(); G.sfx.play('pickup', 0.5);
+    };
+  }
+  // 1.9 : les aides de navigation s'effacent quand on sait faire (compteurs gardés dans ce navigateur)
+  navSkill() { if (!this._nav) { try { this._nav = JSON.parse(localStorage.getItem('mm-nav') || '{}') || {}; } catch { this._nav = {}; } } return this._nav; }
+  navDone(k) { const n = this.navSkill(); n[k] = (n[k] || 0) + 1; try { localStorage.setItem('mm-nav', JSON.stringify(n)); } catch { /* navigation privée */ } }
+  navKnows(k, need = 3) { return (this.navSkill()[k] || 0) >= need; }
+  navReset() { this._nav = {}; try { localStorage.removeItem('mm-nav'); } catch { /* rien */ } this.toast('Les aides de navigation sont de retour.', 'info'); }
+  // le compas : le cap, le vent, et autour la marche du navire à chaque cap (selon son gréement)
+  drawCompass(s, wa) {
+    const cv = $('sh-comp'); if (!cv) return;
+    const x = cv.getContext('2d'), S = shipOf(s.kind), C = 28;
+    const key = s.kind + ':' + Math.round(wa * 40);
+    if (this.compKey !== key) { // l'anneau ne change qu'avec le vent ou le navire
+      this.compKey = key;
+      const ring = this.compRing || (this.compRing = document.createElement('canvas')); ring.width = ring.height = 56;
+      const r = ring.getContext('2d'); r.clearRect(0, 0, 56, 56);
+      r.fillStyle = '#efe0bc'; r.beginPath(); r.arc(C, C, 27, 0, TAU); r.fill();
+      r.strokeStyle = '#4a2c14'; r.lineWidth = 1.5; r.stroke();
+      const N = 36;
+      for (let i = 0; i < N; i++) {
+        const h0 = i / N * TAU, f = rigFactor(S, h0 + TAU / N / 2, wa), t = Math.max(0, Math.min(1, (f - 0.3) / 0.65));
+        r.strokeStyle = `rgb(${Math.round(200 - 120 * t)},${Math.round(70 + 120 * t)},${Math.round(50 + 20 * t)})`;
+        r.lineWidth = 4; r.beginPath(); r.arc(C, C, 23.5, h0, h0 + TAU / N + 0.02); r.stroke();
+      }
+      r.fillStyle = '#4a2c14'; r.font = '700 8px "Pixelify Sans", sans-serif'; r.textAlign = 'center'; r.textBaseline = 'middle';
+      r.fillText('N', C, 7); r.fillText('S', C, 50); r.fillText('E', 50, C); r.fillText('O', 6, C);
+      // le vent : une flèche bleue qui traverse le compas (elle va où le vent pousse)
+      const c = Math.cos(wa), sn = Math.sin(wa);
+      r.strokeStyle = '#3a7ab8'; r.lineWidth = 2; r.beginPath(); r.moveTo(C - c * 15, C - sn * 15); r.lineTo(C + c * 12, C + sn * 12); r.stroke();
+      r.fillStyle = '#3a7ab8'; r.beginPath(); r.moveTo(C + c * 17, C + sn * 17); r.lineTo(C + c * 10 - sn * 4, C + sn * 10 + c * 4); r.lineTo(C + c * 10 + sn * 4, C + sn * 10 - c * 4); r.fill();
+    }
+    x.clearRect(0, 0, 56, 56); x.drawImage(this.compRing, 0, 0);
+    const a = s.a || 0, c = Math.cos(a), sn = Math.sin(a);
+    x.fillStyle = '#c02a1a'; x.strokeStyle = '#1c1008'; x.lineWidth = 1;
+    x.beginPath(); x.moveTo(C + c * 19, C + sn * 19); x.lineTo(C - sn * 4 - c * 5, C + c * 4 - sn * 5); x.lineTo(C - c * 2, C - sn * 2); x.lineTo(C + sn * 4 - c * 5, C - c * 4 - sn * 5); x.closePath(); x.fill(); x.stroke();
+    x.fillStyle = '#f2c14a'; x.beginPath(); x.arc(C, C, 2, 0, TAU); x.fill();
+  }
+  // le tableau de bord du navire : les trois états, le compas, la barre et la voilure, l'ancre, qui tient quel poste,
+  // les canons — et une ligne d'aide qui ne dit que ce qu'on ne sait pas encore (ou ce qui presse)
   updateShipHud(now) {
     const G = this.G, p = G.player, el = $('shiphud');
     if (!el) return;
@@ -830,41 +910,73 @@ export class UI {
       $('sh-unstick').onclick = () => G.send({ t: 'ship', a: 'unstick' });
       $('sh-land').onclick = () => G.send({ t: 'ship', a: 'land' });
       $('sh-home').onclick = () => this.confirm('Ramener le navire au quai le plus proche ? L’équipage s’en charge en quelques secondes, si personne ne vous touche.', () => G.send({ t: 'ship', a: 'home' }));
+      $('sh-help').onclick = () => this.navReset();
+      $('sh-look').onclick = () => this.openShips();
     }
     const s = p && p.ship ? G.ships.get(p.ship) : null;
-    if (!s || !s.buf || !s.buf.length) { if (!el.classList.contains('hidden')) el.classList.add('hidden'); return; }
+    if (!s || !s.buf || !s.buf.length) { if (!el.classList.contains('hidden')) el.classList.add('hidden'); this.lastPost = null; return; }
     el.classList.remove('hidden');
     if (now - (this.shudAt || 0) < 0.1) return;
     this.shudAt = now;
-    const hm = s.hmax || 1, hull = Math.max(0, s.hull || 0);
+    const S = shipOf(s.kind), hm = s.hmax || 1, hull = Math.max(0, s.hull || 0), wa = (G.wind && G.wind[0]) || 0;
+    const k = G.post && G.post.k, gi = k && k.startsWith('gun') ? +k.slice(3) : -1, cd = gi >= 0 && G.gunCd ? Math.max(0, (G.gunCd[gi] || 0) - now) : 0;
+    if (k !== this.lastPost) { if (k) this.navDone('post:' + (gi >= 0 ? 'gun' : k)); this.lastPost = k; this.postAt = now; }
     $('sh-name').textContent = s.name + (s.own && s.own !== p.name ? ` de ${s.own}` : '');
     $('sh-hull-f').style.width = Math.min(100, hull / hm * 100) + '%'; $('sh-hull-f').className = hull / hm < 0.3 ? 'low' : '';
     $('sh-hull-t').textContent = `${Math.round(hull)} / ${hm}`;
+    const part = (id, d) => { const e = $(id); e.style.width = Math.round((1 - d) * 100) + '%'; e.className = d > 0.5 ? 'low' : d > 0.2 ? 'mid' : ''; };
+    part('sh-dsail-f', s.dsail || 0); part('sh-drud-f', s.drud || 0);
+    const leak = !!((s.fl || 0) & 1);
+    $('sh-leak').classList.toggle('hidden', !leak);
+    this.drawCompass(s, wa);
+    $('sh-speed').textContent = `${Math.round((s.sp || 0) / KNOT)} nœuds`;
+    $('sh-wind-t').textContent = `Vent ${windName(wa)}`;
+    // l'allure : d'où vient le vent par rapport au cap, et ce qu'en pense le gréement
+    const rel = Math.cos(wa - (s.a || 0)), allure = rel > 0.7 ? 'vent arrière' : rel > 0.2 ? 'grand largue' : rel > -0.3 ? 'vent de travers' : rel > -0.75 ? 'au près' : 'face au vent';
+    const f = rigFactor(S, s.a || 0, wa);
+    $('sh-allure').textContent = allure + (f >= 0.92 ? ' · belle allure' : f < 0.5 ? ' · le navire peine' : '');
     $('sh-wheel-n').style.transform = `rotate(${Math.round((s.rud || 0) * 140)}deg)`;
     $('sh-sail-f').style.width = Math.round((s.sail || 0) * 100) + '%';
+    const goal = s.sailGoal != null && now - (s.sailGoalAt || 0) < 6 ? s.sailGoal : null;
+    $('sh-sail-g').style.display = goal == null ? 'none' : ''; if (goal != null) $('sh-sail-g').style.left = Math.round(goal * 100) + '%';
     const anc = s.anc || 0;
-    $('sh-anchor').textContent = anc >= 200 ? (anc % 100 > 0 ? `remonte ${anc % 100} %` : 'au fond') : anc >= 100 ? 'tombe…' : 'levée';
+    $('sh-anchor').textContent = anc >= 200 ? (anc % 100 > 0 ? `remonte ${anc % 100} %` : 'au fond') : anc >= 100 ? 'tombe…' : (s.fl & 4) ? 'levée · aux avirons' : 'levée';
     $('sh-anchor').className = anc >= 100 ? 'down' : '';
-    $('sh-wind-a').style.transform = `rotate(${((G.wind && G.wind[0]) || 0).toFixed(2)}rad)`;
-    $('sh-wind-t').textContent = `Vent ${windName((G.wind && G.wind[0]) || 0)}`;
-    $('sh-speed').textContent = `${Math.round((s.sp || 0) / KNOT)} nœuds`;
-    const k = G.post && G.post.k, gi = k && k.startsWith('gun') ? +k.slice(3) : -1, cd = gi >= 0 && G.gunCd ? Math.max(0, (G.gunCd[gi] || 0) - now) : 0;
-    const simple = G.helmMode !== 'reel', homing = G.homingUntil && now < G.homingUntil;
-    // l'allure : d'où vient le vent par rapport au cap
-    const rel = Math.cos(((G.wind && G.wind[0]) || 0) - (s.a || 0)), allure = rel > 0.7 ? 'vent arrière' : rel > 0.2 ? 'grand largue' : rel > -0.3 ? 'vent de travers' : rel > -0.75 ? 'au près' : 'face au vent';
-    $('sh-wind-t').textContent = `Vent ${windName((G.wind && G.wind[0]) || 0)} · ${allure}`;
-    // l'étape suivante, tant que le navire n'est pas lancé
-    const coach = anc >= 100 && (s.sail || 0) < 0.1 ? (k === 'helm' ? (simple ? 'Pour partir : maintenez une direction, puis Espace pour hisser la voile (l’équipage lève l’ancre).' : 'Pour partir : Z (tenir) — l’équipage lève l’ancre et hisse la voile.') : 'Pour partir : prenez la barre (E, à la poupe), puis Espace ou Z.')
-      : (s.sail || 0) < 0.1 && k !== 'helm' ? 'Voile ferlée : à la barre, Espace ou Z pour la hisser.' : '';
-    G.shipCoach = coach && k !== 'helm' ? 'helm' : null;
-    $('sh-hint').textContent = homing ? `Cap sur le port… ${Math.ceil(G.homingUntil - now)} s (sans être touché)`
-      : coach || (!k ? 'E près d’un poste : la barre (poupe), les drisses (grand mât), le cabestan (proue), les canons. E près du bord : descendre à terre.'
-      : k === 'helm' ? (simple ? 'À la barre — ZQSD : la direction voulue · Espace : voilure (ferlée, mi-voile, toute) · E : quitter' : 'À la barre — Q / D : la roue (elle reste où vous la laissez) · Z / S : voilure · E : quitter')
-      : k === 'sails' ? 'Aux drisses — Z : déployer les voiles · S : les carguer · E : quitter'
-      : k === 'cap' ? 'Au cabestan — Z (tenir) : lever l’ancre, plus vite à plusieurs · S : la jeter · E : quitter'
-      : `Au canon — visez à la souris, clic pour tirer${cd > 0 ? ` · rechargement ${cd.toFixed(1)} s` : ' · prêt !'} · E : quitter`);
-    const mine = s.own === p.name;
-    $('sh-home').style.display = mine ? '' : 'none';
+    // qui tient quoi (le serveur le dit dans « me ») et l'état des canons (le recul de chacun est vu de tous)
+    const cr = (G.me && G.me.crew) || {}, mine = (n) => n && n === p.name;
+    const post = (lbl, who, n) => `<span class="${who || n ? 'on' : ''} ${mine(who) ? 'me' : ''}" title="${lbl}">${lbl} ${n ? '×' + n : who ? '· ' + esc(who) : '—'}</span>`;
+    const ph = post('Barre', cr.helm) + post('Drisses', cr.sails) + post('Cabestan', '', cr.cap || 0) + (S.shape !== 'raft' ? post('Établi', cr.fix) : '');
+    if (ph !== this.shPosts) { this.shPosts = ph; $('sh-posts').innerHTML = ph; }
+    $('sh-n').textContent = cr.n ? `· ${cr.n} pirate${cr.n > 1 ? 's' : ''}` : '';
+    $('sh-crew').classList.toggle('hidden', !(cr.n > 1)); // seul à bord, inutile de dire qui tient quoi
+    const ng = stations(S).filter((q) => q.k === 'gun').length, manned = new Set(cr.guns || []);
+    let gh = '';
+    for (let i = 0; i < ng; i++) { const re = s.gunAt && now - (s.gunAt[i] || -9) < GUN_RELOAD; gh += `<i class="${manned.has(i) ? 'on' : ''} ${re ? 're' : ''}" title="Canon ${i % 2 ? 'tribord' : 'bâbord'} ${(i >> 1) + 1}${manned.has(i) ? ' (tenu)' : ''}${re ? ' — rechargement' : ''}"></i>`; }
+    if (gh !== this.shGuns) { this.shGuns = gh; $('sh-guns').innerHTML = gh; }
+    // la ligne d'aide : d'abord ce qui presse, ensuite ce qu'on ne sait pas encore faire
+    const simple = G.helmMode !== 'reel', homing = G.homingUntil && now < G.homingUntil, dr = s.drud || 0, ds = s.dsail || 0;
+    const knowHelm = this.navKnows('sail') && this.navKnows('anchor', 2) && this.navKnows('post:helm');
+    const fresh = now - (this.postAt || 0) < 8; // juste après avoir pris un poste, on rappelle ses commandes tant qu'on ne les sait pas
+    let warn = '', hint = '';
+    if (homing) warn = `Cap sur le port… ${Math.ceil(G.homingUntil - now)} s (sans être touché)`;
+    else if (leak) warn = S.shape === 'raft' ? 'Voie d’eau ! Rentrez au port avant de couler.' : 'Voie d’eau ! L’établi du charpentier colmate (E), ou rentrez au port.';
+    else if (dr > 0.4 && k === 'helm') warn = 'Gouvernail touché : la barre répond mal. L’établi du charpentier le rafistole.';
+    else if (ds > 0.45 && k === 'helm') warn = 'Voiles déchirées : le navire perd de sa vitesse. L’établi les rapièce.';
+    if (!warn) {
+      if (anc >= 100 && (s.sail || 0) < 0.1 && !this.navKnows('sail')) hint = k === 'helm' ? (simple ? 'Pour partir : Espace hisse la voile (l’équipage lève l’ancre), puis la direction voulue (ZQSD).' : 'Pour partir : Z (tenir) — l’équipage lève l’ancre et hisse la voile.') : 'Pour partir : prenez la barre (E, à la poupe), puis Espace.';
+      else if (!k) hint = this.navKnows('post:helm') ? '' : 'E près d’un poste : la barre (poupe), les drisses (grand mât), le cabestan (proue), les canons, l’établi. E près du bord : descendre à terre.';
+      else if (k === 'helm' && (!knowHelm || (fresh && !this.navKnows('post:helm', 6)))) hint = simple ? 'À la barre — ZQSD : la direction · Espace / Maj : plus ou moins de toile · X : l’ancre · voile ferlée, la direction fait ramer · E : quitter' : 'À la barre — Q / D : la roue (elle reste où vous la laissez) · Z / S : voilure · X : l’ancre · E : quitter';
+      else if (k === 'sails' && !this.navKnows('post:sails', 4)) hint = 'Aux drisses — Z : déployer · S : carguer · tant que vous les tenez, la toile se règle deux fois plus vite et porte mieux · E : quitter';
+      else if (k === 'cap' && !this.navKnows('post:cap', 4)) hint = 'Au cabestan — Z (tenir) : lever l’ancre, bien plus vite à plusieurs · S : la jeter · E : quitter';
+      else if (k === 'fix' && !this.navKnows('post:fix', 4)) hint = 'À l’établi — restez-y : le gouvernail d’abord, puis la toile, puis la coque (jusqu’à 80 %). Plus lent sous le feu. · E : quitter';
+      if (gi >= 0) hint = `Au canon — visez à la souris, clic pour tirer${cd > 0 ? ` · rechargement ${cd.toFixed(1)} s` : ' · prêt !'}${this.navKnows('post:gun', 4) ? '' : ' · E : quitter'}`;
+    }
+    G.shipCoach = anc >= 100 && (s.sail || 0) < 0.1 && k !== 'helm' && !this.navKnows('sail') ? 'helm' : null;
+    const he = $('sh-hint'), txt = warn || hint;
+    if (he.textContent !== txt) he.textContent = txt;
+    he.className = warn ? 'warn' : '';
+    const own = s.own === p.name;
+    $('sh-home').style.display = own ? '' : 'none'; $('sh-look').style.display = own ? '' : 'none';
     $('sh-unstick').classList.toggle('hot', (s.sp || 0) < 3 && anc < 100 && (s.sail || 0) > 0.2);
   }
   // ------------------------------------------------------------ boutique

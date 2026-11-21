@@ -6,7 +6,9 @@ import { T, TILE } from '../shared/constants.js';
 import { ITEMS } from '../shared/data/items.js';
 import { NPCS } from '../shared/data/npcs.js';
 
-export const HULL = { radeau: 60, barque: 100, sloop: 180, brick: 260, goelette: 300, galion: 420, veuve: 520, spectre: 320 };
+import { SHIP_HULL } from '../shared/data/ships.js';
+
+export const HULL = SHIP_HULL; // 1.9 : la table vit dans shared/data/ships.js (les fiches des navires la montrent)
 const REPAIR_COST = 3; // doublons par point de coque
 export const isShipwright = (id) => !!(NPCS[id] && (NPCS[id].repair || (NPCS[id].shop || []).some((i) => ITEMS[i] && ITEMS[i].boat)));
 
@@ -38,7 +40,7 @@ export const naval = {
     if (p.gold < cost) return this.toast(p, `La réparation coûte ${cost} doublons.`, 'warn');
     p.gold -= cost;
     for (const s of p.inv) if (s && ITEMS[s.id].boat && this.repairable(p, s.id)) p.hulls[s.id] = this.hullMax(s.id);
-    const sh = this.ownShip(p.key); if (sh && this.repairable(p, sh.item)) sh.hull = this.hullMax(sh.item);
+    const sh = this.ownShip(p.key); if (sh && this.repairable(p, sh.item)) { sh.hull = this.hullMax(sh.item); sh.dmg = { sail: 0, rud: 0 }; } // 1.9 : la toile et le gouvernail aussi
     p.dirtyMe = true; this.audit && this.audit('reparation', { who: p.key, cost });
     this.toast(p, `Coques remises à neuf (−${cost} doublons). Bon vent !`, 'quest');
   },

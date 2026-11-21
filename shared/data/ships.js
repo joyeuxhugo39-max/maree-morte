@@ -12,30 +12,55 @@ import { canStand } from '../world.js';
 // L longueur, B largeur ; masts (x, demi-vergue, hauteur) ; postes : barre, cabestan, canons (x, des deux
 // bords) ; ouvertures dans le bastingage (x, largeur) ; physique : tau (élan, s), turn (rad/s au plus),
 // rud (vitesse de la barre, /s), lat (dérive, s), mass ; lanterns (x, y).
+// 1.9 : rig — le gréement (carré : vent arrière ; aurique : remonte au vent ; au tiers : la barque ; le radeau) ;
+// oar — la vitesse aux avirons, voiles ferlées (px/s) ; hands — les matelots qu'on voit travailler à bord.
 export const SHIPS = {
   radeau: { L: 46, B: 32, shape: 'raft', masts: [{ x: 2, s: 17, h: 20 }], helm: -17, cap: 16, guns: [], open: true,
-    tau: 1.7, turn: 0.95, rud: 1.7, lat: 0.35, mass: 1, lanterns: [] },
-  barque: { L: 62, B: 28, shape: 'boat', masts: [{ x: 6, s: 15, h: 24 }], helm: -25, cap: 23, guns: [], ops: [{ x: -8, w: 16 }],
-    tau: 1.9, turn: 0.85, rud: 1.5, lat: 0.4, mass: 1.5, lanterns: [[-28, 0]] },
-  sloop: { L: 104, B: 38, shape: 'ship', masts: [{ x: 8, s: 22, h: 42 }], helm: -40, cap: 38, guns: [-14], ops: [{ x: 22, w: 14 }],
-    tau: 2.7, turn: 0.6, rud: 1.0, lat: 0.6, mass: 3, lanterns: [[-50, 0], [48, 0]] },
+    tau: 1.7, turn: 0.95, rud: 1.7, lat: 0.35, mass: 1, lanterns: [], rig: 'raft', oar: 22, hands: 0 },
+  barque: { L: 62, B: 28, shape: 'boat', masts: [{ x: 6, s: 15, h: 24, lug: 1 }], helm: -25, cap: 23, guns: [], ops: [{ x: -8, w: 16 }],
+    tau: 1.9, turn: 0.85, rud: 1.5, lat: 0.4, mass: 1.5, lanterns: [[-28, 0]], rig: 'lug', oar: 30, hands: 0 },
+  sloop: { L: 104, B: 38, shape: 'ship', masts: [{ x: 8, s: 22, h: 42, gaff: 1 }], helm: -40, cap: 38, guns: [-14], ops: [{ x: 22, w: 14 }],
+    tau: 2.7, turn: 0.6, rud: 1.0, lat: 0.6, mass: 3, lanterns: [[-50, 0], [48, 0]], rig: 'fore', oar: 20, hands: 1 },
   brick: { L: 126, B: 44, shape: 'ship', masts: [{ x: 28, s: 24, h: 46 }, { x: -16, s: 26, h: 52 }], helm: -50, cap: 48, guns: [8, -34], ops: [{ x: -6, w: 12 }],
-    tau: 3.1, turn: 0.5, rud: 0.9, lat: 0.7, mass: 4, lanterns: [[-61, 0], [58, 0]] },
+    tau: 3.1, turn: 0.5, rud: 0.9, lat: 0.7, mass: 4, lanterns: [[-61, 0], [58, 0]], rig: 'square', oar: 15, hands: 2 },
   goelette: { L: 134, B: 44, shape: 'ship', masts: [{ x: 30, s: 22, h: 50, gaff: 1 }, { x: -16, s: 24, h: 54, gaff: 1 }], helm: -54, cap: 52, guns: [10, -36], ops: [{ x: -6, w: 12 }],
-    tau: 3.0, turn: 0.52, rud: 0.9, lat: 0.7, mass: 4, lanterns: [[-65, 0], [62, 0]] },
+    tau: 3.0, turn: 0.52, rud: 0.9, lat: 0.7, mass: 4, lanterns: [[-65, 0], [62, 0]], rig: 'fore', oar: 15, hands: 2, jibs: 2 },
   spectre: { L: 130, B: 42, shape: 'ship', masts: [{ x: 30, s: 22, h: 50 }, { x: -16, s: 24, h: 54 }], helm: -52, cap: 50, guns: [10, -34], ops: [{ x: -6, w: 12 }],
-    tau: 2.6, turn: 0.6, rud: 1.0, lat: 0.6, mass: 3.5, lanterns: [[-63, 0], [60, 0]] },
-  galion: { L: 176, B: 60, shape: 'ship', masts: [{ x: 50, s: 30, h: 58 }, { x: 6, s: 34, h: 66 }, { x: -40, s: 28, h: 58 }], helm: -70, cap: 68, guns: [30, -14, -54], ops: [{ x: 12, w: 14 }],
-    castle: [-88, -58], fore: [60, 88], tau: 4.6, turn: 0.34, rud: 0.65, lat: 0.95, mass: 7, lanterns: [[-86, -16], [-86, 16], [82, 0]] },
-  veuve: { L: 190, B: 64, shape: 'ship', masts: [{ x: 56, s: 32, h: 62 }, { x: 8, s: 36, h: 70 }, { x: -42, s: 30, h: 62 }], helm: -76, cap: 72, guns: [40, 20, -24, -50], ops: [{ x: -3, w: 12 }],
-    castle: [-95, -62], fore: [64, 95], tau: 4.2, turn: 0.38, rud: 0.7, lat: 0.9, mass: 7.5, lanterns: [[-93, -18], [-93, 18], [88, 0]] },
+    tau: 2.6, turn: 0.6, rud: 1.0, lat: 0.6, mass: 3.5, lanterns: [[-63, 0], [60, 0]], rig: 'ghost', oar: 18, hands: 2 },
+  galion: { L: 176, B: 60, shape: 'ship', masts: [{ x: 50, s: 30, h: 58 }, { x: 6, s: 34, h: 66 }, { x: -40, s: 28, h: 58, lateen: 1 }], helm: -70, cap: 68, guns: [30, -14, -54], ops: [{ x: 12, w: 14 }],
+    castle: [-88, -58], fore: [60, 88], tau: 4.6, turn: 0.34, rud: 0.65, lat: 0.95, mass: 7, lanterns: [[-86, -16], [-86, 16], [82, 0]], rig: 'square', oar: 10, hands: 4 },
+  veuve: { L: 190, B: 64, shape: 'ship', masts: [{ x: 56, s: 32, h: 62 }, { x: 8, s: 36, h: 70 }, { x: -42, s: 30, h: 62, lateen: 1 }], helm: -76, cap: 72, guns: [40, 20, -24, -50], ops: [{ x: -3, w: 12 }],
+    castle: [-95, -62], fore: [64, 95], tau: 4.2, turn: 0.38, rud: 0.7, lat: 0.9, mass: 7.5, lanterns: [[-93, -18], [-93, 18], [88, 0]], rig: 'square', oar: 10, hands: 4 },
 };
 export const RAIL = 3; // épaisseur du bastingage
+// la coque de chaque modèle (points) — 1.9 : partagée, pour que les fiches des navires la montrent
+export const SHIP_HULL = { radeau: 60, barque: 100, sloop: 180, brick: 260, goelette: 300, galion: 420, veuve: 520, spectre: 320 };
+export const RIG_NAMES = { square: 'voiles carrées', fore: 'voiles auriques', ghost: 'voiles spectrales', lug: 'voile au tiers', raft: 'voile de fortune' };
+// 1.9 : forces et faiblesses de chaque modèle (aucun n'est meilleur en tout)
+export const SHIP_TRAITS = {
+  radeau: ['Ne coûte presque rien', 'Se faufile partout'], radeauNo: ['Lent, fragile, sans canon'],
+  barque: ['Maniable, rame bien', 'Accoste n’importe où'], barqueNo: ['Pas de canon, coque légère'],
+  sloop: ['Vif et maniable', 'Remonte bien au vent'], sloopNo: ['Un seul canon par bord'],
+  brick: ['Rapide vent arrière', 'Deux canons par bord'], brickNo: ['Peine au près'],
+  goelette: ['La meilleure au près', 'Fine et rapide'], goeletteNo: ['Coque moyenne'],
+  spectre: ['Se moque du vent', 'Très rapide'], spectreNo: ['Coque moyenne', 'Un seul exemplaire dans l’archipel'],
+  galion: ['Trois canons par bord', 'Coque épaisse, grand équipage'], galionNo: ['Lent à virer', 'Peine au près'],
+  veuve: ['Quatre canons par bord', 'La coque la plus solide'], veuveNo: ['Lourde à manœuvrer', 'Peine au près'],
+};
+// 1.9 : la personnalisation (cosmétique, visible de tous) : pavillon, voiles, liston, fanaux
+export const LOOKS = {
+  flag: { noir: 'Pavillon noir (le crâne)', sabres: 'Sabres croisés', ecarlate: 'Pavillon écarlate', blanc: 'Pavillon blanc', marchand: 'Pavillon marchand (rayé)', equipage: 'Les couleurs de l’équipage' },
+  sail: { nature: 'Toile naturelle', ecru: 'Toile écrue', noir: 'Voiles noires', ecarlate: 'Voiles écarlates', azur: 'Voiles azur', rayee: 'Voiles rayées' },
+  trim: { bois: 'Liston de bois', or: 'Liston doré', blanc: 'Liston blanc', rouge: 'Liston rouge', bleu: 'Liston bleu', vert: 'Liston vert' },
+  lant: { ambre: 'Fanaux ambrés', rouge: 'Fanaux rouges', vert: 'Fanaux verts', bleu: 'Fanaux bleus' },
+};
+export function cleanLook(l) { const o = {}; if (l && typeof l === 'object') for (const k of Object.keys(LOOKS)) if (typeof l[k] === 'string' && LOOKS[k][l[k]]) o[k] = l[k]; return Object.keys(o).length ? o : null; }
 // les navires ennemis (monstres) ont aussi un gabarit : le leur, selon leur voilure
 export const MOB_SHIP = { black: ['sloop', 'noir'], red: ['brick', 'brick'], ghost: ['galion', 'fantome'] };
 export const mobShipKind = (def) => (MOB_SHIP[def.ship && def.ship.sail] || MOB_SHIP.black)[0];
 // un point (au sol) touche-t-il la coque d'un navire de cap a ?
 export function hullHit(S, sx, sy, a, x, y, pad = 3) { const c = Math.cos(a), s = Math.sin(a), dx = x - sx, dy = y - sy, lx = c * dx + s * dy, ly = -s * dx + c * dy; return Math.abs(lx) < S.L / 2 + 2 && Math.abs(ly) < hullHalf(S, lx) + pad; }
+export const GUN_RELOAD = 3.2; // 1.9 : le rechargement d'un canon de bord (s), partagé pour que le tableau de bord le montre
 export const KNOT = 12; // pixels par seconde dans un nœud (pour l'affichage)
 export const shipOf = (kind) => SHIPS[kind] || SHIPS.barque;
 
@@ -58,14 +83,46 @@ export function stations(S) {
   const main = S.masts.reduce((b, m) => (m.s > b.s ? m : b), S.masts[0]);
   const st = [{ k: 'helm', x: S.helm + 5, y: 0, at: [S.helm, 0] }, { k: 'sails', x: main.x - 9, y: 0, at: [main.x, 0] }, { k: 'cap', x: S.cap - 8, y: 0, at: [S.cap, 0] }];
   S.guns.forEach((gx, i) => { for (const side of [-1, 1]) { const hw = hullHalf(S, gx); st.push({ k: 'gun', i: i * 2 + (side > 0 ? 1 : 0), side, x: gx, y: side * (hw - 15), at: [gx, side * (hw - 7)] }); } });
+  // 1.9 : la vie à bord — l'établi du charpentier (réparer en mer), la table des cartes, la vigie à la proue, un banc
+  for (const e of extras(S)) st.push(e);
   return (S._st = st);
 }
+// 1.9 : les coins du pont où l'on fait autre chose que manœuvrer (posés là où il y a de la place)
+export function extras(S) {
+  if (S._ex) return S._ex;
+  const out = [], taken = [[S.helm, 0], [S.cap, 0], ...S.masts.map((m) => [m.x, 0])];
+  const room = (x, y) => taken.every(([ax, ay]) => Math.hypot(ax - x, ay - y) > 12) && Math.abs(y) <= hullHalf(S, x) - RAIL - 9;
+  const spot = (k, x0, side, extra = {}) => { for (const dx of [0, 6, -6, 12, -12, 18, -18, 24, -24]) { const x = x0 + dx, y = side * Math.max(0, hullHalf(S, x) - RAIL - 10); if (room(x, y)) { taken.push([x, y]); const e = { k, x, y: y - side * 8, at: [x, y], side, ...extra }; out.push(e); return e; } } return null; };
+  if (S.shape === 'ship') spot('fix', S.helm + S.L * 0.16, -1); // l'établi : planches, étoupe, maillet
+  else if (S.shape === 'boat') out.push({ k: 'fix', x: S.helm + 14, y: 0, at: [S.helm + 12, 0], side: -1 }); // dans la barque : la caisse à outils sous le banc de poupe (pas un obstacle)
+  if (S.shape === 'ship') spot('carte', S.helm + S.L * 0.16, 1); // la table des cartes, sous la dunette
+  spot('vigie', S.shape === 'ship' ? S.cap - 16 : S.L / 2 - 14, S.shape === 'ship' ? 1 : -1); // vers la proue, la longue-vue
+  if (S.L >= 100) spot('banc', -S.L * 0.05, 1); // un banc contre le bastingage
+  return (S._ex = out);
+}
+// 1.9 : la marche au vent selon le gréement. rel = cos(cap − vent) : 1 vent arrière, 0 vent de travers, −1 face au vent.
+// Les voiles carrées aiment le vent arrière et peinent au près ; les voiles auriques remontent au vent et filent
+// vent de travers ; personne n'est arrêté net face au vent (on y avance lentement : on apprend à tirer des bords).
+const POLAR = {
+  square: [[-1, 0.28], [-0.5, 0.45], [0, 0.82], [0.5, 0.96], [1, 1]],
+  fore: [[-1, 0.38], [-0.8, 0.52], [-0.5, 0.8], [0, 1], [0.5, 0.95], [1, 0.84]],
+  ghost: [[-1, 0.62], [-0.5, 0.8], [0, 0.95], [1, 1]], // le Spectre file « plus vite que le vent » : il s'en moque presque
+  lug: [[-1, 0.42], [-0.5, 0.64], [0, 0.9], [1, 0.95]],
+  raft: [[-1, 0.45], [-0.5, 0.55], [0, 0.75], [1, 1]],
+};
+export function rigFactor(S, heading, windA) {
+  const rel = Math.cos(heading - windA), P = POLAR[S.rig] || POLAR.square;
+  for (let i = 1; i < P.length; i++) if (rel <= P[i][0]) { const [x0, y0] = P[i - 1], [x1, y1] = P[i]; return y0 + (y1 - y0) * (rel - x0) / (x1 - x0); }
+  return P[P.length - 1][1];
+}
+// la meilleure allure d'un gréement (pour l'aide au barreur et l'interface)
+export function bestPoint(S) { const P = POLAR[S.rig] || POLAR.square; return P.reduce((b, q) => (q[1] > b[1] ? q : b), P[0])[0]; }
 // les obstacles du pont (mâts, barre, cabestan, canons)
 function obstacles(S) {
   if (S._ob) return S._ob;
   const o = S.masts.map((m) => [m.x, 0, 3.5]);
   o.push([S.helm, 0, 4], [S.cap, 0, 4.5]);
-  for (const s of stations(S)) if (s.k === 'gun') o.push([s.at[0], s.at[1], 4]);
+  for (const s of stations(S)) if (s.k === 'gun' || ((s.k === 'fix' || s.k === 'carte') && S.shape === 'ship')) o.push([s.at[0], s.at[1], s.k === 'gun' ? 4 : 3.5]);
   return (S._ob = o);
 }
 export function openingAt(S, lx) {

@@ -20,7 +20,7 @@ for (const k in G) {
   const rows = G[k].split('|');
   GLYPHS[k] = { w: rows[0].length, px: rows.map((r) => [...r].map((c) => c === '#')) };
 }
-const ACC = { 'À': 'A', 'Â': 'A', 'Ä': 'A', 'Ç': 'C', 'É': 'E', 'È': 'E', 'Ê': 'E', 'Ë': 'E', 'Î': 'I', 'Ï': 'I', 'Ô': 'O', 'Ö': 'O', 'Ù': 'U', 'Û': 'U', 'Ü': 'U', 'Œ': 'O', 'Æ': 'A' };
+const ACC = { 'À': 'A', 'Â': 'A', 'Ä': 'A', 'Ç': 'C', 'É': 'E', 'È': 'E', 'Ê': 'E', 'Ë': 'E', 'Î': 'I', 'Ï': 'I', 'Ô': 'O', 'Ö': 'O', 'Ù': 'U', 'Û': 'U', 'Ü': 'U', 'Œ': 'O', 'Æ': 'A', '’': "'", '‘': "'" }; // 1.9 : l'apostrophe typographique s'affichait comme rien (« SASSEOIR »)
 function norm(s) { return [...String(s).toUpperCase()].map((c) => ACC[c] || c).filter((c) => GLYPHS[c]).join(''); }
 
 export function textWidth(s, scale = 1) {

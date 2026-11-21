@@ -25,6 +25,55 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Version 1.9.0 : la refonte des navires
+
+Les navires de la 1.1 gardent leurs postes et leur physique ; tout ce qui les entoure est repris.
+
+- **À la barre, tout l'essentiel** (mode simplifié, celui par défaut) :
+  - ZQSD : la direction voulue ; Espace et Maj : un cran de toile en plus ou en moins ; X : jeter ou lever l'ancre ;
+  - voiles ferlées, la direction tenue fait ramer l'équipage, pour accoster ou se dégager d'un quai.
+- **L'équipage compte** (mode équipage, qui marche en même temps) :
+  - aux drisses, un pirate hisse la toile deux fois plus vite et la règle mieux (+7 % de vitesse) ;
+  - au cabestan, l'ancre se lève bien plus vite, et plus encore à plusieurs (l'équipage invisible est plus lent) ;
+  - à l'établi du charpentier, on répare en mer.
+- **La marche au vent dépend du gréement** :
+  - les voiles carrées (brick, galion, Veuve) filent vent arrière et peinent au près ;
+  - les voiles auriques (sloop, goélette) remontent au vent ;
+  - le Spectre s'en moque presque ;
+  - personne n'est arrêté net face au vent.
+- **Les dégâts touchent trois parties** :
+  - la coque : à moins d'un cinquième, la voie d'eau s'aggrave au combat et alourdit le navire ;
+  - la voilure : la vitesse baisse ;
+  - le gouvernail : la barre répond mal.
+  - L'établi répare en mer, le gouvernail d'abord, puis la toile, puis la coque jusqu'à 80 % ; le chantier fait le reste.
+- **Chaque modèle a son dessin** :
+  - le flanc peint rangée par rangée : liston, sabords et leurs mantelets, préceinte, fenêtres de poupe, carène cuivrée
+    ou goudronnée, usure ;
+  - un bastingage en relief, plus haut sur les châteaux ;
+  - une figure de proue ;
+  - le gréement : voile au tiers de la barque, aurique et foc du sloop, brigantine du brick, deux focs de la goélette,
+    trois étages et artimon latin du galion et de la Veuve, haillons du Spectre ;
+  - un pont propre à chacun.
+- **On voit les combats** : boulets en cloche avec leur ombre, nuage de la bordée, gerbe quand on manque, trous sur le
+  pont, fumée puis flammes, toile déchirée, mât brisé, gouvernail qui bat ; le naufrage est progressif et laisse des
+  débris qui flottent.
+- **Ça vit** : la houle, plus forte dans l'orage, les haubans qui ondulent, les fanaux qui se balancent, les remous du
+  virage, la gerbe d'étrave ; des matelots travaillent à bord et lâchent parfois une phrase.
+- **La vie à bord** : un banc pour s'asseoir, la table des cartes, la longue-vue de la vigie, l'établi.
+- **Les couleurs du navire** (pavillon, voiles, liston, fanaux) sont gratuites, vues de tous et gardées. Elles ne changent
+  rien à la marche.
+- **Les fiches des navires** comparent la vitesse, la marche au près, la manœuvre, la coque, les canons, les postes, les
+  forces et les faiblesses. Aucun navire n'en écrase un plus cher en tout.
+- **Le tableau de bord** montre :
+  - les trois états et la voie d'eau ;
+  - un compas avec le cap, le vent et, tout autour, la marche du navire à chaque cap ;
+  - la voilure demandée, l'ancre, les canons qui rechargent ;
+  - qui tient quel poste, quand on est plusieurs.
+  - Ses aides s'effacent quand on sait faire ; le bouton « ? » les rappelle.
+- Les sauvegardes ne changent pas de forme : les couleurs sont un champ facultatif. Le protocole réseau reste le 15 :
+  les champs nouveaux s'ajoutent en fin de ligne.
+- Détail, mesures et limites : `rapports/nv1-audit.md` et `rapports/nv2-livraison.md`.
+
 ## Version 1.8.0 : la refonte de Port-Lanterne
 
 Le port de départ devient la vitrine de l'archipel. La ville ne bouge pas : elle grandit autour de la Flamme, de la

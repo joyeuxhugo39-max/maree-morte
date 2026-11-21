@@ -14,15 +14,17 @@ import { canStand, roomIdAt, zoneAt } from '../shared/world.js';
 import { TILE, ROLL_SPEED, ROLL_TIME, TICK_RATE } from '../shared/constants.js';
 import {
   shipOf, hullHalf, insideHull, toWorld, toLocal, stations, deckOk, nearestDeck, openingAt, hullClear, shipOverlap, shipFits,
-  BERTHS, berthNear, berthOfPlace, findBerth, windAt, windFactor, windName,
+  BERTHS, berthNear, berthOfPlace, findBerth, windAt, windFactor, windName, rigFactor, LOOKS, cleanLook, GUN_RELOAD,
 } from '../shared/data/ships.js';
 
 const DT = 1 / TICK_RATE;
 const DESPAWN = 600; // un navire vide dont le propriétaire est parti : dix minutes
 const BOARD_SPEED = 28; // au-delà, on ne saute plus à bord (ni à terre)
-const GUN_RELOAD = 3.2;
 const ANCHOR_UP = 3.5; // secondes pour lever l'ancre seul (lot 1 : plus court, l'équipage aide)
 const HOME_CHANNEL = 8, HOME_CD = 180, UNSTICK_CD = 20; // lot 1 : rentrer au port, dégager le navire
+// 1.9 : l'équipage invisible lève l'ancre moins vite qu'un pirate au cabestan ; un matelot aux drisses règle la voilure
+// deux fois plus vite et la borde mieux (+7 %) ; à l'établi, on répare en mer (jusqu'à 80 % de la coque)
+const AUTO_CREW = 0.85, TRIM = 0.07, FIX_MAX = 0.8, LEAK_AT = 0.2, PART_MAX = 0.8;
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const wrap = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 
@@ -33,13 +35,17 @@ export const shipsLogic = {
   myShip(p) { return p.ship ? this.ships.get(p.ship) || null : null; },
   ownShip(key) { for (const s of this.ships.values()) if (s.own === key && !s.sinkT) return s; return null; },
   shipSpeed(sh) { return Math.hypot(sh.vx, sh.vy); },
-  shipMaxSpeed(sh) { return ITEMS[sh.item].boat.speed * (0.62 + 0.38 * sh.hull / Math.max(1, this.hullMax(sh.item))); },
+  shipMaxSpeed(sh) { // la coque alourdie, la toile percée, l'eau dans la cale
+    const hm = Math.max(1, this.hullMax(sh.item)), d = sh.dmg || { sail: 0 };
+    return ITEMS[sh.item].boat.speed * (0.62 + 0.38 * sh.hull / hm) * (1 - 0.45 * d.sail) * (sh.hull < hm * LEAK_AT ? 0.88 : 1);
+  },
   createShip(owner, item, x, y, a, st = {}) {
     const sh = {
       id: this.nextId++, own: owner.key, ownName: owner.name, oid: owner.id || 0, crewId: owner.crew || 0, item, kind: ITEMS[item].boat.kind,
       x, y, a, vx: 0, vy: 0, w: 0, u: 0, rud: 0, sail: st.sail || 0, sailT: st.sail || 0, anchor: st.anchor == null ? 2 : st.anchor, anchorAt: 0, anchorP: 0,
       hull: owner.hulls ? this.hullOf(owner, item) : this.hullMax(item), crew: new Set(), posts: {}, cap: new Set(), ctl: {}, gunCd: {},
       emptySince: this.time, ver: 1, sinkT: 0, bumpAt: 0, hitAt: -99,
+      dmg: { sail: 0, rud: 0 }, look: cleanLook(owner.shipLook), row: 0, // 1.9 : voilure et gouvernail abîmés ; pavillon, voiles, liston, fanaux
     };
     this.ships.set(sh.id, sh);
     return sh;
@@ -169,6 +175,7 @@ export const shipsLogic = {
   takePost(p, k, i) {
     const sh = this.myShip(p);
     if (!sh || p.dead) return;
+    if (!['helm', 'sails', 'cap', 'gun', 'fix'].includes(k)) return; // (la carte, la vigie, le banc ne sont pas des postes)
     const st = stations(this.spec(sh)).find((s) => s.k === k && (k !== 'gun' || s.i === (i | 0)));
     if (!st) return;
     if (Math.hypot(st.x - p.lx, st.y - p.ly) > 24) return this.toast(p, 'Approchez-vous du poste.', 'warn');
@@ -177,23 +184,29 @@ export const shipsLogic = {
     if (k !== 'cap' && cur && cur !== p.id && this.players.get(cur) && this.players.get(cur).ship === sh.id) return this.toast(p, 'Ce poste est déjà tenu.', 'warn');
     this.leavePost(p, sh);
     if (k === 'cap') sh.cap.add(p.id); else sh.posts[key] = p.id;
-    p.post = key; p.lx = st.x; p.ly = st.y; sh.ctl[p.id] = [0, 0];
+    p.post = key; p.lx = st.x; p.ly = st.y; sh.ctl[p.id] = [0, 0, 0];
+    for (const id of sh.crew) { const q = this.players.get(id); if (q) q.dirtyMe = true; }
     [p.x, p.y] = toWorld(sh, p.lx, p.ly);
     p.dirtyMe = true;
     this.send(p, { t: 'post', k: key, lx: st.x, ly: st.y, s: sh.id });
   },
   leavePost(p, sh = this.myShip(p)) {
     if (!p.post) return;
-    if (sh) { if (p.post === 'cap') sh.cap.delete(p.id); else if (sh.posts[p.post] === p.id) delete sh.posts[p.post]; delete sh.ctl[p.id]; }
+    if (sh) { if (p.post === 'cap') sh.cap.delete(p.id); else if (sh.posts[p.post] === p.id) delete sh.posts[p.post]; delete sh.ctl[p.id]; for (const id of sh.crew) { const q = this.players.get(id); if (q && q !== p) q.dirtyMe = true; } }
     p.post = null; p.dirtyMe = true;
     this.send(p, { t: 'post', k: '' });
   },
-  postInput(p, x, y, sl) {
+  postInput(p, x, y, sl, row, anc) {
     const sh = this.myShip(p);
     if (!sh || !p.post) return;
-    sh.ctl[p.id] = [clamp(+x || 0, -1, 1), clamp(+y || 0, -1, 1)];
+    sh.ctl[p.id] = [clamp(+x || 0, -1, 1), clamp(+y || 0, -1, 1), p.post === 'helm' ? clamp(Math.round(+row || 0), -1, 1) : 0];
     // lot 1 : à la barre, un cran de voilure d'un coup (Espace) ; l'équipage lève l'ancre s'il le faut
     if (p.post === 'helm' && sl != null && isFinite(+sl)) { sh.sailT = clamp(+sl, 0, 1); if (sh.sailT > 0 && sh.anchor) sh.autoAnchor = true; }
+    // 1.9 : l'ancre depuis la barre — jetée tout de suite, levée par l'équipage (plus vite si quelqu'un tient le cabestan)
+    if (p.post === 'helm' && anc) {
+      if (sh.anchor === 0) { sh.anchor = 1; sh.anchorAt = this.time + 1.1; sh.autoAnchor = false; this.ev(sh.x, sh.y, ['fx', 'anchor', sh.id, 1]); }
+      else if (sh.anchor === 2) sh.autoAnchor = true;
+    }
   },
   fireGun(p, a) {
     const sh = this.myShip(p);
@@ -228,8 +241,21 @@ export const shipsLogic = {
         if ((this.tickCount + q.id) % 10 === 0) this.setZone(q, zoneAt(this.world, q.x, q.y));
       }
       if (this.tickCount % 20 === 0) {
-        const max = this.hullMax(sh.item);
-        if (this.time - sh.hitAt > 10 && sh.hull < max * 0.5) { sh.hull = Math.min(Math.round(max * 0.5), sh.hull + 1); const o = this.shipOwner(sh); if (o) { o.hulls[sh.item] = sh.hull; o.dirtyMe = true; } }
+        const max = this.hullMax(sh.item), D = sh.dmg || (sh.dmg = { sail: 0, rud: 0 }), calm = this.time - sh.hitAt > 12;
+        // 1.9 : une voie d'eau (moins d'un cinquième de coque) : plus de réparation de fortune, et elle s'aggrave en plein combat
+        const leak = sh.hull < max * LEAK_AT;
+        if (leak && this.time - sh.hitAt < 10) this.shipHit(sh, 0.5, true);
+        if (calm && !leak && sh.hull < max * 0.5) { sh.hull = Math.min(Math.round(max * 0.5), sh.hull + 1); const o = this.shipOwner(sh); if (o) { o.hulls[sh.item] = sh.hull; o.dirtyMe = true; } }
+        if (calm) { D.sail = Math.max(0, D.sail - 0.02); D.rud = Math.max(0, D.rud - 0.02); } // l'équipage rapièce, rafistole
+        // à l'établi du charpentier : le gouvernail d'abord, puis la toile, puis la coque (jusqu'à 80 % en mer)
+        const fixer = sh.posts.fix && this.players.get(sh.posts.fix);
+        if (fixer && fixer.ship === sh.id && !fixer.dead) {
+          const k = this.time - sh.hitAt < 3 ? 0.5 : 1;
+          if (D.rud > 0.01) D.rud = Math.max(0, D.rud - 0.1 * k);
+          else if (D.sail > 0.01) D.sail = Math.max(0, D.sail - 0.08 * k);
+          else if (sh.hull < max * FIX_MAX) { sh.hull = Math.min(Math.round(max * FIX_MAX), sh.hull + Math.max(2, Math.round(max * 0.012 * k))); const o = this.shipOwner(sh); if (o) { o.hulls[sh.item] = Math.round(sh.hull); o.dirtyMe = true; } }
+          if (this.tickCount % 60 === 0) this.ev(fixer.x, fixer.y, ['fx', 'fix', Math.round(fixer.x), Math.round(fixer.y)]);
+        }
         if (!sh.crew.size && !sh.oid && !sh.ghost && !sh.race && this.time - sh.emptySince > DESPAWN) this.ships.delete(sh.id);
       }
     }
@@ -260,36 +286,50 @@ export const shipsLogic = {
     const S = this.spec(sh), B = ITEMS[sh.item].boat, maxV = this.shipMaxSpeed(sh);
     if (this.heistCurrent) this.heistCurrent(sh, dt, [this.shipOwner(sh), ...[...this.players.values()].filter((q) => q.ship === sh.id)]); // lot 5 : les Sept Courants
     if (this.festCurrent) this.festCurrent(sh, dt); // lot 6 : les courants et les vents de la course
-    // la barre : la roue tourne tant qu'on la pousse, et reste où on la laisse
+    const D = sh.dmg || (sh.dmg = { sail: 0, rud: 0 });
+    // la barre : la roue tourne tant qu'on la pousse, et reste où on la laisse (un gouvernail touché répond mal)
     const helm = sh.posts.helm && sh.ctl[sh.posts.helm];
-    if (helm && helm[0]) sh.rud = clamp(sh.rud + helm[0] * S.rud * dt, -1, 1);
-    // la voilure : on déploie (Z) ou l'on cargue (S) aux drisses — ou depuis la barre, l'équipage obéit au barreur
+    if (helm && helm[0]) sh.rud = clamp(sh.rud + helm[0] * S.rud * (1 - 0.4 * D.rud) * dt, -1, 1);
+    // la voilure : on déploie (Z) ou l'on cargue (S) aux drisses — ou depuis la barre, l'équipage obéit au barreur.
+    // 1.9 : un pirate aux drisses manœuvre deux fois plus vite que l'équipage, et borde mieux la toile
+    const sailHand = !!(sh.posts.sails && this.players.get(sh.posts.sails) && this.players.get(sh.posts.sails).ship === sh.id);
     const sails = sh.posts.sails && sh.ctl[sh.posts.sails];
     const sy = sails && sails[1] ? sails[1] : helm && helm[1] ? helm[1] : 0;
-    if (sy) sh.sailT = clamp(sh.sailT - sy * 0.5 * dt, 0, 1);
+    if (sy) sh.sailT = clamp(sh.sailT - sy * 0.5 * (sailHand ? 1.8 : 1) * dt, 0, 1);
     if (helm && helm[1] < -0.3 && sh.anchor) sh.autoAnchor = true; // on veut partir : l'équipage lève l'ancre
-    sh.sail += clamp(sh.sailT - sh.sail, -0.55 * dt, 0.32 * dt);
-    // l'ancre : jetée en un instant, levée à la force des bras
+    const hand = sailHand ? 2 : 1;
+    sh.sail += clamp(sh.sailT - sh.sail, -0.55 * hand * dt, 0.32 * hand * dt);
+    // l'ancre : jetée en un instant, levée à la force des bras — l'équipage seul est plus lent qu'un pirate au cabestan
     let crank = 0, drop = false;
     for (const id of sh.cap) { const c = sh.ctl[id]; if (c && c[1] < -0.3) crank++; if (c && c[1] > 0.3) drop = true; }
-    if (sh.autoAnchor && sh.anchor === 2) crank = Math.max(crank, 1); // l'équipage au cabestan
-    if (sh.anchor === 0 || (sh.autoAnchor && sh.sailT <= 0 && !sh.anchorP)) sh.autoAnchor = false;
+    const auto = sh.autoAnchor && sh.anchor === 2;
+    if (sh.anchor === 0 || (sh.autoAnchor && sh.sailT <= 0 && !sh.anchorP && !sh.rowWant)) sh.autoAnchor = false;
     if (sh.anchor === 0 && drop) { sh.anchor = 1; sh.anchorAt = this.time + 1.1; this.ev(sh.x, sh.y, ['fx', 'anchor', sh.id, 1]); }
     if (sh.anchor === 1 && this.time >= sh.anchorAt) { sh.anchor = 2; sh.anchorP = 0; }
-    if (sh.anchor === 2 && crank) {
-      sh.anchorP += dt / ANCHOR_UP * (1 + 0.65 * (crank - 1));
+    const rate = crank ? 1 + 0.65 * (crank - 1) + (auto ? 0.55 : 0) : auto ? AUTO_CREW : 0;
+    sh.crank = crank;
+    if (sh.anchor === 2 && rate) {
+      sh.anchorP += dt / ANCHOR_UP * rate;
       if (sh.anchorP >= 1) { sh.anchor = 0; sh.anchorP = 0; this.ev(sh.x, sh.y, ['fx', 'anchor', sh.id, 0]); }
-    } else if (sh.anchor === 2 && sh.anchorP > 0 && !crank) sh.anchorP = Math.max(0, sh.anchorP - dt * 0.08); // le cabestan glisse un peu
+    } else if (sh.anchor === 2 && sh.anchorP > 0 && !rate) sh.anchorP = Math.max(0, sh.anchorP - dt * 0.08); // le cabestan glisse un peu
     // la vitesse : le long de la coque (u), en travers (la dérive, l)
     const c = Math.cos(sh.a), s = Math.sin(sh.a);
     let u = sh.vx * c + sh.vy * s, l = -sh.vx * s + sh.vy * c;
-    const vt = sh.anchor ? 0 : sh.sail * maxV * windFactor(sh.a, this.wind.a) * this.wind.s * (sh.windMul || 1);
+    // 1.9 : chaque gréement a sa marche au vent (les voiliers de la course gardent l'ancienne, pour que la course reste la même)
+    const wf = sh.race ? windFactor(sh.a, this.wind.a) : rigFactor(S, sh.a, this.wind.a);
+    let vt = sh.anchor ? 0 : sh.sail * maxV * wf * this.wind.s * (sh.windMul || 1) * (sailHand ? 1 + TRIM : 1);
+    // 1.9 : voiles ferlées, on manœuvre aux avirons (pour accoster, se dégager d'un quai)
+    const row = helm ? helm[2] || 0 : 0;
+    sh.row = 0;
+    if (row && sh.sail < 0.1 && !sh.anchor) { vt = row > 0 ? S.oar || 12 : -(S.oar || 12) * 0.5; sh.row = row; }
+    sh.rowWant = row && sh.sail < 0.1 && sh.anchor === 2; // on veut ramer : l'équipage lève l'ancre
+    if (sh.rowWant) sh.autoAnchor = true;
     const tau = sh.anchor === 2 ? 0.9 : sh.anchor === 1 ? 1.8 : u < vt ? S.tau : S.tau * 1.5;
     u += (vt - u) * (1 - Math.exp(-dt / tau));
     l *= Math.exp(-dt / S.lat);
-    // gouverner : il faut de l'erre ; ancre au fond et de la vitesse, le navire pivote sur elle
-    const steer = Math.max(0.1, Math.min(1, Math.abs(u) / (0.3 * B.speed)));
-    let wt = sh.rud * S.turn * steer * (u < -2 ? -1 : 1);
+    // gouverner : il faut de l'erre ; ancre au fond et de la vitesse, le navire pivote sur elle ; aux avirons, on vire court
+    const steer = Math.max(sh.row ? 0.5 : 0.1, Math.min(1, Math.abs(u) / (0.3 * B.speed)));
+    let wt = sh.rud * S.turn * (1 - 0.5 * D.rud) * steer * (u < -2 ? -1 : 1);
     if (sh.anchor && Math.abs(u) > 18) wt *= 1.8;
     sh.w += (wt - sh.w) * (1 - Math.exp(-dt / (0.45 + S.mass * 0.11)));
     let vx = u * c - l * s, vy = u * s + l * c;
@@ -414,9 +454,9 @@ export const shipsLogic = {
     if (!sh.crew.has(p.id)) this.toast(p, `Votre navire est amarré au ${b.name.toLowerCase()}.`, 'quest');
   },
   // ------------------------------------------------------------ la coque : coups, naufrage
-  shipHit(sh, dmg) {
+  shipHit(sh, dmg, leak = false) {
     if (sh.sinkT || !(dmg > 0)) return;
-    sh.hull = Math.max(0, sh.hull - dmg); sh.hitAt = this.time;
+    sh.hull = Math.max(0, sh.hull - dmg); if (!leak) sh.hitAt = this.time;
     const o = this.shipOwner(sh); if (o) { o.hulls[sh.item] = Math.round(sh.hull); o.dirtyMe = true; }
     if (sh.hull <= 0) this.sinkShip(sh);
   },
@@ -456,25 +496,37 @@ export const shipsLogic = {
   },
   shipStruck(sh, pr, src) {
     this.shipHit(sh, Math.round(pr.dmg * 0.8));
+    // 1.9 : où frappe le boulet ? à la poupe, le gouvernail ; près d'un mât, la voilure ; ailleurs, parfois le gréement
+    const S = this.spec(sh), D = sh.dmg || (sh.dmg = { sail: 0, rud: 0 }), [lx] = toLocal(sh, pr.x, pr.y + 8);
+    const k = clamp(pr.dmg / Math.max(1, this.hullMax(sh.item) * 0.25), 0.04, 0.28);
+    if (lx < -S.L / 2 + S.L * 0.2) D.rud = Math.min(PART_MAX, D.rud + k);
+    else if (S.masts.some((m) => Math.abs(lx - m.x) < 14)) D.sail = Math.min(PART_MAX, D.sail + k);
+    else if (Math.random() < 0.3) D.sail = Math.min(PART_MAX, D.sail + k * 0.5);
     for (const id of sh.crew) { // des éclats de bois pour ceux qui sont tout près
       const q = this.players.get(id);
       if (q && !q.dead && Math.hypot(q.x - pr.x, q.y - 9 - pr.y) < 18) this.damagePlayer(q, Math.round(pr.dmg * 0.25), src, false, 'w');
     }
-    this.ev(pr.x, pr.y, ['fx', 'splinter', Math.round(pr.x), Math.round(pr.y + 8)]);
+    const [hx, hy] = toLocal(sh, pr.x, pr.y + 8); // 1.9 : où, sur la coque (le client y peint un trou)
+    this.ev(pr.x, pr.y, ['fx', 'splinter', Math.round(pr.x), Math.round(pr.y + 8), sh.id, Math.round(hx), Math.round(hy)]);
   },
   pointOnShip(x, y) { for (const sh of this.ships.values()) { if (sh.sinkT) continue; const S = this.spec(sh); if (Math.abs(sh.x - x) > S.L / 2 + 4 || Math.abs(sh.y - y) > S.L / 2 + 4) continue; const [lx, ly] = toLocal(sh, x, y); if (Math.abs(lx) < S.L / 2 && insideHull(S, lx, ly, 2)) return sh; } return null; },
   // ------------------------------------------------------------ réseau, sauvegarde, connexion
-  shipMeta(sh) { const o = this.shipOwner(sh); return { id: sh.id, k: 's', kind: sh.kind, item: sh.item, name: ITEMS[sh.item].name, own: sh.ownName, cw: o && o.crew && this.crews.get(o.crew) ? this.crews.get(o.crew).tag : '', hmax: this.hullMax(sh.item), pal: sh.pal || undefined, cos: sh.cos || undefined, race: sh.race ? 1 : 0 }; },
-  shipLine(sh) { return [sh.id, Math.round(sh.x * 10), Math.round(sh.y * 10), Math.round(sh.a * 1000), Math.round(sh.u), Math.round(sh.sail * 100), Math.round(sh.rud * 100), sh.anchor * 100 + Math.round(sh.anchorP * 99), Math.round(sh.hull), sh.sinkT ? 1 : 0, Math.round(Math.hypot(sh.vx, sh.vy))]; },
+  shipMeta(sh) { const o = this.shipOwner(sh); return { id: sh.id, k: 's', kind: sh.kind, item: sh.item, name: ITEMS[sh.item].name, own: sh.ownName, cw: o && o.crew && this.crews.get(o.crew) ? this.crews.get(o.crew).tag : '', hmax: this.hullMax(sh.item), pal: sh.pal || undefined, cos: sh.cos || undefined, race: sh.race ? 1 : 0, look: sh.look || undefined }; },
+  shipLine(sh) { // 1.9 : + voilure abîmée, gouvernail abîmé, drapeaux (1 voie d'eau, 2 drisses tenues, 4 avirons, 8 établi)
+    const D = sh.dmg || { sail: 0, rud: 0 }, hm = this.hullMax(sh.item), fl = (sh.hull < hm * LEAK_AT ? 1 : 0) | (sh.posts.sails ? 2 : 0) | (sh.row ? 4 : 0) | (sh.posts.fix ? 8 : 0);
+    return [sh.id, Math.round(sh.x * 10), Math.round(sh.y * 10), Math.round(sh.a * 1000), Math.round(sh.u), Math.round(sh.sail * 100), Math.round(sh.rud * 100), sh.anchor * 100 + Math.round(sh.anchorP * 99), Math.round(sh.hull), sh.sinkT ? 1 : 0, Math.round(Math.hypot(sh.vx, sh.vy)), Math.round(D.sail * 100), Math.round(D.rud * 100), fl];
+  },
   shipSave(p) {
     const sh = this.ownShip(p.key), on = this.myShip(p);
     return {
       ship: sh ? { item: sh.item, x: Math.round(sh.x), y: Math.round(sh.y), a: +sh.a.toFixed(3), anc: sh.anchor ? 1 : 0, sail: +sh.sail.toFixed(2) } : null,
       deck: on ? { own: on.own, lx: Math.round(p.lx), ly: Math.round(p.ly) } : null,
+      shipLook: p.shipLook || undefined, // 1.9 (facultatif : une sauvegarde d'avant n'en a pas)
     };
   },
   shipLoad(p, d) {
     p.ship = 0; p.post = null; p.lx = 0; p.ly = 0;
+    p.shipLook = d ? cleanLook(d.shipLook) : null;
     if (!d) return;
     if (d.ship && typeof d.ship.x === 'number' && ITEMS[d.ship.item] && ITEMS[d.ship.item].boat) p.pendingShip = d.ship;
     if (d.deck && typeof d.deck.own === 'string') p.pendingDeck = d.deck;
@@ -509,6 +561,20 @@ export const shipsLogic = {
   },
   shipMe(p) {
     const sh = this.myShip(p) || this.ownShip(p.key);
-    return { ship: p.ship || 0, post: p.post || '', hull: sh ? Math.round(sh.hull) : 0, hullMax: sh ? this.hullMax(sh.item) : 0, repairCost: this.repairCost(p), wind: [+this.wind.a.toFixed(2), +this.wind.s.toFixed(2)] };
+    const on = this.myShip(p), nm = (id) => { const q = id && this.players.get(id); return q && q.ship === on.id ? q.name : ''; };
+    // 1.9 : qui tient quoi à bord (le tableau de bord), et l'état des canons
+    const crew = on ? { helm: nm(on.posts.helm), sails: nm(on.posts.sails), cap: on.cap.size, fix: nm(on.posts.fix), n: on.crew.size,
+      guns: Object.keys(on.posts).filter((k) => k.startsWith('gun')).map((k) => +k.slice(3)), nguns: stations(this.spec(on)).filter((s) => s.k === 'gun').length } : null;
+    return { ship: p.ship || 0, post: p.post || '', hull: sh ? Math.round(sh.hull) : 0, hullMax: sh ? this.hullMax(sh.item) : 0, repairCost: this.repairCost(p), wind: [+this.wind.a.toFixed(2), +this.wind.s.toFixed(2)], crew, shipLook: p.shipLook || null };
+  },
+  // 1.9 : la personnalisation du navire — pavillon, voiles, liston, fanaux (visible de tous ; cosmétique, gratuite)
+  setShipLook(p, look) {
+    if ((p.cds.look || 0) > this.time) return; // (pas plus de trois changements par seconde : la fiche réseau du navire est renvoyée à tous)
+    p.cds.look = this.time + 0.3;
+    p.shipLook = cleanLook(look);
+    const sh = this.ownShip(p.key);
+    if (sh) { sh.look = p.shipLook; sh.ver++; }
+    p.dirtyMe = true;
+    this.toast(p, 'Votre navire arbore ses nouvelles couleurs.', 'info');
   },
 };

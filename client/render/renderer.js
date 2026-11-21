@@ -337,6 +337,7 @@ export class Renderer {
     for (const e of G.ents.values()) if (e.k === 'p' && e.petObj && !e.petObj.hidden) draw.push({ y: e.petObj.y, pet: e.petObj });
     for (const f of G.folk || []) if (!f.hidden && f.x > camX - 30 && f.x < camX + W + 30 && f.y > camY - 30 && f.y < camY + H + 40) draw.push({ y: f.y, e: f });
     for (const c of G.cats || []) if (c.x > camX - 20 && c.x < camX + W + 20 && c.y > camY - 20 && c.y < camY + H + 20) draw.push({ y: c.y, c });
+    if (!room && G.ships) for (const s of G.ships.values()) for (const h of s.handsF || []) if (h.vis) draw.push({ y: h.y, e: h }); // 1.9 : les matelots du bord
     if (!room) for (const s of G.portShips || []) if (s.x > camX - 140 && s.x < camX + W + 140 && s.y > camY - 90 && s.y < camY + H + 90) draw.push({ y: s.y + 10, ps: s }); // 1.8 : les navires du port
     if (!room) for (const b of BERTHS) { const [bx, by] = berthPos(b); if (bx > camX - 30 && bx < camX + W + 30 && by > camY - 30 && by < camY + H + 40) draw.push({ y: by, bt: b }); } // 1.1 : les bittes d'amarrage
     draw.sort((a, b) => a.y - b.y);
@@ -357,7 +358,7 @@ export class Renderer {
       } else {
         const o = d.e || d.n;
         if (o.k === 'd' || (o.dyingT && now - o.dyingT > 0.4) || isSea(o)) continue;
-        if (this.inWater(o.x, o.y) && !(o === G.player ? G.player.ship : (o.k === 'p' && (o.flags & 16)))) continue;
+        if (this.inWater(o.x, o.y) && !o.deck && !(o === G.player ? G.player.ship : (o.k === 'p' && (o.flags & 16)))) continue;
         const big = o.sheet && o.sheet.fw > FW ? 2 : 1;
         ctx.beginPath(); ctx.ellipse(o.x - camX + sun.dx * 0.45, o.y - camY - 1, 6 * big * sun.sx, 2.5 * big, 0, 0, TAU); ctx.fill();
       }
@@ -988,7 +989,7 @@ export class Renderer {
       if (e.leap) { const lk = (now - e.leap.t0) / e.leap.dur; if (lk < 1) y -= Math.round(Math.sin(lk * Math.PI) * 30); else { e.leap = null; this.shake(3, 0.2); this.smoke(e.x, e.y, 8, 'rgba(200,180,150,0.55)', { size: 3 }); } }
       if (e.dashT && now > e.dashT && now < e.dashT + 0.7 && e.moving && rnd() < 0.8) this.smoke(e.x, e.y, 1, 'rgba(220,200,160,0.5)', { size: 2, life: 0.4 });
     }
-    const onDeck = e.k === 'p' && (e === G.player ? !!G.player.ship : !!(e.flags & 16)); // 1.1 : sur le pont d'un navire
+    const onDeck = e.deck || (e.k === 'p' && (e === G.player ? !!G.player.ship : !!(e.flags & 16))); // 1.1 : sur le pont d'un navire (1.9 : ses matelots aussi)
     const water = !onDeck && this.inWater(e.x, e.y);
     const cut = Math.max(sit, water ? (sh.fw > FW ? 8 : 5) : 0);
     ctx.save();
@@ -1372,7 +1373,7 @@ export class Renderer {
       p.t += dt;
       const step = p.speed * dt;
       p.x += p.vx * dt; p.y += p.vy * dt; p.left -= step;
-      if (p.left <= 0) { this.projs.delete(id); continue; }
+      if (p.left <= 0) { if (p.kind === 'cball' && this.inWater(p.x, p.y + 9)) { this.burst(p.x, p.y + 9, 14, { z: 1, col: ['#ffffff', '#d8f6ff', '#9fd8ff'], up: 55, speed: 22, life: 0.8, g: 110 }); this.addFx({ kind: 'ring', x: p.x, y: p.y + 9, r: 12, dur: 0.6, col: 'rgba(230,250,255,A)', w: 1 }); } this.projs.delete(id); continue; } // 1.9 : le boulet manqué fait une gerbe
       const x = p.x - camX, y = p.y - camY;
       const dx = p.vx / p.speed, dy = p.vy / p.speed;
       if (p.kind === 'flame') {
@@ -1462,10 +1463,12 @@ export class Renderer {
         if (rnd() < 0.5) this.smoke(p.x, p.y + 9 - h, 1, 'rgba(200,200,200,0.35)', { z: 9, size: 2, life: 0.5 });
         continue;
       }
-      if (p.kind === 'cball') {
-        ctx.fillStyle = '#100c10'; ctx.fillRect(Math.round(x) - 2, Math.round(y) - 2, 4, 4);
-        ctx.fillStyle = '#5a5a6a'; ctx.fillRect(Math.round(x) - 1, Math.round(y) - 2, 1, 1);
-        if (rnd() < 0.6) this.smoke(p.x, p.y + 9, 1, 'rgba(200,200,200,0.4)', { z: 9, size: 2, life: 0.6 });
+      if (p.kind === 'cball') { // 1.9 : un boulet en cloche — son ombre sur l'eau dit d'où il vient et où il tombe
+        const k = p.r0 ? Math.max(0, Math.min(1, 1 - p.left / p.r0)) : 0.5, h = Math.round(Math.sin(k * Math.PI) * 9);
+        ctx.fillStyle = 'rgba(10,20,30,0.32)'; ctx.fillRect(Math.round(x) - 2, Math.round(y) + 8, 4, 2); ctx.fillRect(Math.round(x) - 1, Math.round(y) + 7, 2, 4);
+        ctx.fillStyle = '#100c10'; ctx.fillRect(Math.round(x) - 2, Math.round(y - h) - 2, 4, 4); ctx.fillRect(Math.round(x) - 1, Math.round(y - h) - 3, 2, 6); ctx.fillRect(Math.round(x) - 3, Math.round(y - h) - 1, 6, 2);
+        ctx.fillStyle = '#6a6a7a'; ctx.fillRect(Math.round(x) - 1, Math.round(y - h) - 2, 1, 1);
+        if (rnd() < 0.75) this.smoke(p.x - dx * 3, p.y + 9 - h - dy * 3, 1, 'rgba(210,210,210,0.42)', { z: 9, size: 2, life: 0.7 });
       } else if (p.kind === 'ball') {
         ctx.fillStyle = '#1a1418'; ctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, 3, 3);
         ctx.fillStyle = '#ff6a4a'; ctx.fillRect(Math.round(x), Math.round(y) - 1, 1, 1);

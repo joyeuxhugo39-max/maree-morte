@@ -21,7 +21,7 @@ export function migrateSave(d) {
   return d;
 }
 // les champs qu'écrit serialize() : tout autre champ d'une sauvegarde est conservé à part
-const SAVE_KEYS = new Set(['ship', 'deck', 'fishRec', 'hulls', 'mem', 'songs', 'rep', 'inf', 'jail', 'hon', 'pvph', 'glory', 'gxp', 'friends', 'blocked', 'tradeLog', 'seen', 'st', 'kc', 'met', 'col', 'tut', 'name', 'look', 'level', 'xp', 'gold', 'hp', 'inv', 'eq', 'quests', 'track', 'chests', 'x', 'y', 'kills', 'upg', 'treasure', 'ach', 'title', 'cnt', 'respawnAt', 'found', 'boat', 'pk', 'caches', 'zs', 'pet', 'home', 'base', 'saved', 'sv', 'held']);
+const SAVE_KEYS = new Set(['ship', 'deck', 'fishRec', 'hulls', 'mem', 'songs', 'rep', 'inf', 'jail', 'hon', 'pvph', 'glory', 'gxp', 'friends', 'blocked', 'tradeLog', 'seen', 'st', 'kc', 'met', 'col', 'tut', 'name', 'look', 'level', 'xp', 'gold', 'hp', 'inv', 'eq', 'quests', 'track', 'chests', 'x', 'y', 'kills', 'upg', 'treasure', 'ach', 'title', 'cnt', 'respawnAt', 'found', 'boat', 'pk', 'caches', 'zs', 'pet', 'home', 'base', 'saved', 'sv', 'held', 'shipLook']);
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { STRUCTS, PLANTER_GROW, HOME_OK, HOME_MAX, HOME_PRICE, QUEST_PICK, PROPERTY, HOME_LIMIT, RESALE, plotCategory } from '../shared/data/craft.js';
 import { social } from './social.js';
@@ -249,7 +249,8 @@ export class Game {
       case 'trade': return this.tradeAction(p, String(m.a), m);
       case 'bail': return this.bail(p);
       case 'post': return m.off ? this.leavePost(p) : this.takePost(p, String(m.k || ''), m.i | 0); // 1.1 : les postes du navire
-      case 'ctl': return this.postInput(p, m.x, m.y, m.sl);
+      case 'ctl': return this.postInput(p, m.x, m.y, m.sl, m.row, m.anc);
+      case 'shiplook': return this.setShipLook(p, m.look); // 1.9 : pavillon, voiles, liston, fanaux
       case 'gun': return this.fireGun(p, +m.a);
       case 'ship': return m.a === 'stow' ? this.stowShip(p) : m.a === 'board' ? this.boardByE(p, m.id) : m.a === 'land' ? this.landByE(p) : m.a === 'unstick' ? this.unstickShip(p) : m.a === 'home' ? this.homeShip(p) : this.armShip(p, String(m.item || ''));
       case 'repair': return this.repair(p);
@@ -277,7 +278,7 @@ export class Game {
       case 'ride': return this.toggleRide(p);
       case 'emote': { // 0.8 : émotes de la barre (2 à 5)
         const k = String(m.k);
-        if (!['danse', 'salut', 'doigt', 'salto'].includes(k) || p.dead || (p.cds.emote || 0) > this.time) return;
+        if (!['danse', 'salut', 'doigt', 'salto', 'assis'].includes(k) || p.dead || (p.cds.emote || 0) > this.time) return; // 1.9 : s'asseoir (sur un banc de pont)
         p.cds.emote = this.time + 1.2;
         if (k === 'danse') this.festDance(p); // lot 6 : danser sur la scène pendant le bouquet final
         return this.ev(p.x, p.y, ['emote', p.id, k]);

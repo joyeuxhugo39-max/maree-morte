@@ -102,7 +102,7 @@ ok(A.zone === Z.HAVRE && A.ach.navigateur, 'Havre atteint, haut fait navigateur'
 const mob = game.mobs.find((m) => m.room === -1 && m.def.aggro);
 ok(!game.mobCanTarget(mob, A), 'monstre ne cible pas un pirate à Havre');
 // 8. Sauvegarde / reconnexion sur le pont, grottes mémorisées
-place(A, gw.x, gw.y); A.room = -1; game.onMessage(ca, { t: 'mv', s: sh.id, lx: op.x, ly: lyIn, d: 0, m: 1 });
+place(A, gw2.x, gw2.y); A.room = -1; game.onMessage(ca, { t: 'mv', s: sh.id, lx: op.x, ly: lyIn, d: 0, m: 1 }); // 1.9 : par la passerelle d'où est le navire (aux drisses, la toile monte deux fois plus vite : il a filé plus loin du quai d'armement)
 game.save(A);
 const sv = store.get('alpha');
 ok(sv.ship && sv.ship.item === 'barque' && sv.deck && sv.found.length === 1, 'sauvegarde : navire, pont + grotte trouvée');

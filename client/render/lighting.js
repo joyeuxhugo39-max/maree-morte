@@ -98,7 +98,7 @@ export const lighting = {
       if (!room) for (const fo of G.folk || []) if (fo.lantern && !fo.hidden) { add(fo.x + 5, fo.y - 12, 66, LIGHT_COL.warm, 0.9); vis.push([{ x: fo.x + 5, y: fo.y - 12, r: 40, c: 'warm', flicker: 1 }, 1]); }
       if (!room && dark > 0.2) for (const g of this.garlands) if (g.x1 > camX - 60 && g.x0 < camX + W + 60 && g.y1 > camY - 60 && g.y0 < camY + H + 60) add((g.x0 + g.x1) / 2, (g.y0 + g.y1) / 2 + 6, (g.x1 - g.x0) * 0.6, LIGHT_COL.warm, 0.45);
       for (const p of this.projs.values()) add(p.x, p.y, 22, LIGHT_COL.white, 0.5);
-      if (!room) for (const [lx, ly] of this.shipLights(G)) { const fl = 1 + Math.sin(now * 9 + lx) * 0.05; add(lx, ly, 74 * fl, LIGHT_COL.warm, 0.95); vis.push([{ x: lx, y: ly, r: 34, c: 'warm', flicker: 1 }, fl]); }
+      if (!room) for (const [lx, ly, lc, gc] of this.shipLights(G)) { const fire = lc === 'fire', fl = 1 + Math.sin(now * (fire ? 17 : 9) + lx) * (fire ? 0.18 : 0.05); add(lx, ly, (fire ? 96 : 74) * fl, LIGHT_COL[lc] || LIGHT_COL.warm, 0.95); vis.push([{ x: lx, y: ly, r: fire ? 44 : 34, c: gc || 'warm', flicker: 1 }, fl]); } // 1.9 : fanaux de couleur, et le feu à bord
       // le phare : un faisceau qui tourne
       const LH = room ? null : this.lighthouse;
       if (LH && dark > 0.2) {

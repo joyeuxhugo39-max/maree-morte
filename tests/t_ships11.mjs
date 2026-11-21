@@ -53,9 +53,11 @@ ok(v2 < v3 * 0.6 && v3 > 50, `il prend son élan lentement : ${Math.round(v2)} p
 // le virage : la roue tourne et reste où on la laisse ; le cap change ; on dérive
 const a0 = sh.a; msg(B, { t: 'ctl', x: 1, y: 0 }); ticks(10); msg(B, { t: 'ctl', x: 0, y: 0 }); const rud = sh.rud;
 ok(rud > 0.3, `la roue tourne (${rud.toFixed(2)})`); ticks(20); ok(Math.abs(sh.rud - rud) < 1e-9, 'et reste où on la laisse');
-ticks(20 * 2); let da = sh.a - a0; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+// (1.9 : la dérive se mesure pendant le virage — le navire, plus vif au largue, peut toucher la côte avant la fin)
+let lat = 0; for (let k = 0; k < 40; k++) { ticks(1); const c = Math.cos(sh.a), s = Math.sin(sh.a), l = -sh.vx * s + sh.vy * c; if (Math.abs(l) > Math.abs(lat)) lat = l; }
+let da = sh.a - a0; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
 ok(da > 0.2, `le navire vire (${(da * 180 / Math.PI).toFixed(0)}°)`);
-const c = Math.cos(sh.a), s = Math.sin(sh.a), lat = -sh.vx * s + sh.vy * c; ok(Math.abs(lat) > 1, `il dérive dans le virage (${lat.toFixed(1)} px/s en travers)`);
+ok(Math.abs(lat) > 1, `il dérive dans le virage (${lat.toFixed(1)} px/s en travers, au plus fort)`);
 // la barre droite, le navire file ; l'équipage suit
 msg(B, { t: 'ctl', x: -1, y: 0 }); ticks(Math.round(rud / S.rud * 20)); msg(B, { t: 'ctl', x: 0, y: 0 });
 const [ax, ay] = toWorld(sh, A.lx, A.ly); ok(Math.hypot(A.x - ax, A.y - ay) < 0.5, 'l’équipage reste sur le pont pendant la navigation');

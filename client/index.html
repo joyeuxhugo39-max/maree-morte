@@ -41,13 +41,19 @@
 
     <div id="bottom">
       <div id="shiphud" class="hidden">
-        <div class="sh-box sh-id"><b id="sh-name"></b><div class="sh-hull"><div id="sh-hull-f"></div><span id="sh-hull-t"></span></div></div>
-        <div class="sh-box sh-w" title="La barre"><div class="sh-wheel"><div id="sh-wheel-n"></div></div><span>Barre</span></div>
-        <div class="sh-box"><span>Voilure</span><div class="sh-bar"><div id="sh-sail-f"></div></div></div>
-        <div class="sh-box"><span>Ancre</span><b id="sh-anchor"></b></div>
-        <div class="sh-box sh-wind"><div id="sh-wind-a">➤</div><div><span id="sh-wind-t"></span><b id="sh-speed"></b></div></div>
+        <div class="sh-box sh-id"><b id="sh-name"></b>
+          <div class="sh-st">
+            <div class="sh-g" title="La coque : à zéro, le navire sombre"><i>Coque</i><div class="sh-hull"><div id="sh-hull-f"></div><span id="sh-hull-t"></span></div></div>
+            <div class="sh-g" title="La toile et le gréement : abîmés, le navire perd de sa vitesse"><i>Voiles</i><div class="sh-mini"><div id="sh-dsail-f"></div></div></div>
+            <div class="sh-g" title="Le gouvernail : abîmé, la barre répond mal"><i>Gouvernail</i><div class="sh-mini"><div id="sh-drud-f"></div></div></div>
+          </div>
+          <em id="sh-leak" class="hidden">Voie d’eau !</em>
+        </div>
+        <div class="sh-box sh-comp" title="Le compas : votre cap (la flèche), le vent (la flèche bleue) et, autour, la marche du navire selon le cap (vert : bonne, rouge : lente)"><canvas id="sh-comp" width="56" height="56"></canvas><div><b id="sh-speed"></b><span id="sh-wind-t"></span><span id="sh-allure"></span></div></div>
+        <div class="sh-box sh-w"><div class="sh-wheel" title="La barre"><div id="sh-wheel-n"></div></div><div class="sh-col"><span>Voilure</span><div class="sh-bar"><div id="sh-sail-f"></div><div id="sh-sail-g"></div></div><span>Ancre <b id="sh-anchor"></b></span><div id="sh-guns" title="Les canons : vert, tenu ; orange, il recharge"></div></div></div>
+        <div class="sh-box sh-crew" id="sh-crew"><span>À bord <b id="sh-n"></b></span><div id="sh-posts"></div></div>
         <div id="sh-hint"></div>
-        <div id="sh-btns"><button id="sh-unstick" title="Si le navire est coincé contre la côte ou un quai">Dégager</button><button id="sh-home" title="L'équipage ramène le navire au quai le plus proche">Rentrer au port</button><button id="sh-land" title="Sauter sur la terre ferme la plus proche">Descendre à terre</button></div>
+        <div id="sh-btns"><button id="sh-unstick" title="Si le navire est coincé contre la côte ou un quai">Dégager</button><button id="sh-home" title="L'équipage ramène le navire au quai le plus proche">Rentrer au port</button><button id="sh-land" title="Sauter sur la terre ferme la plus proche">Descendre à terre</button><button id="sh-look" title="La fiche et les couleurs de votre navire">Couleurs</button><button id="sh-help" title="Réafficher les aides de navigation">?</button></div>
       </div>
       <div id="xpbar"><div class="fill" id="xp-fill"></div><span id="xp-txt">0 / 80 XP</span></div>
       <div id="hotbar"></div>

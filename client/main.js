@@ -392,7 +392,7 @@ function snapshot(m, t) {
   if (m.sh) for (const L of m.sh) { // 1.1 : les navires
     const s = G.ships.get(L[0]);
     if (!s) continue;
-    s.buf.push([t, L[1] / 10, L[2] / 10, L[3] / 1000, L[4], L[5] / 100, L[6] / 100, L[7], L[8], L[9], L[10]]);
+    s.buf.push([t, L[1] / 10, L[2] / 10, L[3] / 1000, L[4], L[5] / 100, L[6] / 100, L[7], L[8], L[9], L[10], (L[11] || 0) / 100, (L[12] || 0) / 100, L[13] || 0]);
     if (s.buf.length > 14) s.buf.shift();
     if (L[9] && !s.sinkT) { s.sinkT = t; G.sfx.play('boom', vol(s.x || L[1] / 10, s.y || L[2] / 10)); }
   }
@@ -502,7 +502,7 @@ function onEvent(ev, t) {
     }
     case 'proj': {
       const [, pid, x, y, a, sp, range, kind, owner] = ev;
-      R.projs.set(pid, { x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, speed: sp, left: range, kind, t: 0, owner });
+      R.projs.set(pid, { x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, speed: sp, left: range, r0: range, kind, t: 0, owner });
       R.addFx({ kind: 'flash', x: x + Math.cos(a) * 4, y: y + Math.sin(a) * 4, r: kind === 'ball' ? 5 : 4, dur: 0.08 });
       R.smoke(x + Math.cos(a) * 5, y + 9, 3, 'rgba(220,220,220,0.5)', { z: 9, size: 2, life: 0.6 });
       if (owner !== me && kind !== 'ball') G.sfx.play('shot', vol(x, y) * 0.6);
@@ -607,12 +607,13 @@ function onEvent(ev, t) {
       break;
     case 'fx': {
       const [, k, x, y, id] = ev;
-      if (k === 'cannon' || k === 'crash' || k === 'splinter' || k === 'anchor' || k === 'plank') { // 1.1 : les navires
+      if (k === 'cannon' || k === 'crash' || k === 'splinter' || k === 'anchor' || k === 'plank' || k === 'fix') { // 1.1 : les navires
         R.shipFx(G, k, ev, now);
         const s = k === 'anchor' ? G.ships.get(x) : null, vx = s ? s.x : x, vy = s ? s.y : y;
         if (k === 'cannon') { G.sfx.play('boom', vol(vx, vy) * 0.8); if (G.player && G.player.ship === ev[5]) R.shake(1.5, 0.2); }
         else if (k === 'crash') { G.sfx.play('crack', vol(vx, vy)); G.sfx.play('splash', vol(vx, vy)); }
         else if (k === 'splinter') G.sfx.play('crack', vol(vx, vy) * 0.6);
+        else if (k === 'fix') G.sfx.play('dig', vol(vx, vy) * 0.45); // 1.9 : le maillet du charpentier
         else if (k === 'anchor') { G.sfx.play('chain', vol(vx, vy)); if (y) setTimeout(() => G.sfx.play('splash', vol(vx, vy)), 900); }
         break;
       }
@@ -754,6 +755,9 @@ function interact() {
   else if (t.kind === 'lever') G.send({ t: 'lever', i: t.i }); // 1.0 : le Bastion
   else if (t.kind === 'dive') G.send({ t: 'dive' }); // 1.0 : la cloche de plongée
   else if (t.kind === 'bell') G.send({ t: 'bell', i: t.i });
+  else if (t.kind === 'post' && t.k === 'carte') { G.ui.toggle('map'); G.ui.navDone && G.ui.navDone('carte'); } // 1.9 : la table des cartes
+  else if (t.kind === 'post' && t.k === 'vigie') { G.spyUntil = performance.now() / 1000 + 25; G.renderer.spy = true; G.renderer.resize(G.renderer.lastW, G.renderer.lastH); document.body.classList.add('spy'); G.sfx.play('pickup'); G.ui.toast('À la longue-vue : l’horizon s’ouvre (25 s).', 'info'); } // 1.9 : la vigie
+  else if (t.kind === 'post' && t.k === 'banc') { G.send({ t: 'emote', k: 'assis' }); G.player.sitUntil = performance.now() / 1000 + 60; } // 1.9 : s'asseoir
   else if (t.kind === 'post') { G.send({ t: 'post', k: t.k, i: t.i || 0 }); G.ctlSent = null; } // 1.1 : prendre un poste
   else if (t.kind === 'unpost') leavePost();
   else if (t.kind === 'berth') G.ui.openBerth(t.b); // 1.1 : armer un navire à quai
@@ -1175,7 +1179,9 @@ function handleKeys(now) {
     if (k.code === 'Escape' && G.fest && G.fest.panelOpen()) { G.fest.closePanel(); continue; } // lot 6
     if (k.code === 'Escape') { if (G.build && !ui.open) stopBuild(); else ui.close(); continue; }
     if (ui.open === 'tavern' && k.code === 'Space') { ui.armTap(); continue; } // le bras de fer
-    if (G.post && G.post.k === 'helm' && k.code === 'Space') { cycleSail(); continue; } // lot 1 : la voilure, depuis la barre
+    if (G.post && G.post.k === 'helm' && k.code === 'Space') { sailStep(1); continue; } // 1.9 : à la barre, Espace hisse un cran de toile
+    if (G.post && G.post.k === 'helm' && (k.code === 'ShiftLeft' || k.code === 'ShiftRight')) { sailStep(-1); continue; } // … Maj en réduit un
+    if (G.post && G.post.k === 'helm' && k.code === 'KeyX') { anchorToggle(); continue; } // … X jette ou lève l'ancre
     if (k.key === 'i' || k.code === 'Tab') { ui.toggle('inventory'); continue; }
     if (k.key === 'b') { if (G.build) stopBuild(); else startBuild(null); continue; }
     if (k.key === 'c') { G.send({ t: 'ride' }); continue; }
@@ -1264,7 +1270,7 @@ function deckUpdate(now, dt, ax, rolling) {
   if ((ax.x || ax.y) && !rolling && Math.abs(nly - p.ly - lvy) > 0.01 && tryLeave(s, S, lvy, now)) return;
   const moved = Math.hypot(nlx - p.lx, nly - p.ly) > 0.01;
   p.lx = nlx; p.ly = nly; placeOnDeck(p, s);
-  p.moving = moved;
+  p.moving = moved; if (moved) p.sitUntil = 0; // on se lève en marchant
   if (ax.x || ax.y) p.dir = dirOf(ax.x, ax.y);
   if (moved) p.walk += dt;
   if (now - G.lastSend > 0.05 && (moved || p.moving !== G.lastMoving)) {
@@ -1276,26 +1282,39 @@ function deckUpdate(now, dt, ax, rolling) {
 function stationInput(ax) {
   const k = G.post.k, helm = k === 'helm', gun = k.startsWith('gun'), s = G.ships.get(G.player.ship);
   let x = 0, y = 0;
+  let row = 0;
   if (helm && G.helmMode !== 'reel') {
     // lot 1 : la barre simple — la direction tenue est le cap voulu ; on tourne la roue pour y aller, puis on la remet droite
     let target = 0;
     if ((ax.x || ax.y) && s) { let d = Math.atan2(ax.y, ax.x) - s.a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; target = Math.max(-1, Math.min(1, d * 1.4)); }
     const e = target - ((s && s.rud) || 0); x = Math.abs(e) > 0.12 ? Math.sign(e) : 0;
+    // 1.9 : voiles ferlées, tenir une direction fait souquer l'équipage aux avirons (pour accoster au plus près)
+    row = (ax.x || ax.y) && s && (s.sail || 0) < 0.1 ? 1 : 0;
   } else {
     const useX = helm, useY = helm || k === 'sails' || k === 'cap';
     if ((!useX && Math.abs(ax.x) > 0.5) || (!useY && Math.abs(ax.y) > 0.5) || (gun && (ax.x || ax.y))) { leavePost(); return; }
     x = useX ? Math.sign(Math.round(ax.x * 2) / 2) : 0; y = useY ? Math.sign(Math.round(ax.y * 2) / 2) : 0;
   }
-  const key = x + ',' + y;
-  if (key !== G.ctlSent) { G.ctlSent = key; G.send({ t: 'ctl', x, y }); }
+  const key = x + ',' + y + ',' + row;
+  if (key !== G.ctlSent) { G.ctlSent = key; G.send({ t: 'ctl', x, y, row }); }
 }
-// lot 1 : à la barre, Espace change la voilure d'un cran (ferlée → mi-voile → toute → ferlée)
-function cycleSail() {
+// 1.9 : la voilure d'un cran vers le haut (Espace) ou vers le bas (Maj) ; l'ancre (X) — sans quitter la barre
+const SAIL_NOTCH = [0, 0.5, 1], SAIL_NAMES = ['Voile carguée.', 'Mi-voile.', 'Toute la toile !'];
+function sailStep(d) {
   const s = G.ships.get(G.player.ship); if (!s) return;
-  const cur = s.sail || 0, next = cur < 0.25 ? 0.5 : cur < 0.75 ? 1 : 0;
-  const [x] = (G.ctlSent || '0,0').split(',').map(Number);
-  G.send({ t: 'ctl', x, y: 0, sl: next }); G.sfx.play('flap', 0.6);
-  G.ui.toast(next === 0 ? 'Voile carguée.' : next === 0.5 ? 'Mi-voile.' : 'Toute la toile !', 'info');
+  const cur = s.sailGoal != null && nowS() - (s.sailGoalAt || 0) < 1.5 ? s.sailGoal : s.sail || 0;
+  let i = SAIL_NOTCH.reduce((b, v, k) => (Math.abs(v - cur) < Math.abs(SAIL_NOTCH[b] - cur) ? k : b), 0);
+  i = Math.max(0, Math.min(2, i + d));
+  s.sailGoal = SAIL_NOTCH[i]; s.sailGoalAt = nowS();
+  const [x, y, row] = (G.ctlSent || '0,0,0').split(',').map(Number);
+  G.send({ t: 'ctl', x, y, row, sl: SAIL_NOTCH[i] }); G.sfx.play('flap', 0.6);
+  G.ui.toast(SAIL_NAMES[i], 'info'); G.ui.navDone && G.ui.navDone('sail');
+}
+function anchorToggle() {
+  const s = G.ships.get(G.player.ship); if (!s) return;
+  const [x, y, row] = (G.ctlSent || '0,0,0').split(',').map(Number), down = (s.anc || 0) >= 100;
+  G.send({ t: 'ctl', x, y, row, anc: 1 }); G.sfx.play(down ? 'flap' : 'splash', 0.6);
+  G.ui.toast(down ? 'L’équipage lève l’ancre…' : 'Mouillez l’ancre !', 'info'); G.ui.navDone && G.ui.navDone('anchor');
 }
 function leavePost() { if (!G.post) return; G.send({ t: 'post', off: 1 }); G.post = null; G.ctlSent = null; G.postAt = nowS(); }
 // descendre à terre : par une ouverture du bastingage, vers la terre ferme toute proche
@@ -1348,7 +1367,7 @@ function landNear(s, S) {
   s._ln = { t: performance.now(), v };
   return v;
 }
-const POST_NAMES = { helm: 'Prendre la barre', sails: 'Tenir les drisses (la voilure)', cap: 'Le cabestan (l’ancre)' };
+const POST_NAMES = { helm: 'Prendre la barre', sails: 'Tenir les drisses (la voilure)', cap: 'Le cabestan (l’ancre)', fix: 'L’établi du charpentier (réparer)', carte: 'La table des cartes', vigie: 'La longue-vue (la vigie)', banc: 'S’asseoir' };
 // les animaux de compagnie trottent derrière leur maître
 function updatePets(now, dt) {
   const owners = [G.player];
@@ -1382,6 +1401,7 @@ function interpolate(now, dt) {
     let da = C[3] - A[3]; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
     s.x = A[1] + (C[1] - A[1]) * k; s.y = A[2] + (C[2] - A[2]) * k; s.a = A[3] + da * k;
     s.u = C[4]; s.sail = A[5] + (C[5] - A[5]) * k; s.rud = A[6] + (C[6] - A[6]) * k; s.anc = C[7]; s.hull = C[8]; s.sp = C[10];
+    s.dsail = C[11] || 0; s.drud = C[12] || 0; s.fl = C[13] || 0; // 1.9 : voilure et gouvernail abîmés ; voie d'eau, drisses, avirons, établi
   }
   for (const [id, e] of G.ents) {
     if (e.removeAt && now > e.removeAt) { G.ents.delete(id); continue; }
