@@ -651,6 +651,21 @@ function hangingSign(pb, x, y, icon) {
     for (let j = 0; j < 4; j++) pb.hl(ix + j * 0.5 - 0.2, iy + 3 + j, 6 - j, 0xc01a36); pb.set(ix + 1, iy + 1, 0xff9aa8);
   } else if (icon === 'skull') {
     pb.rect(ix, iy, 6, 4, BONE[3]); pb.rect(ix + 1, iy + 4, 4, 2, BONE[2]); pb.set(ix + 1, iy + 2, 0x1a1418); pb.set(ix + 4, iy + 2, 0x1a1418); pb.set(ix + 2, iy + 5, 0x1a1418);
+  } else if (icon === 'sail') { // 1.8 : la voilerie — une voile carrée gonflée sur sa vergue
+    pb.vl(ix + 3, iy - 1, 7, WOOD[1]); pb.hl(ix, iy, 7, WOOD[2]);
+    for (let j = 1; j < 6; j++) pb.hl(ix + (j > 3 ? 1 : 0), iy + j, 7 - (j > 3 ? 1 : 0), j % 2 ? 0xf3f0e2 : 0xe0d8c0);
+  } else if (icon === 'map') { // 1.8 : le cartographe — une carte, une croix rouge
+    pb.rect(ix - 1, iy, 8, 6, 0xe8d8a8); pb.vl(ix - 1, iy, 6, 0xc4b07a); pb.vl(ix + 6, iy, 6, 0xc4b07a);
+    pb.line(ix, iy + 4, ix + 3, iy + 2, 0x6a8a4a); pb.set(ix + 4, iy + 2, 0xc0302a); pb.set(ix + 5, iy + 1, 0xc0302a); pb.set(ix + 5, iy + 3, 0xc0302a); pb.set(ix + 3, iy + 1, 0xc0302a);
+  } else if (icon === 'jar') { // 1.8 : l'épicerie — un pot d'épices et un piment
+    pb.rect(ix, iy + 1, 4, 5, 0xd88a2a); pb.hl(ix, iy + 1, 4, 0xf0b050); pb.rect(ix, iy, 4, 1, WOOD[1]);
+    pb.line(ix + 5, iy + 1, ix + 6, iy + 5, 0xc0302a); pb.set(ix + 5, iy, 0x3a8a2a);
+  } else if (icon === 'barrel') { // 1.8 : la tonnellerie
+    pb.rect(ix, iy, 6, 6, WOOD[3]); pb.vl(ix, iy + 1, 4, WOOD[2]); pb.vl(ix + 5, iy + 1, 4, WOOD[2]); pb.hl(ix, iy + 1, 6, IRON[3]); pb.hl(ix, iy + 4, 6, IRON[3]);
+  } else if (icon === 'rope') { // 1.8 : la corderie — une glène de cordage
+    for (let a = 0; a < 6.28; a += 0.3) { pb.set(ix + 3 + Math.cos(a) * 3, iy + 3 + Math.sin(a) * 2.4, 0xc4a466); pb.set(ix + 3 + Math.cos(a) * 1.6, iy + 3 + Math.sin(a) * 1.2, 0xa08048); }
+  } else if (icon === 'fish') { // 1.8 : la halle aux poissons
+    pb.ellipse(ix + 3, iy + 3, 3, 1.6, 0x8ab0c4); pb.set(ix + 1, iy + 2, 0x1a1418); pb.set(ix + 6, iy + 2, 0x5a7a90); pb.set(ix + 7, iy + 1, 0x5a7a90); pb.set(ix + 7, iy + 5, 0x5a7a90); pb.set(ix + 6, iy + 4, 0x5a7a90);
   } else if (icon === 'crown') {
     pb.rect(ix, iy + 3, 7, 3, GOLD[3]); for (const k of [0, 3, 6]) pb.vl(ix + k, iy, 3, GOLD[3]); pb.set(ix + 3, iy + 4, 0xe0304a); pb.hl(ix, iy + 5, 7, GOLD[1]);
   }

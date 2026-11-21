@@ -57,7 +57,7 @@ export class Evenements {
       if (f) { this.rest('prise', now, 240, 420); const [ux, uy] = [[0, 1], [-1, 0], [1, 0], [0, -1]][f.dir & 3]; this.fish.push({ x: f.x + ux * 22, y: f.y + uy * 16 - 4, tx: f.x, ty: f.y - 8, t0: now }); G.sfx.hiss(0.2, { f: 1800, q: 0.7, vol: 0.04, type: 'highpass' }); }
     }
     // 3. la poursuite (le jour, dans les grandes villes)
-    if (city && (z === Z.TOWN || z === Z.LIBERTALIA) && ph === 'jour' && this.ready('voleur', now) && rnd() < 0.06) {
+    if (city && z === Z.LIBERTALIA && ph === 'jour' && this.ready('voleur', now) && rnd() < 0.06) { // 1.8 : à Port-Lanterne, le voleur suit le calendrier du port
       const st = T2.streets.get(z).filter(([x, y]) => Math.hypot(x - p.x, y - p.y) > 90 && Math.hypot(x - p.x, y - p.y) < 160 && this.inView({ x, y }, 30));
       if (st.length && city.edges.length) {
         this.rest('voleur', now, 600, 900);
@@ -71,7 +71,7 @@ export class Evenements {
       }
     }
     // 4. le recruteur, sur un quai
-    if (city && city.quay.length && ph === 'jour' && (z === Z.TOWN || z === Z.RADE || z === Z.LIBERTALIA) && this.ready('recrue', now) && rnd() < 0.08) {
+    if (city && city.quay.length && ph === 'jour' && (z === Z.RADE || z === Z.LIBERTALIA) && this.ready('recrue', now) && rnd() < 0.08) {
       const q = city.quay.filter((s) => Math.hypot(s.x - p.x, s.y - p.y) < 150 && this.inView(s, 30));
       if (q.length && city.edges.length) {
         this.rest('recrue', now, 540, 840);

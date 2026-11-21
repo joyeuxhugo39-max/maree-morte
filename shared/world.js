@@ -5,6 +5,8 @@ import { mulberry32, hash2, valueNoise, fbm, shuffle } from './rng.js';
 import { buildHeist } from './heist-world.js'; // lot 5 : le monde du Plus Grand Braquage
 import { buildFest } from './festival-world.js'; // lot 6 : la Nuit des Mille Voiles
 import { buildMobilier } from './mobilier-world.js'; // monde vivant, lot 4 : le mobilier des métiers
+import { buildPort } from './port-world.js'; // 1.8 : la refonte de Port-Lanterne, construite en tout dernier
+import { BERTHS } from './data/ships.js';
 
 export const Z = { SEA: 0, TOWN: 1, BEACH: 2, PLAINS: 3, JUNGLE: 4, RUINS: 5, SWAMP: 6, WRECK: 7, HAVRE: 8, CRANE: 9, ILOT: 10, INTERIOR: 11, CAVE: 12, GOUFFRE: 13,
   RADE: 14, COLLINES: 15, PENDUS: 16, SIRENES: 17, ANSE: 18, OSSEMENTS: 19, QUARANTAINE: 20, VOLCAN: 21, DAMNES: 22, BRUMES: 23, ERMITE: 24,
@@ -77,6 +79,10 @@ export const PROPS = {
   estrade: { ground: 1 }, stand_fete: {}, tente_lice: {}, arche_fete: {}, mat_fete: {}, lampion: {}, canon_fete: {}, bouee: {}, mat_epave: {},
   // monde vivant, lot 4 : le mobilier des métiers et les traces de vie des quais (cordage, filet, casier : on passe dessus)
   foin: { solid: 1 }, sacs: { solid: 1 }, planches: { solid: 1 }, alambic: { solid: 1 }, meule: { solid: 1 }, seau: {}, tabouret: {}, cordage: { ground: 1 }, filet_sol: { ground: 1 }, casier: {},
+  // 1.8 : la refonte de Port-Lanterne (quais, chantier, échoppes, belvédères)
+  bitte: { solid: 1 }, grue: { solid: 1 }, caisses: { solid: 1 }, tonneaux: { solid: 1 }, etal_poisson: { solid: 1 }, sechoir: { solid: 1 }, coque: { solid: 1 }, cabestan: { solid: 1 },
+  panneau: { solid: 1 }, pot_fleurs: { solid: 1 }, table_ext: { solid: 1 }, feu_camp: { solid: 1 }, comptoir_ext: { solid: 1 }, rouleaux: { solid: 1 }, potager: { ground: 1 },
+  longue_vue: { solid: 1 }, muret: { solid: 1 }, escalier: { ground: 1 }, porche: {},
 };
 
 const idx = (x, y) => y * W + x;
@@ -1771,8 +1777,10 @@ export function generateWorld(seed = 7) {
   const heist = buildHeist({ W, tiles, zones, solid, occ, idx, inMap, alloc, rooms, doors, props, addProp, npcs, roomGrid, sail, waterDist, stampPath })();
   const fest = buildFest({ W, H, OVER_H, tiles, zones, solid, occ, idx, inMap, alloc, rooms, doors, props, addProp, npcs, roomGrid })(); // lot 6 : après le braquage (aucun identifiant ne bouge)
   const mobilier = buildMobilier({ W, H, OVER_H, tiles, zones, solid, occ, idx, inMap, rooms, doors, props, addProp, npcs, roomGrid, festBox: { x0: 120, x1: 172, y0: 94, y1: 128 } }); // monde vivant, lot 4 : en tout dernier
+  // 1.8 : Port-Lanterne agrandi — après tout le reste (aucun tirage, aucun identifiant de l'ancien monde ne bouge)
+  const port = buildPort({ W, tiles, zones, solid, occ, idx, inMap, props, addProp, npcs, doors, rooms, sail, waterDist, plankDir, path, spawns, islandOf, Z, PROPS, heist, fest, BERTHS, nextId: () => pid++ });
   const OUT = {
-    heist, fest, mobilier,
+    heist, fest, mobilier, port, spawnPoints: port.spawnPoints,
     block: new Uint8Array(N), // constructions des joueurs : 1 bloque tout, 2 bloque les morts
     islandOf, islands, // 1.0 : chaque case de terre connaît son île
     doorOwner: new Map(), rooms, doors, sail, roomGrid, havre: HC, havreDock, OVER_H,

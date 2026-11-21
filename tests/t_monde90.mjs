@@ -4,6 +4,9 @@
 //  2. une case qui était libre en 1.6.1 l'est encore, sauf exceptions listées et justifiées (le mobilier ajouté) ;
 //  3. chaque personnage, chaque porte, chaque coffre se trouve dans un espace praticable d'au moins 20 cases ;
 //  4. le monde est le même à chaque génération (déterministe).
+// 1.8 : la refonte de Port-Lanterne change, volontairement, le rectangle de la ville (W.port.box) : le sol, les zones et
+// la navigation y sont nouveaux. Hors de ce rectangle, tout reste vérifié case par case contre la 1.6.1 ; dedans, on
+// vérifie ce qui doit survivre (parcelles, portes, personnages, coffres, points d'apparition, accès praticables).
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import { generateWorld, canStand } from '../shared/world.js';
@@ -20,14 +23,21 @@ if (!fs.existsSync(FX) || process.env.MONDE_BASE === '1') { // la photographie d
 }
 const B = JSON.parse(fs.readFileSync(FX, 'utf8'));
 ok(B.W === W.W && B.H === W.H, `la carte garde ses dimensions (${W.W} × ${W.H})`);
-ok(h(W.tiles) === B.tiles, 'le sol de la 1.6.1 n’a pas bougé (aucune case changée)');
-ok(h(W.zones) === B.zones, 'les zones de la 1.6.1 n’ont pas bougé');
+const PB = W.port.box, R = B.port18, inPL = (i) => { const x = i % W.W, y = (i / W.W) | 0; return x >= PB.x0 && x <= PB.x1 && y >= PB.y0 && y <= PB.y1; };
+const hors = (a) => { const b = Uint8Array.from(a); for (let y = PB.y0; y <= PB.y1; y++) for (let x = PB.x0; x <= PB.x1; x++) b[y * W.W + x] = 0; return b; };
+ok(JSON.stringify(PB) === JSON.stringify(R.box), `le rectangle de Port-Lanterne est celui de la référence (${PB.x0}-${PB.x1} × ${PB.y0}-${PB.y1})`);
+ok(h(hors(W.tiles)) === R.tilesHors, 'hors de Port-Lanterne, le sol de la 1.6.1 n’a pas bougé (aucune case changée)');
+ok(h(hors(W.zones)) === R.zonesHors, 'hors de Port-Lanterne, les zones de la 1.6.1 n’ont pas bougé');
+ok(h(hors(W.sail)) === R.sailHors, 'hors de Port-Lanterne, la mer navigable n’a pas bougé');
 // 2. les cases libres restent libres (le mobilier ajouté à l'intérieur est la seule exception, et il est compté)
-const was = Buffer.from(B.free, 'base64'); let closed = 0, closedOut = 0;
-for (let i = 0; i < N; i++) if (was[i] && !free[i]) { closed++; if (W.roomGrid[i] < 0) closedOut++; }
-ok(closedOut === 0, `aucune case libre du monde extérieur n’est devenue bloquante${closedOut ? ' — ' + closedOut + ' CASES BLOQUÉES' : ''}`);
-ok(closed <= 400, `intérieurs : ${closed} cases occupées par du mobilier ajouté depuis la 1.6.1 (limite 400)`);
-ok(W.props.length >= B.props && W.npcs.length >= B.npcs && W.doors.length >= B.doors, `rien n’a disparu (${W.props.length} décors, ${W.npcs.length} personnages, ${W.doors.length} portes)`);
+const was = Buffer.from(B.free, 'base64'); let closedIn = 0, closedOut = 0, closedPL = 0, openedPL = 0;
+for (let i = 0; i < N; i++) { if (was[i] && !free[i]) { if (W.roomGrid[i] >= 0) closedIn++; else if (inPL(i)) closedPL++; else closedOut++; } else if (!was[i] && free[i] && inPL(i)) openedPL++; }
+ok(closedOut === 0, `hors de Port-Lanterne, aucune case libre du monde extérieur n’est devenue bloquante${closedOut ? ' — ' + closedOut + ' CASES BLOQUÉES' : ''}`);
+ok(closedIn <= 400, `intérieurs : ${closedIn} cases occupées par du mobilier ajouté depuis la 1.6.1 (limite 400)`);
+console.log(`     (Port-Lanterne : ${closedPL} cases désormais bâties ou meublées, ${openedPL} cases gagnées sur la mer ou dégagées)`);
+const propsHors = W.props.filter((p) => !(p.tx >= PB.x0 && p.tx <= PB.x1 && p.ty >= PB.y0 && p.ty <= PB.y1)).length;
+ok(propsHors >= R.propsHors && W.npcs.length >= B.npcs && W.doors.length >= B.doors, `rien n’a disparu (${propsHors} décors hors de la ville, ${W.npcs.length} personnages, ${W.doors.length} portes)`);
+ok(JSON.stringify(W.plots.map((p) => [p.k, p.tx, p.ty])) === JSON.stringify(R.plots), 'les parcelles des joueurs (maisons achetées) n’ont pas bougé d’une case');
 // 3. personne n'est muré : les espaces praticables, par remplissage
 const comp = new Int32Array(N).fill(-1), size = [];
 for (let s = 0; s < N; s++) {
@@ -47,6 +57,8 @@ ok(!doorBad.length, `chaque porte (hors plongée, qu’on atteint depuis la mer)
 const chestBad = W.chests.filter((c) => !near(c.x, c.y + 12) && !near(c.x - 16, c.y) && !near(c.x + 16, c.y)).map((c) => `${c.tx},${c.ty}`);
 ok(!chestBad.length, `chaque coffre est accessible${chestBad.length ? ' — ' + chestBad.slice(0, 8).join(' ') : ''}`);
 ok(canStand(W, W.spawnPoint.x, W.spawnPoint.y), 'le point d’arrivée des nouveaux pirates est praticable');
+const spBad = W.spawnPoints.filter((s) => !canStand(W, s.x, s.y) || !roomy(s.x, s.y));
+ok(W.spawnPoints.length >= 16 && !spBad.length, `${W.spawnPoints.length} points d’apparition, tous praticables et ouverts sur la ville${spBad.length ? ' — ' + spBad.length + ' MAUVAIS' : ''}`);
 // 4. déterministe
 const W2 = generateWorld();
 ok(h(W2.tiles) === h(W.tiles) && h(W2.solid) === h(W.solid) && W2.props.length === W.props.length, 'deux générations donnent exactement le même monde');

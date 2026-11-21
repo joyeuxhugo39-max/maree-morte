@@ -25,6 +25,48 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Version 1.8.0 : la refonte de Port-Lanterne
+
+Le port de départ devient la vitrine de l'archipel. La ville ne bouge pas : elle grandit autour de la Flamme, de la
+Sirène Borgne et du quartier des Corsaires.
+
+- **Le grand port** :
+  - un quai de pierre continu de la halle aux poissons jusqu'au Levant, avec sa margelle, son mur sur l'eau, des bittes
+    d'amarrage, deux grues, des aires de chargement, des étals de poisson ;
+  - la jetée des pêcheurs, avec des barques amarrées et deux autres qui rament dans la baie ;
+  - le quai du Levant, où accostent les navires marchands, et sa capitainerie.
+- **La place de la Flamme** : agrandie, avec quatre accès larges, deux étals de plus, des bancs, des jardinières et un
+  panneau d'annonces.
+- **Le quartier de la taverne** :
+  - une terrasse et la cour des conteurs, autour du feu du vieil Achille ;
+  - dans la Sirène Borgne : une table de plus, la table de dés, des lanternes et des tonneaux en perce.
+- **La Grand-Rue** et ses échoppes : voilerie, cartographe, épicerie, tonnellerie, corderie. Chacune a sa façade, son
+  enseigne, son comptoir dehors et son marchand.
+- **Le quartier des Ravaudeuses** : maisons variées, venelles, potagers, linge et puits.
+- **Le chantier naval** : un brick en radoub sur la cale, l'échafaudage et l'atelier. La charpentière y répare les coques
+  et arme les navires (les systèmes existants).
+- **Les hauteurs** : les belvédères du phare et du Couchant, avec leurs longues-vues, et l'arche de la porte du Couchant.
+- **12 habitants nouveaux** :
+  - les marchands ne vendent que des objets qui existaient déjà, au même prix ;
+  - le capitaine du port et le conteur ne vendent rien : ils racontent ;
+  - trois personnages de passage n'apparaissent que pendant un événement.
+- **Les événements du port** suivent un calendrier calculé sur l'heure du monde : tout le monde voit la même chose au
+  même moment, sans message réseau de plus.
+  - Interactifs : le navire marchand (on décharge des caisses contre quelques doublons), le colporteur, le voleur (le
+    pirate qui lui barre la route l'arrête), le crieur.
+  - À regarder : la bagarre devant la taverne, l'équipage qui embarque, le radoub, les musiciens, la dispute à la halle.
+  - Un créneau sur trois reste calme ; pendant la Nuit des Mille Voiles, la musique, le colporteur et le voleur laissent
+    la place à la fête.
+- **L'apparition** :
+  - 24 points autour de la Flamme, hors des grands passages ;
+  - on prend le plus dégagé des autres pirates, et l'on ne se pose jamais sur quelqu'un, même à 20 ;
+  - une ancienne sauvegarde dans un mur neuf repart d'un point libre.
+- **Les garde-fous** :
+  - hors du rectangle de la ville, le sol, les zones et la mer navigable sont identiques case par case à la 1.6.1 ;
+  - les parcelles des joueurs n'ont pas bougé ;
+  - les sauvegardes ne changent pas de forme.
+- Détail, mesures et limites : `rapports/pl1-audit-plan.md` et `rapports/pl2-livraison.md`.
+
 ## Version 1.7.0 : le monde vivant, livré (lots 7 à 10)
 
 - Les pas suivent la vitesse : plus de pieds qui glissent, chez le joueur, les monstres et les habitants. Les

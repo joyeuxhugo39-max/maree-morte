@@ -20,7 +20,8 @@ const dirOf = (dx, dy) => (Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 1 : 2) : (dy 
 export function phaseOf(f) { return f < 0.5 ? 'jour' : f < 0.667 ? 'soir' : f < 0.917 ? 'nuit' : 'aube'; }
 // les villes peuplées et leurs métiers (l'ordre compte : on retire d'abord les derniers si une ville manque de place)
 const CITIES = [
-  [Z.TOWN, ['guet', 'guet', 'marchand', 'marchand', 'marchand', 'docker', 'docker', 'pecheur', 'pecheur', 'artisan', 'habitant', 'habitant', 'habitant', 'client', 'voyageur']],
+  [Z.TOWN, ['guet', 'guet', 'marchand', 'marchand', 'marchand', 'docker', 'docker', 'pecheur', 'pecheur', 'artisan', 'habitant', 'habitant', 'habitant', 'client', 'voyageur',
+    'guet', 'docker', 'docker', 'pecheur', 'artisan', 'artisan', 'habitant', 'habitant', 'client', 'matelot', 'matelot']], // 1.8 : la ville a grandi (quais, chantier, Grand-Rue)
   [Z.LIBERTALIA, ['guet', 'guet', 'guet', 'guet', 'marchand', 'marchand', 'marchand', 'marchand', 'marchand', 'marchand', 'marchand', 'client', 'client', 'client', 'client', 'client', 'client', 'docker', 'docker', 'docker', 'pecheur', 'pecheur', 'artisan', 'artisan', 'habitant', 'habitant', 'habitant', 'habitant', 'voyageur', 'voyageur', 'contrebandier']],
   [Z.RADE, ['guet', 'matelot', 'matelot', 'docker', 'pecheur', 'pecheur', 'habitant', 'marchand']],
   [Z.HAVRE, ['pecheur', 'pecheur', 'pecheur', 'habitant', 'habitant', 'marchand']],
@@ -98,16 +99,16 @@ export class Townsfolk {
     const DOWN = [[0, 14], [0, 18], [12, 6], [-12, 6], [0, -14]], ANY = [[0, 14], [14, 0], [-14, 0], [0, -14], [12, 12], [-12, 12]];
     for (const p of W.props) {
       if (W.roomGrid[p.ty * W.W + p.tx] >= 0 || W.zones[p.ty * W.W + p.tx] !== z) continue;
-      if (p.type === 'stall' || p.type === 'comptoir') { const front = near(p, DOWN); const back = near(p, [[0, -12], [0, -16]]); const held = W.npcs.some((n) => Math.abs(n.x - p.x) < 26 && Math.abs(n.y - p.y) < 30); if (front) out.stalls.push({ front, back: back || front, x: p.x, y: p.y, held }); } // held : un marchand nommé le tient déjà
+      if (p.type === 'stall' || p.type === 'comptoir' || p.type === 'etal_poisson' || p.type === 'comptoir_ext') { const front = near(p, DOWN); const back = near(p, [[0, -12], [0, -16]]); const held = W.npcs.some((n) => Math.abs(n.x - p.x) < 26 && Math.abs(n.y - p.y) < 30); if (front) out.stalls.push({ front, back: back || front, x: p.x, y: p.y, held }); } // held : un marchand nommé le tient déjà
       else if (p.type === 'well' || p.type === 'fontaine') { const s = near(p, ANY); if (s) out.wells.push(s); }
       else if (p.type === 'bench') { const s = near(p, [[0, -2], [0, 10], [0, -10]]); if (s) out.benches.push(s); }
-      else if (p.type === 'crate' || p.type === 'barrel' || p.type === 'tonnelet' || p.type === 'tonneau_d') { const s = near(p, ANY); if (s) out.crates.push(s); }
-      else if (p.type === 'anvil' || p.type === 'workbench') { const s = near(p, ANY); if (s) out.work.push(s); }
-      else if (p.type === 'statue' || p.type === 'porte_cite' || p.type === 'fontaine') { const s = near(p, DOWN); if (s) out.posts.push(s); }
+      else if (p.type === 'crate' || p.type === 'barrel' || p.type === 'tonnelet' || p.type === 'tonneau_d' || p.type === 'caisses' || p.type === 'tonneaux' || p.type === 'grue') { const s = near(p, ANY); if (s) out.crates.push(s); }
+      else if (p.type === 'anvil' || p.type === 'workbench' || p.type === 'cabestan' || p.type === 'sechoir' || p.type === 'coque') { const s = near(p, p.type === 'coque' ? [[-40, -24], [36, -10], [-40, 0]] : ANY); if (s) out.work.push(s); }
+      else if (p.type === 'statue' || p.type === 'porte_cite' || p.type === 'fontaine' || p.type === 'porche' || p.type === 'panneau') { const s = near(p, DOWN); if (s) out.posts.push(s); }
     }
     for (let y = 1; y < W.OVER_H - 1; y++) for (let x = 1; x < W.W - 1; x++) { // les bords des quais, face à l'eau
       const i = y * W.W + x;
-      if (W.tiles[i] !== T.PLANK || W.zones[i] !== z || W.roomGrid[i] >= 0 || W.solid[i]) continue;
+      if ((W.tiles[i] !== T.PLANK && !(W.tiles[i] === T.COBBLE && W.port && W.port.quai && z === Z.TOWN && y === W.port.quai.y1)) || W.zones[i] !== z || W.roomGrid[i] >= 0 || W.solid[i]) continue; // 1.8 : le bord du quai de pierre
       for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) { const t = W.tiles[i + dx + dy * W.W]; if (t === T.WATER || t === T.DEEP) { const px = x * TILE + 8, py = y * TILE + 10; if (stand(px, py)) out.quay.push({ x: px, y: py, dir: dirOf(dx, dy) }); break; } }
     }
     for (const d of W.doors) {

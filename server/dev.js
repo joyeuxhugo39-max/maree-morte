@@ -25,6 +25,7 @@ import { ITEMS, reqLevel } from '../shared/data/items.js';
 import { MOBS } from '../shared/data/mobs.js';
 import { QUESTS, QUEST_ORDER, questState } from '../shared/data/quests.js';
 import { NPCS } from '../shared/data/npcs.js';
+import { PORT_KINDS, portFind, portNextEvent, SHIP as PORT_SHIP } from '../shared/port-events.js'; // 1.8 : les événements du port
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { SKILLS } from '../shared/data/skills.js';
 import { PLACES, PLACE_ORDER } from '../shared/data/places.js';
@@ -494,6 +495,17 @@ export function installDev(game, { env = process.env, panelFile = path.join(DIR,
         if (k === 'eruption') { game.erupt.nextAt = game.time; game.erupt.until = 0; return 'Le volcan entre en éruption dès qu’un pirate est sur son île (« tp lieu-volcan »).'; }
         if (k === 'horde') { let t = Math.floor(game.worldTime / DAY_LENGTH) * DAY_LENGTH + ((22 - 7) / 24) * DAY_LENGTH; if (t <= game.worldTime) t += DAY_LENGTH; for (let i = 0; i < 4 && !isFullMoon(t); i++) t += DAY_LENGTH; game.worldTime = t; game.hordeAt = 0; return `Nuit de pleine lune (${clockString(dayFrac(t))}) : la horde se lève.`; }
         fail('Usage : evenement invasion [lieu] | eruption | horde | fin');
+      } },
+    // 1.8 : les événements du port de Port-Lanterne — voir où en est le calendrier, ou sauter au prochain d'une sorte
+    { n: 'port', al: ['evport'], cat: 'Environnement', u: `port <etat | ${Object.keys(PORT_KINDS).join(' | ')}>`, h: 'Les événements du port de Port-Lanterne : l’état du calendrier, ou avancer l’heure du monde jusqu’au prochain événement de cette sorte (tout le serveur).',
+      run: (p, a, ctx) => {
+        const k = norm(a[0] || 'etat'), fest = game.portClosed();
+        if (k === 'etat') { const e = game.portEvent(), nx = portNextEvent(game.worldTime, fest); return e ? `En cours : ${PORT_KINDS[e.k].name} (${Math.round(e.t)} s sur ${e.dur}).` : `Le port est calme.${nx ? ` Prochain : ${PORT_KINDS[nx.k].name}, dans ${Math.max(0, Math.round(nx.start - game.worldTime))} s.` : ''}`; }
+        if (!PORT_KINDS[k]) fail(`Usage : port <etat | ${Object.keys(PORT_KINDS).join(' | ')}>`);
+        const w = worldConfirm(p, ctx.confirm, 'Avancer l’heure du monde'); if (w) return w;
+        const t = portFind(k, game.worldTime, fest); if (t == null) fail(fest ? 'Pendant la fête, cet événement laisse la place (fete fermer d’abord).' : 'Aucun événement de cette sorte à venir.');
+        game.worldTime = t + (k === 'navire' ? PORT_SHIP.arrive + 2 : 1); game.hordeAt = 0;
+        return `${PORT_KINDS[k].name} : c’est maintenant.`;
       } },
     // ---- cinématiques
     // lot 6 : la Nuit des Mille Voiles — ouvrir ou fermer une édition (pour tout le serveur), lancer le spectacle, des jetons de test

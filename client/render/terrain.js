@@ -134,6 +134,17 @@ export class Terrain {
   constructor(world) {
     this.w = world;
     this.cache = new Map();
+    // 1.8 : les quais de pierre de Port-Lanterne — un bord droit, un mur de pierres taillées sur l'eau, des dalles
+    this.quayT = new Set(); this.flag = null; this.qb = null;
+    const P = world.port;
+    if (P && P.quai) {
+      const Q = P.quai, wat = (i) => world.tiles[i] === T.WATER || world.tiles[i] === T.DEEP;
+      this.flag = Q; this.qb = { x0: P.box.x0 - 1, x1: P.box.x1 + 1, y0: P.box.y0 - 1, y1: P.box.y1 + 1 };
+      for (let y = P.box.y0; y <= P.box.y1; y++) for (let x = P.box.x0; x <= P.box.x1; x++) {
+        const i = y * MAP_W + x; if (world.tiles[i] !== T.COBBLE) continue;
+        if (wat(i + MAP_W) || wat(i - 1) || wat(i + 1)) { this.quayT.add(i); for (const j of [i + MAP_W, i - 1, i + 1]) if (wat(j)) this.quayT.add(j); }
+      }
+    }
   }
   tileT(tx, ty) {
     if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) return T.DEEP;
@@ -154,6 +165,7 @@ export class Terrain {
     const jy = (valueNoise(wx * 0.07, wy * 0.07, 503) - 0.5) * 17 + (valueNoise(wx * 0.3, wy * 0.3, 504) - 0.5) * 3.5;
     const t2 = this.tileT(Math.floor((wx + jx) / TILE), Math.floor((wy + jy) / TILE));
     if (t2 === T.PLANK || t2 >= T.VOID) return base;
+    const QB = this.qb; if (QB && tx >= QB.x0 && tx <= QB.x1 && ty >= QB.y0 && ty <= QB.y1 && (this.quayT.has(ty * MAP_W + tx) || this.quayT.has(Math.floor((wy + jy) / TILE) * MAP_W + Math.floor((wx + jx) / TILE)))) return base; // 1.8 : le quai reste droit
     if (base === T.COBBLE || t2 === T.COBBLE) {
       const t3 = this.smooth(wx + jx * 0.4, wy + jy * 0.4, -1);
       return t3 === T.PLANK || t3 >= T.VOID ? base : t3;
@@ -244,6 +256,18 @@ export class Terrain {
       let col = 0, a = 255;
       switch (t) {
         case T.DEEP: case T.WATER: {
+          if (this.qb && (wx >> 4) >= this.qb.x0 && (wx >> 4) <= this.qb.x1 && (wy >> 4) >= this.qb.y0 && (wy >> 4) <= this.qb.y1) { // 1.8 : sous le rebord du quai, le mur de pierres taillées, puis son ombre sur l'eau
+            let qk = 0;
+            for (let k = 1; k <= 7; k++) { const t1 = at(lx, ly - k); if (t1 === T.COBBLE) { qk = k; break; } if (!WATERY[t1]) break; }
+            if (qk && this.quayT.has(((wy - qk) >> 4) * MAP_W + (wx >> 4))) {
+              const row = wy - qk + 1, joint = ((wx + (((row >> 4) & 1) ? 5 : 0)) % 11) === 0;
+              if (qk === 1) col = 0x8c8794;
+              else if (qk <= 4) col = joint ? 0x2e2a34 : (hash2(Math.floor((wx + 3) / 11), row >> 4, 86) > 0.6 ? 0x6a6672 : 0x5a5662);
+              else if (qk === 5) col = hash2(wx, wy, 87) > 0.5 ? 0x3e5a44 : 0x34303c;
+              else { col = 0x0e3346; a = qk === 6 ? 220 : 170; }
+              break;
+            }
+          }
           const wd = this.wdist(wx, wy);
           let near = 9, nearT = 0;
           if (wd < 2.2) {
@@ -385,6 +409,17 @@ export class Terrain {
         }
         case T.COBBLE: {
           const P = PAL[T.COBBLE];
+          const FQ = this.flag, ftx = wx >> 4, fty = wy >> 4;
+          if (FQ && ftx >= FQ.x0 && ftx <= FQ.x1 && fty >= FQ.y0 && fty <= FQ.y1) { // 1.8 : les dalles du quai de pierre
+            const fr = Math.floor(wy / 6), fx = wx + (fr & 1) * 4, fb = Math.floor(fx / 8), ex = fx - fb * 8, ey = wy - fr * 6, hh = hash2(fb, fr, 85);
+            let k = ex === 0 || ey === 0 ? 0 : hh < 0.3 ? 1 : hh < 0.82 ? 2 : 3;
+            if (ey === 1 && ex > 0) k = Math.min(4, k + 1);
+            col = P[k];
+            if (k > 0 && hash2(fb, fr, 88) > 0.93) col = mix(col, 0x6a5a40, 0.3);
+            const below = W.tiles[(fty + 1) * MAP_W + ftx];
+            if ((below === T.WATER || below === T.DEEP) && (wy & 15) >= 13) col = (wy & 15) === 13 ? 0xb4aea6 : 0x9a948c; // la margelle
+            break;
+          }
           const S = 7, gx = Math.floor(wx / S), gy = Math.floor(wy / S);
           let d1 = 1e9, d2 = 1e9, fx = 0, fy = 0, cid = 0;
           for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {

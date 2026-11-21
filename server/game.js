@@ -38,6 +38,7 @@ import { seasons } from './seasons.js';
 import { cinema } from './cinema.js'; // lot 4 : qui voit quelle cinématique, et la protection des spectateurs
 import { heist, DISGUISE } from './heist.js'; // lot 5 : Le Plus Grand Braquage
 import { festival } from './festival.js'; // lot 6 : la Nuit des Mille Voiles
+import { portLogic } from './port.js'; // 1.8 : Port-Lanterne (apparitions, événements du port)
 import { MEM_KEYS } from '../shared/data/scenes.js';
 import { repLevel, buyPrice, sellPrice } from '../shared/data/places.js';
 import { LEGACY_VALUE, LEGACY_STRUCT, QUEST_ITEM_OLD_VALUE } from '../shared/data/legacy.js';
@@ -262,6 +263,7 @@ export class Game {
       case 'cinema': return this.cinemaMsg(p, m); // lot 4
       case 'heist': return this.heistMsg(p, m); // lot 5
       case 'fest': return this.festMsg(p, m); // lot 6
+      case 'port': return this.portMsg(p, m); // 1.8 : décharger le navire marchand
       case 'mem': { const k = String(m.k); if (MEM_KEYS.has(k) && p.mem.size < 200) p.mem.add(k); if (k === 'silas_oui' || k === 'silas_avance') this.heistAccept(p, k === 'silas_avance'); return; }
       case 'song': { const k = String(m.k), s = HOUSE_MUSIC.find(([x]) => x && x === k); if (!s || p.songs.has(k)) return; p.songs.add(k); p.dirtyMe = true; const n = HOUSE_MUSIC.length - 1; if (p.songs.size >= n) this.unlock(p, 'melomane'); return this.toast(p, `♪ Nouvel air noté dans votre carnet : « ${s[1]} » (${p.songs.size}/${n}). La boîte à musique de votre maison saura le jouer.`, 'quest'); }
       case 'ladder': return this.send(p, { t: 'ladder', top: this.ladderTop(), hist: p.pvpHist, me: [p.honor | 0, Math.floor(p.infamy || 0)] });
@@ -356,6 +358,7 @@ export class Game {
     });
     this.send(p, this.heistState(p)); // lot 5 : barricades, comptable absent, archives fermées
     this.festLogin(p); // lot 6 : le carnet du festival, l'édition en cours
+    this.portState(p); // 1.8 : l'état du port (un voleur déjà pris)
     if (!lab) this.broadcastChat(null, `${p.name} accoste à Port-Lanterne.`, 'sys');
     this.socialLogin(p);
     this.justiceLogin(p);
@@ -452,7 +455,7 @@ export class Game {
   }
 
   createPlayer(conn, name, key, d, look) {
-    const sp = this.world.spawnPoint;
+    const sp = this.spawnSpot ? this.spawnSpot(null) : this.world.spawnPoint; // 1.8 : un point libre parmi ceux de la place
     const p = {
       id: this.nextId++, conn, name: d && d.name ? d.name : name, key,
       base: sanitizeLook(d ? d.look : look),
@@ -518,7 +521,8 @@ export class Game {
       if (d.caches && typeof d.caches === 'object') for (const k in d.caches) if (String(k).startsWith('i:')) p.caches[k] = 1;
       if (Array.isArray(d.zs)) for (const z of d.zs) if (FAR_ZONES.includes(z | 0)) p.zs.add(z | 0);
       if (typeof d.x === 'number' && typeof d.y === 'number') {
-        if (canStand(this.world, d.x, d.y, false, key)) { p.x = d.x; p.y = d.y; }
+        const old = this.world.spawnPoint, atOld = Math.abs(d.x - old.x) <= 12 && Math.abs(d.y - old.y) <= 4; // 1.8 : revenu au point unique d'avant (une mort) : on prend un point libre
+        if (canStand(this.world, d.x, d.y, false, key) && !atOld) { p.x = d.x; p.y = d.y; }
       }
     } else {
       this.addItem(p, 'banane', 3);
@@ -1796,12 +1800,12 @@ export class Game {
     p.diveBoat = null; p.air = null;
     if (p.shieldNext) { p.shieldNext = false; p.shieldUntil = this.time + SHIELD_AFTER_DEATH; p.lookVer++; this.toast(p, `Pavillon blanc : personne ne peut vous attaquer pendant ${SHIELD_AFTER_DEATH / 60} minutes (et vous n’attaquez personne).`, 'info'); }
     if (p.jail > 0) { p.invulnUntil = this.time + 3; this.imprison(p, 0); this.ev(p.x, p.y, ['fx', 'respawn', p.x, p.y]); return; }
-    const sp = this.world.spawnPoint;
-    p.x = sp.x + rand(-12, 12); p.y = sp.y + rand(-4, 4);
+    const sp = this.spawnSpot(p); // 1.8 : l'un des points de la place, le plus dégagé des autres pirates
+    p.x = sp.x; p.y = sp.y;
     const bed = p.respawnAt && this.structs.get(p.respawnAt.ty * this.world.W + p.respawnAt.tx);
     if (bed && bed.type === 'lit' && bed.owner === p.key) {
       for (const [dx, dy] of [[0, 1], [1, 0], [-1, 0], [0, -1], [1, 1], [-1, 1]]) { const x = (bed.tx + dx) * TILE + 8, y = (bed.ty + dy) * TILE + 10; if (canStand(this.world, x, y, false, p.key)) { p.x = x; p.y = y; break; } }
-    } else if (!canStand(this.world, p.x, p.y, false, p.key)) { p.x = sp.x; p.y = sp.y; }
+    } else if (!canStand(this.world, p.x, p.y, false, p.key)) { p.x = this.world.spawnPoint.x; p.y = this.world.spawnPoint.y; }
     p.invulnUntil = this.time + 3; p.moveBudget = 0;
     p.zone = zoneAt(this.world, p.x, p.y); p.room = roomIdAt(this.world, p.x, p.y);
     this.sendPos(p, { respawn: 1 });
@@ -2460,7 +2464,7 @@ export class Game {
   }
   nearNpc(p, id, range = INTERACT_RANGE + 16) {
     const n = this.npcPos.get(id);
-    return n && Math.hypot(n.x - p.x, n.y - p.y) <= range && npcVisible(NPCS[id], p.quests, p.level);
+    return n && Math.hypot(n.x - p.x, n.y - p.y) <= range && npcVisible(NPCS[id], p.quests, p.level) && (!NPCS[id] || !NPCS[id].ev || this.portNpcHere(id)); // 1.8 : un personnage d'événement n'est là que pendant son événement
   }
   buy(p, npc, item) {
     const N = NPCS[npc];
@@ -3242,6 +3246,7 @@ export class Game {
         this.act3Tick(p);
         this.seaTick(p);
         if (p.race) this.raceCheck(p);
+        this.portPlayerTick(p); // 1.8 : une caisse portée trop loin, ou un navire reparti
       }
       if (p.fishing) this.updateFishing(p);
       if (p.homing) this.homeTick(p); // lot 1 : retour au port
@@ -3257,6 +3262,7 @@ export class Game {
     if (this.tickCount % 5 === 0) { this.arenaTick(); this.dungeonTick(); this.cinemaTick(); }
     if (this.tickCount % 10 === 0) this.heistTick();
     if (this.tickCount % 10 === 0) this.festTick(); // lot 6
+    if (this.tickCount % 2 === 0) this.portTick(); // 1.8 : les événements du port (le voleur, les personnages de passage)
     if (this.tickCount % 2 === 0) { this.gabTick(); this.raceTick(); } // lot 6 : le chrono du gabier, les bouées de la course
     this.shipsTick();
     if (this.tickCount % 40 === 0 && this.players.size > 1) { // les autres pirates sur la carte
@@ -3348,3 +3354,4 @@ Object.assign(Game.prototype, seasons); // 1.0 : saisons, concours de pêche, Gr
 Object.assign(Game.prototype, cinema); // lot 4 : les cinématiques
 Object.assign(Game.prototype, heist); // lot 5 : le braquage
 Object.assign(Game.prototype, festival); // lot 6 : la Nuit des Mille Voiles
+Object.assign(Game.prototype, portLogic); // 1.8 : Port-Lanterne

@@ -18,6 +18,7 @@ import { hash2 } from '../../shared/rng.js';
 import { extend06, petSheets, drawTentacle } from './sprites-06.js';
 import { extend07 } from './sprites-07.js';
 import { extend08, citeSprite, proprieteSprite, extendProps08 } from './sprites-cite.js';
+import { extendPort } from './sprites-port.js'; // 1.8 : la refonte de Port-Lanterne
 import { extendFete } from './sprites-fete.js'; // lot 6 : les décors de la Nuit des Mille Voiles
 import { volcanoGen, makePuffs, makeSplats } from './sprites-volcan.js';
 import './sprites-08.js';
@@ -113,7 +114,7 @@ export class Renderer {
     this.water = makeWaterLayers();
     this.env = buildEnvSprites();
     this.structSpr = buildStructSprites(this.env);
-    extend06(this.env, this.structSpr); extend07(this.env); extend08(this.env); extendFete(this.env); extendMobilier(this.env); extendProps08(this.structSpr); this.pets = petSheets(); this.tentacle = drawTentacle;
+    extend06(this.env, this.structSpr); extend07(this.env); extend08(this.env); extendFete(this.env); extendMobilier(this.env); extendPort(this.env, this.structSpr); extendProps08(this.structSpr); this.pets = petSheets(); this.tentacle = drawTentacle;
     // le volcan se peint en tâche de fond, un peu à chaque image (ou d'un coup si l'on arrive devant)
     this.volcJob = world.volcano ? volcanoGen(world.volcano) : null; this.volc = null; this.volcanAlpha = 1;
     this.puffs = world.volcano ? makePuffs() : null; this.plume = [];
@@ -321,6 +322,7 @@ export class Renderer {
     for (const e of G.ents.values()) if (e.k === 'd') this.drawDrop(ctx, e, camX, camY, now, G);
     if (!room && G.fest) G.fest.drawGround(ctx, camX, camY, now); // lot 6 : le coffre déterré, à ras du sol
     if (!room && G.evt) G.evt.drawGround(ctx, camX, camY, now); // monde vivant, lot 6 : la cargaison renversée, le navire au loin
+    if (!room && G.port) G.port.drawGround(ctx, camX, camY, now); // 1.8 : la pile du navire marchand, les copeaux, les notes
     // télégraphes : le remplissage au sol (les contours se dessinent plus haut, par-dessus la lumière)
     this.drawTeles(ctx, camX, camY, now, false);
 
@@ -335,6 +337,7 @@ export class Renderer {
     for (const e of G.ents.values()) if (e.k === 'p' && e.petObj && !e.petObj.hidden) draw.push({ y: e.petObj.y, pet: e.petObj });
     for (const f of G.folk || []) if (!f.hidden && f.x > camX - 30 && f.x < camX + W + 30 && f.y > camY - 30 && f.y < camY + H + 40) draw.push({ y: f.y, e: f });
     for (const c of G.cats || []) if (c.x > camX - 20 && c.x < camX + W + 20 && c.y > camY - 20 && c.y < camY + H + 20) draw.push({ y: c.y, c });
+    if (!room) for (const s of G.portShips || []) if (s.x > camX - 140 && s.x < camX + W + 140 && s.y > camY - 90 && s.y < camY + H + 90) draw.push({ y: s.y + 10, ps: s }); // 1.8 : les navires du port
     if (!room) for (const b of BERTHS) { const [bx, by] = berthPos(b); if (bx > camX - 30 && bx < camX + W + 30 && by > camY - 30 && by < camY + H + 40) draw.push({ y: by, bt: b }); } // 1.1 : les bittes d'amarrage
     draw.sort((a, b) => a.y - b.y);
     // ombres — monde vivant, lot 8 : elles suivent le soleil (à gauche le matin, courtes à midi, longues et douces à
@@ -342,7 +345,7 @@ export class Renderer {
     const sun = room ? { dx: 0, sx: 1, a: 0.28 } : (() => { const dp = Math.min(1, Math.max(0, f / 0.5)), day = f < 0.5; const k = dp - 0.5; return day ? { dx: k * 7, sx: 1 + Math.abs(k) * 0.8, a: 0.28 - Math.abs(k) * 0.06 } : { dx: 0, sx: 1, a: 0.13 }; })();
     ctx.fillStyle = `rgba(20,12,34,${sun.a.toFixed(3)})`;
     for (const d of draw) {
-      if (d.st || d.bt) continue;
+      if (d.st || d.bt || d.ps) continue;
       if (d.p) {
         const s = d.p.spr;
         if (d.p.type === 'ship' || d.p.type === 'wreck' || d.p.type === 'lighthouse' || d.p.type === 'boat' || d.p.type === 'volcan') continue;
@@ -367,6 +370,7 @@ export class Renderer {
       else if (d.pet) this.drawPet(ctx, d.pet, camX, camY, now);
       else if (d.n) this.drawNpc(ctx, d.n, camX, camY, now, G);
       else if (d.bt) this.drawBerth(ctx, d.bt, camX, camY, now);
+      else if (d.ps) this.drawNpcShip(ctx, d.ps, d.ps.kind, d.ps.pal, camX, camY, now, G, null);
       else this.drawEntity(ctx, d.e, camX, camY, now, G);
     }
     if (!room) this.drawShipsTop(ctx, G, camX, camY, now); // 1.1 : mâture et voiles, au-dessus de tout
@@ -1015,7 +1019,7 @@ export class Renderer {
     const src = hw ? whiteSheet(sh) : sh.cv;
     this.drawBody(ctx, src, sh, frame, dir, x, y, cut, (human || e.k === 'm') && !e.moving && !sit && atk > 0.3 && dying < 0 ? this.breath(e.id || 0, human ? now : now * 0.75) : 0); // lot 7 : les morts-vivants « respirent » aussi, plus lentement (1 px, le buste seulement)
     if (e.k === 'f' && e.lantern) { const hx = x + (meta && meta.hand ? meta.hand[0] : 14), hy = y + (meta && meta.hand ? meta.hand[1] : 16); ctx.fillStyle = '#2a1a0e'; ctx.fillRect(hx - 1, hy - 1, 4, 6); ctx.fillStyle = '#ffd24a'; ctx.fillRect(hx, hy + 1, 2, 3); ctx.fillStyle = '#fff6c0'; ctx.fillRect(hx, hy + 1, 1, 1); } // la lanterne du guet
-    if (e.k === 'f' && e.carry) { // monde vivant, lot 5 : le docker porte une caisse à l'épaule
+    if ((e.k === 'f' || e.k === 'p') && e.carry) { // monde vivant, lot 5 : le docker porte une caisse à l'épaule (1.8 : un pirate aussi, au déchargement)
       const cx = x + Math.round(sh.fw / 2) - 3 + (dir === 1 ? -2 : dir === 2 ? 2 : 0), cy = y + 3 + (e.moving && frame % 2 ? 1 : 0);
       ctx.fillStyle = '#2a1a0e'; ctx.fillRect(cx - 1, cy - 1, 9, 8); ctx.fillStyle = '#8c5c33'; ctx.fillRect(cx, cy, 7, 6); ctx.fillStyle = '#ab7643'; ctx.fillRect(cx, cy, 7, 1); ctx.fillStyle = '#6d4626'; ctx.fillRect(cx, cy + 3, 7, 1); ctx.fillRect(cx + 3, cy, 1, 6);
     }

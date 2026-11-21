@@ -94,6 +94,35 @@ const STYLES = {
   fosse: () => ({ wall: 'stone', roof: RF.terra, floors: 1, chimney: false, sign: 'skull', winCols: [0, 13],
     extra(pb, W, H, top, o) { const dx = 4 + o.door * 16 + 1; torchAt(pb, dx - 6, H - 22); torchAt(pb, dx + 18, H - 22); pb.line(dx - 26, H - 26, dx - 14, H - 14, IRON[5]); pb.line(dx - 14, H - 26, dx - 26, H - 14, IRON[4]); pb.line(dx + 30, H - 26, dx + 42, H - 14, IRON[5]); pb.line(dx + 42, H - 26, dx + 30, H - 14, IRON[4]); },
     lights: (W, H, o) => { const dx = 4 + o.door * 16 + 1; return [[dx - 5, H - 25], [dx + 19, H - 25]]; } }),
+  // 1.8 : les échoppes et les maisons de Port-Lanterne (chacune son enseigne, sa couleur, sa marchandise)
+  voilerie: () => ({ wall: 'plaster', plaster: PLA.white, roof: 'blue', floors: 2, chimney: false, sign: 'sail', awning: AWN_B, shutter: SHUT[0], flowers: FLOW[1],
+    extra(pb, W, H, top) { // des voiles qui sèchent, tendues sur le pignon
+      for (const [x0, w] of [[6, 14], [W - 22, 14]]) { pb.hl(x0 - 1, top + 3, w + 2, WOOD[1]); for (let y = 0; y < 16; y++) pb.hl(x0 + (y > 11 ? 1 : 0), top + 4 + y, w - (y > 11 ? 2 : 0), y % 5 === 4 ? 0xd8ceb0 : 0xf3eedc); }
+    } }),
+  cartographe: () => ({ wall: 'plaster', plaster: PLA.lilac, roof: 'slate', floors: 2, chimney: true, sign: 'map', shutter: SHUT[3], flowers: FLOW[2],
+    extra(pb, W, H, top) { // un globe dans l'œil-de-bœuf, une rose des vents peinte
+      const cx = W >> 1; pb.disc(cx, top + 9, 5, WOOD[1]); pb.disc(cx, top + 9, 4, 0x2a6aa8); pb.disc(cx - 1, top + 8, 1.6, 0x5a9a4a); pb.disc(cx + 2, top + 10, 1.2, 0x5a9a4a);
+      for (const [dx, dy] of [[0, -6], [0, 6], [-6, 0], [6, 0]]) pb.set(cx + dx, top + 9 + dy, GOLD[3]);
+    } }),
+  epicerie: () => ({ wall: 'plaster', plaster: PLA.ochre, roof: RF.terra, floors: 1, chimney: false, sign: 'jar', awning: AWN_R, shutter: SHUT[2], flowers: FLOW[3],
+    extra(pb, W, H) { // des sacs de grains et des tresses d'ail devant la vitrine
+      for (const [x, c] of [[5, 0xd88a2a], [W - 15, 0xe8d070], [W - 9, 0xa83a1a]]) { pb.ellipse(x + 3, H - 6, 4, 3.4, 0xc4a466); pb.ellipse(x + 3, H - 8, 3, 1.2, c); }
+      for (const x of [12, W - 20]) for (let j = 0; j < 4; j++) pb.disc(x, H - 26 + j * 2.5, 1.3, 0xf0ead8);
+    } }),
+  tonnellerie: () => ({ wall: 'wood', roof: 'thatch', floors: 1, chimney: true, sign: 'barrel', winCols: [0, 5],
+    extra(pb, W, H, top, o) { // la porte charretière ouverte sur l'atelier, des tonneaux contre le mur
+      const dx = 4 + o.door * 16 - 8; bigDoor(pb, dx, H - 26, 30, 23);
+      for (const x of [6, W - 17]) { pb.cyl(x, H - 13, 10, 10, WOOD, { noise: 0.2 }); pb.hl(x, H - 10, 10, IRON[2]); pb.hl(x, H - 6, 10, IRON[2]); pb.ellipse(x + 5, H - 13, 5, 1.6, WOOD[4]); }
+    } }),
+  corderie: () => ({ wall: 'plaster', plaster: PLA.grime, roof: 'slate', floors: 1, chimney: false, sign: 'rope', shutter: SHUT[3],
+    extra(pb, W, H) { // des glènes de cordage pendues à la façade
+      for (const x of [10, W - 16]) { pb.vl(x + 3, H - 30, 3, IRON[1]); for (let a = 0; a < 6.28; a += 0.25) { pb.set(x + 3 + Math.cos(a) * 4.5, H - 22 + Math.sin(a) * 4.5, 0xc4a466); pb.set(x + 3 + Math.cos(a) * 3, H - 22 + Math.sin(a) * 3, 0xa08048); } }
+    } }),
+  maison: (r) => ({ wall: r(1) < 0.3 ? 'wood' : r(1) < 0.42 ? 'stone' : 'plaster', plaster: pick([PLA.rose, PLA.sky, PLA.mint, PLA.lemon, PLA.white, PLA.ochre], r(2)), roof: pick(['red', RF.terra, 'blue', 'green', 'thatch', 'slate'], r(3)),
+    floors: 2, chimney: r(5) > 0.4, shutter: pick(SHUT, r(7)), flowers: pick(FLOW, r(9)),
+    extra: r(11) > 0.45 ? (pb, W, H) => balcony(pb, 8, W - 8, H - 32) : null }),
+  maison_haute: (r) => ({ wall: 'plaster', plaster: pick([PLA.white, PLA.sky, PLA.rose], r(2)), roof: pick(['blue', RF.copper, 'red'], r(3)), floors: 2, chimney: true, shutter: SHUT[0], flowers: FLOW[0],
+    extra(pb, W, H, top) { balcony(pb, 6, W - 6, H - 32); for (let k = 0; k < 7; k++) { const y = H - 5 - k * 3, x = W - 10 + (k >> 1); pb.hl(W - 12, y, 6, STONE[3 + (k % 2)]); void x; } } }),
   masure: (r) => ({ wall: r(1) < 0.6 ? 'wood' : 'plaster', plaster: PLA.grime, roof: 'thatch', floors: 1, chimney: r(2) > 0.7, shutter: null, flowers: null,
     extra(pb, W, H, top) {
       for (let k = 0; k < 3; k++) { const x = 6 + Math.floor(r(10 + k) * (W - 18)), y = 6 + Math.floor(r(20 + k) * (top - 10)); pb.rect(x, y, 6, 4, k % 2 ? 0x5e4019 : 0x83622a); pb.hl(x, y, 6, 0xa8833a); }

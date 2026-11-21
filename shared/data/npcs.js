@@ -1,4 +1,5 @@
 import { REMEMBER } from './scenes.js';
+import { PORT_NPCS } from './npcs-port.js'; // 1.8 : les gens du nouveau Port-Lanterne
 // Personnages non-joueurs de Port-Lanterne et de Havre-des-Brumes.
 export const NPCS = {
   // lot 4 : Silas Virevent attend à la table isolée de la Sirène Borgne, près de la cheminée (Le Plus Grand Braquage, lot 5)
@@ -430,4 +431,4 @@ Object.assign(NPCS, {
     greet: ['Dans la Lice, personne ne meurt. L’orgueil, parfois.', 'Un champion, ou un ami : choisissez votre adversaire.'],
     topics: [{ q: 'Les règles de la Lice ?', a: 'Le premier touché pour de bon perd : il reste debout, il garde tout. Trois champions vous attendent, l’un après l’autre ; ou défiez un pirate présent dans la Lice. Personne ne peut vous frapper ici, sauf votre adversaire.' }] },
 });
-
+Object.assign(NPCS, PORT_NPCS);

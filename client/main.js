@@ -27,6 +27,8 @@ import { Evenements } from './evenements.js'; // monde vivant, lot 6 : les petit
 import { Cinema } from './cinema.js'; // lot 4 : les cinématiques mises en scène
 import { Heist } from './heist.js'; // lot 5 : Le Plus Grand Braquage
 import { Festival } from './festival.js'; // lot 6 : la Nuit des Mille Voiles
+import { PortLife } from './port.js'; // 1.8 : la vie du port de Port-Lanterne
+import { portNpcAt } from '../shared/port-events.js';
 import { applyTheme } from './render/ui-art.js';
 import { vueWanted } from './render/vue.js'; // monde vivant, lot 2 : la surcouche de vérification (?vue=1, puis F9)
 import { shipOf, hullHalf, toWorld, stations, deckMove, deckOk, nearestDeck, openingAt, insideHull, toLocal, BERTHS, berthPos, RAIL } from '../shared/data/ships.js';
@@ -73,7 +75,7 @@ const G = {
     return mk;
   },
   // les PNJ d'une histoire n'apparaissent qu'à leur étape
-  refreshNpcs() { G.npcs = G.allNpcs.filter((n) => npcVisible(NPCS[n.id], G.quests || {}, G.me ? G.me.lvl : 1) && n.id !== G.npcAway && !(NPCS[n.id] && NPCS[n.id].fest && !G.festOn)); }, // lot 5 ; lot 6 : les gens du festival, pendant une édition // lot 5 : Bréchet peut être sorti prendre l'air
+  refreshNpcs() { G.npcs = G.allNpcs.filter((n) => npcVisible(NPCS[n.id], G.quests || {}, G.me ? G.me.lvl : 1) && n.id !== G.npcAway && !(NPCS[n.id] && NPCS[n.id].fest && !G.festOn) && !(NPCS[n.id] && NPCS[n.id].ev && !portNpcAt(n.id, G.worldTime || 0, !!G.festOn))); }, // 1.8 : les gens de passage du port // lot 5 ; lot 6 : les gens du festival, pendant une édition // lot 5 : Bréchet peut être sorti prendre l'air
   npcReady(id) { return QUEST_ORDER.some((qid) => QUESTS[qid].turnin === id && G.ui.questStateOf(qid) === 'ready'); },
   useSkill: (id, fromUI) => useSkill(id, fromUI),
   inHome: () => !!myHomeRoom(),
@@ -197,6 +199,7 @@ function onMsg(m) {
     case 'cinema': G.cinema.onMsg(m); break; // lot 4
     case 'heist': if (G.heist) G.heist.onMsg(m); break; // lot 5
     case 'fest': if (G.fest) G.fest.onMsg(m); break; // lot 6
+    case 'port': if (G.port) G.port.onMsg(m); break; // 1.8 : la caisse sur l'épaule, le voleur arrêté
     case 's': snapshot(m, now); break;
     case 'me': {
       const prev = G.me;
@@ -454,6 +457,7 @@ function onEvent(ev, t) {
   const e = typeof ev[1] === 'number' ? entOf(ev[1]) : null;
   if (G.heist && G.heist.onEvent(ev, now)) return; // lot 5 : gardes, architecte, poudre, barils
   if (G.fest && G.fest.onEvent(ev, now)) return; // lot 6 : fusées, arrivées de la course, émotes du festival
+  if (G.port && G.port.onEvent(ev)) return; // 1.8 : un autre pirate porte une caisse
   switch (ev[0]) {
     case 'atk': {
       if (!e || ev[1] === me) break;
@@ -733,6 +737,7 @@ function interact() {
   }
   else if (t.kind === 'hspot') G.heist.use(t.i); // lot 5
   else if (t.kind === 'fspot') G.fest.use(t.i); // lot 6
+  else if (t.kind === 'pspot') G.port.interact(); // 1.8
   else if (t.kind === 'prop') G.send({ t: 'open', id: t.id });
   else if (t.kind === 'drop') G.send({ t: 'pick', id: t.id });
   else if (t.kind === 'harvest') G.send({ t: 'harvest', id: t.id });
@@ -810,6 +815,7 @@ function findInteract() {
   for (const n of G.npcs) { const d = Math.hypot(n.x - p.x, n.y - p.y); if (d < INTERACT_RANGE && d < bd) { bd = d; best = { kind: 'npc', id: n.id, x: n.x, y: n.y, h: n.parrot ? 34 : 30 }; } }
   { const hs = G.heist && G.heist.spotNear(p); if (hs && hs.d - 6 < bd) { bd = hs.d; best = { kind: 'hspot', i: hs.s.id, x: hs.s.x, y: hs.s.y - 4, h: 16, verb: hs.s.label }; } } // lot 5 : le décor du braquage
   { const fs = G.fest && G.fest.spotNear(p); if (fs && fs.d - 6 < bd) { bd = fs.d; best = { kind: 'fspot', i: fs.s.id, x: fs.s.x, y: fs.s.y - 4, h: 16, verb: fs.s.label }; } } // lot 6 : le festival
+  { const ps = G.port && G.port.prompt(); if (ps) { const d = Math.hypot(ps.x - p.x, ps.y + 24 - p.y); if (d - 8 < bd) { bd = d; best = { kind: 'pspot', x: ps.x, y: ps.y + 20, h: 16, verb: ps.text.replace(/^E : /, '') }; } } } // 1.8 : la caisse du navire marchand
   for (const c of G.world.chests) { const d = Math.hypot(c.x - p.x, c.y - p.y); if (d < 30 && d < bd) { bd = d; best = { kind: 'prop', id: c.id, x: c.x, y: c.y, h: 18 }; } }
   for (const pr of G.world.props) if (pr.type === 'tonnelet') { const d = Math.hypot(pr.x - p.x, pr.y - p.y); if (d < 30 && d < bd) { bd = d; best = { kind: 'prop', id: pr.id, x: pr.x, y: pr.y, h: 16 }; } }
   for (const e of G.ents.values()) if (e.k === 'd') { const d = Math.hypot(e.x - p.x, e.y - p.y); if (d < 24 && d < bd) { bd = d; best = { kind: 'drop', id: e.id, x: e.x, y: e.y, h: 14 }; } }
@@ -1034,8 +1040,15 @@ function ambience(now) {
   G.weatherK = k;
 }
 // 1.0 : les habitants et leur journée (voir townsfolk.js)
-function initFolk() { G.town = new Townsfolk(G); G.heist = new Heist(G); G.fest = new Festival(G); G.amb = new Ambience(G); G.evt = new Evenements(G); }
-function updateFolk(dt) { if (G.amb) G.amb.update(performance.now() / 1000); if (G.evt) G.evt.update(dt, performance.now() / 1000); if (G.town) G.town.update(dt, performance.now() / 1000); if (G.heist) G.heist.update(dt, performance.now() / 1000); if (G.fest) G.fest.update(dt, performance.now() / 1000); }
+function initFolk() { G.town = new Townsfolk(G); G.heist = new Heist(G); G.fest = new Festival(G); G.amb = new Ambience(G); G.evt = new Evenements(G); G.port = new PortLife(G); }
+function updateFolk(dt) { if (G.amb) G.amb.update(performance.now() / 1000); if (G.evt) G.evt.update(dt, performance.now() / 1000); if (G.town) G.town.update(dt, performance.now() / 1000); if (G.heist) G.heist.update(dt, performance.now() / 1000); if (G.fest) G.fest.update(dt, performance.now() / 1000); if (G.port) { G.port.update(dt, performance.now() / 1000); portNpcs(); } }
+// 1.8 : les personnages d'un événement du port suivent le calendrier (le colporteur fait le tour de la place)
+let portNpcKey = '';
+function portNpcs() {
+  let key = '';
+  for (const n of G.allNpcs || []) { if (!NPCS[n.id] || !NPCS[n.id].ev) continue; const at = portNpcAt(n.id, G.worldTime || 0, !!G.festOn); if (at) { n.moving = Math.hypot(at.x - n.x, at.y - n.y) > 0.2; if (n.moving) n.dir = at.dir; n.x = at.x; n.y = at.y; n.walk = (n.walk || 0) + (n.moving ? 0.016 : 0); key += n.id; } }
+  if (key !== portNpcKey) { portNpcKey = key; G.refreshNpcs(); }
+}
 const TITLE_PATH = [[150, 104], [124, 112], [100, 118], [96, 86], [108, 54], [126, 26], [80, 60], [44, 92], [33, 72], [30, 32], [60, 40], [112, 80], [150, 96]];
 // 1.0 : le tutoriel — les gestes de base, un par un, puis des conseils qui n'arrivent qu'au bon moment
 const TUTO = [
