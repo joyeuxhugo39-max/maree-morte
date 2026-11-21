@@ -22,6 +22,8 @@ import { updateCine, cineLocked, endCine, bossIntro, bossDown, krakenIntro, krak
 import { Scene } from './scene.js';
 import { devHook } from './dev-hook.js';
 import { Townsfolk } from './townsfolk.js';
+import { Ambience } from './ambience.js'; // monde vivant, lot 6 : les sons du lieu
+import { Evenements } from './evenements.js'; // monde vivant, lot 6 : les petits événements spontanés
 import { Cinema } from './cinema.js'; // lot 4 : les cinématiques mises en scène
 import { Heist } from './heist.js'; // lot 5 : Le Plus Grand Braquage
 import { Festival } from './festival.js'; // lot 6 : la Nuit des Mille Voiles
@@ -1032,8 +1034,8 @@ function ambience(now) {
   G.weatherK = k;
 }
 // 1.0 : les habitants et leur journée (voir townsfolk.js)
-function initFolk() { G.town = new Townsfolk(G); G.heist = new Heist(G); G.fest = new Festival(G); }
-function updateFolk(dt) { if (G.town) G.town.update(dt, performance.now() / 1000); if (G.heist) G.heist.update(dt, performance.now() / 1000); if (G.fest) G.fest.update(dt, performance.now() / 1000); }
+function initFolk() { G.town = new Townsfolk(G); G.heist = new Heist(G); G.fest = new Festival(G); G.amb = new Ambience(G); G.evt = new Evenements(G); }
+function updateFolk(dt) { if (G.amb) G.amb.update(performance.now() / 1000); if (G.evt) G.evt.update(dt, performance.now() / 1000); if (G.town) G.town.update(dt, performance.now() / 1000); if (G.heist) G.heist.update(dt, performance.now() / 1000); if (G.fest) G.fest.update(dt, performance.now() / 1000); }
 const TITLE_PATH = [[150, 104], [124, 112], [100, 118], [96, 86], [108, 54], [126, 26], [80, 60], [44, 92], [33, 72], [30, 32], [60, 40], [112, 80], [150, 96]];
 // 1.0 : le tutoriel — les gestes de base, un par un, puis des conseils qui n'arrivent qu'au bon moment
 const TUTO = [

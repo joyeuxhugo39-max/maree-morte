@@ -25,6 +25,24 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Version 1.6.5 : des villes qui vivent, des lieux qui sonnent (lots 5 et 6)
+
+- **Des métiers** :
+  - les marchands tiennent leur étal, les clients vont d'un étal à l'autre ;
+  - les dockers portent des caisses, les pêcheurs pêchent au bord du quai, les artisans travaillent ;
+  - le guet tient son poste puis fait sa ronde, les voyageurs arrivent par la route et vont à l'auberge ;
+  - le soir, on se retrouve devant la taverne.
+- **Des conversations qui se répondent**, choisies selon le lieu, l'heure, les métiers, la pluie ou le festival : une
+  ou deux scènes à la fois, des silences, jamais la même deux fois de suite. Port-Lanterne, le soir, passe de 25 à 6
+  bulles par minute.
+- **Des sons propres à chaque lieu**, tous générés par le code : oiseaux, mouettes, grillons, grenouilles, bois qui
+  grince, feu qui crépite, gouttes, cloche lointaine. La pluie fait taire les oiseaux, et les lieux morts restent
+  silencieux.
+- **Le vent dans les drapeaux et le linge.**
+- **Des événements rares**, sans marqueur : une cargaison renversée, un voleur poursuivi par le guet (barrez-lui la
+  route !), un recruteur sur le quai, une prise qui frétille, un navire inconnu au loin.
+- Rapports : `rapports/mv5-vie-des-lieux.md`, `rapports/mv6-ambiance-evenements.md`.
+
 ## Version 1.6.4 : des ateliers et des quais habités (lot 4)
 
 - Onze nouveaux meubles, dessinés par le code selon la charte : foin, sacs de grain, planches, alambic, seau, meule,

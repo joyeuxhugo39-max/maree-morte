@@ -64,7 +64,7 @@ const a1 = await fetch('http://127.0.0.1:3215/admin/api/status').then((x) => x.s
 const a2 = await fetch('http://127.0.0.1:3215/admin/api/status', { headers: { Authorization: 'Bearer ' + TOKEN } }).then((x) => x.json());
 const page = await fetch('http://127.0.0.1:3215/admin').then((x) => x.text());
 const snaps = await fs.readdir(env.DATA_DIR + '/backups').catch(() => []);
-ok(up && a1 === 403 && a2.version === '1.6.4' && /Capitainerie/.test(page), `console d’administration : 403 sans jeton, état avec (version ${a2.version}, ${a2.players} joueur)`);
+ok(up && a1 === 403 && a2.version === '1.6.5' && /Capitainerie/.test(page), `console d’administration : 403 sans jeton, état avec (version ${a2.version}, ${a2.players} joueur)`);
 ok(snaps.some((n) => n.includes('demarrage')), 'instantané pris au démarrage du serveur');
 srv.kill('SIGTERM'); await wait(800);
 console.log(fails ? `${fails} ÉCHEC(S)` : 'TOUT EST OK');

@@ -320,6 +320,7 @@ export class Renderer {
     // objets tombés au sol
     for (const e of G.ents.values()) if (e.k === 'd') this.drawDrop(ctx, e, camX, camY, now, G);
     if (!room && G.fest) G.fest.drawGround(ctx, camX, camY, now); // lot 6 : le coffre déterré, à ras du sol
+    if (!room && G.evt) G.evt.drawGround(ctx, camX, camY, now); // monde vivant, lot 6 : la cargaison renversée, le navire au loin
     // télégraphes : le remplissage au sol (les contours se dessinent plus haut, par-dessus la lumière)
     this.drawTeles(ctx, camX, camY, now, false);
 
@@ -509,6 +510,15 @@ export class Renderer {
       const cut = Math.round(s.h * 0.55);
       ctx.drawImage(s.cv, 0, cut, s.w, s.h - cut, x, y + cut, s.w, s.h - cut);
       ctx.drawImage(s.cv, 0, 0, s.w, cut, x + Math.round(sway), y, s.w, cut);
+    } else if ((p.type === 'drapeau' || p.type === 'linge') && !this.room) { // monde vivant, lot 6 : le vent dans l'étoffe (1 px au plus), la hampe ne bouge pas
+      const x0 = p.type === 'drapeau' ? 6 : 4, x1 = p.type === 'drapeau' ? s.w : s.w - 4, sp = p.type === 'drapeau' ? 3.1 : 1.9;
+      ctx.drawImage(s.cv, 0, 0, x0, s.h, x, y, x0, s.h);
+      if (x1 < s.w) ctx.drawImage(s.cv, x1, 0, s.w - x1, s.h, x + x1, y, s.w - x1, s.h);
+      for (let i = x0; i < x1; i += 2) {
+        const k = p.type === 'drapeau' ? (i - x0) / (x1 - x0) : Math.sin(((i - x0) / (x1 - x0)) * Math.PI);
+        const off = Math.round(Math.sin(now * sp + i * 0.42 + p.x * 0.07) * 1.2 * k);
+        ctx.drawImage(s.cv, i, 0, 2, s.h, x + i, y + off, 2, s.h);
+      }
     } else ctx.drawImage(s.cv, x, y);
     if (alpha < 1) ctx.globalAlpha = 1;
     if (p.fx) this.drawVolcanoFx(ctx, camX, camY, now, G, alpha);
@@ -951,6 +961,7 @@ export class Renderer {
       if (rnd() < 0.06) this.burst(e.x, e.y, 1, { z: 26, col: ['#ffd23a', '#ff93b8', '#9fd8ff'], up: 26, speed: 12, life: 0.9, g: -12, size: 2 });
     } else if (e.sitUntil && now < e.sitUntil && !e.moving) { sit = 4; frame = 0; }
     let x = Math.round(e.x - sh.ax - camX), y = Math.round(e.y - sh.ay - camY) + sit;
+    if (e.k === 'f' && e.nodT && now - e.nodT < 0.3) y += 1; // monde vivant, lot 5 : un signe de tête (scène muette)
     const human = e.k === 'p' || e.k === 'f';
     if (human && atk < 0.2 && e.atkA != null) { const k = atk < 0.05 ? -1 : atk < 0.15 ? 2 : 1; x += Math.round(Math.cos(e.atkA) * k); y += Math.round(Math.sin(e.atkA) * k * 0.7); } // élan du coup
     if (now - (e.hitT || -9) < 0.12) x += Math.floor(now * 50) % 2 ? 1 : -1; // le choc
@@ -1002,6 +1013,18 @@ export class Renderer {
     const src = hw ? whiteSheet(sh) : sh.cv;
     this.drawBody(ctx, src, sh, frame, dir, x, y, cut, human && !e.moving && !sit && atk > 0.3 && dying < 0 ? this.breath(e.id || 0, now) : 0);
     if (e.k === 'f' && e.lantern) { const hx = x + (meta && meta.hand ? meta.hand[0] : 14), hy = y + (meta && meta.hand ? meta.hand[1] : 16); ctx.fillStyle = '#2a1a0e'; ctx.fillRect(hx - 1, hy - 1, 4, 6); ctx.fillStyle = '#ffd24a'; ctx.fillRect(hx, hy + 1, 2, 3); ctx.fillStyle = '#fff6c0'; ctx.fillRect(hx, hy + 1, 1, 1); } // la lanterne du guet
+    if (e.k === 'f' && e.carry) { // monde vivant, lot 5 : le docker porte une caisse à l'épaule
+      const cx = x + Math.round(sh.fw / 2) - 3 + (dir === 1 ? -2 : dir === 2 ? 2 : 0), cy = y + 3 + (e.moving && frame % 2 ? 1 : 0);
+      ctx.fillStyle = '#2a1a0e'; ctx.fillRect(cx - 1, cy - 1, 9, 8); ctx.fillStyle = '#8c5c33'; ctx.fillRect(cx, cy, 7, 6); ctx.fillStyle = '#ab7643'; ctx.fillRect(cx, cy, 7, 1); ctx.fillStyle = '#6d4626'; ctx.fillRect(cx, cy + 3, 7, 1); ctx.fillRect(cx + 3, cy, 1, 6);
+    }
+    if (e.k === 'f' && e.rod && !e.moving) { // le pêcheur : la canne, la ligne, le bouchon qui danse
+      const hx = x + (meta && meta.hand ? meta.hand[0] : 14), hy = y + (meta && meta.hand ? meta.hand[1] : 16);
+      const [ux, uy] = [[0, 1], [-1, 0], [1, 0], [0, -1]][dir], tipX = hx + ux * 14, tipY = hy + uy * 10 - 9;
+      ctx.strokeStyle = '#5a3a1c'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(hx + 0.5, hy + 0.5); ctx.lineTo(tipX + 0.5, tipY + 0.5); ctx.stroke();
+      const bob = Math.round(Math.sin(now * 2.3 + (e.id || 0)) * 0.8), bx = tipX + ux * 6, by = tipY + 13 + uy * 6 + bob;
+      ctx.strokeStyle = 'rgba(230,230,220,0.55)'; ctx.beginPath(); ctx.moveTo(tipX + 0.5, tipY + 0.5); ctx.lineTo(bx + 0.5, by + 0.5); ctx.stroke();
+      ctx.fillStyle = '#d8402a'; ctx.fillRect(bx, by, 2, 2); ctx.fillStyle = '#f6efe0'; ctx.fillRect(bx, by - 1, 2, 1);
+    }
     if (e.windT && now - e.windT < e.windDur) {
       const k = (now - e.windT) / e.windDur;
       ctx.globalAlpha = 0.25 + 0.35 * k;

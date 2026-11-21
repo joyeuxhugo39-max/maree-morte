@@ -301,7 +301,7 @@ export class Festival {
         if (f.role === 'musicien') { if (Math.random() < dt * 0.4) G.renderer.addFx({ kind: 'emo', e: '♪', follow: () => f, dur: 1.4, h: 34 }); f.dir = 0; }
         else if (f.role === 'danseur') { if (G.night || showing || Math.random() < dt * 0.05) f.danceUntil = Math.max(f.danceUntil || 0, now + 2 + Math.random() * 3); }
         else if (f.role === 'flaneur') { // ils vont d'un stand à l'autre
-          if (f.wait > 0) { f.wait -= dt; f.moving = false; if (Math.random() < dt * 0.02) G.renderer.addFx({ kind: 'bubble', text: FEST_CROWD_LINES[Math.floor(Math.random() * FEST_CROWD_LINES.length)], follow: () => f, dur: 2.6, h: 34 }); continue; }
+          if (f.wait > 0) { f.wait -= dt; f.moving = false; if (Math.random() < dt * 0.02 && (!G.town || G.town.bubblesInView() === 0)) G.renderer.addFx({ kind: 'bubble', text: FEST_CROWD_LINES[Math.floor(Math.random() * FEST_CROWD_LINES.length)], follow: () => f, dur: 2.6, h: 34 }); continue; }
           if (!f.to) f.to = { x: f.ox + (Math.random() - 0.5) * 120, y: f.oy + (Math.random() - 0.5) * 50 };
           const dx = f.to.x - f.x, dy = f.to.y - f.y, d = Math.hypot(dx, dy);
           if (d < 3) { f.to = null; f.wait = 2 + Math.random() * 5; f.moving = false; continue; }
