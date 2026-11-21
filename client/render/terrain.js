@@ -106,6 +106,29 @@ function reefRock(wx, wy, lx, ly, at) {
   if (ny > 0.35 && d > r * 0.6 && valueNoise(wx / 2, wy / 5, 173) > 0.58) col = 0x3a7a52; // des algues au pied
   return col;
 }
+// monde vivant, lot 3 : l'identité des régions. Une teinte par zone, posée sur l'herbe, la jungle et la terre, et fondue
+// d'une zone à l'autre sur environ trois tuiles (aucune couture visible à la frontière). [couleur, force]
+const REGION = {
+  [Z.PLAINS]: [0xb8c25a, 0.16], // la prairie : un vert plus jaune, plus doux
+  [Z.JUNGLE]: [0x0e3a30, 0.26], // Brumesel : sous-bois sombre et bleuté
+  [Z.COLLINES]: [0xa49a58, 0.2], // les collines : une herbe sèche
+  [Z.BAIE]: [0x6e8a62, 0.18], // la Baie des Naufrageurs : brûlée par le sel
+  [Z.HAUTS]: [0x9a9658, 0.16], // les Hauts de Libertalia : herbe rase de plateau
+  [Z.CRANE]: [0x264a36, 0.18], // l'Île au Crâne : plus sombre
+  [Z.CANNAIES]: [0xb6a84a, 0.14], // les Cannaies : la plantation, jaunie
+  [Z.ILOT]: [0x5cc066, 0.08], // les îlots : un vert tropical
+  [Z.SIRENES]: [0x3a9c6a, 0.1], // le lagon : luxuriant
+  [Z.ECARLATE]: [0x6a2e24, 0.2], // la Jungle Écarlate : un sol rougi
+  [Z.MANGROVE]: [0x3a4a2a, 0.22], // la mangrove : boueuse
+  [Z.HAVRE]: [0x6e8a80, 0.14], // Havre-des-Brumes : vert gris de brume
+  [Z.QUARANTAINE]: [0x8e8a4a, 0.16], // la Quarantaine : maladive
+  [Z.ANSE]: [0x7cbc66, 0.06], // l'Anse-Tranquille : un vert tendre
+  [Z.RUINS]: [0x3e6a44, 0.14], // les ruines : mousse
+};
+const REGION_T = new Uint8Array(32); for (const t of [T.GRASS, T.JUNGLE, T.DGRASS, T.DIRT, T.MUD, T.MARSH]) REGION_T[t] = 1;
+const RG = 48; // la maille de la fonte d'une région à l'autre (3 tuiles)
+// monde vivant, lot 3 : les sols « souples », tous praticables : entre eux, le raccord peut onduler largement sans tromper sur les collisions
+const SOFT = new Uint8Array(32); for (const t of [T.GRASS, T.JUNGLE, T.DIRT, T.MARSH, T.MUD, T.ASH, T.DGRASS, T.SWAMP]) SOFT[t] = 1;
 const NO_DECO = new Set(['pont', 'toits', 'cellier', 'gabier', 'lice']); // lot 5 ; lot 6
 export class Terrain {
   constructor(world) {
@@ -132,10 +155,48 @@ export class Terrain {
     const t2 = this.tileT(Math.floor((wx + jx) / TILE), Math.floor((wy + jy) / TILE));
     if (t2 === T.PLANK || t2 >= T.VOID) return base;
     if (base === T.COBBLE || t2 === T.COBBLE) {
-      const t3 = this.tileT(Math.floor((wx + jx * 0.4) / TILE), Math.floor((wy + jy * 0.4) / TILE));
+      const t3 = this.smooth(wx + jx * 0.4, wy + jy * 0.4, -1);
       return t3 === T.PLANK || t3 >= T.VOID ? base : t3;
     }
-    return t2;
+    if (SOFT[base] && SOFT[t2]) { // monde vivant, lot 3 : entre deux sols où l'on marche, une ondulation plus ample efface les marches de plusieurs tuiles
+      const JX = jx + (valueNoise(wx * 0.021, wy * 0.021, 511) - 0.5) * 44, JY = jy + (valueNoise(wx * 0.021, wy * 0.021, 513) - 0.5) * 44;
+      const qx = Math.floor((wx + JX) / TILE), qy = Math.floor((wy + JY) / TILE), tq = this.tileT(qx, qy);
+      if (SOFT[tq] && qx >= 0 && qy >= 0 && qx < MAP_W && qy < MAP_H && this.w.solid[qy * MAP_W + qx] !== 1) {
+        const tl = this.smooth(wx + JX, wy + JY, tq);
+        if (SOFT[tl]) return tl;
+      }
+    }
+    const t4 = this.smooth(wx + jx, wy + jy, t2);
+    return t4 === T.PLANK || t4 >= T.VOID ? t2 : t4;
+  }
+  // monde vivant, lot 3 : la teinte de la région en un point, fondue entre les quatre mailles voisines
+  region(wx, wy) {
+    const fx = wx / RG - 0.5, fy = wy / RG - 0.5, x0 = Math.floor(fx), y0 = Math.floor(fy), u = fx - x0, v = fy - y0;
+    let r = 0, g = 0, b = 0, k = 0;
+    for (const [dx, dy, w] of [[0, 0, (1 - u) * (1 - v)], [1, 0, u * (1 - v)], [0, 1, (1 - u) * v], [1, 1, u * v]]) {
+      const tx = Math.floor(((x0 + dx) * RG + RG / 2) / TILE), ty = Math.floor(((y0 + dy) * RG + RG / 2) / TILE);
+      const z = tx >= 0 && ty >= 0 && tx < MAP_W && ty < MAP_H ? this.w.zones[ty * MAP_W + tx] : 0;
+      const R = REGION[z]; if (!R) continue;
+      const a = R[1] * w; r += ((R[0] >> 16) & 255) * a; g += ((R[0] >> 8) & 255) * a; b += (R[0] & 255) * a; k += a;
+    }
+    return k > 0.004 ? [(Math.round(r / k) << 16) | (Math.round(g / k) << 8) | Math.round(b / k), k] : null;
+  }
+  // monde vivant, lot 3 : plus de bords en escalier. Au lieu de prendre la tuile la plus proche, on pèse les quatre
+  // tuiles qui entourent le point (au prorata de la distance à leur centre) et l'on garde la sorte de sol qui domine :
+  // une suite de marches devient une vraie diagonale, un coin s'arrondit, un chemin d'une case garde sa largeur.
+  // Les collisions ne changent pas (elles restent celles des tuiles) ; l'écart visuel reste sous la demi-tuile.
+  smooth(px, py, prefer) {
+    const fx = px / TILE - 0.5, fy = py / TILE - 0.5, x0 = Math.floor(fx), y0 = Math.floor(fy), u = fx - x0, v = fy - y0;
+    const a = this.tileT(x0, y0), b = this.tileT(x0 + 1, y0), c = this.tileT(x0, y0 + 1), d = this.tileT(x0 + 1, y0 + 1);
+    if (a === b && a === c && a === d) return a;
+    if (a === T.PLANK || b === T.PLANK || c === T.PLANK || d === T.PLANK || a >= T.VOID || b >= T.VOID || c >= T.VOID || d >= T.VOID) return prefer >= 0 ? prefer : this.tileT(Math.floor(px / TILE), Math.floor(py / TILE));
+    const wa = (1 - u) * (1 - v), wb = u * (1 - v), wc = (1 - u) * v, wd = u * v;
+    let best = a, bw = -1;
+    for (const t of [a, b, c, d]) {
+      const w = (t === a ? wa : 0) + (t === b ? wb : 0) + (t === c ? wc : 0) + (t === d ? wd : 0) + (t === prefer ? 0.001 : 0);
+      if (w > bw) { bw = w; best = t; }
+    }
+    return best;
   }
   wdist(wx, wy) {
     const fx = wx / TILE - 0.5, fy = wy / TILE - 0.5;
@@ -243,6 +304,10 @@ export class Terrain {
           else if (!RAISED[at(lx - 1, ly)] || !RAISED[at(lx + 1, ly)]) k = Math.max(1, k - 1);
           else if (b1 !== t && b1 !== T.ROCK && ((wx ^ wy) & 1)) P = PAL[b1];
           col = P[k];
+          // monde vivant, lot 3 : les grandes taches « camouflage » se fondent (moins de contraste entre elles) ;
+          // le grain fin (un pixel sur trois environ, plus clair ou plus foncé) porte la texture à la place
+          if ((k === 1 || k === 3) && t !== T.MARSH && P === PAL[t]) col = mix(col, P[2], 0.42);
+          if (k === 2 && t !== T.MARSH) { const g = hash2(wx, wy, 57); if (g > 0.86) col = mix(col, P[3], 0.55); else if (g < 0.1) col = mix(col, P[1], 0.5); }
           break;
         }
         case T.ROCK: {
@@ -263,6 +328,19 @@ export class Terrain {
             let k = n < 0.35 ? 2 : 3;
             if (hash2(wx, wy, 64) > 0.975) k = 4;
             if (Math.abs(valueNoise(wx / 9, wy / 9, 65) - 0.5) < 0.018) k = 1;
+            { // monde vivant, lot 3 : un champ de blocs plutôt qu'une plaque — chaque bloc reçoit la lumière en haut à gauche
+              const S = 13, gx = Math.floor(wx / S), gy = Math.floor(wy / S);
+              let d1 = 1e9, d2 = 1e9, fx = 0, fy = 0;
+              for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+                const px = (gx + i) * S + 2 + hash2(gx + i, gy + j, 67) * (S - 4), py = (gy + j) * S + 2 + hash2(gx + i, gy + j, 68) * (S - 4);
+                const dx = wx + 0.5 - px, dy = wy + 0.5 - py, dd = dx * dx + dy * dy;
+                if (dd < d1) { d2 = d1; d1 = dd; fx = dx; fy = dy; } else if (dd < d2) d2 = dd;
+              }
+              const edge = Math.sqrt(d2) - Math.sqrt(d1);
+              if (edge < 1.1) k = 1; // la fissure entre deux blocs
+              else if (fx + fy < -5 && edge > 2) k = Math.min(4, k + 1); // le haut éclairé
+              else if (fx + fy > 4) k = Math.max(1, k - 1); // le bas dans l'ombre
+            }
             if (at(lx, ly - 1) !== T.ROCK) k = 4;
             else if (at(lx - 1, ly) !== T.ROCK || at(lx + 1, ly) !== T.ROCK) k = 1;
             col = P[k];
@@ -433,6 +511,7 @@ export class Terrain {
         }
         default: col = 0xff00ff;
       }
+      if (REGION_T[t] && W.roomGrid[(wy >> 4) * MAP_W + (wx >> 4)] < 0) { const rg = this.region(wx, wy); if (rg) col = mix(col, rg[0], rg[1]); } // monde vivant, lot 3
       if (a > 0) put(lx, ly, col, a);
     }
 
@@ -446,23 +525,36 @@ export class Terrain {
       const fx = gx * CELL + Math.floor(hash2(gx, gy, 112) * 5), fy = gy * CELL + Math.floor(hash2(gx, gy, 113) * 5);
       const lx = fx - bx, ly = fy - by;
       const t = at(lx, ly);
+      const rg = REGION_T[t] && W.roomGrid[(fy >> 4) * MAP_W + (fx >> 4)] < 0 ? this.region(fx, fy) : null; // monde vivant, lot 3 : les détails prennent la teinte de la région
+      const putR = rg ? (x, y, c) => put(x, y, mix(c, rg[0], rg[1])) : put;
       if (t === T.GRASS || t === T.JUNGLE || t === T.MARSH) {
         if (!RAISED[at(lx, ly + 2)] || !RAISED[at(lx, ly - 4)]) continue;
         const P = PAL[t];
         if (h < (t === T.JUNGLE ? 0.24 : 0.17)) {
-          for (const [dx, dy, k] of TUFT) if (at(lx + dx, ly + dy) === t) put(lx + dx, ly + dy, P[k]);
+          for (const [dx, dy, k] of TUFT) if (at(lx + dx, ly + dy) === t) putR(lx + dx, ly + dy, P[k]);
         } else if (t === T.GRASS && h < 0.205) {
           const c = FLOWER_COLS[Math.floor(hash2(gx, gy, 114) * FLOWER_COLS.length)];
-          put(lx, ly + 2, P[0]); put(lx + 1, ly + 1, P[0]);
-          put(lx, ly - 1, c); put(lx - 1, ly, c); put(lx + 1, ly, c); put(lx, ly + 1, c);
-          put(lx, ly, hash2(gx, gy, 115) > 0.5 ? 0xffc93d : 0xf08a3a);
+          putR(lx, ly + 2, P[0]); putR(lx + 1, ly + 1, P[0]);
+          putR(lx, ly - 1, c); putR(lx - 1, ly, c); putR(lx + 1, ly, c); putR(lx, ly + 1, c);
+          putR(lx, ly, hash2(gx, gy, 115) > 0.5 ? 0xffc93d : 0xf08a3a);
         } else if (t === T.MARSH && h < 0.2) {
-          put(lx, ly, 0x9a7fc0); put(lx, ly + 1, P[0]);
+          putR(lx, ly, 0x9a7fc0); putR(lx, ly + 1, P[0]);
+        } else if (t === T.GRASS && h < 0.26) { // monde vivant, lot 3 : un brin d'herbe qui accroche la lumière
+          putR(lx, ly, P[4]); putR(lx, ly - 1, P[3]); putR(lx, ly + 1, P[1]);
+        } else if (t === T.JUNGLE && h < 0.29) { // la litière de feuilles du sous-bois
+          putR(lx, ly, 0x4a3a22); putR(lx + 1, ly, 0x5c4a2a); if (h > 0.275) putR(lx, ly + 1, 0x3a2e1c);
         }
+      } else if (t === T.DGRASS && h < 0.12) { // la forêt des Pendus : de l'herbe morte
+        if (at(lx, ly - 2) === t && at(lx + 1, ly) === t) { putR(lx, ly, 0x8a7a4a); putR(lx, ly - 1, 0x6a5e3a); putR(lx + 1, ly - 2, 0x8a7a4a); putR(lx, ly + 1, 0x2a2c1e); }
+      } else if (t === T.SAND && h < 0.11 && h >= 0.05 && W.roomGrid[(fy >> 4) * MAP_W + (fx >> 4)] < 0) { // monde vivant, lot 3 : la laisse de mer — algues et galets sur le sable mouillé
+        let wet = false; for (const [dx, dy] of [[0, 3], [0, -3], [3, 0], [-3, 0], [0, 5]]) if (WATERY[at(lx + dx, ly + dy)]) { wet = true; break; }
+        if (!wet) continue;
+        if (h < 0.085) { putR(lx, ly, 0x3a5a2a); putR(lx + 1, ly, 0x2c4a22); putR(lx + 2, ly + 1, 0x3a5a2a); putR(lx - 1, ly + 1, 0x4a6a30); }
+        else { putR(lx, ly, 0x9a9080); putR(lx + 1, ly, 0x7a7266); putR(lx, ly + 1, 0x5a544a); }
       } else if ((t === T.DIRT || t === T.SAND) && h < 0.05) {
         const P = PAL[t];
         if (at(lx + 1, ly) !== t || at(lx, ly + 1) !== t) continue;
-        put(lx, ly, P[4]); put(lx + 1, ly, P[3]); put(lx, ly + 1, P[0]); put(lx + 1, ly + 1, P[0]);
+        putR(lx, ly, P[4]); putR(lx + 1, ly, P[3]); putR(lx, ly + 1, P[0]); putR(lx + 1, ly + 1, P[0]);
       }
     }
     ctx.putImageData(img, 0, 0);

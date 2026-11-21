@@ -25,6 +25,15 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Version 1.6.3 : des paysages plus naturels (lot 3)
+
+- Plus de bords en escalier : les raccords entre les sols deviennent de vraies diagonales et ondulent entre deux sols
+  où l'on marche. Les collisions ne bougent pas.
+- Chaque région a son sol : prairie plus douce, jungle sombre, collines sèches, jungle rougie, mangrove boueuse…
+- Une herbe plus calme et plus fine, des brins, de la litière de feuilles, de l'herbe morte, une laisse de mer.
+- Les plaques de roche deviennent des champs de blocs en relief, et les arbres varient (un sur deux en miroir).
+- Rapport : `rapports/mv3-environnements.md`.
+
 ## Version 1.6.2 : vers un monde vivant (lots 1 et 2)
 
 Début du dossier « Finalisation du monde et de la direction artistique ».

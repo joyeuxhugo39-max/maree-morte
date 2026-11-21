@@ -30,6 +30,17 @@ import { BERTHS, berthPos, MOB_SHIP } from '../../shared/data/ships.js';
 
 const TAU = Math.PI * 2;
 const TREES = new Set(['tree', 'jtree', 'palm', 'deadtree']);
+// monde vivant, lot 3 : le reflet d'un sprite de décor, gardé en cache (le pied reste au même endroit, en miroir)
+const MIRRORS = new Map();
+function mirrorSpr(s) {
+  let m = MIRRORS.get(s);
+  if (!m) {
+    const cv = document.createElement('canvas'); cv.width = s.w; cv.height = s.h;
+    const x = cv.getContext('2d'); x.imageSmoothingEnabled = false; x.translate(s.w, 0); x.scale(-1, 1); x.drawImage(s.cv, 0, 0);
+    m = { ...s, cv, ax: s.w - s.ax }; MIRRORS.set(s, m);
+  }
+  return m;
+}
 // couleur des zones d'alerte selon l'attaque : canon, cendre, os, onde, bond, geyser, Kraken, vague, tentacule
 const TELE_COL = { 0: [230, 40, 30], 1: [255, 150, 40], 2: [230, 40, 30], 3: [255, 130, 50], 4: [225, 225, 195], 5: [255, 215, 70], 6: [200, 110, 255], 7: [90, 180, 255], 8: [200, 40, 110], 9: [120, 220, 255], 10: [210, 60, 130] };
 const isSea = (e) => e.k === 'a' || (e.k === 'm' && MOBS[e.type] && (MOBS[e.type].sea || MOBS[e.type].ship));
@@ -150,6 +161,7 @@ export class Renderer {
       const list = this.env[p.type];
       const s = p.type === 'cite' ? citeSprite(p) : p.type === 'propriete' ? proprieteSprite(p, this.env) : list ? list[p.v % list.length] : null;
       p.spr = s;
+      if (s && TREES.has(p.type) && hash2(p.tx | 0, p.ty | 0, 919) > 0.5) p.spr = mirrorSpr(s); // monde vivant, lot 3 : un arbre sur deux est vu de l'autre côté (même taille, même pied)
       p.ground = !!(PROPS[p.type] && PROPS[p.type].ground);
       if (!s) continue;
       const nl0 = this.lights.length; // lot 6 : les lumières d'un décor du festival ne brillent que pendant une édition
