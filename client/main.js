@@ -1,6 +1,6 @@
 // Point d'entrée du client : état, réseau, prédiction locale, boucle principale.
 import { generateWorld, moveWithCollision, moveBoat, canSail, canStand, roomIdAt, tileAt, zoneAt, Z, ZONES, SAFE } from '../shared/world.js';
-import { TILE, ROLL_SPEED, ROLL_TIME, SPEED_MUL, INTERACT_RANGE, isNight, dayFrac, weatherAt, WX, WEATHER_PERIOD, T, isFullMoon, moonPhase, PROTOCOL } from '../shared/constants.js';
+import { TILE, PLAYER_SPEED, ROLL_SPEED, ROLL_TIME, SPEED_MUL, INTERACT_RANGE, isNight, dayFrac, weatherAt, WX, WEATHER_PERIOD, T, isFullMoon, moonPhase, PROTOCOL } from '../shared/constants.js';
 import { MOBS } from '../shared/data/mobs.js';
 import { ACHIEVEMENTS } from '../shared/data/achievements.js';
 import { mulberry32 } from '../shared/rng.js';
@@ -1210,12 +1210,12 @@ function updatePlayer(now, dt) {
     [nx, ny] = moveWithCollision(G.world, p.x, p.y, vx * dt, vy * dt, false, G.myKey);
     if (G.room < 0 && shipAtPoint(nx, ny)) { nx = p.x; ny = p.y; } // une coque, dans les hauts-fonds
   }
-  const moved = Math.hypot(nx - p.x, ny - p.y) > 0.01;
+  const stp = Math.hypot(nx - p.x, ny - p.y), moved = stp > 0.01;
   p.x = nx; p.y = ny;
   p.moving = moved;
   if (B) { if (Math.hypot(vx, vy) > 12) p.dir = dirOf(vx, vy); }
   else if (ax.x || ax.y) p.dir = dirOf(ax.x, ax.y);
-  if (p.moving) p.walk += dt;
+  if (p.moving) p.walk += rolling ? dt : Math.min(dt * 2, stp / PLAYER_SPEED); // monde vivant, lot 7 : ralenti (eau, marais), le pas ralentit aussi
   // portes : on entre en poussant contre la porte, on sort par le seuil
   if (!B && !rolling && now > G.doorCd) {
     if (G.room < 0) { if (ax.y < -0.3) for (const d of G.world.doors) if (Math.abs(p.x - d.ox) < 9 && p.y < d.oy + 3 && p.y > d.oy - 24) { if (d.plot != null && !((G.homes.get(d.plot) || {}).name === p.name || now < G.burgleUntil)) break; if (d.seal && !((G.seals || {})[d.seal] > now)) break; useDoor(d, false, now); break; } }
@@ -1387,13 +1387,14 @@ function interpolate(now, dt) {
     }
     const last = b[b.length - 1], sid = rt >= last[0] ? last[5] : (b.find((q) => q[0] >= rt) || last)[5];
     const sh = sid ? G.ships.get(sid) : null;
-    let moved;
+    let moved, step;
     if (sh && sh.buf.length) { // 1.1 : sur un pont — x, y sont des coordonnées du pont
-      moved = Math.hypot(x - (e.lx || 0), y - (e.ly || 0)) > 0.05;
+      step = Math.hypot(x - (e.lx || 0), y - (e.ly || 0)); moved = step > 0.05;
       e.ship = sid; e.lx = x; e.ly = y; placeOnDeck(e, sh);
-    } else { moved = Math.hypot(x - e.x, y - e.y) > 0.05; e.ship = 0; e.x = x; e.y = y; }
+    } else { step = Math.hypot(x - e.x, y - e.y); moved = step > 0.05; e.ship = 0; e.x = x; e.y = y; }
     e.dir = dir; e.moving = !!(flags & 1) || moved;
-    if (e.moving) e.walk += dt;
+    // monde vivant, lot 7 : le pas suit la distance parcourue (un pas à la vitesse du joueur = la cadence d'origine), sans glisser
+    if (e.moving) e.walk += moved ? Math.min(dt * 2, step / PLAYER_SPEED) : dt * 0.5;
   }
   const me = G.player;
   if (me && me.ship) { const s = G.ships.get(me.ship); if (s && s.buf.length) placeOnDeck(me, s); }

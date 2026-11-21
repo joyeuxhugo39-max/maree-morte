@@ -236,6 +236,7 @@ export class UI {
     b.classList.add('hidden'); void b.offsetWidth;
     $('banner-title').textContent = title; $('banner-sub').textContent = sub;
     b.classList.remove('hidden');
+    this.bannerUntil = performance.now() + 3600; // monde vivant, lot 9 : pendant le titre de la zone, les annonces attendent leur tour
     clearTimeout(this.bannerT); this.bannerT = setTimeout(() => b.classList.add('hidden'), 4300);
   }
   feed(msg, icon) {
@@ -250,6 +251,8 @@ export class UI {
   toast(msg, kind = 'info', icon = null) {
     if (kind === 'loot') return this.feed(msg, icon);
     if (this.G.aide !== 'complet' && (kind === 'info' || kind === 'quest') && /ZQSD|\(touche E\)|clic gauche/.test(msg)) return;
+    const wait = (this.bannerUntil || 0) - performance.now();
+    if (wait > 0 && kind !== 'warn' && kind !== 'error') { setTimeout(() => this.toast(msg, kind, icon), wait + Math.random() * 300); return; } // monde vivant, lot 9 : le titre de la zone d'abord
     const box = $('toasts');
     // 1.0 : moins envahissant — un message répété s'additionne au lieu de s'empiler, trois au plus à l'écran
     const same = [...box.children].find((c) => c.dataset.msg === msg && !c.classList.contains('out'));

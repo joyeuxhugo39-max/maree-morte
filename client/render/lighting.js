@@ -68,10 +68,12 @@ export const lighting = {
     const vis = [];
     if (lk > 0.02) {
       L.globalCompositeOperation = 'lighter';
-      const add = (x, y, r, c, k = 1) => {
+      // monde vivant, lot 8 : une flamme éclaire surtout le sol autour d'elle — le halo est un ovale aplati (vue de dessus),
+      // un peu décalé vers le bas, plutôt qu'un disque ; les fenêtres et le phare gardent leur forme propre
+      const add = (x, y, r, c, k = 1, flat = 0.8) => {
         if (x < camX - r || x > camX + W + r || y < camY - r || y > camY + H + r || k <= 0) return;
         L.globalAlpha = Math.min(1, k * lk);
-        L.drawImage(this.lightSprite(c), x - r - camX, y - r - camY, r * 2, r * 2);
+        L.drawImage(this.lightSprite(c), x - r - camX, y - r * flat - camY + r * (1 - flat) * 0.35, r * 2, r * 2 * flat);
       };
       for (const l of this.lights) {
         if (l.x < camX - 160 || l.x > camX + W + 160 || l.y < camY - 160 || l.y > camY + H + 160) continue;
@@ -79,7 +81,7 @@ export const lighting = {
         if (l.fest && !G.festOn) continue; // lot 6
         const fl = l.flicker ? 1 + Math.sin(now * 9 + l.x) * 0.04 + Math.sin(now * 23 + l.y) * 0.03 : 1;
         const c = LIGHT_COL[l.c] || LIGHT_COL.warm;
-        add(l.x, l.y, l.r * (l.soft ? 1.15 : 1.55) * fl, c, l.win ? 0.62 : l.soft ? 0.5 : 1);
+        add(l.x, l.y, l.r * (l.soft ? 1.15 : 1.55) * fl, c, l.win ? 0.62 : l.soft ? 0.5 : 1, l.win ? 1 : 0.8);
         vis.push([l, fl]);
       }
       // le pirate porte un peu de lumière (une torche dans les grottes)

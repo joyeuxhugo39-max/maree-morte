@@ -276,7 +276,7 @@ export class Townsfolk {
       let [nx, ny] = moveWithCollision(G.world, f.x, f.y, dx / d * sp, dy / d * sp);
       if (!dry(G.world, nx, ny)) { nx = f.x; ny = f.y; }
       if (Math.hypot(nx - f.x, ny - f.y) < sp * 0.2) { f.stuck = (f.stuck || 0) + 1; if (f.stuck > 30 && f.next && f.next.hide) { f.hidden = true; f.hideUntil = now + 10; f.next = null; } } else f.stuck = 0;
-      f.x = nx; f.y = ny; f.moving = true; f.walk = (f.walk || 0) + dt; f.dir = dirOf(dx, dy);
+      f.x = nx; f.y = ny; f.moving = true; f.walk = (f.walk || 0) + dt * (f.speed || 23) / 76; f.dir = dirOf(dx, dy); // lot 7 : le pas suit la vitesse (un flâneur ne pédale pas)
     }
     // les chats
     for (const c of this.cats) {

@@ -337,24 +337,26 @@ export class Renderer {
     for (const c of G.cats || []) if (c.x > camX - 20 && c.x < camX + W + 20 && c.y > camY - 20 && c.y < camY + H + 20) draw.push({ y: c.y, c });
     if (!room) for (const b of BERTHS) { const [bx, by] = berthPos(b); if (bx > camX - 30 && bx < camX + W + 30 && by > camY - 30 && by < camY + H + 40) draw.push({ y: by, bt: b }); } // 1.1 : les bittes d'amarrage
     draw.sort((a, b) => a.y - b.y);
-    // ombres
-    ctx.fillStyle = 'rgba(20,12,34,0.28)';
+    // ombres — monde vivant, lot 8 : elles suivent le soleil (à gauche le matin, courtes à midi, longues et douces à
+    // droite le soir, presque effacées la nuit) ; dedans, la lumière vient d'en haut
+    const sun = room ? { dx: 0, sx: 1, a: 0.28 } : (() => { const dp = Math.min(1, Math.max(0, f / 0.5)), day = f < 0.5; const k = dp - 0.5; return day ? { dx: k * 7, sx: 1 + Math.abs(k) * 0.8, a: 0.28 - Math.abs(k) * 0.06 } : { dx: 0, sx: 1, a: 0.13 }; })();
+    ctx.fillStyle = `rgba(20,12,34,${sun.a.toFixed(3)})`;
     for (const d of draw) {
       if (d.st || d.bt) continue;
       if (d.p) {
         const s = d.p.spr;
         if (d.p.type === 'ship' || d.p.type === 'wreck' || d.p.type === 'lighthouse' || d.p.type === 'boat' || d.p.type === 'volcan') continue;
-        const w = Math.min(28, s.w * 0.34);
-        ctx.beginPath(); ctx.ellipse(d.p.x - camX + (TREES.has(d.p.type) ? 3 : 0), d.p.y - camY - 1, w, Math.max(2, Math.min(7, w * 0.3)), 0, 0, TAU); ctx.fill();
+        const w = Math.min(28, s.w * 0.34) * sun.sx;
+        ctx.beginPath(); ctx.ellipse(d.p.x - camX + (TREES.has(d.p.type) ? 1.5 + sun.dx * 1.4 : sun.dx * 0.7), d.p.y - camY - 1, w, Math.max(2, Math.min(7, w * 0.3 / sun.sx)), 0, 0, TAU); ctx.fill();
       } else if (d.c || d.pet) {
         const c = d.c || d.pet;
-        if (c.kind !== 'perroquet') { ctx.beginPath(); ctx.ellipse(c.x - camX, c.y - camY - 1, 4, 1.5, 0, 0, TAU); ctx.fill(); }
+        if (c.kind !== 'perroquet') { ctx.beginPath(); ctx.ellipse(c.x - camX + sun.dx * 0.3, c.y - camY - 1, 4 * sun.sx, 1.5, 0, 0, TAU); ctx.fill(); }
       } else {
         const o = d.e || d.n;
         if (o.k === 'd' || (o.dyingT && now - o.dyingT > 0.4) || isSea(o)) continue;
         if (this.inWater(o.x, o.y) && !(o === G.player ? G.player.ship : (o.k === 'p' && (o.flags & 16)))) continue;
         const big = o.sheet && o.sheet.fw > FW ? 2 : 1;
-        ctx.beginPath(); ctx.ellipse(o.x - camX, o.y - camY - 1, 6 * big, 2.5 * big, 0, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(o.x - camX + sun.dx * 0.45, o.y - camY - 1, 6 * big * sun.sx, 2.5 * big, 0, 0, TAU); ctx.fill();
       }
     }
     const me = G.player;
@@ -1011,7 +1013,7 @@ export class Renderer {
     // pas de la marche : petit rebond déjà dans la feuille
     const hw = now - (e.hitT || -9) < 0.09;
     const src = hw ? whiteSheet(sh) : sh.cv;
-    this.drawBody(ctx, src, sh, frame, dir, x, y, cut, human && !e.moving && !sit && atk > 0.3 && dying < 0 ? this.breath(e.id || 0, now) : 0);
+    this.drawBody(ctx, src, sh, frame, dir, x, y, cut, (human || e.k === 'm') && !e.moving && !sit && atk > 0.3 && dying < 0 ? this.breath(e.id || 0, human ? now : now * 0.75) : 0); // lot 7 : les morts-vivants « respirent » aussi, plus lentement (1 px, le buste seulement)
     if (e.k === 'f' && e.lantern) { const hx = x + (meta && meta.hand ? meta.hand[0] : 14), hy = y + (meta && meta.hand ? meta.hand[1] : 16); ctx.fillStyle = '#2a1a0e'; ctx.fillRect(hx - 1, hy - 1, 4, 6); ctx.fillStyle = '#ffd24a'; ctx.fillRect(hx, hy + 1, 2, 3); ctx.fillStyle = '#fff6c0'; ctx.fillRect(hx, hy + 1, 1, 1); } // la lanterne du guet
     if (e.k === 'f' && e.carry) { // monde vivant, lot 5 : le docker porte une caisse à l'épaule
       const cx = x + Math.round(sh.fw / 2) - 3 + (dir === 1 ? -2 : dir === 2 ? 2 : 0), cy = y + 3 + (e.moving && frame % 2 ? 1 : 0);

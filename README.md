@@ -25,6 +25,18 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Version 1.7.0 : le monde vivant, livré (lots 7 à 10)
+
+- Les pas suivent la vitesse : plus de pieds qui glissent, chez le joueur, les monstres et les habitants. Les
+  morts-vivants respirent aussi à l'arrêt.
+- Les ombres suivent le soleil (à gauche le matin, longues et douces le soir, presque effacées la nuit), et les halos
+  des flammes s'étalent au sol en ovale au lieu d'être des disques.
+- Un tutoriel plus discret, et des annonces qui laissent passer le titre de la zone.
+- Tests de livraison : 33 suites, deux joueurs sur le vrai serveur, changement d'hôte, festival complet, combat, quatre
+  résolutions, 60 images/s partout.
+- Bilan du dossier « Monde vivant » (améliorations, ressources, lieux, systèmes, critères, limites) :
+  `rapports/mv10-livraison.md`.
+
 ## Version 1.6.5 : des villes qui vivent, des lieux qui sonnent (lots 5 et 6)
 
 - **Des métiers** :

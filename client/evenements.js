@@ -26,7 +26,7 @@ export class Evenements {
     this.G.folk.push(f); this.temp.push(f); return f;
   }
   drop(f) { const i = this.G.folk.indexOf(f); if (i >= 0) this.G.folk.splice(i, 1); const j = this.temp.indexOf(f); if (j >= 0) this.temp.splice(j, 1); }
-  walk(f, dt, sp) { const dx = f.tx - f.x, dy = f.ty - f.y, d = Math.hypot(dx, dy); if (d < 3) { f.moving = false; return true; } const s = sp * dt; let [nx, ny] = moveWithCollision(this.G.world, f.x, f.y, dx / d * s, dy / d * s); if (!dry(this.G.world, nx, ny)) { nx = f.x; ny = f.y; } f.moving = Math.hypot(nx - f.x, ny - f.y) > s * 0.2; f.x = nx; f.y = ny; f.walk = (f.walk || 0) + dt; f.dir = dirOf(dx, dy); if (!f.moving) f.stuck = (f.stuck || 0) + 1; return f.stuck > 40; }
+  walk(f, dt, sp) { const dx = f.tx - f.x, dy = f.ty - f.y, d = Math.hypot(dx, dy); if (d < 3) { f.moving = false; return true; } const s = sp * dt; let [nx, ny] = moveWithCollision(this.G.world, f.x, f.y, dx / d * s, dy / d * s); if (!dry(this.G.world, nx, ny)) { nx = f.x; ny = f.y; } f.moving = Math.hypot(nx - f.x, ny - f.y) > s * 0.2; f.x = nx; f.y = ny; f.walk = (f.walk || 0) + dt * sp / 76; f.dir = dirOf(dx, dy); if (!f.moving) f.stuck = (f.stuck || 0) + 1; return f.stuck > 40; }
   update(dt, now) {
     const G = this.G, p = G.player, T2 = G.town;
     if (!p || !T2 || G.room >= 0 || (G.cinema && G.cinema.on)) return;
