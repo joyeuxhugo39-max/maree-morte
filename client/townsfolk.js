@@ -14,7 +14,9 @@ import { CLOTH_KEYS } from './render/sprites-chars.js';
 import { SCENES, CRIES, GREET, WANTED } from './townsfolk-lines.js';
 
 // les habitants ne pataugent pas : l'eau peu profonde, praticable pour un joueur, ne l'est pas pour eux
-export const dry = (W, x, y) => { const t = W.tiles[Math.floor(y / TILE) * W.W + Math.floor(x / TILE)]; return t !== T.WATER && t !== T.DEEP; };
+// 1.9.1 : sec sous les pieds ET juste au-dessus (le dessin juge « dans l'eau » un peu plus haut que les pieds : sans
+// cette marge, un habitant qui longeait le bord du quai paraissait patauger)
+export const dry = (W, x, y) => { const at = (yy) => W.tiles[Math.floor(yy / TILE) * W.W + Math.floor(x / TILE)], a = at(y), b = at(y - 3); return a !== T.WATER && a !== T.DEEP && b !== T.WATER && b !== T.DEEP; };
 const dirOf = (dx, dy) => (Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 1 : 2) : (dy < 0 ? 3 : 0));
 // heures : f = 0 → 7h ; 19h → 0,5 ; 23h → 0,667 ; 5h → 0,917
 export function phaseOf(f) { return f < 0.5 ? 'jour' : f < 0.667 ? 'soir' : f < 0.917 ? 'nuit' : 'aube'; }
@@ -94,7 +96,7 @@ export class Townsfolk {
   // les points d'activité d'une ville : étals, puits, bancs, quais, tas de caisses, établis, postes du guet, portes
   buildPoi(z, st) {
     const W = this.G.world, out = { stalls: [], wells: [], benches: [], quay: [], crates: [], work: [], posts: [], corners: [], pubs: [], shops: [], homes: [], edges: [] };
-    const stand = (x, y) => canStand(W, x, y);
+    const stand = (x, y) => canStand(W, x, y) && dry(W, x, y); // 1.9.1 : un poste de travail, une place au quai… jamais les pieds dans l'eau
     const near = (p, offs) => { for (const [dx, dy] of offs) { const x = p.x + dx, y = p.y + dy; if (stand(x, y)) return { x, y, dir: dirOf(-dx, -dy) }; } return null; };
     const DOWN = [[0, 14], [0, 18], [12, 6], [-12, 6], [0, -14]], ANY = [[0, 14], [14, 0], [-14, 0], [0, -14], [12, 12], [-12, 12]];
     for (const p of W.props) {
@@ -275,7 +277,13 @@ export class Townsfolk {
       }
       const sp = (f.speed || 23) * dt;
       let [nx, ny] = moveWithCollision(G.world, f.x, f.y, dx / d * sp, dy / d * sp);
-      if (!dry(G.world, nx, ny)) { nx = f.x; ny = f.y; }
+      if (!dry(G.world, nx, ny)) { // l'eau devant : on la contourne en longeant la rive (un pas sur un seul axe), sinon on s'arrête
+        const ax = moveWithCollision(G.world, f.x, f.y, dx / d * sp, 0), ay = moveWithCollision(G.world, f.x, f.y, 0, dy / d * sp);
+        if (dry(G.world, ax[0], ax[1]) && Math.abs(dx) >= Math.abs(dy)) [nx, ny] = ax;
+        else if (dry(G.world, ay[0], ay[1])) [nx, ny] = ay;
+        else if (dry(G.world, ax[0], ax[1])) [nx, ny] = ax;
+        else { nx = f.x; ny = f.y; }
+      }
       if (Math.hypot(nx - f.x, ny - f.y) < sp * 0.2) { f.stuck = (f.stuck || 0) + 1; if (f.stuck > 30 && f.next && f.next.hide) { f.hidden = true; f.hideUntil = now + 10; f.next = null; } } else f.stuck = 0;
       f.x = nx; f.y = ny; f.moving = true; f.walk = (f.walk || 0) + dt * (f.speed || 23) / 76; f.dir = dirOf(dx, dy); // lot 7 : le pas suit la vitesse (un flâneur ne pédale pas)
     }

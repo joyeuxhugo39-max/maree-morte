@@ -9,6 +9,8 @@ import { canonTargets, targetAt, gabBarrels, gabBoom, BARREL_R } from '../shared
 import { CINE_LINES } from './cinema.js';
 import { registerIcons, iconURL } from './render/sprites-items.js';
 import { TILE } from '../shared/constants.js';
+import { canStand } from '../shared/world.js';
+import { dry } from './townsfolk.js';
 
 Object.assign(CINE_LINES, { mira_welcome: MIRA.welcome });
 registerIcons({
@@ -44,8 +46,10 @@ export class Festival {
     const add = (role, x, y, dir) => { const k = out.length + 1, L = look(k + 40); out.push({ k: 'f', id: -8000 - k, x, y, ox: x, oy: y, dir, moving: false, walk: 0, look: L, lookKey: JSON.stringify(L), weapon: null, crowd: 1000 + k, role, hidden: true, wait: r01(k) * 4 }); };
     for (let i = 0; i < 3; i++) add('musicien', st.x0 + 28 + i * 26, st.y0 + 20, 0); // sur la scène
     for (let i = 0; i < 8; i++) add('danseur', st.x0 + 10 + (i % 4) * 24, st.y1 + 12 + Math.floor(i / 4) * 16, i % 2 ? 1 : 2); // devant la scène
-    for (let i = 0; i < 6; i++) add('badaud', (143 + i * 2.4) * TILE, 124 * TILE + (i % 2) * 8, 0); // sur la jetée, face à la mer
-    for (let i = 0; i < 6; i++) add('flaneur', (130 + i * 6) * TILE, (109 + (i % 3) * 3) * TILE, i % 4); // entre les stands
+    // 1.9.1 : sur le quai de pierre, face à la mer (l'ancienne jetée, en y 124, est devenue de l'eau profonde avec le port de la 1.8)
+    const spot = (x, y) => { for (let r = 0; r <= 40; r += 4) for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2, px = x + Math.cos(a) * r, py = y - Math.abs(Math.sin(a)) * r; if (canStand(G.world, px, py) && dry(G.world, px, py)) return [px, py]; } return [x, y - 40]; };
+    for (let i = 0; i < 6; i++) { const [bx, by] = spot((141 + i * 3) * TILE + 8, 119 * TILE + 10 + (i % 2) * 6); add('badaud', bx, by, 0); }
+    for (let i = 0; i < 6; i++) { const [fx, fy] = spot((130 + i * 6) * TILE + 8, (109 + (i % 3) * 3) * TILE + 8); add('flaneur', fx, fy, i % 4); } // entre les stands (1.9.1 : jamais dans un mur)
     for (const f of out) G.folk.push(f);
     this.crowd = out;
   }
@@ -302,7 +306,15 @@ export class Festival {
         else if (f.role === 'danseur') { if (G.night || showing || Math.random() < dt * 0.05) f.danceUntil = Math.max(f.danceUntil || 0, now + 2 + Math.random() * 3); }
         else if (f.role === 'flaneur') { // ils vont d'un stand à l'autre
           if (f.wait > 0) { f.wait -= dt; f.moving = false; if (Math.random() < dt * 0.02 && (!G.town || G.town.bubblesInView() === 0)) G.renderer.addFx({ kind: 'bubble', text: FEST_CROWD_LINES[Math.floor(Math.random() * FEST_CROWD_LINES.length)], follow: () => f, dur: 2.6, h: 34 }); continue; }
-          if (!f.to) f.to = { x: f.ox + (Math.random() - 0.5) * 120, y: f.oy + (Math.random() - 0.5) * 50 };
+          if (!f.to) { // 1.9.1 : une destination sur la terre ferme, joignable en ligne droite (ni mur ni eau en chemin)
+            const ok = (x, y) => canStand(G.world, x, y) && dry(G.world, x, y);
+            for (let k = 0; k < 8 && !f.to; k++) {
+              const tx = f.ox + (Math.random() - 0.5) * 120, ty = f.oy + (Math.random() - 0.5) * 50, n = Math.ceil(Math.hypot(tx - f.x, ty - f.y) / 5);
+              let clear = ok(tx, ty); for (let j = 1; j < n && clear; j++) clear = ok(f.x + (tx - f.x) * j / n, f.y + (ty - f.y) * j / n);
+              if (clear) f.to = { x: tx, y: ty };
+            }
+            if (!f.to) { f.wait = 1 + Math.random() * 2; f.moving = false; continue; }
+          }
           const dx = f.to.x - f.x, dy = f.to.y - f.y, d = Math.hypot(dx, dy);
           if (d < 3) { f.to = null; f.wait = 2 + Math.random() * 5; f.moving = false; continue; }
           f.x += dx / d * 22 * dt; f.y += dy / d * 22 * dt; f.moving = true; f.walk += dt; f.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 1 : 2) : (dy < 0 ? 3 : 0);

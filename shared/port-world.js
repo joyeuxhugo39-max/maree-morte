@@ -264,6 +264,20 @@ export function buildPort(C) {
     delete m.z0;
   }
 
+  // ------------------------------------------------------------ 6 bis. 1.9.1 : plus de rue sous un bâtiment
+  // Des tracés de la 0.6 passaient sous des maisons : la rue du nord (x 148-150) débordait dans la maison aux volets bleus,
+  // et les allées des deux maisons du sud traversaient leur propre emprise. Les bâtiments ne bougent pas (portes et
+  // intérieurs identiques) : ce sont les rues qui les contournent.
+  for (const p of props) {
+    if (!(p.w && p.h && inBox(p.tx, p.ty) && ['house', 'tavern', 'forge', 'home', 'cite'].includes(p.type))) continue;
+    for (let y = p.ty; y < p.ty + p.h; y++) for (let x = p.tx; x < p.tx + p.w; x++) { const i = idx(x, y); if (tiles[i] === T.COBBLE || tiles[i] === T.DIRT) { tiles[i] = T.GRASS; path[i] = 0; } }
+  }
+  const unpave = (x0, y0, x1, y1) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = idx(x, y); if (tiles[i] === T.COBBLE) { tiles[i] = T.GRASS; path[i] = 0; } } };
+  unpave(150, 80, 150, 82); // la rue du nord longe la maison aux volets bleus (x 148-149), sans passer sous son toit
+  unpave(155, 79, 169, 79); // la rue des parcelles ne passe plus sous les toits de la tonnellerie et de la corderie
+  line([[138, 105.5], [141.6, 105.5], [141.6, 101.2], [145, 99]], 0.9, T.COBBLE); // l'allée de la maison du sud-ouest, par le côté
+  line([[161, 105], [158.4, 105], [158.4, 101.2], [155, 99]], 0.9, T.COBBLE); // celle du sud-est, depuis la rue du Levant
+
   // ------------------------------------------------------------ 7. finitions : eau profonde, navigation, distance à l'eau, île
   for (let y = PL_BOX.y0; y <= PL_BOX.y1; y++) for (let x = PL_BOX.x0; x <= PL_BOX.x1; x++) {
     const i = idx(x, y), t = tiles[i];

@@ -25,6 +25,21 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Version 1.9.1 : Port-Lanterne remis d'aplomb
+
+- **Les badauds du festival** se tenaient dans l'eau, sur l'ancienne jetée devenue eau profonde avec le port de la
+  1.8. Ils regardent désormais la mer depuis le quai de pierre. Les flâneurs ne traversent plus les murs.
+- **Les habitants** ne longent plus le bord du quai les pieds dans l'eau. Leurs postes de travail et leurs places sont
+  toujours sur la terre ferme, et ils contournent l'eau en longeant la rive.
+- **Plus de rue sous un bâtiment.**
+  - Des tracés anciens passaient sous des maisons : la rue du nord dans la maison aux volets bleus, les allées des deux
+    maisons du sud à travers leur propre emprise, une rangée sous l'Entrepôt de la Douane.
+  - Les rues les contournent maintenant ; la route des parcelles ne passe plus sous les toits de la tonnellerie et de la
+    corderie.
+  - Les bâtiments n'ont pas bougé : portes, intérieurs et sauvegardes sont identiques.
+- `t_port18` vérifie désormais qu'aucune rue ne passe sous les 26 bâtiments du port et qu'aucun personnage n'a les pieds
+  dans l'eau.
+
 ## Version 1.9.0 : la refonte des navires
 
 Les navires de la 1.1 gardent leurs postes et leur physique ; tout ce qui les entoure est repris.

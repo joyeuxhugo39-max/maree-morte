@@ -145,4 +145,18 @@ ok(!/chantier naval/.test(toasts(M, n0)), 'et elle répare les coques (le chanti
 const saved = game.saveData ? game.saveData(D) : null;
 const saveKeys = saved ? Object.keys(saved) : Object.keys(store.get('docker') || {});
 ok(!saveKeys.includes('portCarry') && !saveKeys.includes('portN'), 'la sauvegarde ne change pas de forme (rien du port n’y entre)');
+// ---------------------------------------------------------------- 6. 1.9.1 : ni rue sous un bâtiment, ni PNJ dans l'eau
+{
+  const Wd = game.world, B = Wd.port.box, tl = (x, y) => Wd.tiles[y * Wd.W + x], wet = (x, y) => { const t = Wd.tiles[Math.floor(y / TILE) * Wd.W + Math.floor(x / TILE)]; return t === 0 || t === 1; };
+  const blds = Wd.props.filter((q) => q.w && q.h && q.tx >= B.x0 && q.tx <= B.x1 && q.ty >= B.y0 && q.ty <= B.y1 && ['house', 'tavern', 'forge', 'home', 'cite'].includes(q.type));
+  const under = []; for (const q of blds) for (let y = q.ty; y < q.ty + q.h; y++) for (let x = q.tx; x < q.tx + q.w; x++) if (tl(x, y) === 6 || tl(x, y) === 5) under.push([q.name || q.type, x, y]);
+  ok(blds.length >= 15 && !under.length, `aucune rue ne passe sous les ${blds.length} bâtiments du port${under.length ? ' : ' + JSON.stringify(under.slice(0, 4)) : ''}`);
+  const v1 = blds.find((q) => q.type === 'house' && q.tx === 150 && q.ty === 83);
+  ok(v1 && [81, 82, 83, 84, 85, 86].every((y) => tl(148, y) === 6 && tl(149, y) === 6), 'la rue du nord longe la maison aux volets bleus (deux cases de pavé, x 148-149)');
+  ok([[141, 103], [142, 101], [158, 103], [158, 105]].every(([x, y]) => tl(x, y) === 6), 'les allées des maisons du sud contournent les maisons au lieu de les traverser');
+  const wetN = Wd.npcs.filter((n) => n.room < 0 && n.x >= B.x0 * TILE && n.x <= B.x1 * TILE && n.y >= B.y0 * TILE && n.y <= B.y1 * TILE && (wet(n.x, n.y) || wet(n.x, n.y - 3)));
+  ok(!wetN.length, `aucun habitant du port n’a les pieds dans l’eau${wetN.length ? ' : ' + wetN.map((n) => n.id).join(', ') : ''}`);
+  let wetE = 0; for (let wt = 0; wt < PORT_PERIOD * 30; wt += 3) for (const id of Object.keys(NPCS)) { const at = portNpcAt(id, wt, false); if (at && (wet(at.x, at.y) || wet(at.x, at.y - 3))) wetE++; }
+  ok(!wetE, `ni les personnages des événements, à aucun moment (${wetE})`);
+}
 console.log(fails ? `${fails} ÉCHEC(S)` : 'TOUT EST OK'); process.exit(fails ? 1 : 0);
