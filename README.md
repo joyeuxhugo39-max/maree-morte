@@ -25,6 +25,25 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Version 2.4.0 : LStudio, les personnages, le contrôle avancé, la livraison (lot 4)
+
+Le dernier lot de LStudio. Bilan complet de la mission, point par point : `rapports/ls5-livraison.md`.
+
+- **Des personnages** : un nom, une apparence (celles que le jeu sait dessiner), des répliques, des sujets, des phrases
+  qu'ils marmonnent. En jeu, ils rejoignent les personnages du jeu (dialogue, codex).
+- **Les chemins coupés** : comparé au monde d'origine, ce qu'un pirate n'atteint plus à pied (une entrée, un personnage,
+  une arrivée, un coffre). La correction désigne et enlève ce qui ferme le passage.
+- **Les références cassées**, corrigées d'un coup ; le poids du monde surveillé.
+- **Le même monde pour tous** : un pirate dont la page a un autre monde que la partie en est averti. Sur GitHub Pages, le
+  jeu attend le monde publié jusqu'à 15 secondes.
+- **La recherche** dans tout le monde ; l'aide au premier lancement.
+- **La suite `t_studio40`** vérifie :
+  - les personnages, avec le vrai moteur ;
+  - les chemins coupés et leurs corrections ;
+  - l'empreinte du monde ;
+  - les performances d'un monde de 5 000 décors.
+- **Le monde publié reste vide** : le jeu n'a pas changé.
+
 ## Version 2.3.0 : LStudio, le monde, les modèles et les images (lot 3)
 
 LStudio voit et agrandit le monde, enregistre vos modèles, et importe votre pixel art. Mode d'emploi : `LSTUDIO.md`,

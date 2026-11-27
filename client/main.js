@@ -8,6 +8,8 @@ import { CLOTH_KEYS, mobSheet, humanSheet } from './render/sprites-chars.js';
 import { STRUCTS, PLANTER_GROW, HOME_OK, HOME_PRICE, QUEST_PICK } from '../shared/data/craft.js';
 import { ITEMS } from '../shared/data/items.js';
 import { NPCS } from '../shared/data/npcs.js';
+import { useNpcRegistry } from '../shared/studio-world.js';
+useNpcRegistry(NPCS); // 2.4 : les personnages de LStudio rejoignent ceux du jeu
 import { SKILLS } from '../shared/data/skills.js';
 import { QUESTS, QUEST_ORDER, npcVisible } from '../shared/data/quests.js';
 import { displayLook } from '../shared/formulas.js';
@@ -153,7 +155,7 @@ async function boot(hotData = {}) {
     if (!G.net) return G.ui.loginError('Serveur injoignable.');
     G.loginInfo = { name, look };
     const rs = resumeInfo(); // 1.0 : reprise après une coupure, sans redemander le mot de passe
-    G.send({ t: 'login', v: PROTOCOL, name, pass: online && !solo ? pass : 'solo', look, rt: rs && rs.name === name ? rs.rt : undefined });
+    G.send({ t: 'login', v: PROTOCOL, name, pass: online && !solo ? pass : 'solo', look, rt: rs && rs.name === name ? rs.rt : undefined, sw: G.world.studioSig || '' }); // 2.4 : l'empreinte du monde de LStudio
   };
   if (G.studio && G.studio.mode === 'apercu') G.ui.showLogin({ solo: true, noPass: true, note: `Aperçu LStudio : « ${(G.studio.doc.meta && G.studio.doc.meta.nom) || 'monde de test'} », en solo. Votre pirate est copié : rien de ce que vous faites ici ne touche sa vraie sauvegarde.`, onSubmit: submit });
   else if (PAGES && !online) G.ui.showLogin({ noPass: true, offerSolo: true, note: 'En ligne : tous ceux qui ouvrent ce lien jouent dans le même monde. Votre progression reste dans ce navigateur.', onSubmit: submit });
@@ -781,6 +783,17 @@ function useZone(z, now) {
   G.send({ t: 'mv', x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, d: p.dir, m: 0 });
   G.send({ t: 'passage', id: z.id });
 }
+// 2.4 : les personnages de LStudio disent de temps en temps une de leurs phrases, quand un pirate passe près d'eux
+function studioNpcsStep(p, now) {
+  for (const n of G.npcs) {
+    const N = NPCS[n.id]; if (!N || !N.studio || !N.bulles || !N.bulles.length) continue;
+    if (Math.hypot(n.x - p.x, n.y - p.y) > 150) { n._bulle = Math.max(n._bulle || 0, now + 2); continue; }
+    if (!n._bulle) n._bulle = now + 1 + Math.random() * 3;
+    if (now < n._bulle) continue;
+    n._bulle = now + 11 + Math.random() * 11;
+    G.renderer.addFx({ kind: 'bubble', text: N.bulles[Math.floor(Math.random() * N.bulles.length)], follow: () => n, dur: 3.8, h: 34 });
+  }
+}
 function studioZonesStep(p, now) {
   const Z = G.world.studioZones; if (!Z || !Z.length) return;
   const inside = G.szIn || (G.szIn = new Set());
@@ -1268,6 +1281,7 @@ function updatePlayer(now, dt) {
     else if (ax.y > 0.3 && tileAt(G.world, p.x, p.y) === T.EXIT) { let d = null, bd = 1e9; for (const q of G.world.doors) if (q.room === G.room) { const dd = Math.hypot(q.ex - p.x, q.ey - p.y); if (dd < bd) { bd = dd; d = q; } } if (d) useDoor(d, true, now); } // 2.2 : une pièce à deux portes : on sort par celle dont on foule le seuil
   }
   studioZonesStep(p, now); // 2.2 : les zones écrites dans LStudio (les messages et les passages qui se déclenchent d'eux-mêmes)
+  studioNpcsStep(p, now); // 2.4 : les personnages de LStudio
   if (now - G.lastSend > 0.05 && (moved || p.moving !== G.lastMoving)) {
     G.send({ t: 'mv', x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, d: p.dir, m: p.moving ? 1 : 0 });
     G.lastSend = now; G.lastMoving = p.moving;

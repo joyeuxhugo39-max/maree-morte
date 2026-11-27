@@ -33,7 +33,7 @@ joueurs ne la voient pas.
 | Sélection | V | Cliquer : choisir un élément. Maj + clic : en ajouter un. Glisser dans le vide : un cadre de sélection. Glisser un élément : le déplacer, case par case ; avec Alt, au pixel près. |
 | Poser | P | Pose l'élément choisi dans la bibliothèque, à chaque clic. **[** et **]** changent la variante, Alt pose au pixel près, clic droit ou Échap arrête. |
 | Peindre | B | Peint, au pinceau de 1 à 9 cases, le **sol**, les **régions**, les **collisions** ou la **navigation**. Clic droit (ou « Gomme ») : revenir au monde d'origine. |
-| Bâtir | K | Dans les pièces : les **cloisons**, le **style du sol**, le **style des murs**, le **décor mural** (fenêtres, tableaux…) ; partout : les **zones** (un message, un passage). Clic droit : effacer. |
+| Bâtir | K | Dans les pièces : les **cloisons**, le **style du sol**, le **style des murs**, le **décor mural** (fenêtres, tableaux…) ; partout : les **zones** (un message, un passage) et les **personnages**. Clic droit : effacer. |
 | Main | H | Déplace la vue. |
 
 **Raccourcis**
@@ -125,6 +125,23 @@ peut avoir plusieurs portes : chacune a sa colonne de sortie, et l'on ressort pa
 (jaune : un message ; violet : un passage, avec la flèche vers son arrivée), les entrées des portes. Rien de cela ne se
 voit en jeu (onglet Couches → Affichage).
 
+## Des personnages
+
+Outil **Bâtir** (K) → **🧑 Personnage**, puis un clic sur la carte (dehors, ou dans une pièce). Dans ses propriétés :
+
+- **son nom et son titre** (« Bertille, marchande de cordes ») ;
+- **où il regarde** ;
+- **son apparence** : la peau, les cheveux, la barbe, l'habit, les couleurs, le chapeau, avec un aperçu sous ses quatre
+  faces. Ce sont les apparences que le jeu sait dessiner ;
+- **ce qu'il dit** :
+  - ses **répliques** (une par ligne) : il en dit une au hasard quand on lui parle avec E ;
+  - ses **sujets** : « une question | sa réponse », par ligne ; ce sont les choix de la conversation ;
+  - ce qu'il **marmonne** : de courtes phrases, dans une bulle, de temps en temps, quand un pirate passe près de lui.
+
+En jeu, il rejoint les personnages du jeu : la même boîte de dialogue, le même codex des personnages rencontrés, le moteur
+vérifie qu'on est assez près pour lui parler. Un personnage posé dans une pièce la suit quand on la déplace, et voyage avec
+elle dans vos modèles. Il ne donne ni quêtes ni marchandises : ses répliques et ses sujets.
+
 ## Le monde : îles, cartes à part, liaisons
 
 Le jeu n'a qu'une grande carte : l'archipel (960 × 448 cases), et sous lui, la bande des intérieurs (les pièces, les
@@ -139,6 +156,8 @@ grottes, les fonds marins). On ne l'agrandit pas : on la remplit.
   comme les grottes du jeu. Une crique cachée, un îlot secret, un souterrain… Son sol (herbe, sable, terre, grotte,
   pavés…), ce qu'on voit tout autour (la mer, des ruelles, des murs), le ciel du jour et de la nuit. On y va par une porte
   (« ＋ Entrée… ») ou par un passage. Elle se peint, se meuble et se bâtit comme le reste.
+- **Rechercher** (en haut de l'onglet Monde) : une pièce, un personnage, une zone, une porte, un décor nommé, un repère,
+  une image, un lieu ou un personnage du jeu, une région. Un clic vous y emmène.
 - **La vue du monde** (« 🗺 Vue du monde ») : tout l'archipel et la bande des intérieurs d'un coup d'œil.
   - Les îles : vertes si on peut les atteindre depuis l'arrivée des pirates (le point blanc), jaunes si vous les avez
     modifiées, rouges si personne ne peut y aller (aucun bateau n'y accoste).
@@ -223,11 +242,20 @@ LStudio n'invente aucun dessin : vous importez le vôtre.
     un message vide.
 
   - pour le monde : une île que les bateaux n'atteignent pas, un lieu dont l'entrée est hors d'atteinte ;
+  - **les chemins coupés** : LStudio compare avec le monde d'origine ce qu'un pirate atteint à pied (depuis l'arrivée et
+    depuis chaque côte où l'on accoste). Une entrée, un personnage, un point d'arrivée qu'on atteignait et qu'on
+    n'atteint plus est un problème bloquant (un coffre, un avertissement). Le contrôle dit par quoi le passage est fermé
+    (un décor, une collision peinte, un sol repeint, un décor du jeu déplacé) et propose de l'enlever ;
+  - les personnages dans un mur, ou qui n'ont rien à dire ;
+  - le poids du monde : chaque joueur le charge au démarrage (avertissement au-delà de 1 500 Ko, bloquant au-delà de
+    4 000 Ko) ;
   - pour les images : une image manquante ou illisible, des images trop lourdes, l'habillage d'un élément qui n'existe
     pas.
 
   Chaque problème a son emplacement (« Aller voir ») et, souvent, une correction en un clic. Les problèmes **bloquants**
-  empêchent la publication ; les **avertissements**, non.
+  empêchent la publication ; les **avertissements**, non. **« 🧹 Corriger les références cassées »** corrige d'un coup,
+  en une action annulable, tout ce qui désigne quelque chose qui n'existe plus (une retouche d'un décor disparu, une
+  porte vers une pièce supprimée, un décor d'une image effacée…).
 - **▶ Tester dans le jeu** ouvre la vraie page du jeu, en solo, avec vos modifications : vraies collisions, vraies portes,
   vrais personnages.
   - Votre pirate y est copié : rien de ce que vous faites pendant le test ne touche sa vraie sauvegarde.
@@ -252,13 +280,19 @@ LStudio n'invente aucun dessin : vous importez le vôtre.
 | Version de test | ce navigateur | vous, dans le vrai jeu (« Tester dans le jeu ») |
 | Version publiée | le dépôt du jeu (`docs/monde-studio.json`) | tous les joueurs |
 
+**À plusieurs** : tous les joueurs d'une partie doivent avoir le même monde. Si l'hôte d'une partie a gardé sa page ouverte
+depuis avant une publication, le jeu le dit au pirate qui le rejoint (au lieu de les faire jouer sur deux mondes
+différents) : l'un des deux recharge sa page.
+
 ## Ce que LStudio ne fait pas encore
 
-Prévus au lot suivant :
+- **Des quêtes** : les personnages de LStudio parlent, mais ne donnent pas de quêtes (les quêtes du jeu sont écrites dans
+  son code, avec leurs scènes).
+- **Des monstres** : leurs points d'apparition sont posés par le jeu ; une île neuve n'en a pas.
+- **Des étages superposés** : le moteur n'en a pas ; un étage est une autre pièce, reliée par un escalier.
+- **Agrandir la grande carte** (960 × 560 cases) : on la remplit d'îles, et de cartes à part sous l'archipel.
 
-- **Des personnages** à placer (aujourd'hui, les tavernes se remplissent d'habitués toutes seules).
-- **Le contrôle avancé** : les passages bloqués entre deux lieux d'une même île, et plus de corrections proposées.
-- **Les finitions**.
+Le bilan complet de la mission, point par point, est dans `rapports/ls5-livraison.md`.
 
 ## Pour qui voudrait comprendre comment c'est fait
 
@@ -266,7 +300,7 @@ Prévus au lot suivant :
   `rapports/ls1-audit-architecture.md`). Le jeu l'applique en tout dernier, avec le même code que l'éditeur
   (`shared/studio-world.js`). Un document vide ne change rien.
 - **Les sources** de l'éditeur sont dans `studio/`. La page est fabriquée par `npm run build:studio` (ou `npm run build`).
-- **Les tests** : `tests/t_studio10.mjs`, `tests/t_studio20.mjs` et `tests/t_studio30.mjs` vérifient qu'après une longue suite d'actions au
+- **Les tests** : `tests/t_studio10.mjs` à `tests/t_studio40.mjs` vérifient qu'après une longue suite d'actions au
   hasard (décors, peinture, pièces, portes, zones, cloisons, styles), l'éditeur et le jeu ont exactement le même monde,
   et que tout annuler ramène le monde d'origine à l'octet près. Le second fait aussi entrer un pirate par la porte d'une
   pièce, monter un escalier et ressortir, avec le vrai moteur du jeu.

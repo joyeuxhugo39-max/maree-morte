@@ -51,6 +51,8 @@
     <section data-pane="build" class="pane"><div id="build-pane"></div><div id="prefab-pane"></div></section>
     <section data-pane="map" class="pane">
       <div class="btns"><button id="monde-vue" class="primary" title="Les îles, les lieux, ce qui les relie, ce qui est isolé">🗺 Vue du monde</button><button id="monde-ile" title="Peindre une île neuve en pleine mer">🏝 Nouvelle île…</button><button id="monde-carte" title="Un lieu de plein air à part, sous l’archipel, relié par des portes et des passages">🧭 Nouvelle carte…</button></div>
+      <input id="monde-search" placeholder="Rechercher dans ce monde (une pièce, un personnage, un lieu…)" spellcheck="false">
+      <div id="monde-found" class="plist"></div>
       <h3>Aller à</h3>
       <div class="row"><input id="go-x" type="number" placeholder="x"><input id="go-y" type="number" placeholder="y"><button id="go-btn">Aller</button></div>
       <h3>Mes repères <button id="rep-add" class="mini" title="Poser un repère au centre de la vue">+ ici</button></h3>

@@ -30,7 +30,7 @@ export function captureModel(ED, refs, nom, opts = {}) {
   // les bâtiments de la sélection, et les pièces où mènent leurs portes ; puis, de proche en proche, les pièces où mènent
   // les passages de ces pièces (les étages)
   const pieceIdx = new Map(), queue = [];
-  const addPiece = (uid) => { if (pieceIdx.has(uid)) return pieceIdx.get(uid); const pc = ED.piece(uid); if (!pc) return -1; const k = M.pieces.length; pieceIdx.set(uid, k); const def = {}; for (const f of PIECE_FIELDS) if (pc[f] !== undefined) def[f] = clone(pc[f]); M.pieces.push({ def, decors: [], sol: {}, collisions: {}, regions: {}, navigation: {} }); queue.push(pc); return k; };
+  const addPiece = (uid) => { if (pieceIdx.has(uid)) return pieceIdx.get(uid); const pc = ED.piece(uid); if (!pc) return -1; const k = M.pieces.length; pieceIdx.set(uid, k); const def = {}; for (const f of PIECE_FIELDS) if (pc[f] !== undefined) def[f] = clone(pc[f]); M.pieces.push({ def, decors: [], persos: [], sol: {}, collisions: {}, regions: {}, navigation: {} }); queue.push(pc); return k; };
   decors.forEach((d, bi) => { if (!d._uid) return; for (const q of ED.doc.portes) if (q.batiment === d._uid && typeof q.piece === 'string') { const k = addPiece(q.piece); if (k >= 0) M.portes.push({ bat: bi, piece: k, nom: q.nom || '', sortie: q.sortie }); } });
   const inPiece = (x, y) => { for (const [uid, k] of pieceIdx) { const pc = ED.piece(uid), E = pieceEnvelope(pc); if (x >= E.x0 && x <= E.x1 && y >= E.y0 && y <= E.y1) return { k, pc }; } return null; };
   for (let qi = 0; qi < queue.length; qi++) {
@@ -40,6 +40,7 @@ export function captureModel(ED, refs, nom, opts = {}) {
   for (const [uid, k] of pieceIdx) {
     const pc = ED.piece(uid), C = ED.contentsOf(pc), P = M.pieces[k];
     for (const u of C.decors) { const d = DECOR_FIELDS(ED.decorOf.get(u)); d.x -= pc.x; d.y -= pc.y; P.decors.push(d); }
+    for (const u of C.persos || []) { const c = clone(ED.perso(u)); delete c.uid; c.x -= pc.x; c.y -= pc.y; P.persos.push(c); } // 2.4 : ses personnages
     for (const kk of ['sol', 'collisions', 'regions', 'navigation']) for (const k2 of C.keys[kk]) { const [x, y] = unkey(k2); P[kk][key(x - pc.x, y - pc.y)] = ED.doc[kk][k2]; }
     for (const u of C.zones) {
       const z = clone(ED.zone(u)); delete z.uid; z.piece = k; z.x -= pc.x; z.y -= pc.y;
@@ -77,6 +78,7 @@ export function placeModel(ED, M, tx, ty, couche = 'decors') {
     pcs.push(pc);
     for (const d of P.decors) { const u = newUid(); ED.set('decor', u, { ...clone(d), uid: u, x: pc.x + d.x, y: pc.y + d.y, couche: layer(d.couche || 'decors'), verrou: false }); }
     for (const kk of ['sol', 'collisions', 'regions', 'navigation']) for (const [k2, v] of Object.entries(P[kk] || {})) { const [x, y] = unkey(k2); ED.set(kk, key(pc.x + x, pc.y + y), v); }
+    for (const c of P.persos || []) { const u = newUid(); ED.set('personnage', u, { ...clone(c), uid: u, x: pc.x + c.x, y: pc.y + c.y }); }
   }
   for (const z of M.zones || []) {
     const pc = pcs[z.piece]; if (!pc) continue;

@@ -1,4 +1,5 @@
 // Serveur HTTP (fichiers du client) + WebSocket (jeu) sur le même port.
+import { setStudioDoc, normalizeDoc } from '../shared/studio-world.js';
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
@@ -74,6 +75,8 @@ const storage = new FileStorage(DATA);
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 // 1.0 : un instantané avant tout démarrage (donc avant chaque déploiement), puis toutes les heures
 await storage.snapshot('demarrage').then((n) => log('[sauvegarde] instantané', n)).catch((e) => log('[sauvegarde] instantané impossible', e.message));
+// 2.4 : le serveur Node joue le même monde que la page publiée (le monde écrit dans LStudio, s'il y en a un)
+try { const raw = fs.readFileSync(new URL('../docs/monde-studio.json', import.meta.url), 'utf8'); setStudioDoc(normalizeDoc(JSON.parse(raw))); } catch (e) { /* pas de monde publié : le monde d'origine */ }
 const game = new Game({ storage, log });
 // lot 2 : outils développeur — inactifs tant que DEV_ACCOUNTS et DEV_SECRET ne sont pas définis sur le serveur
 const dev = installDev(game);

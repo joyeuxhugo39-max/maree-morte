@@ -5,12 +5,15 @@
 import { StudioWorld, applyDoc, key, unkey, BUILDING_PROPS, pieceEnvelope, PIECE_MIN, PIECE_MAX_W, PIECE_MAX_H } from '../shared/studio-world.js';
 import { inMap } from '../shared/world.js';
 import { T, OVER_H } from '../shared/constants.js';
+import { NPCS } from '../shared/data/npcs.js';
+import { useNpcRegistry } from '../shared/studio-world.js';
+useNpcRegistry(NPCS); // 2.4 : les personnages de LStudio
 
 const clone = (o) => (o == null ? o : JSON.parse(JSON.stringify(o)));
 let uidN = 0;
 export const newUid = () => 'd' + Date.now().toString(36) + (uidN++).toString(36) + Math.floor(Math.random() * 1296).toString(36);
 const MAPS = ['sol', 'regions', 'collisions', 'navigation'];
-const STRUCT = { piece: 'pieces', porte: 'portes', zone: 'zones' }; // lot 2 : les pièces, les portes, les zones (rangées par uid)
+const STRUCT = { piece: 'pieces', porte: 'portes', zone: 'zones', personnage: 'personnages' }; // lot 2 : les pièces, les portes, les zones (rangées par uid)
 const envCells = (pc) => { const E = pieceEnvelope(pc), out = []; for (let y = E.y0; y <= E.y1; y++) for (let x = E.x0; x <= E.x1; x++) out.push([x, y]); return out; };
 
 export class Editor {
@@ -23,7 +26,7 @@ export class Editor {
     this.nextId = max + 1;
     if (!doc.couches.some((c) => c.id === 'origine')) doc.couches.unshift({ id: 'origine', nom: 'Monde d’origine', visible: true, verrou: false, origine: true });
     this.S = new StudioWorld({ W: world.W, H: world.H, tiles: world.tiles, zones: world.zones, solid: world.solid, occ: new Uint8Array(world.W * world.H), sail: world.sail, waterDist: world.waterDist, plankDir: world.plankDir, props: world.props, PROPS, inMap,
-      rooms: world.rooms, doors: world.doors, roomGrid: world.roomGrid, szones: world.studioZones || (world.studioZones = []),
+      rooms: world.rooms, doors: world.doors, roomGrid: world.roomGrid, npcs: world.npcs, szones: world.studioZones || (world.studioZones = []),
       make: (type, tx, ty, v, ox, oy, extra) => { const p = { id: this.nextId++, type, x: tx * 16 + 8 + ox, y: ty * 16 + 14 + oy, tx, ty, v, ...extra }; world.props.push(p); return p; } });
     this.report = applyDoc(this.S, doc);
     this.S.origin(); if (!this.S.gridO) this.S.gridO = world.roomGrid.slice(); // pour chercher la place d'une pièce neuve
@@ -185,6 +188,17 @@ export class Editor {
   piece(uid) { return this.doc.pieces.find((p) => p.uid === uid); }
   porte(uid) { return this.doc.portes.find((p) => p.uid === uid); }
   zone(uid) { return this.doc.zones.find((p) => p.uid === uid); }
+  perso(uid) { return this.doc.personnages.find((p) => p.uid === uid); }
+  // 2.4 : un personnage ; son apparence est tirée de son identifiant (on la change ensuite)
+  addPerso(x, y, o = {}) {
+    const uid = newUid(), r = (k) => { let h = 2166136261; for (const ch of uid + k) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return (h >>> 0) / 4294967296; };
+    const pick = (list, k) => list[Math.floor(r(k) * list.length)];
+    const C = ['red', 'navy', 'green', 'brown', 'purple', 'yellow', 'teal', 'black', 'orange', 'white'];
+    const look = o.look || { skin: pick([0, 1, 2, 3], 's'), hair: pick([0, 1, 2, 3, 4, 5, 6], 'h'), hairStyle: pick(['court', 'long', 'queue', 'hirsute', 'chauve'], 'hs'), beard: pick([0, 0, 1, 2], 'b'), top: pick(['chemise', 'gilet', 'manteau', 'vareuse', 'rayee', 'tablier'], 't'), topCol: pick(C, 'tc'), pants: pick(['brown', 'black', 'navy', 'white'], 'p'), boots: pick(['black', 'brown'], 'bo'), hat: pick(['', '', 'tricorne', 'bandana', 'bonnet', 'paille', 'foulard'], 'ha'), hatCol: pick(C, 'hc') };
+    const c = { uid, nom: o.nom || 'Nouveau personnage', titre: o.titre || '', x, y, dir: o.dir || 0, look, repliques: o.repliques || ['Belle journée pour prendre la mer.'], sujets: o.sujets || [], bulles: o.bulles || [] };
+    this.set('personnage', uid, c); return c;
+  }
+  changePerso(uid, f) { const c = this.perso(uid); if (c) this.set('personnage', uid, { ...clone(c), ...clone(f) }); }
   roomAt(x, y) { if (!inMap(x, y)) return null; const id = this.world.roomGrid[y * this.world.W + x]; return id >= 0 ? this.world.rooms[id] : null; }
   pieceAt(x, y) { const r = this.roomAt(x, y); return r && r.studio ? this.piece(r.studio) : null; }
   // la place d'une pièce : son enveloppe ne touche que du vide d'origine, et aucune autre pièce (sauf elle-même)
@@ -224,7 +238,7 @@ export class Editor {
   contentsOf(pc) {
     const E = pieceEnvelope(pc), inE = (x, y) => x >= E.x0 && x <= E.x1 && y >= E.y0 && y <= E.y1;
     const keys = {}; for (const k of MAPS) keys[k] = Object.keys(this.doc[k]).filter((kk) => { const [x, y] = unkey(kk); return inE(x, y); });
-    return { decors: this.doc.decors.filter((d) => inE(d.x, d.y)).map((d) => d.uid), zones: this.doc.zones.filter((z) => inE(z.x, z.y)).map((z) => z.uid), arrivals: this.doc.zones.filter((z) => z.vers && inE(z.vers.x, z.vers.y)).map((z) => z.uid), keys, inE };
+    return { decors: this.doc.decors.filter((d) => inE(d.x, d.y)).map((d) => d.uid), persos: this.doc.personnages.filter((c) => inE(c.x, c.y)).map((c) => c.uid), zones: this.doc.zones.filter((z) => inE(z.x, z.y)).map((z) => z.uid), arrivals: this.doc.zones.filter((z) => z.vers && inE(z.vers.x, z.vers.y)).map((z) => z.uid), keys, inE };
   }
   movePiece(uid, nx, ny) {
     const pc = this.piece(uid); if (!pc) return 'pièce introuvable';
@@ -233,6 +247,7 @@ export class Editor {
     const C = this.contentsOf(pc);
     this.begin('Déplacer la pièce');
     for (const u of C.decors) { const d = this.decorOf.get(u); this.change({ k: 'd', uid: u }, { x: d.x + dx, y: d.y + dy }); }
+    for (const u of C.persos) { const c = clone(this.perso(u)); c.x += dx; c.y += dy; this.set('personnage', u, c); }
     for (const u of C.zones) { const z = clone(this.zone(u)); z.x += dx; z.y += dy; if (z.vers && C.inE(z.vers.x, z.vers.y)) z.vers = { x: z.vers.x + dx, y: z.vers.y + dy }; this.set('zone', u, z); }
     for (const u of C.arrivals) if (!C.zones.includes(u)) { const z = clone(this.zone(u)); z.vers = { x: z.vers.x + dx, y: z.vers.y + dy }; this.set('zone', u, z); }
     for (const k of MAPS) { const vals = C.keys[k].map((kk) => [kk, this.doc[k][kk]]); for (const [kk] of vals) this.set(k, kk, undefined); for (const [kk, v] of vals) { const [x, y] = unkey(kk); this.set(k, key(x + dx, y + dy), v); } }
@@ -248,6 +263,7 @@ export class Editor {
     if (withContents) {
       for (const u of C.decors) this.set('decor', u, undefined);
       for (const u of C.zones) this.set('zone', u, undefined);
+      for (const u of C.persos) this.set('personnage', u, undefined);
       for (const k of MAPS) for (const kk of C.keys[k]) this.set(k, kk, undefined);
     }
     this.set('piece', uid, undefined);

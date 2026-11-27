@@ -5,9 +5,13 @@
 // tout le monde voit le même monde. Un document vide ne change rien.
 // Format : voir rapports/ls1-audit-architecture.md (« Le format du document »).
 import { T, OVER_H } from './constants.js';
+// 2.4 : les personnages de LStudio rejoignent ceux du jeu (dialogues, codex) : le jeu, le moteur et l'éditeur donnent ici
+// le registre des personnages (shared/data/npcs.js) — il ne peut pas être importé d'ici (il dépend du monde)
+let NPCS = null;
+export function useNpcRegistry(reg) { NPCS = reg; }
 
 export const STUDIO_FORMAT = 'lstudio';
-export const STUDIO_VERSION = 3; // 2 : les pièces, les portes et les zones ; 3 : les images importées (un document plus ancien se lit tel quel)
+export const STUDIO_VERSION = 4; // 2 : les pièces, les portes et les zones ; 3 : les images importées ; 4 : les personnages (un document plus ancien se lit tel quel)
 export const TILE_NAMES = Object.fromEntries(Object.entries(T).map(([k, v]) => [v, k])); // 3 → 'GRASS'
 const SOLID_T = new Set([T.DEEP, T.ROCK, T.LAVA, T.VOID, T.CWALL, T.IWALL]);
 const isWater = (t) => t === T.WATER || t === T.DEEP;
@@ -21,6 +25,27 @@ export const PIECE_GENRES = { house: 'Maison', tavern: 'Taverne', auberge: 'Aube
 export const PIECE_SOLS = { 1: 'Parquet', 2: 'Parquet sombre', 3: 'Marbre', 4: 'Dallage de galerie', 5: 'Dalles', 6: 'Planches sombres', 7: 'Planches d’entrepôt', 8: 'Allée peinte', 9: 'Pierre humide', 18: 'Planches d’atelier', 19: 'Pavés', 15: 'Terrasse', 16: 'Pont de navire', 17: 'Dunette', 10: 'Tuiles rouges', 11: 'Ardoise', 12: 'Tuiles canal' };
 export const PIECE_MURS = { salon: 'Damas rouge', vestibule: 'Pierre claire', office: 'Enduit et faïence', jeu: 'Damas vert', galerie: 'Tenture bleue', archives: 'Lambris sombre', cabinet: 'Lambris', entrepot: 'Planches brutes', atelier: 'Planches claires', cave: 'Pierre de cave', facade_ocre: 'Façade ocre', facade_rose: 'Façade rose', facade_bleue: 'Façade bleue', facade_brique: 'Briques', lointain: 'Ciel de nuit' };
 export const MUR_DECORS = { fenetre: 'Haute fenêtre', fenetre_s: 'Petite fenêtre', rue_fenetre: 'Fenêtre à volets', rue_porte: 'Porte peinte', tableau: 'Tableau', portrait_ch: 'Grand portrait', miroir: 'Miroir', tapisserie: 'Tapisserie', biblio: 'Bibliothèque', carte: 'Carte marine', blason: 'Blason', vaisselle: 'Vaisselier mural', cuivres: 'Cuivres', porte_ch: 'Porte de chargement', avis: 'Panneau d’avis', tarifs: 'Tableau des tarifs', outils: 'Tableau à outils', plans: 'Plans épinglés', echelle_m: 'Échelle', soupirail: 'Soupirail', niche: 'Niche et bougie', enseigne: 'Enseigne' };
+// 2.4 : l'apparence d'un personnage — ce que la feuille de personnage du jeu sait dessiner (client/render/sprites-chars.js)
+export const PERSO_LOOK = {
+  skin: [0, 1, 2, 3], hair: [0, 1, 2, 3, 4, 5, 6], hairStyle: ['court', 'chauve', 'hirsute', 'long', 'queue'], beard: [0, 1, 2],
+  top: ['chemise', 'gilet', 'manteau', 'vareuse', 'capitaine', 'rayee', 'tablier', 'armure', 'haillons'],
+  hat: ['', 'tricorne', 'bandana', 'plume', 'bonnet', 'capitaine', 'foulard', 'morion', 'paille', 'couronne', 'cagoule'],
+  colors: ['red', 'navy', 'green', 'brown', 'purple', 'yellow', 'teal', 'black', 'orange', 'white'],
+};
+export function persoLook(L = {}) {
+  const pick = (v, list, d) => (list.includes(v) ? v : d), C = PERSO_LOOK.colors;
+  const out = { skin: pick(L.skin, PERSO_LOOK.skin, 0), hair: pick(L.hair, PERSO_LOOK.hair, 1), hairStyle: pick(L.hairStyle, PERSO_LOOK.hairStyle, 'court'), beard: pick(L.beard, PERSO_LOOK.beard, 0),
+    top: pick(L.top, PERSO_LOOK.top, 'chemise'), topCol: pick(L.topCol, C, 'brown'), pants: pick(L.pants, C, 'brown'), boots: pick(L.boots, C, 'black') };
+  const hat = pick(L.hat || '', PERSO_LOOK.hat, ''); if (hat) { out.hat = hat; out.hatCol = pick(L.hatCol, C, 'black'); }
+  return out;
+}
+export const persoId = (uid) => 'ls_' + uid;
+const lines = (a, n = 12, len = 300) => (Array.isArray(a) ? a : []).map((t) => String(t || '').trim().slice(0, len)).filter(Boolean).slice(0, n);
+// la fiche d'un personnage de LStudio, comme celles des personnages du jeu (shared/data/npcs.js)
+export function persoDef(c) {
+  return { name: String(c.nom || 'Inconnu').slice(0, 40), title: String(c.titre || '').slice(0, 60), look: persoLook(c.look), greet: lines(c.repliques).length ? lines(c.repliques) : ['…'],
+    topics: (Array.isArray(c.sujets) ? c.sujets : []).filter((t) => t && t.q && t.a).slice(0, 8).map((t) => ({ q: String(t.q).slice(0, 80), a: String(t.a).slice(0, 600) })), bulles: lines(c.bulles, 8, 90), studio: 1 };
+}
 export const ZONE_TYPES = { message: 'Message (un panneau, une inscription)', passage: 'Passage (vers un autre point : un escalier, une trappe)' };
 export const PIECE_MIN = 3, PIECE_MAX_W = 200, PIECE_MAX_H = 72; // 2.3 : assez pour une « carte » à part (un lieu de 200 × 72 cases)
 export const PIECE_BORDS = { '': 'Des murs', mer: 'La mer tout autour', ruelle: 'Des ruelles en contrebas' }; // ce qu'on voit au-delà du sol
@@ -37,7 +62,7 @@ export function emptyDoc(name = 'Mon monde') {
     meta: { nom: name, cree: now, modifie: now },
     couches: [{ id: 'decors', nom: 'Décors', visible: true, verrou: false }, { id: 'batiments', nom: 'Bâtiments', visible: true, verrou: false }, { id: 'nature', nom: 'Nature', visible: true, verrou: false }],
     sol: {}, regions: {}, collisions: {}, navigation: {}, decors: [], retouches: {}, reperes: [],
-    pieces: [], portes: [], zones: [], assets: [],
+    pieces: [], portes: [], zones: [], assets: [], personnages: [],
   };
 }
 export const key = (x, y) => x + ',' + y;
@@ -49,7 +74,7 @@ export function normalizeDoc(d) {
   const e = emptyDoc();
   const out = { ...e, ...d, meta: { ...e.meta, ...(d.meta || {}) } };
   for (const k of ['sol', 'regions', 'collisions', 'navigation', 'retouches']) if (!out[k] || typeof out[k] !== 'object' || Array.isArray(out[k])) out[k] = {};
-  for (const k of ['decors', 'couches', 'reperes', 'pieces', 'portes', 'zones', 'assets']) if (!Array.isArray(out[k])) out[k] = e[k];
+  for (const k of ['decors', 'couches', 'reperes', 'pieces', 'portes', 'zones', 'assets', 'personnages']) if (!Array.isArray(out[k])) out[k] = e[k];
   out.version = STUDIO_VERSION;
   if (!out.couches.length) out.couches = e.couches;
   return out;
@@ -303,6 +328,16 @@ Object.assign(StudioWorld.prototype, {
           to: z.type === 'passage' ? { x: z.vers.x * 16 + 8, y: z.vers.y * 16 + 10 } : null });
       }
     }
+    // 4 bis. les personnages (2.4) : ils rejoignent les personnages du monde, et leur fiche celle des personnages du jeu
+    if (C.npcs) {
+      for (let k = C.npcs.length - 1; k >= 0; k--) if (C.npcs[k].studio) C.npcs.splice(k, 1);
+      if (NPCS) for (const id of Object.keys(NPCS)) if (NPCS[id].studio) delete NPCS[id];
+      for (const c of doc.personnages || []) {
+        if (!c.uid || !C.inMap(c.x, c.y)) { skip('personnage', `Le personnage « ${c.nom || c.uid} » est écarté : hors de la carte`, c.x, c.y, c.uid); continue; }
+        const id = persoId(c.uid); if (NPCS) NPCS[id] = persoDef(c);
+        C.npcs.push({ id, x: c.x * 16 + 8, y: c.y * 16 + 12, dir: [0, 1, 2, 3].includes(c.dir) ? c.dir : 0, studio: c.uid });
+      }
+    }
     // 5. les cases changées reprennent leur sol (peint, ou celui de base), leur navigation, leur solidité
     for (const i of changed) {
       const painted = this.solPaint.has(i);
@@ -348,11 +383,11 @@ const WALL_KEYS = new Set(Object.keys(PIECE_MURS));
 export function applyDoc(S, doc) {
   const C = S.C, rep = { sol: 0, regions: 0, collisions: 0, navigation: 0, decors: 0, retouches: 0, pieces: 0, portes: 0, zones: 0, ecartes: [] };
   if (!doc) return rep;
-  const skip = (quoi, raison, x, y) => rep.ecartes.push({ quoi, raison, x, y });
+  const skip = (quoi, raison, x, y, uid) => rep.ecartes.push({ quoi, raison, x, y, uid });
   // les pièces d'abord : elles changent le monde « de base », sur lequel le sol est ensuite repeint
-  if ((doc.pieces || []).length || (doc.portes || []).length || (doc.zones || []).length) {
+  if ((doc.pieces || []).length || (doc.portes || []).length || (doc.zones || []).length || (doc.personnages || []).length) {
     S.setStructure(doc);
-    rep.pieces = S.pieceRooms.size; rep.portes = S.doorOf.size; rep.zones = C.szones ? C.szones.length : 0;
+    rep.pieces = S.pieceRooms.size; rep.portes = S.doorOf.size; rep.zones = C.szones ? C.szones.length : 0; rep.personnages = C.npcs ? C.npcs.filter((n) => n.studio).length : 0;
     rep.ecartes.push(...S.ecartesStructure);
   }
   for (const [k, name] of Object.entries(doc.sol || {})) { const [x, y] = unkey(k); if (!C.inMap(x, y)) { skip('sol', 'hors de la carte', x, y); continue; } if (T[name] == null) { skip('sol', `sol inconnu « ${name} »`, x, y); continue; } S.setTile(x, y, name); rep.sol++; }
@@ -361,9 +396,9 @@ export function applyDoc(S, doc) {
   const byId = new Map(C.props.map((p) => [p.id, p]));
   for (const [id, r] of Object.entries(doc.retouches || {})) {
     const p = byId.get(+id);
-    if (!p) { skip('retouche', `le décor n° ${id} n’existe pas dans cette version du jeu`, r.ref && r.ref.x, r.ref && r.ref.y); continue; }
-    if (r.ref && (r.ref.type !== p.type || r.ref.x !== p.tx || r.ref.y !== p.ty)) { skip('retouche', `le décor n° ${id} n’est plus « ${r.ref.type} » en (${r.ref.x}, ${r.ref.y}) : modification écartée`, r.ref.x, r.ref.y); continue; }
-    if (!r.retire && r.x != null && !C.inMap(r.x, r.y)) { skip('retouche', 'déplacé hors de la carte', r.x, r.y); continue; }
+    if (!p) { skip('retouche', `le décor n° ${id} n’existe pas dans cette version du jeu`, r.ref && r.ref.x, r.ref && r.ref.y, id); continue; }
+    if (r.ref && (r.ref.type !== p.type || r.ref.x !== p.tx || r.ref.y !== p.ty)) { skip('retouche', `le décor n° ${id} n’est plus « ${r.ref.type} » en (${r.ref.x}, ${r.ref.y}) : modification écartée`, r.ref.x, r.ref.y, id); continue; }
+    if (!r.retire && r.x != null && !C.inMap(r.x, r.y)) { skip('retouche', 'déplacé hors de la carte', r.x, r.y, id); continue; }
     S.retouch(p, r); rep.retouches++;
   }
   const assetIds = new Set((doc.assets || []).filter((a) => !assetProblem(a)).map((a) => a.id));
@@ -381,7 +416,7 @@ export function applyDoc(S, doc) {
 export function applyStudio(C, doc) {
   const none = () => ({ sol: 0, regions: 0, collisions: 0, navigation: 0, decors: 0, retouches: 0, pieces: 0, portes: 0, zones: 0, ecartes: [] });
   if (!doc) return none();
-  const empty = !Object.keys(doc.sol || {}).length && !Object.keys(doc.regions || {}).length && !Object.keys(doc.collisions || {}).length && !Object.keys(doc.navigation || {}).length && !(doc.decors || []).length && !Object.keys(doc.retouches || {}).length && !(doc.pieces || []).length && !(doc.portes || []).length && !(doc.zones || []).length;
+  const empty = !Object.keys(doc.sol || {}).length && !Object.keys(doc.regions || {}).length && !Object.keys(doc.collisions || {}).length && !Object.keys(doc.navigation || {}).length && !(doc.decors || []).length && !Object.keys(doc.retouches || {}).length && !(doc.pieces || []).length && !(doc.portes || []).length && !(doc.zones || []).length && !(doc.personnages || []).length;
   if (empty) return none();
   const S = new StudioWorld({ ...C, make: (type, tx, ty, v, ox, oy, extra) => C.addProp(type, tx, ty, v, ox, oy, extra) });
   const rep = applyDoc(S, doc);
@@ -473,13 +508,13 @@ export function checkStudio(world, doc, deps) {
     else if (!inMap(d.x, d.y)) add('bloquant', 'decor_hors', `Un décor « ${d.type} » est hors de la carte`, d.x, d.y, { op: 'supprimer', uid: d.uid });
     else {
       const t = world.tiles[d.y * W + d.x];
-      if ((t === T.DEEP || t === T.VOID) && !WATER_PROPS.has(d.type)) add('avertissement', 'flotte', `Le décor « ${d.type} » est posé sur ${t === T.VOID ? 'le vide' : 'la mer profonde'}`, d.x, d.y, null);
+      if ((t === T.DEEP || t === T.VOID) && !WATER_PROPS.has(d.type)) add('avertissement', 'flotte', `Le décor « ${d.type} » est posé sur ${t === T.VOID ? 'le vide' : 'la mer profonde'}`, d.x, d.y, { op: 'supprimer', uid: d.uid });
     }
   }
-  if (world.studio) for (const e of world.studio.ecartes) if (e.quoi === 'retouche') add('avertissement', 'retouche', e.raison, e.x, e.y, null);
+  if (world.studio) for (const e of world.studio.ecartes) if (e.quoi === 'retouche') add('avertissement', 'retouche', e.raison, e.x, e.y, e.uid != null ? { op: 'retirer_retouche', id: e.uid } : null);
   // les chevauchements de décors solides ajoutés
   const cellOwner = new Map();
-  for (const p of world.props) if (p.cellsStudio) for (const [x, y] of p.cellsStudio) { const k = key(x, y); if (cellOwner.has(k) && cellOwner.get(k) !== p) add('avertissement', 'superpose', `Deux décors solides se chevauchent (« ${cellOwner.get(k).type} » et « ${p.type} »)`, x, y, null); else cellOwner.set(k, p); }
+  for (const p of world.props) if (p.cellsStudio) for (const [x, y] of p.cellsStudio) { const k = key(x, y); if (cellOwner.has(k) && cellOwner.get(k) !== p) add('avertissement', 'superpose', `Deux décors solides se chevauchent (« ${cellOwner.get(k).type} » et « ${p.type} »)`, x, y, p.studio ? { op: 'supprimer', uid: p.studio } : null); else cellOwner.set(k, p); }
   // personne et rien d'important n'est muré par le document ; la correction : retirer le décor ajouté qui bouche, sinon libérer la case
   const culprit = (x, y) => { for (const p of world.props) if (p.cellsStudio && p.cellsStudio.some(([cx, cy]) => Math.abs(cx - x) <= 1 && Math.abs(cy - y) <= 1)) return p; return null; };
   const fixAt = (x, y) => { const p = culprit(x, y); return p ? { op: 'supprimer', uid: p.studio } : { op: 'liberer', x, y }; };
@@ -489,20 +524,74 @@ export function checkStudio(world, doc, deps) {
     const x = Math.floor(d.ox / 16), y = Math.floor(d.oy / 16);
     if (!near(d.ox, d.oy + 4) && touched(doc, x, y)) add('bloquant', 'porte_muree', `L’entrée « ${d.name || 'porte ' + d.id} » est bouchée`, x, y, fixAt(x, y + 1));
   }
-  for (const n of world.npcs) { const x = Math.floor(n.x / 16), y = Math.floor(n.y / 16); if (!n.hidden && !near(n.x, n.y) && touched(doc, x, y)) add('bloquant', 'pnj_mure', `Le personnage « ${n.id} » est muré`, x, y, fixAt(x, y)); }
+  for (const n of world.npcs) { const x = Math.floor(n.x / 16), y = Math.floor(n.y / 16); if (!n.studio && !n.hidden && !near(n.x, n.y) && touched(doc, x, y)) add('bloquant', 'pnj_mure', `Le personnage « ${n.id} » est muré`, x, y, fixAt(x, y)); }
   // un coffre s'ouvre depuis l'une des quatre cases qui le touchent (celle du dessous, ou à côté s'il est contre un mur)
   const reachable = (tx, ty) => [[0, 1], [1, 0], [-1, 0], [0, -1]].some(([dx, dy]) => canStand(world, (tx + dx) * 16 + 8, (ty + dy) * 16 + 10));
   for (const c of world.chests) if (!reachable(c.tx, c.ty) && touched(doc, c.tx, c.ty)) add('avertissement', 'coffre_mure', 'Un coffre n’est plus accessible', c.tx, c.ty, fixAt(c.tx, c.ty + 1));
   for (const s of world.spawnPoints || []) { const x = Math.floor(s.x / 16), y = Math.floor(s.y / 16); if (!canStand(world, s.x, s.y) && touched(doc, x, y)) add('bloquant', 'arrivee_muree', 'Un point d’arrivée des pirates est bloqué', x, y, fixAt(x, y)); }
   checkStructure(world, doc, deps, add, fixAt);
   checkAssets(world, doc, add, PROPS);
+  if (deps.base) checkPaths(world, doc, deps, add);
+  const kb = Math.round(JSON.stringify(doc).length / 1000);
+  if (kb > 4000) add('bloquant', 'monde_lourd', `Le monde pèse ${kb} Ko : au plus 4 000 Ko (chaque joueur le charge au démarrage)`, 0, 0, null);
+  else if (kb > 1500) add('avertissement', 'monde_lourd', `Le monde pèse ${kb} Ko : chaque joueur le charge au démarrage, ce qui peut prendre quelques secondes`, 0, 0, null);
   if (deps.graph !== false && ((doc.pieces || []).length || Object.keys(doc.sol || {}).length || Object.keys(doc.navigation || {}).length)) checkIsolated(world, doc, add);
   return out;
+}
+// 2.4 : les chemins à pied. Ce qu'un pirate peut atteindre à pied sur l'archipel, depuis l'arrivée et depuis chaque côte
+// où l'on accoste ; comparé au monde d'origine. Une porte, un personnage, un coffre, un point d'arrivée qu'on atteignait
+// et qu'on n'atteint plus : le chemin est coupé. Le contrôle dit par quoi (le décor, la collision peinte, le sol repeint
+// ou le décor d'origine déplacé qui ferme le passage), et propose de l'enlever.
+export function walkReach(world) {
+  const W = world.W, N = W * world.OVER_H, solid = world.solid, sail = world.sail, R = new Uint8Array(N), st = new Int32Array(N); let sp = 0;
+  const free = (i) => !solid[i];
+  const seed = (i) => { if (i >= 0 && i < N && free(i) && !R[i]) { R[i] = 1; st[sp++] = i; } };
+  const s0 = Math.floor(world.spawnPoint.y / 16) * W + Math.floor(world.spawnPoint.x / 16); seed(s0);
+  for (const s of world.spawnPoints || []) seed(Math.floor(s.y / 16) * W + Math.floor(s.x / 16));
+  for (let i = 0; i < N; i++) if (!R[i] && free(i) && !sail[i]) { const x = i % W; if ((x > 0 && sail[i - 1]) || (x < W - 1 && sail[i + 1]) || (i >= W && sail[i - W]) || (i + W < N && sail[i + W])) seed(i); } // les côtes où l'on accoste
+  while (sp) { const j = st[--sp], x = j % W; if (x > 0) seed(j - 1); if (x < W - 1) seed(j + 1); seed(j - W); seed(j + W); }
+  return R;
+}
+function checkPaths(world, doc, deps, add) {
+  const base = deps.base, W = world.W, OH = world.OVER_H, N = W * OH;
+  const R0 = deps.baseReach || (deps.baseReach = walkReach(base)), R1 = walkReach(world);
+  const near = (R, tx, ty) => [[0, 0], [0, 1], [1, 0], [-1, 0], [0, -1]].some(([dx, dy]) => { const x = tx + dx, y = ty + dy; return x >= 0 && y >= 0 && x < W && y < OH && R[y * W + x]; });
+  const pts = [];
+  for (const d of world.doors) if (!d.dive && d.oy < OH * 16) pts.push({ x: Math.floor(d.ox / 16), y: Math.floor(d.oy / 16), what: `l’entrée « ${d.name} »`, niveau: 'bloquant' });
+  for (const n of world.npcs) if (n.y < OH * 16 && !n.hidden) pts.push({ x: Math.floor(n.x / 16), y: Math.floor(n.y / 16), what: `le personnage « ${n.studio ? ((doc.personnages || []).find((c) => c.uid === n.studio) || {}).nom || n.id : n.id} »`, niveau: 'bloquant' });
+  for (const s of world.spawnPoints || []) pts.push({ x: Math.floor(s.x / 16), y: Math.floor(s.y / 16), what: 'un point d’arrivée des pirates', niveau: 'bloquant' });
+  for (const c of world.chests) if (c.ty < OH) pts.push({ x: c.tx, y: c.ty, what: 'un coffre', niveau: 'avertissement' });
+  let reported = 0;
+  for (const P of pts) {
+    if (reported >= 40) break;
+    if (!near(R0, P.x, P.y) || near(R1, P.x, P.y)) continue;
+    // la poche où se trouve le point (bornée), et ce qui la sépare du reste : des cases bloquées par le document
+    const pocket = new Set(), q = []; const push = (i) => { if (i >= 0 && i < N && !world.solid[i] && !pocket.has(i)) { pocket.add(i); q.push(i); } };
+    for (const [dx, dy] of [[0, 0], [0, 1], [1, 0], [-1, 0], [0, -1]]) push((P.y + dy) * W + P.x + dx);
+    for (let k = 0; k < q.length && pocket.size < 20000; k++) { const j = q[k], x = j % W; if (x > 0) push(j - 1); if (x < W - 1) push(j + 1); push(j - W); push(j + W); }
+    const cut = [];
+    for (const j of pocket) { const x = j % W; for (const n of [x > 0 ? j - 1 : -1, x < W - 1 ? j + 1 : -1, j - W, j + W]) { if (n < 0 || n >= N || !world.solid[n] || base.solid[n]) continue; const nx = n % W; if ([nx > 0 ? n - 1 : -1, nx < W - 1 ? n + 1 : -1, n - W, n + W].some((m) => m >= 0 && m < N && R1[m])) cut.push(n); } }
+    const fix = cutFix(world, doc, cut);
+    add(P.niveau, 'chemin_coupe', `Le chemin à pied vers ${P.what} est coupé par vos modifications${cut.length ? ` (${new Set(cut).size} case(s) fermée(s))` : ''}`, P.x, P.y, fix);
+    reported++;
+  }
+}
+// ce qui ferme une case que le monde d'origine laissait libre : la correction la plus simple
+function cutFix(world, doc, cells) {
+  const W = world.W;
+  for (const i of cells) {
+    const x = i % W, y = (i / W) | 0, k = key(x, y);
+    if (doc.collisions && doc.collisions[k] === 1) return { op: 'retirer_collision', k };
+    for (const p of world.props) if (p.cellsStudio && p.cellsStudio.some(([cx, cy]) => cx === x && cy === y)) return { op: 'supprimer', uid: p.studio };
+    if (doc.sol && doc.sol[k] != null) return { op: 'retirer_sol', k };
+    for (const [id, r] of Object.entries(doc.retouches || {})) if (!r.retire && r.x === x && r.y === y) return { op: 'retirer_retouche', id: +id };
+  }
+  return cells.length ? { op: 'aller', x: cells[0] % W, y: (cells[0] / W) | 0 } : null;
 }
 // 2.3 : les images importées
 function checkAssets(world, doc, add, PROPS) {
   const ids = new Map();
-  for (const a of doc.assets || []) { const why = assetProblem(a); if (why) add('bloquant', 'image_invalide', why, 0, 0, null); else ids.set(a.id, a); if (a && a.remplace && !PROPS[a.remplace]) add('avertissement', 'habillage_inconnu', `L’image « ${a.nom || a.id} » habille « ${a.remplace} », qui n’est pas un élément du jeu`, 0, 0, null); }
+  for (const a of doc.assets || []) { const why = assetProblem(a); if (why) add('bloquant', 'image_invalide', why, 0, 0, a && a.id ? { op: 'supprimer_image', id: a.id } : null); else ids.set(a.id, a); if (a && a.remplace && !PROPS[a.remplace]) add('avertissement', 'habillage_inconnu', `L’image « ${a.nom || a.id} » habille « ${a.remplace} », qui n’est pas un élément du jeu`, 0, 0, { op: 'retirer_habillage', id: a.id }); }
   for (const d of doc.decors || []) if (d.type === 'image' && !ids.has(d.donnees && d.donnees.asset)) add('bloquant', 'image_inconnue', 'Un décor montre une image qui n’existe pas (ou plus)', d.x, d.y, { op: 'supprimer', uid: d.uid });
   const kb = Math.round(assetBytes(doc) / 1000);
   if (kb * 1000 > ASSETS_MAX_BYTES) add('bloquant', 'images_lourdes', `Les images importées pèsent ${kb} Ko : au plus ${ASSETS_MAX_BYTES / 1000} Ko (chaque joueur les charge au démarrage)`, 0, 0, null);
@@ -521,7 +610,7 @@ function checkIsolated(world, doc, add) {
 // un décor qui bouche, retirer un décor mural sans mur).
 function checkStructure(world, doc, deps, add, fixAt) {
   const { canStand } = deps, W = world.W, tile = (px) => Math.floor(px / 16);
-  for (const e of (world.studio && world.studio.ecartes) || []) if (e.quoi === 'pièce' || e.quoi === 'porte' || e.quoi === 'zone') add('bloquant', e.quoi === 'pièce' ? 'piece_ecartee' : e.quoi === 'porte' ? 'porte_ecartee' : 'zone_ecartee', e.raison, e.x | 0, e.y | 0, e.uid ? { op: 'aller', x: e.x | 0, y: e.y | 0 } : null);
+  for (const e of (world.studio && world.studio.ecartes) || []) if (e.quoi === 'pièce' || e.quoi === 'porte' || e.quoi === 'zone') add('bloquant', e.quoi === 'pièce' ? 'piece_ecartee' : e.quoi === 'porte' ? 'porte_ecartee' : 'zone_ecartee', e.raison, e.x | 0, e.y | 0, e.quoi === 'porte' ? { op: 'supprimer_porte', uid: e.uid } : e.quoi === 'zone' ? { op: 'supprimer_zone', uid: e.uid } : e.uid ? { op: 'aller', x: e.x | 0, y: e.y | 0 } : null);
   const studioRooms = world.rooms.filter((r) => r.studio), sDoors = world.doors.filter((d) => d.studio), zones = world.studioZones || [];
   const stand = (x, y) => canStand(world, x, y) || canStand(world, x, y + 4) || canStand(world, x, y - 4);
   // les portes : on doit pouvoir s'y présenter dehors, et arriver sur le sol dedans
@@ -530,6 +619,13 @@ function checkStructure(world, doc, deps, add, fixAt) {
     if (!stand(d.rx, d.ry + 2)) add('bloquant', 'entree_bouchee', `L’entrée « ${d.name} » est bouchée dehors : on ne peut pas s’y présenter`, ox, oy, fixAt(ox, oy));
     if (!stand(d.ix, d.iy)) add('bloquant', 'arrivee_bouchee', `En entrant par « ${d.name} », on arrive dans un mur ou un meuble`, tile(d.ix), tile(d.iy), fixAt(tile(d.ix), tile(d.iy)));
   }
+  // 2.4 : les personnages de LStudio : debout sur une case où l'on tient, et qui ont quelque chose à dire
+  for (const n of world.npcs) if (n.studio) {
+    const x = tile(n.x), y = tile(n.y), c = (doc.personnages || []).find((q) => q.uid === n.studio);
+    if (!canStand(world, n.x, n.y) && !canStand(world, n.x, n.y - 3)) add('bloquant', 'personnage_mure', `Le personnage « ${c ? c.nom : n.id} » est dans un mur ou un meuble`, x, y, fixAt(x, y));
+    if (c && !(c.repliques || []).some((t) => String(t).trim()) && !(c.sujets || []).length) add('avertissement', 'personnage_muet', `Le personnage « ${c.nom} » n’a rien à dire (aucune réplique)`, x, y, null);
+  }
+  for (const e of (world.studio && world.studio.ecartes) || []) if (e.quoi === 'personnage') add('bloquant', 'personnage_ecarte', e.raison, e.x | 0, e.y | 0, e.uid ? { op: 'supprimer_perso', uid: e.uid } : null);
   // les zones
   for (const z of zones) {
     const zx = tile(z.x0), zy = tile(z.y0);

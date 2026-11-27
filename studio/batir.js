@@ -1,7 +1,8 @@
 // LStudio — l'éditeur de bâtiments (lot 2) : l'onglet « Bâtiments », l'outil Bâtir et ses modes, la sélection et les
 // propriétés des pièces, des portes et des zones. Toutes les modifications passent par l'éditeur (annulables, et
 // identiques au jeu : shared/studio-world.js).
-import { PIECE_GENRES, PIECE_SOLS, PIECE_MURS, MUR_DECORS, ZONE_TYPES, BUILDING_PROPS, pieceEnvelope, porteExit, PIECE_BORDS, PIECE_MAX_W, PIECE_MAX_H } from '../shared/studio-world.js';
+import { PIECE_GENRES, PIECE_SOLS, PIECE_MURS, MUR_DECORS, ZONE_TYPES, BUILDING_PROPS, pieceEnvelope, porteExit, PIECE_BORDS, PIECE_MAX_W, PIECE_MAX_H, PERSO_LOOK, persoLook, persoId } from '../shared/studio-world.js';
+import { humanSheet, FW, FH } from '../client/render/sprites-chars.js';
 import { T, OVER_H } from '../shared/constants.js';
 import { MUR_VARIANTES, AMBIANCES } from './catalogue.js';
 import { MODELES, buildFromModel, interiorFor, addEtage } from './modeles.js';
@@ -12,6 +13,7 @@ const MODES = [
   ['stylemur', '▥ Style de mur', 'Peignez le style des murs : cliquez sur le sol au pied du mur (ou sur le mur). Clic droit : celui de la pièce.'],
   ['deco', '🖼 Décor mural', 'Accrochez une fenêtre, un tableau, une bibliothèque… : cliquez sur un mur (ou au pied d’un mur). Clic droit : le décrocher.'],
   ['zone', '▭ Zone', 'Tracez un rectangle sur la carte : une zone de message (un panneau, une inscription) ou de passage (un escalier, une trappe, vers un autre point).'],
+  ['perso', '🧑 Personnage', 'Cliquez sur la carte pour poser un personnage : son nom, son apparence, ce qu’il dit quand on lui parle (E), et ce qu’il marmonne quand on passe près de lui. Il rejoint les personnages du jeu (et le codex).'],
 ];
 export function installBatir(X) {
   const { S, ED, VIEW, WORLD, h, toast, field, num, sel, confirmBox } = X;
@@ -23,6 +25,7 @@ export function installBatir(X) {
   function selectStruct(st) { S.struct = st; VIEW.struct = st; if (st) VIEW.sel = []; VIEW.dirty = true; X.renderProps(); renderPane(); }
   // sous le pointeur : l'entrée d'une porte de LStudio, puis (si aucun décor n'est visé) une zone, puis une pièce
   function pickStruct(wx, wy, propHit) {
+    for (const n of WORLD.npcs) if (n.studio && Math.abs(n.x - wx) < 8 && wy > n.y - 24 && wy < n.y + 2) return { k: 'personnage', uid: n.studio };
     for (const d of ED.doc.portes) { const D = ED.S.doorOf.get(d.uid); if (D && Math.hypot(D.ox - wx, D.oy - 5 - wy) < 9) return { k: 'porte', uid: d.uid }; }
     if (propHit) return null;
     const tx = Math.floor(wx / 16), ty = Math.floor(wy / 16);
@@ -78,6 +81,13 @@ export function installBatir(X) {
       ED.addMurDeco(T0.pc.uid, { x: Math.max(0, x), y: T0.y, k: B.deco.k, n, v: B.deco.v });
       return null;
     }
+    if (B.mode === 'perso') {
+      if (right) return null;
+      const t = WORLD.tiles[ty * WORLD.W + tx];
+      if (WORLD.solid[ty * WORLD.W + tx] && t !== T.WATER) { toast('Choisissez une case libre (le personnage doit pouvoir s’y tenir).', 'warn'); return null; }
+      const c = ED.addPerso(tx, ty); selectStruct({ k: 'personnage', uid: c.uid }); X.setTool('select');
+      toast('Personnage posé : donnez-lui un nom, une apparence et ce qu’il dit (à droite).'); return null;
+    }
     if (B.mode === 'zone') { if (right) return null; VIEW.zrect = { x0: tx, y0: ty, x1: tx, y1: ty, col: B.zone === 'passage' ? '#c07aff' : '#ffd84a' }; return { k: 'build', zone: [tx, ty] }; }
     return null;
   }
@@ -117,6 +127,7 @@ export function installBatir(X) {
     if (B.pick) VIEW.bhover = { cells: [[tx, ty]], col: '#c07aff', fill: 'rgba(192,122,255,0.3)', label: B.pick.k === 'vers' ? 'Arrivée du passage' : 'Entrée de la porte' };
     else if (B.modele) X.ghostModel(MODELES.find((m) => m.id === B.modele), tx, ty);
     else if (B.mode === 'deco') { const T0 = wallTarget(tx, ty); if (T0) { const n = Math.max(1, B.deco.n | 0), x = Math.max(0, Math.min(T0.x, T0.pc.w - n)); VIEW.bhover = { cells: [...Array(n)].map((_, k) => [T0.pc.x + x + k, T0.pc.y + T0.y - 1]), col: '#ffd84a', label: MUR_DECORS[B.deco.k] }; } }
+    else if (B.mode === 'perso') VIEW.bhover = { cells: [[tx, ty]], col: '#7dff9a', fill: 'rgba(125,255,154,0.2)', label: 'Personnage' };
     else if (B.mode !== 'zone') VIEW.bhover = { cells: cellsOf(tx, ty), col: B.mode === 'murs' ? '#ffb070' : '#9ad0ff', fill: 'rgba(255,255,255,0.08)' };
     VIEW.dirty = true;
   }
@@ -214,6 +225,28 @@ export function installBatir(X) {
       P.append(h('p', { class: 'hint' }, 'En jeu : on entre en poussant contre la porte (ou avec E), on ressort par le seuil de la pièce. Une porte vers une pièce du jeu en fait une deuxième entrée : on en ressort par l’entrée d’origine.'));
       return true;
     }
+    if (st.k === 'personnage') {
+      const c = ED.perso(st.uid); if (!c) { S.struct = null; return false; }
+      const ch = (f) => (v) => ED.changePerso(c.uid, { [f]: v }), L = persoLook(c.look), setL = (f) => (v) => { const n = { ...L, [f]: /^\d+$/.test(v) ? +v : v }; if (f === 'hat' && !v) delete n.hat; ED.changePerso(c.uid, { look: n }); };
+      const cv = document.createElement('canvas'); cv.width = FW * 4; cv.height = FH; cv.style.cssText = 'width:' + FW * 8 + 'px;image-rendering:pixelated;background:#2a3140;border-radius:6px';
+      { const sh = humanSheet(L), x = cv.getContext('2d'); x.imageSmoothingEnabled = false; for (let d = 0; d < 4; d++) x.drawImage(sh.cv, 0, [0, 1, 2, 3][d] * FH, FW, FH, d * FW, 0, FW, FH); }
+      P.append(h('div', { class: 'head' }, h('div', {}, h('div', { class: 't' }, '🧑 ' + c.nom), h('div', { class: 's' }, (c.titre || 'Personnage de LStudio') + ` · case ${c.x}, ${c.y}`))), cv);
+      P.append(field('Nom', h('input', { value: c.nom, on: { change: (e) => ch('nom')(e.target.value.slice(0, 40) || 'Inconnu') } })));
+      P.append(field('Titre', h('input', { value: c.titre || '', placeholder: 'Marchande de cordes, vieux loup de mer…', on: { change: (e) => ch('titre')(e.target.value.slice(0, 60)) } })));
+      P.append(field('Regarde', sel(c.dir || 0, [[0, 'vers le bas'], [1, 'vers la gauche'], [2, 'vers la droite'], [3, 'vers le haut']], (v) => ch('dir')(+v))));
+      P.append(h('h3', {}, 'Apparence'));
+      const C = PERSO_LOOK.colors.map((k) => [k, { red: 'rouge', navy: 'marine', green: 'vert', brown: 'brun', purple: 'violet', yellow: 'jaune', teal: 'sarcelle', black: 'noir', orange: 'orange', white: 'blanc' }[k]]);
+      P.append(field('Peau', sel(L.skin, PERSO_LOOK.skin.map((k) => [k, ['claire', 'hâlée', 'mate', 'foncée'][k]]), setL('skin'))), field('Cheveux', h('div', { class: 'two' }, sel(L.hairStyle, PERSO_LOOK.hairStyle.map((k) => [k, k]), setL('hairStyle')), sel(L.hair, PERSO_LOOK.hair.map((k) => [k, ['noirs', 'bruns', 'châtains', 'roux', 'blonds', 'gris', 'blancs'][k]]), setL('hair')))),
+        field('Barbe', sel(L.beard, [[0, 'aucune'], [1, 'courte'], [2, 'longue']], setL('beard'))), field('Haut', h('div', { class: 'two' }, sel(L.top, PERSO_LOOK.top.map((k) => [k, k]), setL('top')), sel(L.topCol, C, setL('topCol')))),
+        field('Pantalon, bottes', h('div', { class: 'two' }, sel(L.pants, C, setL('pants')), sel(L.boots, C, setL('boots')))), field('Chapeau', h('div', { class: 'two' }, sel(L.hat || '', PERSO_LOOK.hat.map((k) => [k, k || 'aucun']), setL('hat')), L.hat ? sel(L.hatCol, C, setL('hatCol')) : null)));
+      P.append(h('h3', {}, 'Ce qu’il dit'));
+      P.append(field('Répliques', h('textarea', { rows: 3, placeholder: 'Une réplique par ligne : il en dit une au hasard quand on lui parle (E).', on: { change: (e) => ch('repliques')(e.target.value.split('\n').map((t) => t.trim()).filter(Boolean).slice(0, 12)) } }, (c.repliques || []).join('\n'))));
+      P.append(field('Sujets', h('textarea', { rows: 3, placeholder: 'Une question | sa réponse, par ligne (des choix dans la conversation).', on: { change: (e) => ch('sujets')(e.target.value.split('\n').map((t) => t.split('|')).filter((a) => a.length >= 2 && a[0].trim() && a[1].trim()).map((a) => ({ q: a[0].trim(), a: a.slice(1).join('|').trim() })).slice(0, 8)) } }, (c.sujets || []).map((t) => t.q + ' | ' + t.a).join('\n'))));
+      P.append(field('Marmonne', h('textarea', { rows: 2, placeholder: 'Une phrase courte par ligne : une bulle, de temps en temps, quand on passe près de lui.', on: { change: (e) => ch('bulles')(e.target.value.split('\n').map((t) => t.trim()).filter(Boolean).slice(0, 8)) } }, (c.bulles || []).join('\n'))));
+      P.append(btns(h('button', { on: { click: () => VIEW.goTo(c.x, c.y, Math.max(1.5, VIEW.cam.z)) } }, 'Aller voir'), h('button', { class: 'danger', on: { click: () => { ED.set('personnage', c.uid, undefined); selectStruct(null); } } }, 'Supprimer')));
+      P.append(h('p', { class: 'hint' }, 'Glissez-le (une fois sélectionné) pour le déplacer, ou flèches. En jeu, on lui parle avec E : sa réplique, puis ses sujets. Il rejoint le codex des personnages.'));
+      void persoId; return true;
+    }
     if (st.k === 'zone') {
       const z = ED.zone(st.uid); if (!z) { S.struct = null; return false; }
       const ch = (f) => (v) => ED.changeZone(z.uid, { [f]: v });
@@ -260,6 +293,7 @@ export function installBatir(X) {
     const st = S.struct; if (!st) return false;
     if (st.k === 'piece') { const pc = ED.piece(st.uid); if (pc) movePiece(pc, pc.x + dx, pc.y + dy); return true; }
     if (st.k === 'zone') { const z = ED.zone(st.uid); if (z) ED.changeZone(z.uid, { x: z.x + dx, y: z.y + dy }); return true; }
+    if (st.k === 'personnage') { const c = ED.perso(st.uid); if (c) ED.changePerso(c.uid, { x: c.x + dx, y: c.y + dy }); return true; }
     if (st.k === 'porte') { const d = ED.porte(st.uid); if (d && !d.batiment) ED.changePorte(d.uid, { x: d.x + dx, y: d.y + dy }); return true; }
     return false;
   }

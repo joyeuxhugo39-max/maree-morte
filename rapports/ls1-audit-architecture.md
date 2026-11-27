@@ -111,6 +111,19 @@ Une île peinte dans la mer devient une île du jeu, numérotée après les autr
 `shared/world.js`). Les liaisons du monde (les îles, la grande mer, les portes, les passages) sont calculées par
 `worldGraph` (`shared/studio-world.js`), pour la vue du monde et le contrôle.
 
+**Version 4 (lot 4)** : une liste de plus, `personnages` :
+
+```
+  personnages: [ { uid, nom, titre, x, y, dir,
+                   look: { skin, hair, hairStyle, beard, top, topCol, pants, boots, hat, hatCol },
+                   repliques: […], sujets: [ { q, a } ], bulles: […] } ]
+```
+
+Chacun devient un personnage du jeu : `world.npcs` (identifiant `ls_<uid>`), et sa fiche dans le registre des
+personnages (`shared/data/npcs.js`), que le jeu, le moteur et l'éditeur donnent à `shared/studio-world.js`
+(`useNpcRegistry`). Le monde a une empreinte (`studioSignature`, dans `shared/world.js`) que le client donne en se
+connectant : le moteur refuse un pirate venu d'un autre monde.
+
 Une pièce est creusée dans la bande des intérieurs, seulement là où il n'y a que du vide d'origine ; elle devient une
 pièce du jeu (numérotée après toutes les pièces du jeu), et ses portes des portes du jeu (numérotées après toutes les
 portes du jeu). Les zones sont lues par le client (`world.studioZones`) et le moteur vérifie chaque passage. Le jeu et

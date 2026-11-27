@@ -47,6 +47,8 @@ import { ITEMS, STACK_MAX, isStackable } from '../shared/data/items.js';
 import { MOBS } from '../shared/data/mobs.js';
 import { QUESTS, questState, goalsMet, npcVisible } from '../shared/data/quests.js';
 import { NPCS } from '../shared/data/npcs.js';
+import { useNpcRegistry } from '../shared/studio-world.js';
+useNpcRegistry(NPCS); // 2.4 : les personnages de LStudio rejoignent ceux du jeu
 import { SKILLS } from '../shared/data/skills.js';
 import { computeStats, xpToNext, mitigate, displayLook, sanitizeLook, MAX_LEVEL, GLORY_XP, GLORY_MAX, UPG_SLOTS, UPG_MAX, upgradeCost, reqLevel } from '../shared/formulas.js';
 
@@ -299,6 +301,7 @@ export class Game {
     const name = String(m.name || '').trim().replace(/\s+/g, ' ');
     const pass = String(m.pass || '');
     if ((m.v | 0) !== PROTOCOL) return conn.send({ t: 'err', msg: 'Une nouvelle version du jeu est disponible : rechargez la page.', reload: 1 });
+    if (m.sw != null && String(m.sw) !== (this.world.studioSig || '')) return conn.send({ t: 'err', msg: 'Le monde a été mis à jour depuis l’ouverture de la page : rechargez-la pour jouer sur le même monde que les autres (si l’hôte de la partie a gardé sa page ouverte, c’est à lui de recharger).' }); // 2.4 : le monde publié par LStudio doit être le même pour tous
     if (this.maintenance && this.maintenance.closed) return conn.send({ t: 'err', msg: 'Maintenance en cours : ' + (this.maintenance.msg || 'revenez dans quelques minutes.') });
     if (!NAME_RE.test(name)) return conn.send({ t: 'err', msg: 'Nom invalide : 3 à 16 lettres ou chiffres.' });
     const key = name.toLowerCase(), ip = conn.ip || 'local';

@@ -14,6 +14,7 @@ import { readImageFile, newAssetId, bigPreview } from './assets.js';
 import { installMonde, createIsland, createCarte, CARTE_SOLS } from './monde.js';
 import { captureModel, placeModel, readModelFile } from './prefabs.js';
 import { PIECE_BORDS } from '../shared/studio-world.js';
+import { NPCS as NPCS_ } from '../shared/data/npcs.js';
 import { store, stats, github, guessRepo, PUB_PATH } from './store.js';
 
 const $ = (id) => document.getElementById(id);
@@ -68,6 +69,7 @@ async function boot() {
   });
   renderAll();
   if (ED.report.ecartes.length) toast(`${ED.report.ecartes.length} modification(s) du brouillon n’ont pas pu être appliquées : voir « Contrôle ».`, 'warn');
+  try { if (!(await store.get('aide_vue'))) { await store.put('aide_vue', 1); setTimeout(showHelp, 400); } } catch (e) { /* */ } // 2.4 : l'aide, au tout premier lancement
   toast(from === 'brouillon' ? 'Brouillon rouvert : vous reprenez où vous en étiez.' : from === 'publié' ? 'Nouveau brouillon, à partir du monde publié.' : 'Nouveau brouillon : le monde d’origine du jeu.');
   setSaveState();
   window.LS = { ED, VIEW, S, store, B, MO, R }; // pour les vérifications automatiques
@@ -142,7 +144,7 @@ function wireMap() {
     // la sélection : l'entrée d'une porte, puis un décor, puis une zone, puis une pièce (lot 2)
     const p = VIEW.pick(wx, wy), st = B.pickStruct(wx, wy, p && !ED.locked(p));
     if (st && st.k === 'porte') { B.selectStruct(st); return; }
-    if (st && !(p && !ED.locked(p))) {
+    if (st && (st.k === 'personnage' || !(p && !ED.locked(p)))) {
       if (S.struct && S.struct.k === st.k && S.struct.uid === st.uid && st.k !== 'porte') { drag = { k: 'smove', st, wx, wy, dx: 0, dy: 0 }; return; } // une seconde fois : on la déplace
       B.selectStruct(st); drag = { k: 'sclick', wx, wy, add: e.shiftKey }; return;
     }
@@ -172,8 +174,8 @@ function wireMap() {
     if (drag.k === 'sclick') { if (Math.hypot(wx - drag.wx, wy - drag.wy) > 4 / VIEW.cam.z * 2) { drag = { k: 'marquee', wx: drag.wx, wy: drag.wy, add: drag.add }; VIEW.marquee = { x0: drag.wx, y0: drag.wy, x1: wx, y1: wy }; } return; }
     if (drag.k === 'smove') {
       drag.dx = Math.round((wx - drag.wx) / 16); drag.dy = Math.round((wy - drag.wy) / 16);
-      const o = drag.st.k === 'piece' ? ED.piece(drag.st.uid) : ED.zone(drag.st.uid);
-      if (o) { const E = drag.st.k === 'piece' ? { x0: o.x - 1, y0: o.y - 2, x1: o.x + o.w, y1: o.y + o.h } : { x0: o.x, y0: o.y, x1: o.x + o.w - 1, y1: o.y + o.h - 1 }; const okp = drag.st.k !== 'piece' || !ED.canPut({ ...o, x: o.x + drag.dx, y: o.y + drag.dy }, o.uid); VIEW.pghost = { x0: E.x0 + drag.dx, y0: E.y0 + drag.dy, x1: E.x1 + drag.dx, y1: E.y1 + drag.dy, col: okp ? '#7dff9a' : '#ff6a6a', fill: okp ? 'rgba(125,255,154,0.1)' : 'rgba(255,106,106,0.12)' }; VIEW.dirty = true; }
+      const o = drag.st.k === 'piece' ? ED.piece(drag.st.uid) : drag.st.k === 'personnage' ? ED.perso(drag.st.uid) : ED.zone(drag.st.uid);
+      if (o) { const E = drag.st.k === 'piece' ? { x0: o.x - 1, y0: o.y - 2, x1: o.x + o.w, y1: o.y + o.h } : drag.st.k === 'personnage' ? { x0: o.x, y0: o.y, x1: o.x, y1: o.y } : { x0: o.x, y0: o.y, x1: o.x + o.w - 1, y1: o.y + o.h - 1 }; const okp = drag.st.k !== 'piece' || !ED.canPut({ ...o, x: o.x + drag.dx, y: o.y + drag.dy }, o.uid); VIEW.pghost = { x0: E.x0 + drag.dx, y0: E.y0 + drag.dy, x1: E.x1 + drag.dx, y1: E.y1 + drag.dy, col: okp ? '#7dff9a' : '#ff6a6a', fill: okp ? 'rgba(125,255,154,0.1)' : 'rgba(255,106,106,0.12)' }; VIEW.dirty = true; }
       return;
     }
     if (drag.k === 'pan') { const z = VIEW.cam.z; VIEW.cam.x = drag.cx - (e.offsetX - drag.sx) / z; VIEW.cam.y = drag.cy - (e.offsetY - drag.sy) / z; VIEW.clamp(); VIEW.dirty = true; return; }
@@ -192,7 +194,7 @@ function wireMap() {
     if (!drag) return;
     if (drag.k === 'paint') { ED.end(); if (drag.er !== undefined) S.erase = drag.er; renderPaint(); }
     if (drag.k === 'build') B.up(drag);
-    if (drag.k === 'smove') { VIEW.pghost = null; if (drag.dx || drag.dy) { if (drag.st.k === 'piece') { const o = ED.piece(drag.st.uid); if (o) B.movePiece(o, o.x + drag.dx, o.y + drag.dy); } else { const z = ED.zone(drag.st.uid); if (z) ED.changeZone(z.uid, { x: z.x + drag.dx, y: z.y + drag.dy }); } } }
+    if (drag.k === 'smove') { VIEW.pghost = null; if (drag.dx || drag.dy) { if (drag.st.k === 'piece') { const o = ED.piece(drag.st.uid); if (o) B.movePiece(o, o.x + drag.dx, o.y + drag.dy); } else if (drag.st.k === 'personnage') { const c = ED.perso(drag.st.uid); if (c) ED.changePerso(c.uid, { x: c.x + drag.dx, y: c.y + drag.dy }); } else { const z = ED.zone(drag.st.uid); if (z) ED.changeZone(z.uid, { x: z.x + drag.dx, y: z.y + drag.dy }); } } }
     if (drag.k === 'move' && drag.started) ED.end();
     if (drag.k === 'marquee') { const m = VIEW.marquee; VIEW.marquee = null; const found = VIEW.inRect(m.x0, m.y0, m.x1, m.y1).map((p) => ED.refOf(p)); if (Math.abs(m.x1 - m.x0) > 3 || Math.abs(m.y1 - m.y0) > 3) select(drag.add ? [...VIEW.sel, ...found.filter((f) => !VIEW.sel.some((r) => refEq(r, f)))] : found); else if (!drag.add) select([]); }
     if (drag.k === 'pan') $('map').style.cursor = S.tool === 'pan' ? 'grab' : S.tool === 'select' ? 'default' : 'crosshair';
@@ -353,6 +355,25 @@ function renderReperes() {
   if (!(ED.doc.reperes || []).length) L.append(h('p', { class: 'hint' }, 'Aucun repère. Un repère marque un endroit où vous travaillez (une future île, un quartier…).'));
   (ED.doc.reperes || []).forEach((r, k) => L.append(h('div', { class: 'li', on: { click: () => { VIEW.goTo(r.x, r.y); } } }, '📍', r.nom, h('span', { class: 'x' }, `${r.x}, ${r.y}`), h('button', { class: 'mini', title: 'Retirer ce repère', on: { click: (e) => { e.stopPropagation(); const L2 = ED.doc.reperes.slice(); L2.splice(k, 1); ED.set('reperes', '', L2); } } }, '✕'))));
 }
+// ------------------------------------------------------------------ 2.4 : rechercher dans ce monde
+function searchWorld() {
+  const L = $('monde-found'); L.innerHTML = '';
+  const norm = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(), q = norm($('monde-search').value.trim());
+  if (q.length < 2) return;
+  const hit = (...t) => t.some((x) => norm(x).includes(q)), out = [];
+  for (const pc of ED.doc.pieces) if (hit(pc.nom)) out.push(['🏠', pc.nom, 'pièce', () => { B.selectStruct({ k: 'piece', uid: pc.uid }); B.goPiece(pc); }]);
+  for (const c of ED.doc.personnages) if (hit(c.nom, c.titre, ...(c.repliques || []))) out.push(['🧑', c.nom, c.titre || 'personnage', () => { B.selectStruct({ k: 'personnage', uid: c.uid }); VIEW.goTo(c.x, c.y, Math.max(1.5, VIEW.cam.z)); }]);
+  for (const z of ED.doc.zones) if (hit(z.bouton, z.titre, z.texte, z.nom)) out.push([z.type === 'passage' ? '⇢' : '✉', z.bouton || z.titre || (z.texte || '').slice(0, 30) || 'Zone', z.type, () => { B.selectStruct({ k: 'zone', uid: z.uid }); VIEW.goTo(z.x, z.y, Math.max(1, VIEW.cam.z)); }]);
+  for (const d of ED.doc.portes) if (hit(d.nom)) out.push(['🚪', d.nom, 'porte', () => B.selectStruct({ k: 'porte', uid: d.uid })]);
+  for (const d of ED.doc.decors) if (hit(d.nom, d.donnees && d.donnees.nom)) out.push(['◆', d.nom || d.donnees.nom, nomDe(d.type), () => { select([{ k: 'd', uid: d.uid }]); VIEW.goTo(d.x, d.y, Math.max(1, VIEW.cam.z)); }]);
+  for (const r of ED.doc.reperes || []) if (hit(r.nom)) out.push(['📍', r.nom, 'repère', () => VIEW.goTo(r.x, r.y)]);
+  for (const a of ED.doc.assets) if (hit(a.nom)) out.push(['🖼', a.nom, 'image', () => assetDialog(a.id)]);
+  for (const r of WORLD.rooms) if (!r.studio && hit(r.name)) out.push(['▣', r.name, 'lieu du jeu', () => VIEW.goTo(r.x0 + (r.w >> 1), r.y0 + (r.h >> 1), 1)]);
+  ZONES.forEach((z, i) => { if (i && hit(z.name) && zoneCenters && zoneCenters[i]) out.push(['◎', z.name, 'région', () => VIEW.goTo(zoneCenters[i][0], zoneCenters[i][1], 1)]); });
+  for (const n of WORLD.npcs) if (!n.studio && NPCS_[n.id] && hit(NPCS_[n.id].name, NPCS_[n.id].title)) out.push(['👤', NPCS_[n.id].name, 'personnage du jeu', () => VIEW.goTo(Math.floor(n.x / 16), Math.floor(n.y / 16), 1.5)]);
+  if (!out.length) L.append(h('p', { class: 'hint' }, 'Rien ne correspond.'));
+  for (const [ic, t, sub, go] of out.slice(0, 40)) L.append(h('div', { class: 'li', on: { click: () => { go(); zoomLabel(); } } }, h('span', {}, ic), t, h('span', { class: 'x' }, sub)));
+}
 // ------------------------------------------------------------------ 2.3 : les images importées
 const HABILLABLES = () => CATEGORIES.flatMap((c) => c.types).filter((t) => PROPS[t] && R.env[t] && !NOT_REPLACEABLE.has(t));
 function imageForm(an, A, opts = {}) {
@@ -475,8 +496,8 @@ function renderProps() {
   if (!s.length) {
     const st = stats(ED.doc);
     P.append(h('p', { class: 'hint' }, 'Cliquez sur un élément de la carte pour le sélectionner (Maj : plusieurs ; glisser dans le vide : un cadre). Dans une pièce, cliquez sur le sol vide pour choisir la pièce.'),
-      h('h3', {}, 'Ce monde'), field('Décors ajoutés', h('b', {}, st.decors)), field('Décors retouchés', h('b', {}, st.retouches)), field('Cases repeintes', h('b', {}, st.sol)), field('Régions peintes', h('b', {}, st.regions)), field('Collisions', h('b', {}, st.collisions)), field('Navigation', h('b', {}, st.navigation)), field('Pièces', h('b', {}, st.pieces)), field('Portes', h('b', {}, st.portes)), field('Zones', h('b', {}, st.zones)),
-      h('h3', {}, 'Raccourcis'), h('p', { class: 'hint', html: 'Ctrl+Z / Ctrl+Y : annuler, rétablir · Ctrl+C / Ctrl+V : copier, coller · Ctrl+D : dupliquer · Suppr : supprimer · flèches : déplacer d’une case (Alt : d’un pixel) · [ et ] : variante · M : miroir · L : verrouiller · molette : zoom · Espace + glisser : se déplacer · Ctrl+S : enregistrer une version' }));
+      h('h3', {}, 'Ce monde'), field('Décors ajoutés', h('b', {}, st.decors)), field('Décors retouchés', h('b', {}, st.retouches)), field('Cases repeintes', h('b', {}, st.sol)), field('Régions peintes', h('b', {}, st.regions)), field('Collisions', h('b', {}, st.collisions)), field('Navigation', h('b', {}, st.navigation)), field('Pièces', h('b', {}, st.pieces)), field('Portes', h('b', {}, st.portes)), field('Zones', h('b', {}, st.zones)), field('Personnages', h('b', {}, (ED.doc.personnages || []).length)), field('Images', h('b', {}, (ED.doc.assets || []).length)),
+      h('h3', {}, 'Raccourcis'), h('p', { class: 'hint', html: 'V sélection · P poser · B peindre · K bâtir · H main · Ctrl+Z / Ctrl+Y : annuler, rétablir · Ctrl+C / Ctrl+V : copier, coller · Ctrl+D : dupliquer · Suppr : supprimer · flèches : déplacer d’une case (Alt : d’un pixel) · [ et ] : variante · M : miroir · L : verrouiller · molette : zoom · Espace + glisser : se déplacer · Ctrl+S : enregistrer une version' }));
     return;
   }
   if (s.length > 1) {
@@ -536,8 +557,12 @@ function drawMinimap() {
 async function runQC() {
   $('qc-list').innerHTML = '<p class="hint">Vérification : le monde est régénéré avec vos modifications, comme le fera le jeu…</p>'; showTab('right', 'qc');
   await frame(); await sleep(20);
-  const t0 = performance.now(), W2 = generateWorld(7, { studio: ED.doc });
-  const issues = checkStudio(W2, ED.doc, { PROPS, canStand });
+  const t0 = performance.now();
+  if (!S.qcBase) { S.qcBase = { world: generateWorld(7, { studio: null }) }; } // le monde d'origine, pour voir ce que le document a coupé (une seule fois)
+  const W2 = generateWorld(7, { studio: ED.doc });
+  const qdeps = { PROPS, canStand, base: S.qcBase.world, baseReach: S.qcBase.reach };
+  const issues = checkStudio(W2, ED.doc, qdeps);
+  S.qcBase.reach = qdeps.baseReach; // (ce qu'on atteignait à pied dans le monde d'origine : calculé une fois)
   S.qc = issues; renderQC(Math.round(performance.now() - t0)); return issues;
 }
 function renderQC(ms) {
@@ -545,14 +570,25 @@ function renderQC(ms) {
   $('qc-count').textContent = I.length ? String(I.length) : '';
   L.innerHTML = '';
   L.append(h('p', { class: 'hint' }, I.length ? `${nb} problème(s) bloquant(s), ${I.length - nb} avertissement(s)${ms ? ` (vérifié en ${ms} ms)` : ''}. Les problèmes bloquants empêchent la publication.` : `Aucun problème trouvé${ms ? ` (vérifié en ${ms} ms)` : ''}.`));
+  // 2.4 : les références cassées (ce qui désigne quelque chose qui n'existe plus) se corrigent d'un coup, en une action
+  const SAFE_REFS = new Set(['retouche', 'porte_ecartee', 'zone_ecartee', 'image_inconnue', 'asset_inconnu', 'decor_hors', 'sol_hors', 'sol_inconnu', 'habillage_inconnu', 'personnage_ecarte']);
+  const refs = I.filter((i) => SAFE_REFS.has(i.code) && i.fix && i.fix.op !== 'aller');
+  if (refs.length > 1) L.append(h('div', { class: 'btns' }, h('button', { on: { click: () => { ED.begin('Corriger les références cassées'); for (const i of refs) fix(i.fix); ED.end(); toast(`${refs.length} référence(s) cassée(s) corrigée(s) en une action (Ctrl+Z pour annuler).`); runQC(); } } }, `🧹 Corriger les ${refs.length} références cassées`)));
   for (const it of I.slice(0, 200)) {
     L.append(h('div', { class: 'qc' + (it.niveau === 'bloquant' ? ' b' : '') }, h('div', { class: 'm' }, (it.niveau === 'bloquant' ? '⛔ ' : '⚠ ') + it.msg), h('div', { class: 'w' }, `case ${it.x}, ${it.y}`),
       h('div', { class: 'btns' }, h('button', { class: 'mini', on: { click: () => { VIEW.goTo(it.x, it.y, Math.max(1, VIEW.cam.z)); zoomLabel(); } } }, 'Aller voir'), it.fix && it.fix.op !== 'aller' ? h('button', { class: 'mini', on: { click: () => { fix(it.fix); runQC(); } } }, fixLabel(it.fix)) : null)));
   }
 }
-const fixLabel = (f) => ({ supprimer: 'Supprimer ce décor', retirer_sol: 'Annuler ce sol', liberer: 'Libérer la case', interieur: 'Créer son intérieur', retirer_deco: 'Décrocher ce décor' }[f.op] || 'Corriger');
+const fixLabel = (f) => ({ retirer_retouche: 'Rétablir le décor d’origine', supprimer_porte: 'Supprimer cette porte', supprimer_zone: 'Supprimer cette zone', supprimer_image: 'Supprimer cette image', retirer_habillage: 'Retirer l’habillage', retirer_collision: 'Retirer cette collision', supprimer_perso: 'Supprimer ce personnage', supprimer: 'Supprimer ce décor', retirer_sol: 'Annuler ce sol', liberer: 'Libérer la case', interieur: 'Créer son intérieur', retirer_deco: 'Décrocher ce décor' }[f.op] || 'Corriger');
 function fix(f) {
-  if (f.op === 'interieur') { const r = interiorFor(ED, f.uid); if (r.err) toast('Impossible : ' + r.err, 'err'); else toast('Intérieur créé, relié à la porte du bâtiment.'); }
+  if (f.op === 'supprimer_perso') ED.set('personnage', f.uid, undefined);
+  else if (f.op === 'retirer_retouche') ED.set('retouche', String(f.id), undefined);
+  else if (f.op === 'supprimer_porte') ED.set('porte', f.uid, undefined);
+  else if (f.op === 'supprimer_zone') ED.set('zone', f.uid, undefined);
+  else if (f.op === 'retirer_collision') ED.set('collisions', f.k, undefined);
+  else if (f.op === 'retirer_habillage') { const a = ED.doc.assets.find((q) => q.id === f.id); if (a) { const n = { ...a }; delete n.remplace; ED.set('asset', a.id, n); } }
+  else if (f.op === 'supprimer_image') { ED.begin('Supprimer une image'); for (const d of ED.doc.decors.filter((q) => q.type === 'image' && q.donnees && q.donnees.asset === f.id)) ED.set('decor', d.uid, undefined); ED.set('asset', f.id, undefined); ED.end(); }
+  else if (f.op === 'interieur') { const r = interiorFor(ED, f.uid); if (r.err) toast('Impossible : ' + r.err, 'err'); else toast('Intérieur créé, relié à la porte du bâtiment.'); }
   else if (f.op === 'retirer_deco') ED.removeMurDeco(f.uid, f.x, f.y);
   else if (f.op === 'supprimer') ED.set('decor', f.uid, undefined);
   else if (f.op === 'retirer_sol') ED.set('sol', f.k, undefined);
@@ -642,11 +678,12 @@ function showHelp() {
   <li><b>Modifier</b> : outil Sélection (V), cliquez sur un élément ; ses propriétés s’affichent à droite. Glissez pour déplacer, flèches pour ajuster, Suppr pour supprimer. Les décors d’origine du jeu peuvent aussi être déplacés ou retirés, et « Rétablir l’original » les remet.</li>
   <li><b>Peindre</b> : onglet « Peinture » — le sol (sable, herbe, pavés, eau…), les régions, les collisions (ce qui bloque), la navigation des bateaux. Clic droit : gomme.</li>
   <li><b>Bâtir</b> : onglet « Bâtiments » — posez un bâtiment complet (façade, intérieur meublé, porte), ou créez une pièce, dessinez ses cloisons, ses sols et ses murs, accrochez des fenêtres et des tableaux, reliez-la à une entrée dehors, ajoutez un étage, tracez des zones (un message, un passage).</li>
+  <li><b>Des personnages</b> : outil Bâtir → « 🧑 Personnage » : un nom, une apparence, ce qu’il dit quand on lui parle, ce qu’il marmonne quand on passe.</li>
   <li><b>Le monde</b> : onglet « Monde » — la vue du monde (les îles, les lieux, ce qui les relie, ce qui est isolé), une île neuve peinte en pleine mer, une carte à part (un lieu de plein air sous l’archipel).</li>
   <li><b>Vos modèles</b> : sélectionnez des éléments, « ★ Enregistrer comme modèle », et reposez-les ailleurs (onglet Bâtiments).</li>
   <li><b>Vos images</b> : « ＋ Image » dans la bibliothèque importe votre pixel art (PNG, GIF, WebP) ; il se pose comme un décor, ou habille un élément du jeu.</li>
   <li><b>Couches</b> : rangez vos ajouts, masquez-les, verrouillez-les.</li>
-  <li><b>Vérifier</b> : le contrôle cherche ce qui serait cassé (un décor inconnu, une porte bouchée, un personnage muré…) et propose une correction.</li>
+  <li><b>Vérifier</b> : le contrôle cherche ce qui serait cassé (un décor inconnu, une porte bouchée, un personnage muré, un chemin coupé, un lieu isolé…), dit où, et propose une correction ; les références cassées se corrigent d’un coup.</li>
   <li><b>Tester dans le jeu</b> : le vrai jeu s’ouvre, en solo, avec vos modifications. Votre pirate y est copié : sa vraie sauvegarde n’est jamais touchée.</li>
   <li><b>Publier</b> : vos modifications partent dans le jeu pour tout le monde (il faut une clé GitHub qui a le droit d’écrire dans le dépôt).</li>
   </ol>
@@ -669,6 +706,7 @@ function wire() {
   $('img-in').onchange = (e) => { const f = e.target.files[0]; if (f) importImage(f); e.target.value = ''; };
   $('model-in').onchange = (e) => { const f = e.target.files[0]; if (f) importModelFile(f); e.target.value = ''; };
   $('monde-vue').onclick = () => MO.showWorld(); $('monde-ile').onclick = islandDialog; $('monde-carte').onclick = carteDialog;
+  $('monde-search').oninput = searchWorld;
   for (const b of document.querySelectorAll('#paint-kind button')) b.onclick = () => { S.paintKind = b.dataset.k; renderPaint(); setTool('paint'); };
   for (const b of document.querySelectorAll('#paint-size button')) b.onclick = () => { S.brush = +b.dataset.n; renderPaint(); };
   $('paint-erase').onchange = (e) => { S.erase = e.target.checked; };

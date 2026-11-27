@@ -15,7 +15,8 @@ export async function loadStudioWorld() {
     } catch (e) { console.warn('LStudio : aperçu illisible', e); }
   }
   try {
-    const ac = typeof AbortController !== 'undefined' ? new AbortController() : null, t = ac && setTimeout(() => ac.abort(), 3000); // au plus trois secondes (sur claude.ai, le fichier n'est pas joignable)
+    const pages = /github\.io$/.test(location.hostname) || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+    const ac = typeof AbortController !== 'undefined' ? new AbortController() : null, t = ac && setTimeout(() => ac.abort(), pages ? 15000 : 3000); // 2.4 : sur GitHub Pages, on attend le monde publié (un monde lourd met du temps à venir) ; ailleurs (claude.ai), le fichier n'est pas joignable : trois secondes
     const r = await fetch('monde-studio.json', { cache: 'no-cache', signal: ac ? ac.signal : undefined }); if (t) clearTimeout(t);
     if (r.ok) { const d = normalizeDoc(await r.json()); setStudioDoc(d); return { mode: 'publie', doc: d }; }
   } catch (e) { /* pas de fichier publié à côté de la page */ }

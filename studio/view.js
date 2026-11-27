@@ -47,6 +47,7 @@ export class MapView {
   // 2.3 : une image a changé (importée, remplacée, habillant un élément) : les décors concernés reprennent leur sprite
   refreshSprites(types, assetIds) { for (const p of this.world.props) if ((p.type === 'image' && assetIds.has(p.asset)) || types.has(p.type)) { p._sk = null; p.spr = null; this.alpha = new WeakMap(); } this.dirty = true; }
   onChange(ch) {
+    if (ch.structure) this.npcSpr.clear(); // (un personnage de LStudio a pu changer d'apparence)
     if (ch.props) for (const p of ch.props) { this.delB(p); if (this.world.props.includes(p)) this.addB(p); }
     if (ch.cells && ch.cells.length) {
       const seen = new Set();
@@ -181,7 +182,8 @@ export class MapView {
     let s = this.npcSpr.get(n.id);
     if (s === undefined) { const D = NPCS[n.id]; s = D && D.look ? humanSheet(D.look) : null; this.npcSpr.set(n.id, s); }
     if (!s) return;
-    ctx.drawImage(s.cv, 0, 0, FW, FH, Math.round(n.x - FW / 2), Math.round(n.y - FH + 2), FW, FH);
+    ctx.drawImage(s.cv, 0, ((n.dir | 0) % 4) * FH, FW, FH, Math.round(n.x - FW / 2), Math.round(n.y - FH + 2), FW, FH); // (sa direction : 2.4)
+    if (n.studio && this.struct && this.struct.k === 'personnage' && this.struct.uid === n.studio) { ctx.strokeStyle = '#ffd84a'; ctx.lineWidth = 1.5 / this.cam.z; ctx.strokeRect(Math.round(n.x - FW / 2) - 1, Math.round(n.y - FH + 2) - 1, FW + 2, FH + 2); }
   }
   // ---------------------------------------------------------------- trouver ce qui est sous le pointeur (au pixel près)
   opaque(s, x, y) {

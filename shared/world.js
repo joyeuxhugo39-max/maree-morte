@@ -91,6 +91,15 @@ export const PROPS = {
   image: {},
 };
 
+// 2.4 : l'empreinte d'un document LStudio (son nom et ses dates n'y comptent pas) : '' sans document
+export function studioSignature(doc) {
+  if (!doc) return '';
+  const { meta, couches, reperes, ...rest } = doc; void meta; void couches; void reperes; // (ce qui ne change rien au jeu n'y compte pas)
+  if (['sol', 'regions', 'collisions', 'navigation', 'retouches'].every((k) => !Object.keys(rest[k] || {}).length) && ['decors', 'pieces', 'portes', 'zones', 'personnages', 'assets'].every((k) => !(rest[k] || []).length)) return ''; // un monde vide : le monde d'origine
+  const str = JSON.stringify(rest); let h = 2166136261;
+  for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619);
+  return (h >>> 0).toString(36) + '-' + str.length.toString(36);
+}
 // 2.3 : LStudio a pu changer la terre et la mer. Les cases de terre nouvelles rejoignent l'île qu'elles touchent, ou forment
 // une île neuve, numérotée après les autres (aucune île ne change de numéro : la brume de la carte des pirates reste juste) ;
 // les cases devenues mer quittent leur île.
@@ -1820,10 +1829,10 @@ export function generateWorld(seed = 7, opts = {}) { // opts.studio : le documen
   // LStudio : le monde écrit dans l'éditeur, par-dessus tout le reste (un document vide ne change rien)
   const studioZones = []; // les zones d'interaction et de passage écrites dans LStudio (le client et le moteur les lisent)
   const sdoc = opts.studio !== undefined ? opts.studio : studioDoc();
-  const studio = applyStudio({ W, H, tiles, zones, solid, occ, sail, waterDist, plankDir, props, addProp, PROPS, inMap, rooms, doors, roomGrid, szones: studioZones }, sdoc);
+  const studio = applyStudio({ W, H, tiles, zones, solid, occ, sail, waterDist, plankDir, props, addProp, PROPS, inMap, rooms, doors, roomGrid, npcs, szones: studioZones }, sdoc);
   if (studio.sol) relabelIslands({ W, tiles, zones, islandOf, islands }, Object.keys(sdoc.sol).map((k) => { const [x, y] = unkey(k); return y * W + x; }).filter((i) => i >= 0 && i < W * OVER_H)); // 2.3 : une île peinte dans LStudio est une île
   const OUT = {
-    heist, fest, mobilier, port, spawnPoints: port.spawnPoints, studio, studioZones,
+    heist, fest, mobilier, port, spawnPoints: port.spawnPoints, studio, studioZones, studioSig: studioSignature(sdoc), // 2.4 : l'empreinte du monde de LStudio (tous les joueurs d'une partie doivent avoir la même)
     block: new Uint8Array(N), // constructions des joueurs : 1 bloque tout, 2 bloque les morts
     islandOf, islands, // 1.0 : chaque case de terre connaît son île
     doorOwner: new Map(), rooms, doors, sail, roomGrid, havre: HC, havreDock, OVER_H,
