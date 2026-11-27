@@ -96,6 +96,21 @@ aux lots suivants, sans changer ce qui existe (le numéro de version permet de f
 
 Les décors gagnent aussi une `emprise` facultative (`[largeur, hauteur]`) pour les meubles de plusieurs cases.
 
+**Version 3 (lot 3)** : une liste de plus, `assets` (les images importées), et deux champs de pièce (`bord`, et des
+tailles jusqu'à 200 × 72 cases pour les cartes à part) :
+
+```
+  assets: [ { id, nom, w, h,              // au plus 256 × 256 pixels
+              pal: ['#rrggbb', …],         // au plus 255 couleurs
+              px: "…",                     // les numéros de couleur (0 : transparent), par plages, en base 64
+              remplace } ]                 // facultatif : l'élément du jeu que l'image habille
+  decors: [ { type: 'image', donnees: { asset: '<id>' }, emprise, solide, … } ]
+```
+
+Une île peinte dans la mer devient une île du jeu, numérotée après les autres (`relabelIslands`, dans
+`shared/world.js`). Les liaisons du monde (les îles, la grande mer, les portes, les passages) sont calculées par
+`worldGraph` (`shared/studio-world.js`), pour la vue du monde et le contrôle.
+
 Une pièce est creusée dans la bande des intérieurs, seulement là où il n'y a que du vide d'origine ; elle devient une
 pièce du jeu (numérotée après toutes les pièces du jeu), et ses portes des portes du jeu (numérotées après toutes les
 portes du jeu). Les zones sont lues par le client (`world.studioZones`) et le moteur vérifie chaque passage. Le jeu et

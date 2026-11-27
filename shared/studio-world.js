@@ -7,7 +7,7 @@
 import { T, OVER_H } from './constants.js';
 
 export const STUDIO_FORMAT = 'lstudio';
-export const STUDIO_VERSION = 2; // 2 : les pièces, les portes et les zones (un document de la version 1 se lit tel quel)
+export const STUDIO_VERSION = 3; // 2 : les pièces, les portes et les zones ; 3 : les images importées (un document plus ancien se lit tel quel)
 export const TILE_NAMES = Object.fromEntries(Object.entries(T).map(([k, v]) => [v, k])); // 3 → 'GRASS'
 const SOLID_T = new Set([T.DEEP, T.ROCK, T.LAVA, T.VOID, T.CWALL, T.IWALL]);
 const isWater = (t) => t === T.WATER || t === T.DEEP;
@@ -22,7 +22,8 @@ export const PIECE_SOLS = { 1: 'Parquet', 2: 'Parquet sombre', 3: 'Marbre', 4: '
 export const PIECE_MURS = { salon: 'Damas rouge', vestibule: 'Pierre claire', office: 'Enduit et faïence', jeu: 'Damas vert', galerie: 'Tenture bleue', archives: 'Lambris sombre', cabinet: 'Lambris', entrepot: 'Planches brutes', atelier: 'Planches claires', cave: 'Pierre de cave', facade_ocre: 'Façade ocre', facade_rose: 'Façade rose', facade_bleue: 'Façade bleue', facade_brique: 'Briques', lointain: 'Ciel de nuit' };
 export const MUR_DECORS = { fenetre: 'Haute fenêtre', fenetre_s: 'Petite fenêtre', rue_fenetre: 'Fenêtre à volets', rue_porte: 'Porte peinte', tableau: 'Tableau', portrait_ch: 'Grand portrait', miroir: 'Miroir', tapisserie: 'Tapisserie', biblio: 'Bibliothèque', carte: 'Carte marine', blason: 'Blason', vaisselle: 'Vaisselier mural', cuivres: 'Cuivres', porte_ch: 'Porte de chargement', avis: 'Panneau d’avis', tarifs: 'Tableau des tarifs', outils: 'Tableau à outils', plans: 'Plans épinglés', echelle_m: 'Échelle', soupirail: 'Soupirail', niche: 'Niche et bougie', enseigne: 'Enseigne' };
 export const ZONE_TYPES = { message: 'Message (un panneau, une inscription)', passage: 'Passage (vers un autre point : un escalier, une trappe)' };
-const PIECE_MIN = 3, PIECE_MAX_W = 96, PIECE_MAX_H = 48;
+export const PIECE_MIN = 3, PIECE_MAX_W = 200, PIECE_MAX_H = 72; // 2.3 : assez pour une « carte » à part (un lieu de 200 × 72 cases)
+export const PIECE_BORDS = { '': 'Des murs', mer: 'La mer tout autour', ruelle: 'Des ruelles en contrebas' }; // ce qu'on voit au-delà du sol
 
 // ------------------------------------------------------------------ le document courant (celui que generateWorld applique)
 let current = null;
@@ -36,7 +37,7 @@ export function emptyDoc(name = 'Mon monde') {
     meta: { nom: name, cree: now, modifie: now },
     couches: [{ id: 'decors', nom: 'Décors', visible: true, verrou: false }, { id: 'batiments', nom: 'Bâtiments', visible: true, verrou: false }, { id: 'nature', nom: 'Nature', visible: true, verrou: false }],
     sol: {}, regions: {}, collisions: {}, navigation: {}, decors: [], retouches: {}, reperes: [],
-    pieces: [], portes: [], zones: [],
+    pieces: [], portes: [], zones: [], assets: [],
   };
 }
 export const key = (x, y) => x + ',' + y;
@@ -48,7 +49,7 @@ export function normalizeDoc(d) {
   const e = emptyDoc();
   const out = { ...e, ...d, meta: { ...e.meta, ...(d.meta || {}) } };
   for (const k of ['sol', 'regions', 'collisions', 'navigation', 'retouches']) if (!out[k] || typeof out[k] !== 'object' || Array.isArray(out[k])) out[k] = {};
-  for (const k of ['decors', 'couches', 'reperes', 'pieces', 'portes', 'zones']) if (!Array.isArray(out[k])) out[k] = e[k];
+  for (const k of ['decors', 'couches', 'reperes', 'pieces', 'portes', 'zones', 'assets']) if (!Array.isArray(out[k])) out[k] = e[k];
   out.version = STUDIO_VERSION;
   if (!out.couches.length) out.couches = e.couches;
   return out;
@@ -81,6 +82,48 @@ export function propAnchor(d) {
   if (E) return { ox: E[0] * 8 - 8 + (d.dx || 0), oy: (E[1] - 1) * 16 + (d.dy || 0) };
   return { ox: d.dx || 0, oy: (d.dy || 0) };
 }
+
+// ------------------------------------------------------------------ les images importées (2.3)
+// Une image est du pixel art : au plus 256 × 256 pixels, au plus 255 couleurs, chaque pixel opaque ou transparent. Elle
+// est rangée dans le document par sa palette et ses pixels (des numéros de couleur, compressés par plages) : le jeu la
+// redessine telle quelle, sans lissage, sans rien générer. On la désigne par son identifiant : remplacer son dessin ne
+// casse aucun décor qui s'en sert.
+export const ASSET_MAX = 256, ASSET_COLORS = 255, ASSETS_MAX_BYTES = 2000000;
+const b64e = (bytes) => { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); };
+const b64d = (str) => { const s = atob(str), out = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i); return out; };
+// rgba : les pixels (4 octets chacun) ; renvoie { w, h, pal, px } ou lève une erreur qui dit quoi faire
+export function encodeAsset(rgba, w, h) {
+  if (!(w >= 1 && h >= 1 && w <= ASSET_MAX && h <= ASSET_MAX)) throw new Error(`L’image fait ${w} × ${h} pixels : au plus ${ASSET_MAX} × ${ASSET_MAX}.`);
+  const pal = [], key = new Map(), idx = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    if (rgba[i * 4 + 3] < 128) continue; // transparent
+    const c = (rgba[i * 4] << 16) | (rgba[i * 4 + 1] << 8) | rgba[i * 4 + 2];
+    let k = key.get(c);
+    if (k == null) { if (pal.length >= ASSET_COLORS) throw new Error(`L’image a plus de ${ASSET_COLORS} couleurs : ce n’est pas du pixel art. Réduisez sa palette dans votre logiciel de dessin.`); pal.push('#' + c.toString(16).padStart(6, '0')); k = pal.length; key.set(c, k); }
+    idx[i] = k;
+  }
+  const runs = []; for (let i = 0; i < idx.length;) { let n = 1; while (n < 256 && i + n < idx.length && idx[i + n] === idx[i]) n++; runs.push(n - 1, idx[i]); i += n; }
+  return { w, h, pal, px: b64e(Uint8Array.from(runs)) };
+}
+// les pixels d'une image du document (4 octets chacun), ou null si elle est illisible
+export function decodeAsset(a) {
+  if (!a || !(a.w >= 1 && a.h >= 1 && a.w <= ASSET_MAX && a.h <= ASSET_MAX) || !Array.isArray(a.pal) || a.pal.length > ASSET_COLORS || typeof a.px !== 'string') return null;
+  let runs; try { runs = b64d(a.px); } catch (e) { return null; }
+  const N = a.w * a.h, out = new Uint8ClampedArray(N * 4), pal = a.pal.map((c) => parseInt(String(c).slice(1), 16));
+  let i = 0;
+  for (let r = 0; r + 1 < runs.length; r += 2) {
+    const n = runs[r] + 1, k = runs[r + 1];
+    if (k > pal.length || i + n > N) return null;
+    if (k) { const c = pal[k - 1]; for (let j = i; j < i + n; j++) { out[j * 4] = c >> 16; out[j * 4 + 1] = (c >> 8) & 255; out[j * 4 + 2] = c & 255; out[j * 4 + 3] = 255; } }
+    i += n;
+  }
+  return i === N ? out : null;
+}
+export function assetProblem(a) {
+  if (!a || typeof a.id !== 'string' || !a.id) return 'une image sans identifiant';
+  return decodeAsset(a) ? null : `l’image « ${a.nom || a.id} » est illisible (abîmée, ou faite par un autre outil)`;
+}
+export const assetBytes = (doc) => (doc.assets || []).reduce((n, a) => n + (a.px ? a.px.length : 0) + (a.pal ? a.pal.length * 10 : 0), 0);
 
 // ------------------------------------------------------------------ le monde modifiable (le jeu ET l'éditeur s'en servent)
 // Une case est solide si : une collision peinte le dit (le dernier mot) ; sinon si son sol est un sol solide ; sinon si
@@ -129,6 +172,7 @@ export class StudioWorld {
     p.tx = d.x; p.ty = d.y; p.x = d.x * 16 + 8 + ox; p.y = d.y * 16 + 14 + oy; p.v = d.v | 0;
     p.plan = d.plan && d.plan !== 'auto' ? d.plan : undefined; p.flip = d.miroir ? true : undefined;
     if (BUILDING_PROPS.has(d.type)) { const D = d.donnees || {}; Object.assign(p, { w: D.w || 4, h: D.h || 3, door: D.door != null ? D.door : -1, name: D.nom || '', style: D.style || 'maison' }); }
+    if (d.type === 'image') p.asset = (d.donnees && d.donnees.asset) || ''; // 2.3 : le dessin vient du document (doc.assets)
     p._cells = studioCells(d, this.C.PROPS); p.cellsStudio = p._cells;
   }
   addDecor(d) {
@@ -291,6 +335,7 @@ Object.assign(StudioWorld.prototype, {
     const kind = PIECE_GENRES[pc.genre] ? pc.genre : 'house';
     const r = { id, name: pc.nom || 'Pièce sans nom', kind, x0: pc.x, y0: pc.y, w: pc.w, h: pc.h, studio: pc.uid, fl, ws, wsk, wd, noDeco: pc.decoAuto === false ? 1 : 0 };
     if (pc.dehors) r.outdoor = 1;
+    if (pc.bord === 'mer' || pc.bord === 'ruelle') r.voidStyle = pc.bord; // au-delà du sol : la mer, ou des ruelles
     if (pc.ambiance) r.amb = pc.ambiance;
     C.rooms.push(r);
     return r;
@@ -321,8 +366,10 @@ export function applyDoc(S, doc) {
     if (!r.retire && r.x != null && !C.inMap(r.x, r.y)) { skip('retouche', 'déplacé hors de la carte', r.x, r.y); continue; }
     S.retouch(p, r); rep.retouches++;
   }
+  const assetIds = new Set((doc.assets || []).filter((a) => !assetProblem(a)).map((a) => a.id));
   for (const d of doc.decors || []) {
     if (!C.PROPS[d.type]) { skip('décor', `type de décor inconnu « ${d.type} »`, d.x, d.y); continue; }
+    if (d.type === 'image' && !assetIds.has(d.donnees && d.donnees.asset)) { skip('décor', `l’image « ${(d.donnees && d.donnees.asset) || '?'} » n’existe pas (ou est illisible)`, d.x, d.y); continue; }
     if (!C.inMap(d.x, d.y)) { skip('décor', 'hors de la carte', d.x, d.y); continue; }
     S.addDecor(d); rep.decors++;
   }
@@ -353,6 +400,62 @@ function recomputeWaterDist(C, painted) {
       waterDist[i] = md;
     }
   }
+}
+
+// ------------------------------------------------------------------ le monde et ses liaisons (2.3 : la vue du monde, le contrôle)
+// Les îles (la terre de l'archipel, d'un seul tenant), la mer navigable, les pièces ; et ce qui les relie : le bateau (une
+// île est accostable si sa côte touche la grande mer), les portes (du dehors à une pièce, dans les deux sens), les passages
+// (d'un point à un autre, dans un sens). Atteignable : depuis l'île où les pirates arrivent, de liaison en liaison.
+export function worldGraph(world) {
+  const W = world.W, OH = world.OVER_H, N = W * OH, tiles = world.tiles, sail = world.sail;
+  const water = (t) => t === T.WATER || t === T.DEEP;
+  const isl = new Int32Array(N), islands = [], st = new Int32Array(N);
+  for (let i0 = 0; i0 < N; i0++) {
+    if (isl[i0] || water(tiles[i0])) continue;
+    const id = islands.length + 1; let n = 0, sp = 0, sx = 0, sy = 0, x0 = W, x1 = 0, y0 = OH, y1 = 0; const zc = new Map();
+    isl[i0] = id; st[sp++] = i0;
+    while (sp) {
+      const j = st[--sp], jx = j % W, jy = (j / W) | 0; n++; sx += jx; sy += jy; if (jx < x0) x0 = jx; if (jx > x1) x1 = jx; if (jy < y0) y0 = jy; if (jy > y1) y1 = jy;
+      const z = world.zones[j]; zc.set(z, (zc.get(z) || 0) + 1);
+      if (jx > 0 && !isl[j - 1] && !water(tiles[j - 1])) { isl[j - 1] = id; st[sp++] = j - 1; }
+      if (jx < W - 1 && !isl[j + 1] && !water(tiles[j + 1])) { isl[j + 1] = id; st[sp++] = j + 1; }
+      if (jy > 0 && !isl[j - W] && !water(tiles[j - W])) { isl[j - W] = id; st[sp++] = j - W; }
+      if (jy < OH - 1 && !isl[j + W] && !water(tiles[j + W])) { isl[j + W] = id; st[sp++] = j + W; }
+    }
+    let zone = 0, bz = -1; for (const [z, c] of zc) if (c > bz && z !== 0) { bz = c; zone = z; }
+    islands.push({ id, n, cx: Math.round(sx / n), cy: Math.round(sy / n), x0, y0, x1, y1, zone, boat: false, reach: false });
+  }
+  // la grande mer : la plus grande étendue navigable d'un seul tenant
+  const sea = new Int32Array(N); let best = 0, bestN = 0, nc = 0;
+  for (let i0 = 0; i0 < N; i0++) {
+    if (sea[i0] || !sail[i0]) continue;
+    const c = ++nc; let n = 0, sp = 0; sea[i0] = c; st[sp++] = i0;
+    while (sp) { const j = st[--sp], jx = j % W; n++; for (const k of [jx > 0 ? j - 1 : -1, jx < W - 1 ? j + 1 : -1, j - W, j + W]) if (k >= 0 && k < N && !sea[k] && sail[k]) { sea[k] = c; st[sp++] = k; } }
+    if (n > bestN) { bestN = n; best = c; }
+  }
+  for (let i = 0; i < N; i++) { const id = isl[i]; if (!id || islands[id - 1].boat) continue; const x = i % W; if ((x > 0 && sea[i - 1] === best) || (x < W - 1 && sea[i + 1] === best) || (i >= W && sea[i - W] === best) || (i + W < N && sea[i + W] === best)) islands[id - 1].boat = true; }
+  // les nœuds : 'i<île>' sur l'archipel, 'r<pièce>' dans la bande des intérieurs ; un point du monde → son nœud
+  const nodeAt = (px, py) => { const tx = Math.floor(px / 16), ty = Math.floor(py / 16); if (tx < 0 || ty < 0 || tx >= W || ty >= world.H) return null; const r = world.roomGrid[ty * W + tx]; if (r >= 0) return 'r' + r; if (ty < OH) { const id = isl[ty * W + tx]; return id ? 'i' + id : null; } return null; };
+  const adj = new Map(), link = (a, b) => { if (!a || !b) return; if (!adj.has(a)) adj.set(a, new Set()); adj.get(a).add(b); };
+  const links = [];
+  for (const d of world.doors) {
+    if (d.dive) continue;
+    const out = nodeAt(d.ox, d.oy), inn = 'r' + d.room;
+    link(out, inn); link(inn, out); // (un passage secret se découvre : on le compte comme une porte)
+    links.push({ kind: 'porte', studio: !!d.studio, ax: d.ox, ay: d.oy, bx: d.ix, by: d.iy, from: out, to: inn, name: d.name });
+  }
+  for (const z of world.studioZones || []) if (z.type === 'passage' && z.to) { const a = nodeAt((z.x0 + z.x1) / 2, (z.y0 + z.y1) / 2), b = nodeAt(z.to.x, z.to.y); link(a, b); links.push({ kind: 'passage', studio: true, ax: (z.x0 + z.x1) / 2, ay: (z.y0 + z.y1) / 2, bx: z.to.x, by: z.to.y, from: a, to: b, name: z.label }); }
+  // depuis l'île d'arrivée des pirates : à pied (portes, passages) et en bateau (toutes les îles accostables)
+  const start = nodeAt(world.spawnPoint.x, world.spawnPoint.y), seen = new Set(start ? [start] : []), q = start ? [start] : [];
+  let boatDone = false;
+  while (q.length) {
+    const a = q.shift();
+    if (a[0] === 'i' && islands[+a.slice(1) - 1].boat && !boatDone) { boatDone = true; for (const I of islands) if (I.boat && !seen.has('i' + I.id)) { seen.add('i' + I.id); q.push('i' + I.id); } }
+    for (const b of adj.get(a) || []) if (!seen.has(b)) { seen.add(b); q.push(b); }
+  }
+  for (const I of islands) I.reach = seen.has('i' + I.id);
+  const rooms = world.rooms.map((r) => ({ id: r.id, name: r.name, studio: r.studio || null, x0: r.x0, y0: r.y0, w: r.w, h: r.h, reach: seen.has('r' + r.id), entries: links.filter((l) => l.to === 'r' + r.id).length }));
+  return { islands, rooms, links, start, islandAt: (x, y) => (x >= 0 && y >= 0 && x < W && y < OH ? isl[y * W + x] : 0) };
 }
 
 // ------------------------------------------------------------------ le contrôle qualité (LStudio et les tests)
@@ -392,7 +495,26 @@ export function checkStudio(world, doc, deps) {
   for (const c of world.chests) if (!reachable(c.tx, c.ty) && touched(doc, c.tx, c.ty)) add('avertissement', 'coffre_mure', 'Un coffre n’est plus accessible', c.tx, c.ty, fixAt(c.tx, c.ty + 1));
   for (const s of world.spawnPoints || []) { const x = Math.floor(s.x / 16), y = Math.floor(s.y / 16); if (!canStand(world, s.x, s.y) && touched(doc, x, y)) add('bloquant', 'arrivee_muree', 'Un point d’arrivée des pirates est bloqué', x, y, fixAt(x, y)); }
   checkStructure(world, doc, deps, add, fixAt);
+  checkAssets(world, doc, add, PROPS);
+  if (deps.graph !== false && ((doc.pieces || []).length || Object.keys(doc.sol || {}).length || Object.keys(doc.navigation || {}).length)) checkIsolated(world, doc, add);
   return out;
+}
+// 2.3 : les images importées
+function checkAssets(world, doc, add, PROPS) {
+  const ids = new Map();
+  for (const a of doc.assets || []) { const why = assetProblem(a); if (why) add('bloquant', 'image_invalide', why, 0, 0, null); else ids.set(a.id, a); if (a && a.remplace && !PROPS[a.remplace]) add('avertissement', 'habillage_inconnu', `L’image « ${a.nom || a.id} » habille « ${a.remplace} », qui n’est pas un élément du jeu`, 0, 0, null); }
+  for (const d of doc.decors || []) if (d.type === 'image' && !ids.has(d.donnees && d.donnees.asset)) add('bloquant', 'image_inconnue', 'Un décor montre une image qui n’existe pas (ou plus)', d.x, d.y, { op: 'supprimer', uid: d.uid });
+  const kb = Math.round(assetBytes(doc) / 1000);
+  if (kb * 1000 > ASSETS_MAX_BYTES) add('bloquant', 'images_lourdes', `Les images importées pèsent ${kb} Ko : au plus ${ASSETS_MAX_BYTES / 1000} Ko (chaque joueur les charge au démarrage)`, 0, 0, null);
+  else if (kb > 600) add('avertissement', 'images_lourdes', `Les images importées pèsent ${kb} Ko : chaque joueur les charge au démarrage`, 0, 0, null);
+}
+// 2.3 : les lieux de LStudio qu'on ne peut pas atteindre depuis l'arrivée des pirates (une île peinte que les bateaux
+// n'atteignent pas, une pièce dont l'entrée est sur une telle île…)
+function checkIsolated(world, doc, add) {
+  const G = worldGraph(world);
+  const painted = new Set(); for (const k of Object.keys(doc.sol || {})) { const [x, y] = unkey(k); const id = G.islandAt(x, y); if (id) painted.add(id); }
+  for (const id of painted) { const I = G.islands[id - 1]; if (!I.reach && I.n >= 4) add('avertissement', 'ile_isolee', `Une île de ${I.n} cases ${I.boat ? 'n’est reliée à rien' : 'n’est accostable par aucun bateau (sa côte ne touche pas la grande mer)'} : aucun pirate ne peut y aller`, I.cx, I.cy, null); }
+  for (const r of G.rooms) if (r.studio && r.entries && !r.reach) add('avertissement', 'lieu_isole', `On entre dans « ${r.name} », mais depuis un endroit qu’aucun pirate ne peut atteindre`, r.x0, r.y0, null);
 }
 // lot 2 : les pièces, les portes, les zones — ce qui empêcherait d'entrer, de sortir, de passer, ou laisserait un lieu
 // sans accès. Une correction est proposée quand elle est sûre (créer l'intérieur d'un bâtiment, libérer une case, retirer

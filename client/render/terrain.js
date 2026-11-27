@@ -510,6 +510,7 @@ export class Terrain {
         }
         case T.IWALL: {
           const tx = wx >> 4, ty = wy >> 4;
+          { const r0 = W.rooms[W.roomGrid[ty * MAP_W + tx]]; if (r0 && r0.studio && r0.voidStyle && (tx < r0.x0 || tx >= r0.x0 + r0.w || ty < r0.y0 || ty >= r0.y0 + r0.h)) { col = r0.voidStyle === 'mer' ? heistSea(wx, wy) : heistAlley(wx, wy); break; } } // 2.3 : une carte de LStudio, bordée par la mer (ou des ruelles) au lieu de murs
           const below1 = this.tileT(tx, ty + 1), below2 = this.tileT(tx, ty + 2);
           let d = 0, rid = -1, tyF = 0;
           if (isFloor(below1)) { d = (ty + 1) * TILE - wy; rid = W.roomGrid[(ty + 1) * MAP_W + tx]; tyF = ty + 1; }

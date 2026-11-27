@@ -1,7 +1,7 @@
 // LStudio — l'éditeur de bâtiments (lot 2) : l'onglet « Bâtiments », l'outil Bâtir et ses modes, la sélection et les
 // propriétés des pièces, des portes et des zones. Toutes les modifications passent par l'éditeur (annulables, et
 // identiques au jeu : shared/studio-world.js).
-import { PIECE_GENRES, PIECE_SOLS, PIECE_MURS, MUR_DECORS, ZONE_TYPES, BUILDING_PROPS, pieceEnvelope, porteExit } from '../shared/studio-world.js';
+import { PIECE_GENRES, PIECE_SOLS, PIECE_MURS, MUR_DECORS, ZONE_TYPES, BUILDING_PROPS, pieceEnvelope, porteExit, PIECE_BORDS, PIECE_MAX_W, PIECE_MAX_H } from '../shared/studio-world.js';
 import { T, OVER_H } from '../shared/constants.js';
 import { MUR_VARIANTES, AMBIANCES } from './catalogue.js';
 import { MODELES, buildFromModel, interiorFor, addEtage } from './modeles.js';
@@ -156,7 +156,7 @@ export function installBatir(X) {
     P.append(L);
   }
   async function newPieceDialog() {
-    const I = { nom: h('input', { value: 'Nouvelle pièce' }), w: h('input', { type: 'number', value: 12, min: 3, max: 96 }), hh: h('input', { type: 'number', value: 8, min: 3, max: 48 }), genre: sel('house', Object.entries(PIECE_GENRES), () => {}), sol: sel('FLOOR', [['FLOOR', 'Plancher'], ['STONEF', 'Dallage']], () => {}), style: sel(0, [[0, 'Celui du genre'], ...Object.entries(PIECE_SOLS)], () => {}), mur: sel('', [['', 'Celui du genre'], ...Object.entries(PIECE_MURS)], () => {}) };
+    const I = { nom: h('input', { value: 'Nouvelle pièce' }), w: h('input', { type: 'number', value: 12, min: 3, max: PIECE_MAX_W }), hh: h('input', { type: 'number', value: 8, min: 3, max: PIECE_MAX_H }), genre: sel('house', Object.entries(PIECE_GENRES), () => {}), sol: sel('FLOOR', [['FLOOR', 'Plancher'], ['STONEF', 'Dallage']], () => {}), style: sel(0, [[0, 'Celui du genre'], ...Object.entries(PIECE_SOLS)], () => {}), mur: sel('', [['', 'Celui du genre'], ...Object.entries(PIECE_MURS)], () => {}) };
     const body = h('div', {}, h('p', { class: 'hint' }, 'La pièce est rangée toute seule dans la bande des intérieurs, sous l’archipel, là où il y a de la place. Reliez-la ensuite à une entrée (dehors) ou à une autre pièce par un passage.'),
       field('Nom', I.nom), field('Largeur × hauteur (cases)', h('div', { class: 'two' }, I.w, I.hh)), field('Genre', I.genre), field('Sol', I.sol), field('Style du sol', I.style), field('Style des murs', I.mur));
     const r = await X.modal('Nouvelle pièce', body, [{ label: 'Annuler', value: false }, { label: 'Créer la pièce', value: true, cls: 'primary' }]);
@@ -185,6 +185,7 @@ export function installBatir(X) {
       P.append(field('Sortie (colonne)', h('div', { class: 'two' }, num(pc.sortie ?? (pc.w >> 1), (v) => ch('sortie')(v | 0)), h('label', { class: 'chk' }, h('input', { type: 'checkbox', checked: pc.sortie < 0, on: { change: (e) => ch('sortie')(e.target.checked ? -1 : pc.w >> 1) } }), 'aucune'))));
       P.append(field('Ambiance', sel(pc.ambiance || '', AMBIANCES, ch('ambiance'))));
       P.append(field('Ciel', h('label', { class: 'chk' }, h('input', { type: 'checkbox', checked: !!pc.dehors, on: { change: (e) => ch('dehors')(e.target.checked) } }), 'à ciel ouvert (une cour, un pont)')));
+      P.append(field('Tout autour', sel(pc.bord || '', Object.entries(PIECE_BORDS), ch('bord'))));
       P.append(H3('Entrées'));
       const portes = ED.doc.portes.filter((d) => d.piece === pc.uid), arr = ED.doc.zones.filter((z) => z.vers && ED.pieceAt(z.vers.x, z.vers.y) === pc);
       if (!portes.length && !arr.length) P.append(h('p', { class: 'hint warn' }, 'Aucune entrée : personne ne peut venir ici. Ajoutez une porte (son entrée est dehors) ou un passage depuis une autre pièce.'));

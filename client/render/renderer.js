@@ -29,6 +29,8 @@ import { lighting } from './lighting.js'; // finition : la lumière en couleur
 import { extendMobilier } from './sprites-mobilier.js'; // monde vivant, lot 4 : le mobilier des métiers
 import { extendHeist } from './heist-art.js'; // 2.0 : les lieux du braquage
 import { drawVue } from './vue.js'; // monde vivant, lot 2 : la surcouche de vérification
+import { installStudioAssets, envKey } from './studio-assets.js'; // 2.3 : les images importées dans LStudio
+import { studioDoc } from '../../shared/studio-world.js';
 import { BERTHS, berthPos, MOB_SHIP } from '../../shared/data/ships.js';
 
 const TAU = Math.PI * 2;
@@ -114,6 +116,7 @@ export class Renderer {
     this.terrain = new Terrain(world);
     this.water = makeWaterLayers();
     this.env = buildEnvSprites();
+    installStudioAssets(this.env, studioDoc()); // 2.3 : les images de LStudio (et les éléments qu'elles habillent)
     this.structSpr = buildStructSprites(this.env);
     extend06(this.env, this.structSpr); extend07(this.env); extend08(this.env); extendFete(this.env); extendMobilier(this.env); extendPort(this.env, this.structSpr); extendProps08(this.structSpr); extendHeist(this.env, this.structSpr); this.pets = petSheets(); this.tentacle = drawTentacle;
     // le volcan se peint en tâche de fond, un peu à chaque image (ou d'un coup si l'on arrive devant)
@@ -161,7 +164,7 @@ export class Renderer {
       this.buckets.get(key).push(p);
       if (p.type === 'comptoir') p.v = p.tx % 3;
       if (p.type === 'grotte') { const d = this.world.doors.find((q) => q.secret && (q.ox >> 4) === p.tx && (q.oy >> 4) === p.ty + 1); p.door = d ? d.id : null; }
-      const list = this.env[p.type];
+      const list = this.env[envKey(p)];
       const s = p.type === 'cite' ? citeSprite(p) : p.type === 'propriete' ? proprieteSprite(p, this.env) : list ? list[p.v % list.length] : null;
       p.spr = s;
       if (s && TREES.has(p.type) && hash2(p.tx | 0, p.ty | 0, 919) > 0.5) p.spr = mirrorSpr(s); // monde vivant, lot 3 : un arbre sur deux est vu de l'autre côté (même taille, même pied)

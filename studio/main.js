@@ -1,7 +1,7 @@
 // LStudio — le studio de création de Marée Morte. Démarrage, outils, panneaux, sauvegardes, aperçu, publication.
 import { generateWorld, PROPS, ZONES, canStand } from '../shared/world.js';
 import { T } from '../shared/constants.js';
-import { emptyDoc, normalizeDoc, checkStudio, key, unkey, BUILDING_PROPS, TILE_NAMES } from '../shared/studio-world.js';
+import { emptyDoc, normalizeDoc, checkStudio, key, unkey, BUILDING_PROPS, TILE_NAMES, decodeAsset as decodeAssetPx } from '../shared/studio-world.js';
 import { Renderer } from '../client/render/renderer.js';
 import { MINI_COL } from '../client/render/terrain.js';
 import { Editor } from './editor.js';
@@ -9,6 +9,11 @@ import { MapView, ZOOMS, zoneColor } from './view.js';
 import { CATEGORIES, HORS_BIBLIOTHEQUE, nomDe, SOLS, STYLES_BATIMENT, EMPRISES } from './catalogue.js';
 import { installBatir } from './batir.js';
 import { interiorFor } from './modeles.js';
+import { installStudioAssets, NOT_REPLACEABLE } from '../client/render/studio-assets.js';
+import { readImageFile, newAssetId, bigPreview } from './assets.js';
+import { installMonde, createIsland, createCarte, CARTE_SOLS } from './monde.js';
+import { captureModel, placeModel, readModelFile } from './prefabs.js';
+import { PIECE_BORDS } from '../shared/studio-world.js';
 import { store, stats, github, guessRepo, PUB_PATH } from './store.js';
 
 const $ = (id) => document.getElementById(id);
@@ -18,7 +23,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
 const APERCU_KEY = 'lstudio:apercu';
 const S = { tool: 'select', armed: null, armedV: 0, paintKind: 'sol', paintVal: { sol: 'SAND', regions: 1, collisions: 1, navigation: 1 }, brush: 1, erase: false, activeLayer: 'decors', clip: null, dirty: false, lastSaved: null, qc: null, space: false };
-let ED, VIEW, R, WORLD, B;
+let ED, VIEW, R, WORLD, B, MO;
 
 // ------------------------------------------------------------------ messages
 function toast(msg, kind = '') { const e = h('div', { class: 'toast ' + kind }, msg); $('toasts').append(e); setTimeout(() => e.remove(), kind === 'err' ? 6000 : 3200); }
@@ -47,18 +52,26 @@ async function boot() {
   if (!doc) { try { const r = await fetch('monde-studio.json', { cache: 'no-cache' }); if (r.ok) { doc = normalizeDoc(await r.json()); from = 'publié'; } } catch (e) { /* */ } }
   if (!doc) { doc = emptyDoc('Mon monde'); from = 'neuf'; }
   ED = new Editor(WORLD, doc, PROPS);
+  const habilles = installStudioAssets(R.env, ED.doc); // 2.3 : les images importées (et les éléments qu'elles habillent)
   msg('Mise en place…', 90); await frame();
   VIEW = new MapView($('map'), ED, R);
   B = installBatir({ S, ED, VIEW, WORLD, h, toast, field, num, sel, confirmBox, modal, select, setTool, renderProps, zoomLabel, ghostModel });
+  MO = installMonde({ ED, VIEW, WORLD, h, toast, modal, zoomLabel });
+  VIEW.refreshSprites(habilles, new Set(ED.doc.assets.map((a) => a.id)));
   $('boot').classList.add('hidden'); $('app').classList.remove('hidden');
   VIEW.resize(); window.addEventListener('resize', () => VIEW.resize());
   wire();
-  ED.on((ch) => { if (ch.dirty) markDirty(); if (ch.layers) renderLayers(); if (ch.reperes) renderReperes(); if (ch.structure || ch.history) S.structDirty = true; schedulePanel(); });
+  ED.on((ch) => {
+    if (ch.dirty) markDirty(); if (ch.layers) renderLayers(); if (ch.reperes) renderReperes(); if (ch.structure || ch.history) S.structDirty = true;
+    if (ch.assets) { const t = installStudioAssets(R.env, ED.doc); VIEW.refreshSprites(new Set([...t, ...(ch.assetTypes || [])]), ch.assetIds || new Set()); libCanvas.clear(); renderLib(); }
+    schedulePanel();
+  });
   renderAll();
   if (ED.report.ecartes.length) toast(`${ED.report.ecartes.length} modification(s) du brouillon n’ont pas pu être appliquées : voir « Contrôle ».`, 'warn');
   toast(from === 'brouillon' ? 'Brouillon rouvert : vous reprenez où vous en étiez.' : from === 'publié' ? 'Nouveau brouillon, à partir du monde publié.' : 'Nouveau brouillon : le monde d’origine du jeu.');
   setSaveState();
-  window.LS = { ED, VIEW, S, store, B }; // pour les vérifications automatiques
+  window.LS = { ED, VIEW, S, store, B, MO, R }; // pour les vérifications automatiques
+  renderPrefabs();
 }
 
 // ------------------------------------------------------------------ l'état de l'enregistrement
@@ -92,13 +105,17 @@ async function replaceDraft(doc, why) {
 // ------------------------------------------------------------------ les outils et la souris
 function setTool(t) {
   S.tool = t; for (const b of document.querySelectorAll('#tools button')) b.classList.toggle('on', b.dataset.tool === t);
-  if (t !== 'place') { VIEW.ghost = null; } if (t !== 'paint') VIEW.brush = null;
+  if (t !== 'place') { VIEW.ghost = null; if (S.prefab || S.island) { S.prefab = null; S.island = null; VIEW.pghost = null; } } if (t !== 'paint') VIEW.brush = null;
   if (t !== 'build' && S.build) { S.build.pick = null; S.build.modele = null; VIEW.bhover = null; if (B) B.renderPane(); }
   if (t === 'paint') showTab('left', 'paint');
   if (t === 'build') { showTab('left', 'build'); if (B) B.renderPane(); }
   $('map').style.cursor = t === 'pan' ? 'grab' : t === 'select' ? 'default' : 'crosshair'; VIEW.dirty = true; status();
 }
-function arm(type, v = 0) { S.armed = type; S.armedV = v; setTool('place'); renderLib(); toast(`« ${nomDe(type)} » : cliquez sur la carte pour le poser (Échap pour arrêter).`); }
+function arm(type, v = 0) { S.prefab = null; S.island = null; S.armed = type; S.armedV = v; setTool('place'); renderLib(); toast(`« ${nomDe2(type)} » : cliquez sur la carte pour le poser (Échap pour arrêter).`); }
+// 2.3 : le nom d'un élément de la bibliothèque, une image importée comprise ('image:<id>')
+const assetOf = (t) => (t && t.startsWith('image:') ? ED.doc.assets.find((a) => a.id === t.slice(6)) : null);
+function nomDe2(t) { const a = assetOf(t); return a ? a.nom || 'Image' : nomDe(t); }
+const imageEmprise = (a) => [Math.max(1, Math.ceil(a.w / 16)), 1];
 const cellAt = (wx, wy) => [Math.floor(wx / 16), Math.floor(wy / 16)];
 function brushCells(tx, ty) { const n = S.brush, o = Math.floor((n - 1) / 2), out = []; for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) out.push([tx - o + x, ty - o + y]); return out; }
 function paintAt(tx, ty) {
@@ -116,7 +133,9 @@ function wireMap() {
   cv.addEventListener('pointerdown', (e) => {
     cv.focus(); cv.setPointerCapture(e.pointerId);
     const [wx, wy] = VIEW.toWorld(e.offsetX, e.offsetY), [tx, ty] = cellAt(wx, wy);
-    if (e.button === 1 || e.button === 2 && S.tool !== 'paint' && S.tool !== 'build' || S.tool === 'pan' || S.space) { drag = { k: 'pan', sx: e.offsetX, sy: e.offsetY, cx: VIEW.cam.x, cy: VIEW.cam.y }; cv.style.cursor = 'grabbing'; if (e.button === 2 && S.tool === 'place') { S.armed = null; setTool('select'); renderLib(); } return; }
+    if (e.button === 1 || e.button === 2 && S.tool !== 'paint' && S.tool !== 'build' || S.tool === 'pan' || S.space) { drag = { k: 'pan', sx: e.offsetX, sy: e.offsetY, cx: VIEW.cam.x, cy: VIEW.cam.y }; cv.style.cursor = 'grabbing'; if (e.button === 2 && S.tool === 'place') { S.armed = null; S.prefab = null; S.island = null; setTool('select'); renderLib(); } return; }
+    if (S.tool === 'place' && S.prefab) { const r = placeModel(ED, S.prefab, tx, ty, S.activeLayer); if (r.err) toast('Impossible : ' + r.err, 'err'); else { toast(`Modèle « ${S.prefab.nom} » posé${r.pieces.length ? ` (avec ${r.pieces.length} pièce(s))` : ''} : Ctrl+Z pour l’annuler.`); S.prefab = null; setTool('select'); select(r.refs); } return; }
+    if (S.tool === 'place' && S.island) { const o = S.island, r = createIsland(ED, tx, ty, o.w, o.h, o); if (r.err) toast('Impossible : ' + r.err, 'warn'); else { toast(`Île « ${o.nom} » peinte : ${r.land.length} cases de terre${r.decors.length ? `, ${r.decors.length} arbres et rochers` : ''} (Ctrl+Z pour l’annuler). Vérifiez-la dans la vue du monde.`); S.island = null; setTool('select'); } return; }
     if (S.tool === 'place' && S.armed) { placeArmed(tx, ty, e.altKey ? wx : null, e.altKey ? wy : null); return; }
     if (S.tool === 'paint') { const er = S.erase; if (e.button === 2) S.erase = true; ED.begin(paintLabel()); paintAt(tx, ty); drag = { k: 'paint', tx, ty, er }; return; }
     if (S.tool === 'build') { const dr = B.down(e, wx, wy, tx, ty); if (dr) drag = dr; return; }
@@ -142,7 +161,9 @@ function wireMap() {
     S.mouse = [tx, ty];
     if (!drag) {
       if (S.tool === 'select') { const p = VIEW.pick(wx, wy); if (p !== VIEW.hover) { VIEW.hover = p; VIEW.dirty = true; } }
-      if (S.tool === 'place' && S.armed) ghostAt(tx, ty, e.altKey ? wx : null, e.altKey ? wy : null);
+      if (S.tool === 'place' && S.prefab) { VIEW.pghost = { x0: tx, y0: ty, x1: tx + S.prefab.w - 1, y1: ty + S.prefab.h - 1, col: '#ffd84a' }; VIEW.dirty = true; }
+      else if (S.tool === 'place' && S.island) { const o = S.island; VIEW.pghost = { x0: tx - Math.ceil(o.w / 2 + 4), y0: ty - Math.ceil(o.h / 2 + 4), x1: tx + Math.ceil(o.w / 2 + 4), y1: ty + Math.ceil(o.h / 2 + 4), col: '#7dd8ff', fill: 'rgba(125,216,255,0.12)' }; VIEW.dirty = true; }
+      else if (S.tool === 'place' && S.armed) ghostAt(tx, ty, e.altKey ? wx : null, e.altKey ? wy : null);
       if (S.tool === 'paint') { const n = S.brush, o = Math.floor((n - 1) / 2); VIEW.brush = { x: tx - o, y: ty - o, n, col: S.erase ? '#ff9a9a' : '#ffffff' }; VIEW.dirty = true; }
       if (S.tool === 'build') B.hover(tx, ty);
       status(); return;
@@ -185,6 +206,8 @@ function wireMap() {
 }
 function ghostAt(tx, ty, wx = null, wy = null) {
   const type = S.armed; if (!type) return;
+  const A = assetOf(type);
+  if (A) { const E = imageEmprise(A), s = VIEW.spr({ type: 'image', asset: A.id, v: 0 }); VIEW.ghost = { spr: s, x: tx * 16 + 8 + E[0] * 8 - 8, y: ty * 16 + 14, tx, ty, w: E[0], h: 1, ok: tx >= 0 && ty >= 0 && tx < WORLD.W && ty < WORLD.H }; VIEW.dirty = true; return; }
   const d = { type, v: S.armedV, tx, ty, x: 0, y: 0 };
   const isB = BUILDING_PROPS.has(type), E = EMPRISES[type] || [1, 1];
   const fake = { type, v: S.armedV, tx, ty, w: isB ? 5 : undefined, h: isB ? 4 : undefined, door: isB ? 2 : undefined, style: isB ? 'maison' : undefined };
@@ -202,7 +225,8 @@ function placeArmed(tx, ty, wx = null, wy = null) {
   if (tx < 0 || ty < 0 || tx >= WORLD.W || ty >= WORLD.H) return toast('Hors de la carte.', 'warn');
   const L = ED.layer(S.activeLayer); if (!L || L.origine) S.activeLayer = 'decors';
   if (ED.layer(S.activeLayer) && ED.layer(S.activeLayer).verrou) return toast('La couche active est verrouillée.', 'warn');
-  const E = EMPRISES[S.armed], d = ED.placeDecor(S.armed, tx, ty, { v: S.armedV, couche: S.activeLayer, ...(E ? { emprise: [E[0], E[1]], solide: E[2] || 'tout' } : {}) });
+  const A = assetOf(S.armed), E = EMPRISES[S.armed];
+  const d = A ? ED.placeDecor('image', tx, ty, { couche: S.activeLayer, donnees: { asset: A.id }, emprise: imageEmprise(A), solide: 'tout' }) : ED.placeDecor(S.armed, tx, ty, { v: S.armedV, couche: S.activeLayer, ...(E ? { emprise: [E[0], E[1]], solide: E[2] || 'tout' } : {}) });
   if (wx != null) ED.change({ k: 'd', uid: d.uid }, { dx: Math.round(wx - (tx * 16 + 8)), dy: Math.round(wy - (ty * 16 + 14)) });
   select([{ k: 'd', uid: d.uid }]);
 }
@@ -263,7 +287,7 @@ function showTab(side, tab) {
 const libCanvas = new Map();
 function preview(type, v = 0, size = 56) {
   const k = type + '|' + v; if (libCanvas.has(k)) return libCanvas.get(k).cloneNode ? cloneCanvas(libCanvas.get(k)) : null;
-  const isB = BUILDING_PROPS.has(type), s = VIEW.spr({ type, v, w: isB ? 5 : undefined, h: isB ? 4 : undefined, door: isB ? 2 : undefined, style: isB ? 'maison' : undefined });
+  const A = assetOf(type), isB = BUILDING_PROPS.has(type), s = A ? VIEW.spr({ type: 'image', asset: A.id, v: 0 }) : VIEW.spr({ type, v, w: isB ? 5 : undefined, h: isB ? 4 : undefined, door: isB ? 2 : undefined, style: isB ? 'maison' : undefined });
   const cv = document.createElement('canvas'); cv.width = s ? s.w : 16; cv.height = s ? s.h : 16;
   if (s) cv.getContext('2d').drawImage(s.cv, 0, 0);
   cv.dataset.dim = s ? `${s.w} × ${s.h} px` : '?'; libCanvas.set(k, cv); return cloneCanvas(cv); void size;
@@ -274,6 +298,16 @@ function renderLib() {
   const L = $('lib-list'), q = $('lib-search').value.trim().toLowerCase(), cat = $('lib-cat').value, onlyUsed = $('lib-used').checked, U = usage();
   L.innerHTML = '';
   const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  // 2.3 : vos images importées, en tête
+  const imgs = ED.doc.assets.filter((a) => (!cat || cat === 'images') && (!q || norm(a.nom || '').includes(norm(q))) && (!onlyUsed || ED.doc.decors.some((d) => d.type === 'image' && d.donnees && d.donnees.asset === a.id) || a.remplace));
+  if (imgs.length) {
+    L.append(h('div', { class: 'cat' }, 'Vos images importées'));
+    for (const a of imgs) {
+      const t = 'image:' + a.id, cv = preview(t), n = ED.doc.decors.filter((d) => d.type === 'image' && d.donnees && d.donnees.asset === a.id).length;
+      L.append(h('div', { class: 'it' + (S.armed === t ? ' on' : ''), draggable: 'true', title: `${a.nom} — ${a.w} × ${a.h} px, ${a.pal.length} couleurs — posée ${n} fois${a.remplace ? ` — habille « ${nomDe(a.remplace)} »` : ''}\nCliquer pour la poser ; ⚙ pour la modifier.`,
+        on: { click: () => arm(t), dragstart: (e) => { S.dragType = t; e.dataTransfer.setData('text/lstudio', t); e.dataTransfer.effectAllowed = 'copy'; } } }, cv, h('div', { class: 'n' }, a.nom || 'Image'), h('div', { class: 'd' }, `${a.w} × ${a.h} px${n ? ' · ' + n + '×' : ''}${a.remplace ? ' · habille' : ''}`), h('button', { class: 'mini gear', title: 'Modifier cette image', on: { click: (e) => { e.stopPropagation(); assetDialog(a.id); } } }, '⚙')));
+    }
+  }
   for (const C of CATEGORIES) {
     if (cat && cat !== C.id) continue;
     const items = C.types.filter((t) => PROPS[t] && R.env[t] || t === 'cite').filter((t) => !q || norm(nomDe(t)).includes(norm(q)) || t.includes(q)).filter((t) => !onlyUsed || U[t]);
@@ -319,6 +353,96 @@ function renderReperes() {
   if (!(ED.doc.reperes || []).length) L.append(h('p', { class: 'hint' }, 'Aucun repère. Un repère marque un endroit où vous travaillez (une future île, un quartier…).'));
   (ED.doc.reperes || []).forEach((r, k) => L.append(h('div', { class: 'li', on: { click: () => { VIEW.goTo(r.x, r.y); } } }, '📍', r.nom, h('span', { class: 'x' }, `${r.x}, ${r.y}`), h('button', { class: 'mini', title: 'Retirer ce repère', on: { click: (e) => { e.stopPropagation(); const L2 = ED.doc.reperes.slice(); L2.splice(k, 1); ED.set('reperes', '', L2); } } }, '✕'))));
 }
+// ------------------------------------------------------------------ 2.3 : les images importées
+const HABILLABLES = () => CATEGORIES.flatMap((c) => c.types).filter((t) => PROPS[t] && R.env[t] && !NOT_REPLACEABLE.has(t));
+function imageForm(an, A, opts = {}) {
+  const spr = { cv: (() => { const c = document.createElement('canvas'); c.width = an.w; c.height = an.h; const dec = new ImageData(decodePx(an.enc || A), an.w, an.h); c.getContext('2d').putImageData(dec, 0, 0); return c; })(), w: an.w, h: an.h };
+  const scale = Math.max(1, Math.min(6, Math.floor(240 / Math.max(an.w, an.h))));
+  const name = h('input', { value: opts.nom || '' }), hab = sel(opts.remplace || '', [['', '— aucun (un décor à poser) —'], ...HABILLABLES().map((t) => [t, nomDe(t)])], () => {});
+  const body = h('div', {}, h('div', { style: 'display:flex;gap:12px;align-items:flex-start' }, h('div', { style: 'flex:none' }, bigPreview(spr, scale)),
+    h('div', {}, h('p', {}, `${an.w} × ${an.h} pixels (${Math.ceil(an.w / 16)} × ${Math.ceil(an.h / 16)} cases), ${(an.enc || A).pal.length} couleurs.`), ...(an.notes || []).map((n) => h('p', { class: 'hint' }, n)))),
+    field('Nom', name), field('Habiller', hab), h('p', { class: 'hint' }, 'Habiller un élément du jeu : tous ses exemplaires (ceux du jeu et les vôtres) prennent ce dessin ; son nom, sa solidité et son rôle ne changent pas. Sinon, l’image se pose comme un décor, depuis la bibliothèque.'));
+  return { body, name, hab };
+}
+const decodePx = (a) => { const out = new Uint8ClampedArray(a.w * a.h * 4); const enc = a; return decodeAssetPx(enc) || out; };
+async function importImage(file) {
+  let an; try { an = await readImageFile(file); } catch (e) { return toast('Import impossible : ' + e.message, 'err'); }
+  const F = imageForm(an, an.enc, { nom: file.name.replace(/\.[a-z]+$/i, '').replace(/[_-]+/g, ' ').slice(0, 40) });
+  const ok = await modal('Importer une image', F.body, [{ label: 'Annuler', value: false }, { label: 'Importer', value: true, cls: 'primary' }]);
+  if (!ok) return;
+  const id = newAssetId(), a = { id, nom: F.name.value.trim().slice(0, 40) || 'Image', ...an.enc };
+  if (F.hab.value) a.remplace = F.hab.value;
+  ED.set('asset', id, a);
+  toast(a.remplace ? `« ${a.nom} » habille désormais « ${nomDe(a.remplace)} », partout dans le monde.` : `« ${a.nom} » est dans la bibliothèque (Vos images importées) : cliquez dessus, puis sur la carte.`);
+  if (!a.remplace) { $('lib-search').value = ''; renderLib(); showTab('left', 'lib'); }
+}
+async function assetDialog(id) {
+  const A = ED.doc.assets.find((a) => a.id === id); if (!A) return;
+  const uses = ED.doc.decors.filter((d) => d.type === 'image' && d.donnees && d.donnees.asset === id);
+  const F = imageForm({ w: A.w, h: A.h, enc: A }, A, { nom: A.nom, remplace: A.remplace });
+  F.body.append(h('p', {}, `Posée ${uses.length} fois${A.remplace ? `, et elle habille les ${WORLD.props.filter((p) => p.type === A.remplace).length} « ${nomDe(A.remplace)} » du monde` : ''}.`));
+  let replaced = null;
+  const r = await modal(`Image « ${A.nom} »`, F.body, [
+    { label: 'Remplacer le dessin…', run: () => new Promise((ok) => { const inp = h('input', { type: 'file', accept: 'image/png,image/gif,image/webp' }); inp.onchange = async () => { try { replaced = await readImageFile(inp.files[0]); toast(`Nouveau dessin prêt (${replaced.w} × ${replaced.h} px) : « Enregistrer » pour l’appliquer partout.`); } catch (e) { toast('Remplacement impossible : ' + e.message, 'err'); } ok(false); }; inp.click(); }) },
+    { label: 'Supprimer', cls: 'danger', value: 'suppr' }, { label: 'Annuler', value: false }, { label: 'Enregistrer', cls: 'primary', value: 'ok' }]);
+  if (r === 'suppr') {
+    if (!(await confirmBox('Supprimer cette image ?', `${uses.length ? `Les ${uses.length} décor(s) qui la montrent seront supprimés aussi. ` : ''}${A.remplace ? `Les « ${esc(nomDe(A.remplace))} » reprendront leur dessin d’origine. ` : ''}Ctrl+Z la fait revenir.`, 'Supprimer', 'danger'))) return;
+    ED.begin('Supprimer une image'); for (const d of uses) ED.set('decor', d.uid, undefined); ED.set('asset', id, undefined); ED.end(); select([]); return;
+  }
+  if (r !== 'ok') return;
+  const n = { ...A, nom: F.name.value.trim().slice(0, 40) || A.nom, ...(replaced ? replaced.enc : {}) }; if (F.hab.value) n.remplace = F.hab.value; else delete n.remplace;
+  ED.set('asset', id, n); toast(replaced ? `Dessin remplacé : les ${uses.length} décor(s) qui s’en servent ont suivi.` : 'Image modifiée.');
+}
+// ------------------------------------------------------------------ 2.3 : vos modèles
+async function prefabList() { return (await store.get('modeles')) || []; }
+async function renderPrefabs() {
+  const P = $('prefab-pane'); if (!P) return; const list = await prefabList();
+  P.innerHTML = '';
+  P.append(h('h3', {}, `Vos modèles (${list.length})`, h('button', { class: 'mini', title: 'Importer un modèle (fichier)', on: { click: () => $('model-in').click() } }, '⬆ importer')));
+  if (!list.length) P.append(h('p', { class: 'hint' }, 'Sélectionnez des éléments sur la carte (une maison meublée, un quai, un jardin), puis « ★ Enregistrer comme modèle » dans leurs propriétés : vous pourrez les reposer ailleurs, ici ou dans un autre monde. Un bâtiment emporte son intérieur, ses étages et ses meubles.'));
+  const L = h('div', { class: 'plist' });
+  for (const M of list) L.append(h('div', { class: 'li' + (S.prefab && S.prefab.id === M.id ? ' on' : ''), title: `${M.w} × ${M.h} cases, ${M.decors.length} élément(s)${M.pieces.length ? `, ${M.pieces.length} pièce(s)` : ''}. Cliquer, puis cliquer sur la carte pour le poser.`, on: { click: () => { S.armed = null; S.island = null; S.prefab = M; setTool('place'); renderPrefabs(); toast(`« ${M.nom} » : cliquez sur la carte pour le poser (son coin en haut à gauche). Clic droit : annuler.`); } } },
+    h('span', {}, '★'), M.nom, h('span', { class: 'x' }, `${M.w} × ${M.h}${M.pieces.length ? ' · 🏠' + M.pieces.length : ''}`),
+    h('button', { class: 'mini', title: 'Renommer', on: { click: async (e) => { e.stopPropagation(); const n = prompt('Nom du modèle', M.nom); if (!n) return; const l2 = await prefabList(); const m2 = l2.find((x) => x.id === M.id); if (m2) m2.nom = n.slice(0, 40); await store.put('modeles', l2); renderPrefabs(); } } }, '✎'),
+    h('button', { class: 'mini', title: 'Exporter (fichier)', on: { click: (e) => { e.stopPropagation(); download(M, 'modele-' + M.nom); } } }, '⬇'),
+    h('button', { class: 'mini', title: 'Supprimer ce modèle', on: { click: async (e) => { e.stopPropagation(); if (!(await confirmBox('Supprimer ce modèle ?', `« ${esc(M.nom)} » sera effacé de ce navigateur (ce qui a déjà été posé reste).`, 'Supprimer', 'danger'))) return; await store.put('modeles', (await prefabList()).filter((x) => x.id !== M.id)); renderPrefabs(); } } }, '✕')));
+  P.append(L);
+}
+async function saveModelDialog(refs) {
+  const name = h('input', { value: 'Mon modèle' }), peint = h('input', { type: 'checkbox', checked: true });
+  const ok = await modal('Enregistrer comme modèle', h('div', {}, h('p', {}, `${refs.length} élément(s) sélectionné(s). Un bâtiment de LStudio emporte son intérieur, ses étages, ses meubles et ses zones.`), field('Nom', name), field('', h('label', { class: 'chk' }, peint, 'avec le sol peint et les collisions dessous')), h('p', { class: 'hint' }, 'Le modèle est rangé dans ce navigateur (pas dans le monde publié) ; « ⬇ » l’exporte en fichier, pour un autre ordinateur.')), [{ label: 'Annuler', value: false }, { label: 'Enregistrer', value: true, cls: 'primary' }]);
+  if (!ok) return;
+  const r = captureModel(ED, refs, name.value.trim().slice(0, 40) || 'Mon modèle', { peint: peint.checked });
+  if (r.err) return toast(r.err, 'warn');
+  await store.put('modeles', [...(await prefabList()), r.M]); renderPrefabs(); showTab('left', 'build');
+  toast(`Modèle « ${r.M.nom} » enregistré (${r.M.w} × ${r.M.h} cases${r.M.pieces.length ? `, ${r.M.pieces.length} pièce(s)` : ''}) : onglet Bâtiments, « Vos modèles ».`);
+}
+async function importModelFile(file) {
+  try { const M = readModelFile(JSON.parse(await file.text())); await store.put('modeles', [...(await prefabList()), M]); renderPrefabs(); showTab('left', 'build'); toast(`Modèle « ${M.nom} » importé.`); }
+  catch (e) { toast('Import impossible : ' + e.message, 'err'); }
+}
+// ------------------------------------------------------------------ 2.3 : une île neuve, une carte à part
+async function islandDialog() {
+  const I = { nom: h('input', { value: 'Île nouvelle' }), w: h('input', { type: 'number', value: 30, min: 8, max: 120 }), hh: h('input', { type: 'number', value: 22, min: 6, max: 90 }), t: sel('GRASS', [['GRASS', 'Herbe'], ['JUNGLE', 'Jungle'], ['SAND', 'Sable'], ['DIRT', 'Terre']], () => {}), z: sel(10, ZONES.map((z, i) => [i, z.name]).filter(([i]) => i !== 0 && i !== 11 && i !== 12), () => {}), veg: h('input', { type: 'checkbox', checked: true }) };
+  const ok = await modal('Nouvelle île', h('div', {}, h('p', { class: 'hint' }, 'Une île neuve se peint en pleine mer : une plage, un haut-fond autour, de la terre au milieu. Choisissez sa taille, puis cliquez sur la mer pour la poser (son centre). Tout se retouche ensuite au pinceau.'),
+    field('Nom', I.nom), field('Largeur × hauteur', h('div', { class: 'two' }, I.w, I.hh)), field('Terre', I.t), field('Région', I.z), field('', h('label', { class: 'chk' }, I.veg, 'un peu de végétation (palmiers, arbres, buissons, rochers du jeu)'))),
+  [{ label: 'Annuler', value: false }, { label: 'Choisir sa place', value: true, cls: 'primary' }]);
+  if (!ok) return;
+  S.armed = null; S.prefab = null; S.island = { nom: I.nom.value.trim().slice(0, 40) || 'Île nouvelle', w: Math.max(8, Math.min(120, +I.w.value | 0)), h: Math.max(6, Math.min(90, +I.hh.value | 0)), terrain: I.t.value, region: +I.z.value, vegetation: I.veg.checked };
+  setTool('place'); VIEW.goTo(Math.floor(VIEW.cam.x / 16), Math.floor(VIEW.cam.y / 16), 0.5); zoomLabel(); toast('Cliquez en pleine mer : le centre de l’île (clic droit : annuler).');
+}
+async function carteDialog() {
+  const I = { nom: h('input', { value: 'Nouvelle carte' }), w: h('input', { type: 'number', value: 80, min: 8, max: 200 }), hh: h('input', { type: 'number', value: 40, min: 6, max: 72 }), sol: sel('GRASS', CARTE_SOLS, () => {}), bord: sel('mer', Object.entries(PIECE_BORDS), () => {}), ciel: h('input', { type: 'checkbox', checked: true }) };
+  const ok = await modal('Nouvelle carte', h('div', {}, h('p', { class: 'hint' }, 'Le jeu n’a qu’une grande carte (l’archipel, 960 × 448 cases), qu’on ne peut pas agrandir. Une « carte neuve » est un lieu à part, rangé sous l’archipel comme les grottes et les fonds marins du jeu : une crique cachée, un îlot secret, un souterrain. On y va par une porte ou un passage. Elle se peint, se meuble et se bâtit comme le reste.'),
+    field('Nom', I.nom), field('Largeur × hauteur', h('div', { class: 'two' }, I.w, I.hh)), field('Sol', I.sol), field('Tout autour', I.bord), field('', h('label', { class: 'chk' }, I.ciel, 'à ciel ouvert (la lumière du jour et de la nuit)'))),
+  [{ label: 'Annuler', value: false }, { label: 'Créer la carte', value: true, cls: 'primary' }]);
+  if (!ok) return;
+  const r = createCarte(ED, { nom: I.nom.value.trim().slice(0, 60) || 'Nouvelle carte', w: +I.w.value, h: +I.hh.value, sol: I.sol.value, bord: I.bord.value, dehors: I.ciel.checked });
+  if (r.err) return toast('Impossible : ' + r.err, 'err');
+  B.selectStruct({ k: 'piece', uid: r.pc.uid }); B.goPiece(r.pc); VIEW.cam.z = 0.75; zoomLabel();
+  toast('Carte créée. Reliez-la au monde : « ＋ Entrée… » (une porte depuis l’archipel), ou une zone de passage.');
+}
+
 // ------------------------------------------------------------------ les couches et l'affichage
 function renderLayers() {
   const L = $('layer-list'); L.innerHTML = '';
@@ -360,11 +484,12 @@ function renderProps() {
     const studio = s.filter((r) => r.k === 'd');
     if (studio.length) P.append(field('Couche', sel('', [['', '—'], ...ED.doc.couches.filter((c) => !c.origine).map((c) => [c.id, c.nom])], (v) => { if (!v) return; ED.begin('Changer de couche'); for (const r of studio) ED.change(r, { couche: v }); ED.end(); })));
     P.append(h('div', { class: 'btns' }, h('button', { on: { click: duplicate } }, 'Dupliquer'), h('button', { on: { click: copySel } }, 'Copier'), studio.length ? h('button', { on: { click: () => { ED.begin('Verrouiller'); for (const r of studio) ED.change(r, { verrou: true }); ED.end(); } } }, 'Verrouiller') : null, h('button', { class: 'danger', on: { click: () => { ED.remove(s); select([]); } } }, 'Supprimer')));
+    P.append(h('div', { class: 'btns' }, h('button', { on: { click: () => saveModelDialog(s) } }, '★ Enregistrer comme modèle…')));
     return;
   }
   const r = s[0], p = ED.propOf(r), d = ED.describe(r), isD = r.k === 'd', isB = BUILDING_PROPS.has(p.type);
-  const cv = preview(p.type, p.v);
-  P.append(h('div', { class: 'head' }, cv, h('div', {}, h('div', { class: 't' }, (d.nom ? d.nom + ' — ' : '') + nomDe(p.type)), h('div', { class: 's' }, isD ? 'Ajouté dans LStudio' : `Décor d’origine n° ${p.id}${ED.doc.retouches[p.id] ? ' (retouché)' : ''}`), h('div', { class: 's' }, cv.dataset.dim))));
+  const cv = preview(p.type === 'image' ? 'image:' + p.asset : p.type, p.v);
+  P.append(h('div', { class: 'head' }, cv, h('div', {}, h('div', { class: 't' }, (d.nom ? d.nom + ' — ' : '') + (p.type === 'image' ? nomDe2('image:' + p.asset) : nomDe(p.type))), h('div', { class: 's' }, isD ? 'Ajouté dans LStudio' : `Décor d’origine n° ${p.id}${ED.doc.retouches[p.id] ? ' (retouché)' : ''}`), h('div', { class: 's' }, cv.dataset.dim))));
   const ch = (f) => (v) => ED.change(r, { [f]: v });
   P.append(field('Case (x, y)', h('div', { class: 'two' }, num(d.x, ch('x')), num(d.y, ch('y')))));
   P.append(field('Décalage (px)', h('div', { class: 'two' }, num(d.dx || 0, ch('dx')), num(d.dy || 0, ch('dy')))));
@@ -386,7 +511,8 @@ function renderProps() {
     P.append(field('Nom', h('input', { value: d.nom || '', placeholder: 'facultatif', on: { change: (e) => ED.change(r, { nom: e.target.value.slice(0, 60) }) } })));
     P.append(field('Verrouillé', h('label', { class: 'chk' }, h('input', { type: 'checkbox', checked: !!d.verrou, on: { change: (e) => ED.change(r, { verrou: e.target.checked }) } }), 'plus de déplacement (L)')));
   }
-  P.append(h('div', { class: 'btns' }, h('button', { on: { click: duplicate } }, 'Dupliquer'), h('button', { on: { click: copySel } }, 'Copier'),
+  if (p.type === 'image') { const A = ED.doc.assets.find((a) => a.id === p.asset); P.append(field('Image', h('div', { class: 'two' }, h('span', { style: 'flex:1;padding-top:5px' }, A ? `${A.nom} (${A.w} × ${A.h} px)` : '⛔ introuvable'), A ? h('button', { class: 'mini', on: { click: () => assetDialog(A.id) } }, '⚙ Modifier') : null))); }
+  P.append(h('div', { class: 'btns' }, h('button', { on: { click: duplicate } }, 'Dupliquer'), h('button', { on: { click: copySel } }, 'Copier'), h('button', { on: { click: () => saveModelDialog([r]) } }, '★ Modèle…'),
     !isD && ED.doc.retouches[p.id] ? h('button', { on: { click: () => { ED.set('retouche', String(p.id), undefined); renderProps(); } } }, 'Rétablir l’original') : null,
     h('button', { class: 'danger', on: { click: () => { ED.remove([r]); select([]); } } }, isD ? 'Supprimer' : 'Retirer du monde')));
   if (!isD) P.append(h('p', { class: 'hint' }, 'Un décor du jeu : vos changements sont gardés comme des retouches, et « Rétablir l’original » le remet tel qu’il était.'));
@@ -396,7 +522,7 @@ function status() {
   const [tx, ty] = S.mouse || [0, 0]; if (tx < 0 || ty < 0 || tx >= WORLD.W || ty >= WORLD.H) return;
   const i = ty * WORLD.W + tx, room = WORLD.roomGrid[i] >= 0 ? WORLD.rooms[WORLD.roomGrid[i]].name : null;
   const sol = SOLS.find(([n]) => T[n] === WORLD.tiles[i]);
-  const tool = { select: 'Sélection', place: S.armed ? `Poser « ${nomDe(S.armed)} » (variante ${S.armedV + 1}, [ ] pour changer ; Alt : au pixel)` : 'Poser', paint: paintLabel() + ` (pinceau ${S.brush})`, pan: 'Main', build: S.build && S.build.pick ? 'Bâtir : choisissez un point sur la carte' : S.build && S.build.modele ? 'Bâtir : posez le bâtiment' : 'Bâtir : ' + ({ murs: 'cloisons', stylesol: 'style du sol', stylemur: 'style des murs', deco: 'décor mural', zone: 'zone' }[S.build && S.build.mode] || '') }[S.tool];
+  const tool = { select: 'Sélection', place: S.prefab ? `Poser le modèle « ${S.prefab.nom} »` : S.island ? `Poser l’île « ${S.island.nom} » (son centre, en pleine mer)` : S.armed ? `Poser « ${nomDe2(S.armed)} » (variante ${S.armedV + 1}, [ ] pour changer ; Alt : au pixel)` : 'Poser', paint: paintLabel() + ` (pinceau ${S.brush})`, pan: 'Main', build: S.build && S.build.pick ? 'Bâtir : choisissez un point sur la carte' : S.build && S.build.modele ? 'Bâtir : posez le bâtiment' : 'Bâtir : ' + ({ murs: 'cloisons', stylesol: 'style du sol', stylemur: 'style des murs', deco: 'décor mural', zone: 'zone' }[S.build && S.build.mode] || '') }[S.tool];
   $('status').textContent = `Case ${tx}, ${ty} · ${sol ? sol[1] : TILE_NAMES[WORLD.tiles[i]]} · ${ZONES[WORLD.zones[i]] ? ZONES[WORLD.zones[i]].name : 'région ' + WORLD.zones[i]}${room ? ' · ' + room : ''} · ${WORLD.solid[i] ? 'bloque' : 'libre'}${WORLD.sail[i] ? ' · navigable' : ''} — ${tool}`;
 }
 function zoomLabel() { $('z-val').textContent = Math.round(VIEW.cam.z * 100) + ' %'; }
@@ -516,6 +642,9 @@ function showHelp() {
   <li><b>Modifier</b> : outil Sélection (V), cliquez sur un élément ; ses propriétés s’affichent à droite. Glissez pour déplacer, flèches pour ajuster, Suppr pour supprimer. Les décors d’origine du jeu peuvent aussi être déplacés ou retirés, et « Rétablir l’original » les remet.</li>
   <li><b>Peindre</b> : onglet « Peinture » — le sol (sable, herbe, pavés, eau…), les régions, les collisions (ce qui bloque), la navigation des bateaux. Clic droit : gomme.</li>
   <li><b>Bâtir</b> : onglet « Bâtiments » — posez un bâtiment complet (façade, intérieur meublé, porte), ou créez une pièce, dessinez ses cloisons, ses sols et ses murs, accrochez des fenêtres et des tableaux, reliez-la à une entrée dehors, ajoutez un étage, tracez des zones (un message, un passage).</li>
+  <li><b>Le monde</b> : onglet « Monde » — la vue du monde (les îles, les lieux, ce qui les relie, ce qui est isolé), une île neuve peinte en pleine mer, une carte à part (un lieu de plein air sous l’archipel).</li>
+  <li><b>Vos modèles</b> : sélectionnez des éléments, « ★ Enregistrer comme modèle », et reposez-les ailleurs (onglet Bâtiments).</li>
+  <li><b>Vos images</b> : « ＋ Image » dans la bibliothèque importe votre pixel art (PNG, GIF, WebP) ; il se pose comme un décor, ou habille un élément du jeu.</li>
   <li><b>Couches</b> : rangez vos ajouts, masquez-les, verrouillez-les.</li>
   <li><b>Vérifier</b> : le contrôle cherche ce qui serait cassé (un décor inconnu, une porte bouchée, un personnage muré…) et propose une correction.</li>
   <li><b>Tester dans le jeu</b> : le vrai jeu s’ouvre, en solo, avec vos modifications. Votre pirate y est copié : sa vraie sauvegarde n’est jamais touchée.</li>
@@ -535,7 +664,11 @@ function wire() {
   $('file-in').onchange = (e) => { const f = e.target.files[0]; if (f) importFile(f); e.target.value = ''; };
   $('doc-name').value = ED.doc.meta.nom; $('doc-name').onchange = (e) => { ED.set('meta', 'nom', e.target.value.trim().slice(0, 60) || 'Mon monde'); };
   $('lib-search').oninput = renderLib; $('lib-used').onchange = renderLib;
-  const C = $('lib-cat'); C.append(h('option', { value: '' }, 'Toutes les catégories')); for (const c of CATEGORIES) C.append(h('option', { value: c.id }, c.nom)); C.onchange = renderLib;
+  const C = $('lib-cat'); C.append(h('option', { value: '' }, 'Toutes les catégories'), h('option', { value: 'images' }, 'Vos images importées')); for (const c of CATEGORIES) C.append(h('option', { value: c.id }, c.nom)); C.onchange = renderLib;
+  $('img-import').onclick = () => $('img-in').click();
+  $('img-in').onchange = (e) => { const f = e.target.files[0]; if (f) importImage(f); e.target.value = ''; };
+  $('model-in').onchange = (e) => { const f = e.target.files[0]; if (f) importModelFile(f); e.target.value = ''; };
+  $('monde-vue').onclick = () => MO.showWorld(); $('monde-ile').onclick = islandDialog; $('monde-carte').onclick = carteDialog;
   for (const b of document.querySelectorAll('#paint-kind button')) b.onclick = () => { S.paintKind = b.dataset.k; renderPaint(); setTool('paint'); };
   for (const b of document.querySelectorAll('#paint-size button')) b.onclick = () => { S.brush = +b.dataset.n; renderPaint(); };
   $('paint-erase').onchange = (e) => { S.erase = e.target.checked; };

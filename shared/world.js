@@ -7,7 +7,7 @@ import { buildFest } from './festival-world.js'; // lot 6 : la Nuit des Mille Vo
 import { buildMobilier } from './mobilier-world.js'; // monde vivant, lot 4 : le mobilier des métiers
 import { buildPort } from './port-world.js'; // 1.8 : la refonte de Port-Lanterne, construite en tout dernier
 import { buildHeistDecor, HEIST_PROPS } from './heist-decor.js'; // 2.0 : la refonte des lieux du braquage, après Port-Lanterne
-import { applyStudio, studioDoc } from './studio-world.js'; // LStudio : la couche écrite par l'éditeur, appliquée en tout dernier
+import { applyStudio, studioDoc, unkey } from './studio-world.js'; // LStudio : la couche écrite par l'éditeur, appliquée en tout dernier
 import { BERTHS } from './data/ships.js';
 
 export const Z = { SEA: 0, TOWN: 1, BEACH: 2, PLAINS: 3, JUNGLE: 4, RUINS: 5, SWAMP: 6, WRECK: 7, HAVRE: 8, CRANE: 9, ILOT: 10, INTERIOR: 11, CAVE: 12, GOUFFRE: 13,
@@ -87,8 +87,40 @@ export const PROPS = {
   longue_vue: { solid: 1 }, muret: { solid: 1 }, escalier: { ground: 1 }, porche: {},
   // 2.0 : les lieux du braquage (l'emprise de chaque meuble est déclarée dans son plan : shared/heist-decor.js)
   ...HEIST_PROPS,
+  // 2.3 : une image importée dans LStudio (son dessin est dans le document ; sa solidité, le décor la choisit)
+  image: {},
 };
 
+// 2.3 : LStudio a pu changer la terre et la mer. Les cases de terre nouvelles rejoignent l'île qu'elles touchent, ou forment
+// une île neuve, numérotée après les autres (aucune île ne change de numéro : la brume de la carte des pirates reste juste) ;
+// les cases devenues mer quittent leur île.
+export function relabelIslands(C, cells) {
+  const { W, tiles, zones, islandOf, islands } = C, NO = W * OVER_H, isWater = (t) => t === T.WATER || t === T.DEEP;
+  const fresh = [];
+  for (const i of cells) { if (i < 0 || i >= NO) continue; if (isWater(tiles[i])) islandOf[i] = 0; else if (!islandOf[i]) fresh.push(i); }
+  const seen = new Set();
+  for (const i0 of fresh) {
+    if (islandOf[i0] || seen.has(i0)) continue;
+    const comp = [i0], touch = new Map(); seen.add(i0);
+    for (let k = 0; k < comp.length; k++) {
+      const j = comp[k], jx = j % W;
+      for (const n of [j - 1, j + 1, j - W, j + W]) {
+        if (n < 0 || n >= NO || (n === j - 1 && jx === 0) || (n === j + 1 && jx === W - 1) || isWater(tiles[n])) continue;
+        if (islandOf[n]) { touch.set(islandOf[n], (touch.get(islandOf[n]) || 0) + 1); continue; }
+        if (!seen.has(n)) { seen.add(n); comp.push(n); }
+      }
+    }
+    let id = 0, best = -1; for (const [t, c] of touch) if (c > best) { best = c; id = t; }
+    if (!id) {
+      let sx = 0, sy = 0, x0 = W, x1 = 0, y0 = OVER_H, y1 = 0; const zc = new Map();
+      for (const j of comp) { const x = j % W, y = (j / W) | 0; sx += x; sy += y; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); zc.set(zones[j], (zc.get(zones[j]) || 0) + 1); }
+      let zone = 0, bz = -1; for (const [z, c] of zc) if (c > bz && z !== Z.SEA) { bz = c; zone = z; }
+      id = islands.length + 1;
+      islands.push({ id, n: comp.length, cx: Math.round(sx / comp.length), cy: Math.round(sy / comp.length), x0, y0, x1, y1, zone, zones: [...zc.keys()], studio: 1 });
+    }
+    for (const j of comp) islandOf[j] = id;
+  }
+}
 const idx = (x, y) => y * W + x;
 export const inMap = (x, y) => x >= 0 && y >= 0 && x < W && y < H;
 
@@ -1787,7 +1819,9 @@ export function generateWorld(seed = 7, opts = {}) { // opts.studio : le documen
   buildHeistDecor({ W, tiles, zones, solid, occ, idx, inMap, alloc, rooms, doors, props, addProp, npcs, roomGrid, sail, waterDist, heist, chests, stampPath, spawns });
   // LStudio : le monde écrit dans l'éditeur, par-dessus tout le reste (un document vide ne change rien)
   const studioZones = []; // les zones d'interaction et de passage écrites dans LStudio (le client et le moteur les lisent)
-  const studio = applyStudio({ W, H, tiles, zones, solid, occ, sail, waterDist, plankDir, props, addProp, PROPS, inMap, rooms, doors, roomGrid, szones: studioZones }, opts.studio !== undefined ? opts.studio : studioDoc());
+  const sdoc = opts.studio !== undefined ? opts.studio : studioDoc();
+  const studio = applyStudio({ W, H, tiles, zones, solid, occ, sail, waterDist, plankDir, props, addProp, PROPS, inMap, rooms, doors, roomGrid, szones: studioZones }, sdoc);
+  if (studio.sol) relabelIslands({ W, tiles, zones, islandOf, islands }, Object.keys(sdoc.sol).map((k) => { const [x, y] = unkey(k); return y * W + x; }).filter((i) => i >= 0 && i < W * OVER_H)); // 2.3 : une île peinte dans LStudio est une île
   const OUT = {
     heist, fest, mobilier, port, spawnPoints: port.spawnPoints, studio, studioZones,
     block: new Uint8Array(N), // constructions des joueurs : 1 bloque tout, 2 bloque les morts

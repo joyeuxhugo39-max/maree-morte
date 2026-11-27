@@ -4,6 +4,7 @@
 import { CHUNK_PX, MINI_COL } from '../client/render/terrain.js';
 import { citeSprite, proprieteSprite } from '../client/render/sprites-cite.js';
 import { mirrorSpr } from '../client/render/renderer.js';
+import { envKey } from '../client/render/studio-assets.js';
 import { humanSheet, FW, FH } from '../client/render/sprites-chars.js';
 import { NPCS } from '../shared/data/npcs.js';
 import { T } from '../shared/constants.js';
@@ -32,17 +33,19 @@ export class MapView {
   reindex() { this.buckets.clear(); for (const p of this.world.props) { if (p.spr && p._sk == null) p._sk = this.skey(p); this.addB(p); } } // les décors d'origine gardent le sprite choisi par le jeu
   addB(p) { const k = this.bkey(p); p._bk = k; if (!this.buckets.has(k)) this.buckets.set(k, new Set()); this.buckets.get(k).add(p); }
   delB(p) { const b = this.buckets.get(p._bk); if (b) b.delete(p); }
-  skey(p) { return `${p.type}|${p.v}|${p.flip == null ? '' : p.flip ? 1 : 0}|${p.w || ''}|${p.h || ''}|${p.door ?? ''}|${p.style || ''}|${p.plan || ''}`; }
+  skey(p) { return `${p.type}|${p.asset || ''}|${p.v}|${p.flip == null ? '' : p.flip ? 1 : 0}|${p.w || ''}|${p.h || ''}|${p.door ?? ''}|${p.style || ''}|${p.plan || ''}`; }
   spr(p) {
     const sk = this.skey(p);
     if (p._sk !== sk || !p.spr) {
       p.ground = p.plan === 'sol' || (!p.plan && !!(PROPS[p.type] && PROPS[p.type].ground)); p.over = p.plan === 'dessus' || (!p.plan && !!(PROPS[p.type] && PROPS[p.type].over));
-      let s = p.type === 'cite' ? citeSprite(p) : p.type === 'propriete' ? proprieteSprite(p, this.R.env) : (() => { const L = this.R.env[p.type]; return L && L.length ? L[(p.v | 0) % L.length] : null; })();
+      let s = p.type === 'cite' ? citeSprite(p) : p.type === 'propriete' ? proprieteSprite(p, this.R.env) : (() => { const L = this.R.env[envKey(p)]; return L && L.length ? L[(p.v | 0) % L.length] : null; })();
       if (s && p.flip) s = mirrorSpr(s);
       p.spr = s; p._sk = sk;
     }
     return p.spr;
   }
+  // 2.3 : une image a changé (importée, remplacée, habillant un élément) : les décors concernés reprennent leur sprite
+  refreshSprites(types, assetIds) { for (const p of this.world.props) if ((p.type === 'image' && assetIds.has(p.asset)) || types.has(p.type)) { p._sk = null; p.spr = null; this.alpha = new WeakMap(); } this.dirty = true; }
   onChange(ch) {
     if (ch.props) for (const p of ch.props) { this.delB(p); if (this.world.props.includes(p)) this.addB(p); }
     if (ch.cells && ch.cells.length) {

@@ -2,7 +2,7 @@
 // Le monde affiché est le VRAI monde du jeu (generateWorld, sans document), auquel on applique le document avec le
 // même code que le jeu (StudioWorld, shared/studio-world.js). Chaque action modifie le document et le monde ensemble,
 // et s'enregistre dans l'historique : annuler, c'est réappliquer l'état d'avant, clé par clé.
-import { StudioWorld, applyDoc, key, unkey, BUILDING_PROPS, pieceEnvelope } from '../shared/studio-world.js';
+import { StudioWorld, applyDoc, key, unkey, BUILDING_PROPS, pieceEnvelope, PIECE_MIN, PIECE_MAX_W, PIECE_MAX_H } from '../shared/studio-world.js';
 import { inMap } from '../shared/world.js';
 import { T, OVER_H } from '../shared/constants.js';
 
@@ -42,6 +42,7 @@ export class Editor {
     if (kind === 'meta') return clone(this.doc.meta[k]);
     if (kind === 'reperes') return clone(this.doc.reperes);
     if (STRUCT[kind]) return clone(this.doc[STRUCT[kind]].find((o) => o.uid === k));
+    if (kind === 'asset') return clone(this.doc.assets.find((a) => a.id === k));
   }
   write(kind, k, v, ch) {
     const S = this.S;
@@ -64,6 +65,13 @@ export class Editor {
       const after = new Set(this.S.pieceRooms.keys());
       for (const pc of this.doc.pieces) if (before.has(pc.uid) !== after.has(pc.uid)) touch(pc);
       ch.structure = true;
+      return;
+    }
+    if (kind === 'asset') { // 2.3 : une image importée (son dessin ; l'élément du jeu qu'elle habille)
+      const arr = this.doc.assets, i = arr.findIndex((a) => a.id === k), old = i >= 0 ? arr[i] : null;
+      if (v === undefined) { if (i >= 0) arr.splice(i, 1); } else if (i >= 0) arr[i] = clone(v); else arr.push(clone(v));
+      ch.assets = true; (ch.assetIds || (ch.assetIds = new Set())).add(k); ch.assetTypes = ch.assetTypes || new Set();
+      for (const a of [old, v]) if (a && a.remplace) ch.assetTypes.add(a.remplace);
       return;
     }
     if (kind === 'decor') {
@@ -182,7 +190,7 @@ export class Editor {
   // la place d'une pièce : son enveloppe ne touche que du vide d'origine, et aucune autre pièce (sauf elle-même)
   canPut(pc, except = null) {
     const S = this.S, W = this.world.W, E = pieceEnvelope(pc);
-    if (!(pc.w >= 3 && pc.h >= 3 && pc.w <= 96 && pc.h <= 48)) return 'dimensions impossibles (de 3 à 96 × 48 cases)';
+    if (!(pc.w >= PIECE_MIN && pc.h >= PIECE_MIN && pc.w <= PIECE_MAX_W && pc.h <= PIECE_MAX_H)) return `dimensions impossibles (de ${PIECE_MIN} × ${PIECE_MIN} à ${PIECE_MAX_W} × ${PIECE_MAX_H} cases)`;
     if (E.y0 < OVER_H + 1 || E.x0 < 1 || E.x1 > W - 2 || E.y1 > this.world.H - 2) return 'hors de la bande des intérieurs';
     for (let y = E.y0; y <= E.y1; y++) for (let x = E.x0; x <= E.x1; x++) {
       const i = y * W + x;
@@ -203,10 +211,10 @@ export class Editor {
     return null;
   }
   createPiece(o = {}) {
-    const w = Math.max(3, Math.min(96, o.w | 0 || 12)), h = Math.max(3, Math.min(48, o.h | 0 || 8)), at = o.x != null ? [o.x, o.y] : this.freeSpot(w, h);
+    const w = Math.max(PIECE_MIN, Math.min(PIECE_MAX_W, o.w | 0 || 12)), h = Math.max(PIECE_MIN, Math.min(PIECE_MAX_H, o.h | 0 || 8)), at = o.x != null ? [o.x, o.y] : this.freeSpot(w, h);
     if (!at) return null;
     const pc = { uid: newUid(), nom: o.nom || 'Nouvelle pièce', x: at[0], y: at[1], w, h, genre: o.genre || 'house', sol: o.sol || 'FLOOR', style: o.style | 0, mur: o.mur || '', sortie: o.sortie != null ? o.sortie : w >> 1, decoAuto: o.decoAuto !== false, sols: {}, murs: {}, deco: [] };
-    if (o.ambiance) pc.ambiance = o.ambiance; if (o.dehors) pc.dehors = true;
+    if (o.ambiance) pc.ambiance = o.ambiance; if (o.dehors) pc.dehors = true; if (o.bord) pc.bord = o.bord;
     if (this.canPut(pc)) return null;
     this.set('piece', pc.uid, pc);
     return pc;

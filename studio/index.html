@@ -35,9 +35,9 @@
     </div>
   </header>
   <aside id="left">
-    <nav class="tabs" data-for="left"><button data-tab="lib" class="on">Bibliothèque</button><button data-tab="paint">Peinture</button><button data-tab="build">Bâtiments</button><button data-tab="map">Carte</button></nav>
+    <nav class="tabs" data-for="left"><button data-tab="lib" class="on">Bibliothèque</button><button data-tab="paint">Peinture</button><button data-tab="build">Bâtiments</button><button data-tab="map">Monde</button></nav>
     <section data-pane="lib" class="pane on">
-      <input id="lib-search" placeholder="Rechercher (ex. tonneau, lanterne…)" spellcheck="false">
+      <div class="row"><input id="lib-search" placeholder="Rechercher (ex. tonneau, lanterne…)" spellcheck="false"><button id="img-import" title="Importer votre propre pixel art (PNG, GIF, WebP)">＋ Image</button></div>
       <div class="row"><select id="lib-cat"></select><label class="chk"><input type="checkbox" id="lib-used"> déjà utilisés</label></div>
       <div id="lib-list" class="lib"></div>
     </section>
@@ -48,8 +48,9 @@
       <div id="paint-list" class="plist"></div>
       <p class="hint" id="paint-hint"></p>
     </section>
-    <section data-pane="build" class="pane"><div id="build-pane"></div></section>
+    <section data-pane="build" class="pane"><div id="build-pane"></div><div id="prefab-pane"></div></section>
     <section data-pane="map" class="pane">
+      <div class="btns"><button id="monde-vue" class="primary" title="Les îles, les lieux, ce qui les relie, ce qui est isolé">🗺 Vue du monde</button><button id="monde-ile" title="Peindre une île neuve en pleine mer">🏝 Nouvelle île…</button><button id="monde-carte" title="Un lieu de plein air à part, sous l’archipel, relié par des portes et des passages">🧭 Nouvelle carte…</button></div>
       <h3>Aller à</h3>
       <div class="row"><input id="go-x" type="number" placeholder="x"><input id="go-y" type="number" placeholder="y"><button id="go-btn">Aller</button></div>
       <h3>Mes repères <button id="rep-add" class="mini" title="Poser un repère au centre de la vue">+ ici</button></h3>
@@ -86,6 +87,8 @@
 <div id="menu" class="hidden"></div>
 <div id="toasts"></div>
 <input type="file" id="file-in" accept=".json,application/json" class="hidden">
+<input type="file" id="img-in" accept="image/png,image/gif,image/webp" class="hidden">
+<input type="file" id="model-in" accept=".json,application/json" class="hidden">
 <script type="module" src="main.js"></script>
 </body>
 </html>

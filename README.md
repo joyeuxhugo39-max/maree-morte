@@ -25,6 +25,29 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Version 2.3.0 : LStudio, le monde, les modèles et les images (lot 3)
+
+LStudio voit et agrandit le monde, enregistre vos modèles, et importe votre pixel art. Mode d'emploi : `LSTUDIO.md`,
+rapport : `rapports/ls4-lot3.md`.
+
+- **La vue du monde** : les îles, les lieux, ce qui les relie (bateaux, portes, passages) et ce qui est isolé.
+- **Une île neuve**, peinte en pleine mer : une plage, un haut-fond, de la végétation du jeu si on le veut. C'est une île
+  du jeu (la carte et sa brume la connaissent).
+- **Une carte à part** : un lieu de plein air jusqu'à 200 × 72 cases, rangé sous l'archipel, bordé par la mer, relié par
+  des portes et des passages.
+- **Vos modèles** : une sélection enregistrée (un bâtiment emporte son intérieur, ses étages, ses meubles), reposée
+  ailleurs en une action, exportée en fichier.
+- **Vos images** : votre pixel art (PNG, GIF, WebP) vérifié et ramené à l'échelle du jeu. Il se pose comme un décor, ou
+  habille un élément du jeu. On peut le remplacer sans casser les décors qui s'en servent.
+- **Le contrôle** des îles et des lieux isolés, et des images (manquantes, illisibles, trop lourdes).
+- **La suite `t_studio30`** vérifie :
+  - les images, relues au pixel près ;
+  - l'île neuve et la numérotation des îles ;
+  - les liaisons et ce qui est isolé ;
+  - la carte à part ;
+  - les modèles, éditeur et jeu identiques, et tout annuler.
+- **Le monde publié reste vide** : le jeu n'a pas changé.
+
 ## Version 2.2.0 : LStudio, les bâtiments et les intérieurs (lot 2)
 
 LStudio sait maintenant bâtir : des intérieurs, leurs portes, leurs étages, et des zones de message et de passage. Ce

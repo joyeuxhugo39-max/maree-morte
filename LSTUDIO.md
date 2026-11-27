@@ -21,8 +21,10 @@ joueurs ne la voient pas.
    le déplacer, les flèches l'ajustent, Suppr le supprime.
 5. **Bâtissez.** Onglet **Bâtiments** : choisissez « Taverne », cliquez sur l'archipel. La façade, son intérieur meublé
    et la porte qui les relie sont posés d'un coup (voir « Bâtir » plus bas).
-6. **Testez.** **▶ Tester dans le jeu** ouvre le vrai jeu, en solo, avec vos modifications.
-7. **Publiez** quand c'est prêt (voir plus bas).
+6. **Agrandissez le monde.** Onglet **Monde** : « 🏝 Nouvelle île… », « 🧭 Nouvelle carte… », et la **vue du monde**
+   pour voir ce qui est relié et ce qui est isolé (voir « Le monde » plus bas).
+7. **Testez.** **▶ Tester dans le jeu** ouvre le vrai jeu, en solo, avec vos modifications.
+8. **Publiez** quand c'est prêt (voir plus bas).
 
 ## Les outils
 
@@ -86,7 +88,7 @@ Tout se modifie ensuite.
 
 **Une pièce à soi**
 
-1. **Créer** : « ＋ Nouvelle pièce… » : son nom, sa taille (de 3 × 3 à 96 × 48 cases), son genre (maison, taverne,
+1. **Créer** : « ＋ Nouvelle pièce… » : son nom, sa taille (de 3 × 3 à 200 × 72 cases), son genre (maison, taverne,
    forge, grotte…, qui donne son style par défaut aux murs et au sol), le sol (plancher ou dallage), les styles. LStudio
    la range tout seul là où il y a de la place.
 2. **La choisir** : cliquez sur son sol vide (ou dans la liste « Pièces de ce monde »). Ses propriétés s'affichent à
@@ -122,6 +124,66 @@ peut avoir plusieurs portes : chacune a sa colonne de sortie, et l'on ressort pa
 **Ce que l'on voit en édition seulement** : le contour des pièces de LStudio (rouge si elle est écartée), les zones
 (jaune : un message ; violet : un passage, avec la flèche vers son arrivée), les entrées des portes. Rien de cela ne se
 voit en jeu (onglet Couches → Affichage).
+
+## Le monde : îles, cartes à part, liaisons
+
+Le jeu n'a qu'une grande carte : l'archipel (960 × 448 cases), et sous lui, la bande des intérieurs (les pièces, les
+grottes, les fonds marins). On ne l'agrandit pas : on la remplit.
+
+- **Une île neuve** (onglet Monde → « 🏝 Nouvelle île… ») : son nom, sa taille, sa terre (herbe, jungle, sable, terre),
+  sa région, et, si vous le voulez, un peu de végétation du jeu (palmiers, arbres, buissons, rochers). Cliquez ensuite en
+  pleine mer : son centre. Elle a une plage et un haut-fond tout autour ; les bateaux y accostent. C'est une île du jeu
+  comme les autres (la carte des pirates et sa brume la connaissent). Elle ne se pose qu'en pleine mer, et tout se
+  retouche ensuite au pinceau.
+- **Une carte à part** (« 🧭 Nouvelle carte… ») : un lieu de plein air, jusqu'à 200 × 72 cases, rangé sous l'archipel
+  comme les grottes du jeu. Une crique cachée, un îlot secret, un souterrain… Son sol (herbe, sable, terre, grotte,
+  pavés…), ce qu'on voit tout autour (la mer, des ruelles, des murs), le ciel du jour et de la nuit. On y va par une porte
+  (« ＋ Entrée… ») ou par un passage. Elle se peint, se meuble et se bâtit comme le reste.
+- **La vue du monde** (« 🗺 Vue du monde ») : tout l'archipel et la bande des intérieurs d'un coup d'œil.
+  - Les îles : vertes si on peut les atteindre depuis l'arrivée des pirates (le point blanc), jaunes si vous les avez
+    modifiées, rouges si personne ne peut y aller (aucun bateau n'y accoste).
+  - Les lieux de LStudio, et ce qui les relie : les portes (en jaune), les passages (en violet). Les lieux du jeu
+    s'affichent aussi, si vous le demandez.
+  - La liste de ce qui est isolé, avec « Aller voir ». Cliquer sur la carte vous y emmène.
+  - Les lieux du jeu où l'on arrive par une mécanique (la plongée, les scènes du braquage, le festival) ne sont pas
+    comptés comme isolés.
+
+## Vos modèles
+
+Une maison meublée, un quai marchand, un jardin, une taverne avec son étage : enregistrez-les une fois, reposez-les
+ailleurs autant de fois que vous voulez.
+
+1. Sélectionnez les éléments sur la carte (un clic, Maj + clic, ou un cadre).
+2. Dans leurs propriétés : **★ Enregistrer comme modèle…** (son nom ; avec ou sans le sol peint et les collisions
+   dessous).
+3. Onglet **Bâtiments** → « Vos modèles » : cliquez sur le modèle, puis sur la carte (son coin en haut à gauche).
+
+- Un bâtiment de LStudio emporte son intérieur, ses étages, ses meubles, ses cloisons, ses zones et sa porte : reposé,
+  il a sa propre pièce, rangée toute seule sous l'archipel.
+- Un modèle posé, c'est une seule action : Ctrl+Z le défait entièrement.
+- Les modèles sont rangés dans ce navigateur, pas dans le monde publié. « ⬇ » en exporte un dans un fichier ;
+  « ⬆ importer » le relit, sur un autre ordinateur ou pour un autre monde (avec les images dont il se sert).
+
+## Vos images (pixel art)
+
+LStudio n'invente aucun dessin : vous importez le vôtre.
+
+- **Importer** : dans la Bibliothèque, « ＋ Image ». Une image PNG, GIF ou WebP (pas de JPEG : il abîme les pixels).
+- **Ce que LStudio vérifie** :
+  - au plus 256 × 256 pixels (un décor de 16 × 16 cases) ;
+  - au plus 255 couleurs ; au-delà, ce n'est pas du pixel art, et LStudio vous dit de réduire la palette ;
+  - des pixels opaques ou transparents : un pixel à demi transparent devient l'un ou l'autre, et LStudio le dit ;
+  - une image agrandie (chaque pixel devenu un carré de 2 × 2, 4 × 4…) est ramenée à l'échelle du jeu : un pixel de
+    l'image = un pixel du jeu.
+- **Poser** : vos images sont en tête de la Bibliothèque (« Vos images importées »). Elles se posent comme un décor : le
+  pied du dessin au milieu du bas, sa rangée du bas bloque (réglable dans « Solidité »).
+- **Habiller un élément du jeu** : à l'import, ou plus tard (⚙ sur l'image), choisissez un élément (un tonneau, une
+  lanterne…). Tous ses exemplaires, ceux du jeu et les vôtres, prennent ce dessin. Son nom, sa solidité et son rôle ne
+  changent pas. Retirez l'habillage : ils reprennent leur dessin d'origine.
+- **Remplacer** (⚙ → « Remplacer le dessin… ») : l'image garde son identifiant ; tous les décors qui s'en servent
+  suivent.
+- **Le poids** : chaque joueur charge vos images au démarrage. Le contrôle prévient à partir de 600 Ko, et bloque au-delà
+  de 2 000 Ko.
 
 ## Peindre
 
@@ -160,6 +222,10 @@ voit en jeu (onglet Couches → Affichage).
     qu'on ne peut pas atteindre depuis l'entrée, un bâtiment dont la porte ne mène nulle part, un décor mural sans mur,
     un message vide.
 
+  - pour le monde : une île que les bateaux n'atteignent pas, un lieu dont l'entrée est hors d'atteinte ;
+  - pour les images : une image manquante ou illisible, des images trop lourdes, l'habillage d'un élément qui n'existe
+    pas.
+
   Chaque problème a son emplacement (« Aller voir ») et, souvent, une correction en un clic. Les problèmes **bloquants**
   empêchent la publication ; les **avertissements**, non.
 - **▶ Tester dans le jeu** ouvre la vraie page du jeu, en solo, avec vos modifications : vraies collisions, vraies portes,
@@ -188,13 +254,11 @@ voit en jeu (onglet Couches → Affichage).
 
 ## Ce que LStudio ne fait pas encore
 
-Prévus aux lots suivants :
+Prévus au lot suivant :
 
-- **La vue du monde** et ses connexions ; créer une carte neuve aux dimensions choisies.
-- **Vos propres modèles** : enregistrer une sélection (un quai marchand, une maison meublée) pour la reposer ailleurs.
-  Aujourd'hui, cinq bâtiments complets sont fournis.
-- **L'import d'images** en pixel art.
-- **Des personnages** à placer dans les pièces (aujourd'hui, les tavernes se remplissent d'habitués toutes seules).
+- **Des personnages** à placer (aujourd'hui, les tavernes se remplissent d'habitués toutes seules).
+- **Le contrôle avancé** : les passages bloqués entre deux lieux d'une même île, et plus de corrections proposées.
+- **Les finitions**.
 
 ## Pour qui voudrait comprendre comment c'est fait
 
@@ -202,7 +266,7 @@ Prévus aux lots suivants :
   `rapports/ls1-audit-architecture.md`). Le jeu l'applique en tout dernier, avec le même code que l'éditeur
   (`shared/studio-world.js`). Un document vide ne change rien.
 - **Les sources** de l'éditeur sont dans `studio/`. La page est fabriquée par `npm run build:studio` (ou `npm run build`).
-- **Les tests** : `tests/t_studio10.mjs` et `tests/t_studio20.mjs` vérifient qu'après une longue suite d'actions au
+- **Les tests** : `tests/t_studio10.mjs`, `tests/t_studio20.mjs` et `tests/t_studio30.mjs` vérifient qu'après une longue suite d'actions au
   hasard (décors, peinture, pièces, portes, zones, cloisons, styles), l'éditeur et le jeu ont exactement le même monde,
   et que tout annuler ramène le monde d'origine à l'octet près. Le second fait aussi entrer un pirate par la porte d'une
   pièce, monter un escalier et ressortir, avec le vrai moteur du jeu.
