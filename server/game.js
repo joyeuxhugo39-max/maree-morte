@@ -535,6 +535,7 @@ export class Game {
     p.en = p.stats.maxEn;
     p.zone = zoneAt(this.world, p.x, p.y);
     p.room = roomIdAt(this.world, p.x, p.y);
+    { const mv = this.world.heist && (this.world.heist.legacy || []).find((q) => q.room === p.room); if (mv) { p.x = mv.to.x; p.y = mv.to.y; p.room = roomIdAt(this.world, p.x, p.y); } } // 2.0 : sauvegardé dans l'ancien atelier de Lafleur : on reparaît dans le neuf
     this.markSeen(p, true); // on voit au moins là où l'on se tient
     if (d && !d.seen) this.revealKnown(p); // sauvegarde d'avant la 1.0 : les îles déjà parcourues sortent de la brume
     if (!d) { const sp0 = this.world.spawnPoint; const keep = [p.x, p.y]; p.x = sp0.x; p.y = sp0.y; this.markSeen(p, true); [p.x, p.y] = keep; }

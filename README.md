@@ -25,6 +25,36 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Version 2.0.0 : les lieux du Plus Grand Braquage, reconstruits
+
+Les huit lieux de la grande quête sont redessinés comme de vrais lieux, d'après un plan écrit pour chacun
+(`shared/heist-decor.js`). Chaque meuble a sa place et son emprise, et le décor mural est choisi mur par mur : rien
+n'est plus tiré au hasard. Les mécaniques, les chiffres et les sauvegardes ne changent pas.
+
+- **La demeure de Valdorne** : sept pièces distinctes (le grand salon, le vestibule, l'office, le salon de jeu, la
+  galerie à alcôves, les archives, le cabinet). Chacune a son sol, ses murs et son mobilier : cheminée de marbre sous
+  le portrait du maître, lustres, estrade des musiciens, buffet, vitrines, statue, coffre central.
+- **Le quartier** : la demeure monte au-dessus d'une cour d'honneur close (parterres, allée de lanternes, fontaine,
+  terrasse sur la baie), derrière un portail gardé sur la rue des Corsaires. Les maisons des joueurs ne bougent pas.
+- **La réception vit** :
+  - neuf groupes qui parlent chacun de leur sujet, des invités qui changent de groupe ;
+  - des domestiques qui font leur tournée, les musiciens, le majordome, le portier ;
+  - des réactions au pirate, à la bagarre et à l'alarme.
+- **L'entrepôt de la Douane** est organisé en zones : rayonnages, îlots de stockage, saisies, allée de manutention, quai
+  de chargement, bureau du receveur.
+- **L'atelier de Lafleur** devient une vraie pièce : table à dessin, maquette de la demeure, plans, trappe dans le
+  plancher. **La cave** est faite de pierre humide, avec un casier à vin et la bouche d'égout des crabes.
+- **Les toits** : cinq toitures différentes, des cheminées fumantes, des lucarnes, une terrasse, une passerelle ; les
+  façades vues des ruelles ; quatre ruelles nommées avec leur cour et leur puits.
+- **La Mouche d'Or** : un vrai pont de navire, avec mâts et gréement, dunette, barre, bastingage, et la mer tout autour.
+- **Le moteur** : des sols et des murs par pièce, une couche au-dessus des personnages (lustres, gréement, linge), la
+  lumière du ciel sur les toits et le pont, des sons par lieu. Les gardes contournent murs et meubles.
+- **Les vérifications** :
+  - `t_lieux20` (nouveau) vérifie les accès, les passages, les figurants, les rondes, la poursuite, le pont et les
+    sauvegardes ;
+  - `t_monde90` liste les sept rectangles redessinés et vérifie que le reste du monde n'a pas bougé d'une case ;
+  - rapport détaillé dans `rapports/br2-livraison.md`.
+
 ## Version 1.9.1 : Port-Lanterne remis d'aplomb
 
 - **Les badauds du festival** se tenaient dans l'eau, sur l'ancienne jetée devenue eau profonde avec le port de la

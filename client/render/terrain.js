@@ -4,6 +4,7 @@ import { TILE, MAP_W, MAP_H, T } from '../../shared/constants.js';
 import { valueNoise, hash2 } from '../../shared/rng.js';
 import { Z } from '../../shared/world.js';
 import { mix, shade } from './pixel.js';
+import { heistFloor, heistAlley, heistSea, WSTYLE, heistWallUp, heistWallLow, heistDecorPix } from './heist-art.js'; // 2.0 : les lieux du braquage
 
 export const CHUNK_T = 16;
 export const CHUNK_PX = CHUNK_T * TILE;
@@ -476,18 +477,22 @@ export class Terrain {
           break;
         }
         case T.VOID: {
-          const rid = W.roomGrid[(wy >> 4) * MAP_W + (wx >> 4)];
-          col = rid >= 0 && W.rooms[rid].kind === 'gabier' ? this.harbour(wx, wy) : 0x07050b; // lot 6 : l'eau du port, entre les quais du gabier
+          const rid = W.roomGrid[(wy >> 4) * MAP_W + (wx >> 4)], vr = rid >= 0 ? W.rooms[rid] : null;
+          col = vr && vr.kind === 'gabier' ? this.harbour(wx, wy) : vr && vr.voidStyle === 'ruelle' ? heistAlley(wx, wy) : vr && vr.voidStyle === 'mer' ? heistSea(wx, wy) : 0x07050b; // lot 6 : l'eau du port, entre les quais du gabier ; 2.0 : la ruelle sous les toits, la mer le long du navire
           break;
         }
         case T.FLOOR: case T.STONEF: case T.EXIT: {
           const tx = wx >> 4, ty = wy >> 4, rid = W.roomGrid[ty * MAP_W + tx], room = rid >= 0 ? W.rooms[rid] : null;
           const kind = room ? room.kind : 'house';
-          if (kind === 'cave') { col = this.caveFloor(wx, wy, lx, ly, at, room); col = mix(col, 0x9aa8b0, 0.12 + (wy & 15) / 16 * 0.3); break; }
-          if (kind === 'toits' && t === T.FLOOR) { col = this.roofTiles(wx, wy); break; } // lot 5 : des tuiles rouges, rangée après rangée
-          const S = WALLS[kind] || WALLS.house;
-          const stone = t === T.STONEF || (t === T.EXIT && kind === 'forge');
-          col = stone ? this.flagstone(wx, wy, PAL[T.STONEF]) : this.planks(wx, wy, S.F);
+          const hst = room && room.fl && t !== T.EXIT ? room.fl[(ty - room.y0) * room.w + (tx - room.x0)] : 0; // 2.0 : le sol choisi par le plan du lieu
+          if (hst) { col = heistFloor(hst, wx, wy, room, tx, ty); if (room.outdoor) break; }
+          else if (kind === 'cave') { col = this.caveFloor(wx, wy, lx, ly, at, room); col = mix(col, 0x9aa8b0, 0.12 + (wy & 15) / 16 * 0.3); break; }
+          else if (kind === 'toits' && t === T.FLOOR) { col = this.roofTiles(wx, wy); break; } // lot 5 : des tuiles rouges, rangée après rangée
+          else {
+            const S = WALLS[kind] || WALLS.house;
+            const stone = t === T.STONEF || (t === T.EXIT && kind === 'forge');
+            col = stone ? this.flagstone(wx, wy, PAL[T.STONEF]) : this.planks(wx, wy, S.F);
+          }
           if (t === T.EXIT) {
             const u = wx & 15, v = wy & 15;
             if (u >= 3 && u <= 12 && v >= 2 && v <= 11) col = (u === 3 || u === 12 || v === 2 || v === 11) ? 0x3a1a12 : ((u + v) % 4 < 2 ? 0x7a3a2a : 0x5a2a1e);
@@ -506,11 +511,12 @@ export class Terrain {
         case T.IWALL: {
           const tx = wx >> 4, ty = wy >> 4;
           const below1 = this.tileT(tx, ty + 1), below2 = this.tileT(tx, ty + 2);
-          let d = 0, rid = -1;
-          if (isFloor(below1)) { d = (ty + 1) * TILE - wy; rid = W.roomGrid[(ty + 1) * MAP_W + tx]; }
-          else if (below1 === T.IWALL && isFloor(below2)) { d = (ty + 2) * TILE - wy; rid = W.roomGrid[(ty + 2) * MAP_W + tx]; }
-          if (d > 0) col = this.wallFace(wx, wy, d, rid >= 0 ? W.rooms[rid] : null, tx);
+          let d = 0, rid = -1, tyF = 0;
+          if (isFloor(below1)) { d = (ty + 1) * TILE - wy; rid = W.roomGrid[(ty + 1) * MAP_W + tx]; tyF = ty + 1; }
+          else if (below1 === T.IWALL && isFloor(below2)) { d = (ty + 2) * TILE - wy; rid = W.roomGrid[(ty + 2) * MAP_W + tx]; tyF = ty + 2; }
+          if (d > 0) col = this.wallFace(wx, wy, d, rid >= 0 ? W.rooms[rid] : null, tx, tyF);
           else if (W.roomGrid[ty * MAP_W + tx] >= 0 && W.rooms[W.roomGrid[ty * MAP_W + tx]].kind === 'gabier') col = this.harbour(wx, wy);
+          else if (W.roomGrid[ty * MAP_W + tx] >= 0 && W.rooms[W.roomGrid[ty * MAP_W + tx]].voidStyle === 'mer') col = heistSea(wx, wy); // 2.0 : autour du pont de La Mouche d'Or, la mer
           else {
             col = hash2(wx >> 1, wy >> 1, 181) > 0.85 ? 0x22170f : 0x1a1210;
             const up1 = this.tileT(tx, ty - 1), fy = wy & 15;
@@ -653,7 +659,19 @@ export class Terrain {
     for (const [dx, dy, dd] of RING3) if (at(lx + dx, ly + dy) === T.CWALL) { col = shade(col, 0.55 + dd * 0.13); break; }
     return col;
   }
-  wallFace(wx, wy, d, room, tx) { // NO_DECO : ni fenêtre ni tableau au pont d'un navire, sur les toits, dans une cave
+  wallFace(wx, wy, d, room, tx, tyF) { // NO_DECO : ni fenêtre ni tableau au pont d'un navire, sur les toits, dans une cave
+    if (room && room.ws) { // 2.0 : un lieu redessiné — le style de mur de la pièce, et le décor choisi pour ce mur (jamais tiré au hasard)
+      const li = (tyF - room.y0) * room.w + (tx - room.x0), k = li >= 0 && li < room.ws.length ? room.ws[li] : 0;
+      const D = room.wd && room.wd.get(tx + tyF * 4096);
+      if (D) { const c = heistDecorPix(D, wx & 15, d); if (c !== -1) return c; }
+      if (k) {
+        const HS = WSTYLE[room.wsk[k - 1]];
+        if (d <= 2) return HS.N[0];
+        if (d <= 13) return heistWallLow(HS, wx, d);
+        if (d >= 30) return d === 30 ? HS.U[0] : 0x1a100a;
+        return heistWallUp(HS, wx, wy, d);
+      }
+    }
     const S = WALLS[room ? room.kind : 'house'] || WALLS.house, N = S.N, U = S.U;
     if (d <= 2) return N[0];
     if (d <= 11) { const px = wx % 12; if (d === 11) return N[4]; if (d === 3) return N[1]; return px === 0 ? N[0] : px === 1 ? N[3] : N[2]; }
@@ -669,7 +687,7 @@ export class Terrain {
     // décor accroché au mur (fenêtre, tableau, carte) sur certaines colonnes
     const fy = room ? room.y0 : 0, h = hash2(tx, fy, 175);
     const u = wx & 15;
-    if (room && !NO_DECO.has(room.kind) && h > 0.7 && tx > room.x0 && tx < room.x0 + room.w - 1 && d >= 16 && d <= 27 && u >= 3 && u <= 12) {
+    if (room && !NO_DECO.has(room.kind) && !room.noDeco && h > 0.7 && tx > room.x0 && tx < room.x0 + room.w - 1 && d >= 16 && d <= 27 && u >= 3 && u <= 12) {
       const kind = Math.floor(hash2(tx, fy, 176) * 3);
       const fr = u === 3 || u === 12 || d === 16 || d === 27;
       if (kind === 0) { // fenêtre

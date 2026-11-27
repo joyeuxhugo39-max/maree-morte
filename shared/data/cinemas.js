@@ -138,7 +138,7 @@ export const CINEMAS = {
       { at: 15.4, do: 'grade', col: '255,150,80', a: 0.1, mode: 'soft-light', dur: 0.1 },
       { at: 15.4, do: 'cam', to: { world: [140, 79] }, dur: 0 },
       { at: 15.5, do: 'fade', to: 0, dur: 0.9 },
-      { at: 15.5, do: 'cam', to: { world: [151, 67] }, dur: 5.2 }, // la rue des Corsaires, puis l'allée qui monte à la demeure
+      { at: 15.5, do: 'cam', to: { world: [150, 62] }, dur: 5.2 }, // la rue des Corsaires, le portail, puis la cour d'honneur et la demeure (2.0)
       { at: 16.2, do: 'sub', who: 'silas', text: 'Valdorne vend ce soir. On y entrera avec ses invités. Rejoins-moi devant chez lui.' },
       { at: 18.4, do: 'title', name: 'La demeure d’Octave Valdorne', tag: 'Quartier des Corsaires' },
       { at: 21.2, do: 'title', name: null },
@@ -162,7 +162,7 @@ export const CINEMAS = {
       { at: 0, do: 'theme', name: 'reception', fade: 1.4 },
       { at: 0, do: 'grade', col: '255,190,120', a: 0.07, mode: 'soft-light', dur: 2 }, // les chandelles
       { at: 0, do: 'cam', to: { tile: [13, 15] }, dur: 0 },
-      { at: 0.4, do: 'cam', to: { tile: [5, 4] }, dur: 2.6 },
+      { at: 0.4, do: 'cam', to: { tile: [4, 8] }, dur: 2.6 }, // 2.0 : l'estrade des musiciens, à l'ouest du grand salon
       { at: 1.6, do: 'emo', who: { crowd: 0 }, e: '♪', dur: 2.2 }, { at: 2.0, do: 'emo', who: { crowd: 1 }, e: '♪', dur: 2.0 }, { at: 2.4, do: 'emo', who: { crowd: 2 }, e: '♪', dur: 1.8 },
       { at: 3.2, do: 'cam', to: { npc: 'valdorne', dy: -8 }, dur: 1.8 },
       { at: 5.0, do: 'say', who: { npc: 'valdorne' }, text: 'Mes amis ! La vente commencera à minuit. D’ici là, buvez : tout est payé.', dur: 3.2 },
@@ -173,7 +173,7 @@ export const CINEMAS = {
       { at: 8.0, do: 'zoom', h: 13, dur: 1.2 }, // la porte est au bas du salon : sans se rapprocher, les bandes noires la cacheraient
       { at: 8.2, do: 'face', id: 'player', to: 'silas' },
       { at: 9.4, do: 'sub', who: 'silas', text: 'Ne fais pas de bruit. Ne touche à rien. Et surtout, ne regarde pas trop longtemps le coffre central.' },
-      { at: 13.4, do: 'cam', to: { tile: [31, 12] }, dur: 1.8 }, // la galerie et ses gardes
+      { at: 13.4, do: 'cam', to: { tile: [32, 9] }, dur: 1.8 }, // la galerie et ses gardes (2.0 : par l'arche, ses alcôves)
       { at: 13.4, do: 'zoom', h: 0, dur: 1.2 },
       { at: 14.0, do: 'sub', who: 'silas', text: 'La galerie : deux gardes en faction, une ronde. Les archives sont au bout. Un uniforme t’attend au vestiaire.' },
       { at: 18.6, do: 'cam', to: { between: ['player', 'silas'] }, dur: 1.4 },
@@ -182,7 +182,7 @@ export const CINEMAS = {
       { at: 20.0, do: 'gesture', id: 'silas', g: 'wave', dur: 1.0 },
       { at: 21.2, do: 'sub', text: '' },
       { at: 21.4, do: 'release' },
-      { at: 21.5, do: 'walk', id: 'silas', path: [[16, 13], [21, 10]], speed: 44 },
+      { at: 21.5, do: 'walk', id: 'silas', path: [[14.4, 14], [14.4, 10.6], [19, 8.6]], speed: 44 }, // 2.0 : par le chemin du vestibule et la grande baie
       { at: 25.0, do: 'remove', id: 'silas' },
     ],
   },
@@ -214,7 +214,7 @@ export const CINEMAS = {
       { at: 11.6, do: 'walk', id: 'silas', path: [[39.4, 4.2]], speed: 52 },
       { at: 12.6, do: 'sfx', name: 'unlock', vol: 0.9 },
       { at: 12.8, do: 'sub', text: 'Clic. Il a verrouillé la porte.' },
-      { at: 13.2, do: 'walk', id: 'silas', path: [[44.6, 4.2]], speed: 70 },
+      { at: 13.2, do: 'walk', id: 'silas', path: [[42.5, 3.6], [44.9, 1.7]], speed: 70 }, // 2.0 : la fenêtre est au nord des archives
       { at: 14.8, do: 'gesture', id: 'silas', g: 'flip' },
       { at: 15.2, do: 'remove', id: 'silas' },
       { at: 15.3, do: 'vignette', a: 0, dur: 0.6 },

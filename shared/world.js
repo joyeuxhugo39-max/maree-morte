@@ -6,6 +6,7 @@ import { buildHeist } from './heist-world.js'; // lot 5 : le monde du Plus Grand
 import { buildFest } from './festival-world.js'; // lot 6 : la Nuit des Mille Voiles
 import { buildMobilier } from './mobilier-world.js'; // monde vivant, lot 4 : le mobilier des métiers
 import { buildPort } from './port-world.js'; // 1.8 : la refonte de Port-Lanterne, construite en tout dernier
+import { buildHeistDecor, HEIST_PROPS } from './heist-decor.js'; // 2.0 : la refonte des lieux du braquage, après Port-Lanterne
 import { BERTHS } from './data/ships.js';
 
 export const Z = { SEA: 0, TOWN: 1, BEACH: 2, PLAINS: 3, JUNGLE: 4, RUINS: 5, SWAMP: 6, WRECK: 7, HAVRE: 8, CRANE: 9, ILOT: 10, INTERIOR: 11, CAVE: 12, GOUFFRE: 13,
@@ -83,6 +84,8 @@ export const PROPS = {
   bitte: { solid: 1 }, grue: { solid: 1 }, caisses: { solid: 1 }, tonneaux: { solid: 1 }, etal_poisson: { solid: 1 }, sechoir: { solid: 1 }, coque: { solid: 1 }, cabestan: { solid: 1 },
   panneau: { solid: 1 }, pot_fleurs: { solid: 1 }, table_ext: { solid: 1 }, feu_camp: { solid: 1 }, comptoir_ext: { solid: 1 }, rouleaux: { solid: 1 }, potager: { ground: 1 },
   longue_vue: { solid: 1 }, muret: { solid: 1 }, escalier: { ground: 1 }, porche: {},
+  // 2.0 : les lieux du braquage (l'emprise de chaque meuble est déclarée dans son plan : shared/heist-decor.js)
+  ...HEIST_PROPS,
 };
 
 const idx = (x, y) => y * W + x;
@@ -1779,6 +1782,8 @@ export function generateWorld(seed = 7) {
   const mobilier = buildMobilier({ W, H, OVER_H, tiles, zones, solid, occ, idx, inMap, rooms, doors, props, addProp, npcs, roomGrid, festBox: { x0: 120, x1: 172, y0: 94, y1: 128 } }); // monde vivant, lot 4 : en tout dernier
   // 1.8 : Port-Lanterne agrandi — après tout le reste (aucun tirage, aucun identifiant de l'ancien monde ne bouge)
   const port = buildPort({ W, tiles, zones, solid, occ, idx, inMap, props, addProp, npcs, doors, rooms, sail, waterDist, plankDir, path, spawns, islandOf, Z, PROPS, heist, fest, BERTHS, nextId: () => pid++ });
+  // 2.0 : les lieux du braquage redessinés, en tout dernier (les pièces, les portes et les décors d'avant gardent leurs numéros)
+  buildHeistDecor({ W, tiles, zones, solid, occ, idx, inMap, alloc, rooms, doors, props, addProp, npcs, roomGrid, sail, waterDist, heist, chests, stampPath, spawns });
   const OUT = {
     heist, fest, mobilier, port, spawnPoints: port.spawnPoints,
     block: new Uint8Array(N), // constructions des joueurs : 1 bloque tout, 2 bloque les morts

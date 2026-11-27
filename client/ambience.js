@@ -14,6 +14,7 @@ const CRICKETS = new Set([Z.PLAINS, Z.COLLINES, Z.BAIE, Z.HAUTS, Z.CANNAIES, Z.J
 const FROGS = new Set([Z.SWAMP, Z.MANGROVE]);
 const SILENT = new Set([Z.PENDUS, Z.DAMNES, Z.OSSEMENTS, Z.RUINS, Z.QUARANTAINE, Z.VOLCAN]); // des lieux où rien ne chante
 
+const N_FIRE = (a) => a.near && a.near.fire < 90; // 2.0 : près du poêle de l'atelier
 export class Ambience {
   constructor(G) { this.G = G; this.at = {}; this.scanAt = 0; this.near = { water: 0, plank: 0, fire: 0 }; }
   due(k, now, min, max) { if (now < (this.at[k] || 0)) return false; this.at[k] = now + min + Math.random() * (max - min); return true; }
@@ -33,6 +34,19 @@ export class Ambience {
     if (room) { // les intérieurs : seulement les grottes et la forge ont leur bruit propre
       if (room.kind === 'cave' && this.due('drip', now, 2.5, 8)) { const f = 1500 + Math.random() * 900; S.tone(f, 0.14, { type: 'sine', vol: v(0.018), slide: 0.55 }); }
       if (room.kind === 'forge' && this.due('clink', now, 2.2, 5.5)) { S.tone(1900 + Math.random() * 300, 0.08, { type: 'square', vol: v(0.008) }); S.tone(2900, 0.05, { type: 'triangle', vol: v(0.006), delay: 0.01 }); }
+      // 2.0 : les lieux du braquage ont chacun leur bruit (rare, bref, jamais en boucle)
+      const A = room.amb;
+      if (A === 'cave' && this.due('drip', now, 1.8, 5)) { const f = 1300 + Math.random() * 1100; S.tone(f, 0.12, { type: 'sine', vol: v(0.02), slide: 0.5 }); if (Math.random() < 0.3) S.tone(f * 1.4, 0.08, { type: 'sine', vol: v(0.01), slide: 0.6, delay: 0.21 }); } // l'eau qui goutte
+      if (A === 'cave' && this.due('scratch', now, 9, 20)) for (let k = 0; k < 3; k++) S.hiss(0.03, { f: 3400, q: 4, vol: v(0.02), delay: k * 0.07 }); // des pinces, quelque part dans l'égout
+      if (A === 'entrepot' && this.due('creakW', now, 6, 15)) S.hiss(0.5 + Math.random() * 0.3, { f: 220 + Math.random() * 120, q: 10, vol: v(0.04), slide: 0.8 }); // la charpente qui travaille
+      if (A === 'entrepot' && this.due('chain', now, 12, 26)) for (let k = 0; k < 4; k++) S.tone(1500 + k * 60, 0.04, { type: 'square', vol: v(0.004), delay: k * 0.09 }); // la chaîne du palan
+      if (A === 'atelier' && this.due('scratchA', now, 3, 8)) for (let k = 0; k < 2 + Math.floor(Math.random() * 3); k++) S.hiss(0.06, { f: 5200, q: 2, vol: v(0.012), delay: k * 0.12 }); // la plume de l'architecte sur le papier
+      if (A === 'atelier' && N_FIRE(this) && this.due('crackleA', now, 0.4, 1.2)) S.hiss(0.025, { f: 2800, q: 1.5, vol: v(0.02), type: 'highpass' }); // le poêle
+      if (room.heist === 'demeure' && this.due('glass', now, 5, 12)) { S.tone(2400 + Math.random() * 600, 0.12, { type: 'sine', vol: v(0.006) }); S.tone(3100, 0.1, { type: 'sine', vol: v(0.004), delay: 0.05 }); } // des verres qui trinquent
+      if (A === 'ville' && this.due('wind', now, 8, 18)) S.hiss(1.2, { f: 500, q: 0.7, vol: v(0.03), slide: 1.3 }); // le vent sur les toits
+      if (A === 'ville' && this.due('dog', now, 25, 60)) for (let k = 0; k < 2; k++) S.tone(420, 0.09, { type: 'square', vol: v(0.006), slide: 0.7, delay: k * 0.22 }); // un chien, loin
+      if (A === 'navire' && this.due('creakN', now, 3, 8)) S.hiss(0.45 + Math.random() * 0.4, { f: 260 + Math.random() * 150, q: 9, vol: v(0.05), slide: 0.75 }); // la coque qui grince
+      if (A === 'navire' && this.due('wave', now, 4, 9)) S.hiss(1.4, { f: 700, q: 0.6, vol: v(0.03), slide: 0.6 }); // la mer contre la coque
       return;
     }
     const z = zoneAt(W, p.x, p.y), N = this.near, coast = N.water > 6;

@@ -27,6 +27,7 @@ import { mountSheet } from './sprites-mounts.js';
 import { shipRender } from './ships.js'; // 1.1 : les vrais navires
 import { lighting } from './lighting.js'; // finition : la lumière en couleur
 import { extendMobilier } from './sprites-mobilier.js'; // monde vivant, lot 4 : le mobilier des métiers
+import { extendHeist } from './heist-art.js'; // 2.0 : les lieux du braquage
 import { drawVue } from './vue.js'; // monde vivant, lot 2 : la surcouche de vérification
 import { BERTHS, berthPos, MOB_SHIP } from '../../shared/data/ships.js';
 
@@ -114,7 +115,7 @@ export class Renderer {
     this.water = makeWaterLayers();
     this.env = buildEnvSprites();
     this.structSpr = buildStructSprites(this.env);
-    extend06(this.env, this.structSpr); extend07(this.env); extend08(this.env); extendFete(this.env); extendMobilier(this.env); extendPort(this.env, this.structSpr); extendProps08(this.structSpr); this.pets = petSheets(); this.tentacle = drawTentacle;
+    extend06(this.env, this.structSpr); extend07(this.env); extend08(this.env); extendFete(this.env); extendMobilier(this.env); extendPort(this.env, this.structSpr); extendProps08(this.structSpr); extendHeist(this.env, this.structSpr); this.pets = petSheets(); this.tentacle = drawTentacle;
     // le volcan se peint en tâche de fond, un peu à chaque image (ou d'un coup si l'on arrive devant)
     this.volcJob = world.volcano ? volcanoGen(world.volcano) : null; this.volc = null; this.volcanAlpha = 1;
     this.puffs = world.volcano ? makePuffs() : null; this.plume = [];
@@ -165,6 +166,7 @@ export class Renderer {
       p.spr = s;
       if (s && TREES.has(p.type) && hash2(p.tx | 0, p.ty | 0, 919) > 0.5) p.spr = mirrorSpr(s); // monde vivant, lot 3 : un arbre sur deux est vu de l'autre côté (même taille, même pied)
       p.ground = !!(PROPS[p.type] && PROPS[p.type].ground);
+      p.over = !!(PROPS[p.type] && PROPS[p.type].over); // 2.0 : lustres, cordages, linge tendu : au-dessus des personnages
       if (!s) continue;
       const nl0 = this.lights.length; // lot 6 : les lumières d'un décor du festival ne brillent que pendant une édition
       const ox = p.x - s.ax, oy = p.y - s.ay;
@@ -328,7 +330,7 @@ export class Renderer {
 
     // tri en profondeur
     const draw = [];
-    for (const p of props) if (!p.ground && !(p.heistBar != null && !(G.heist && G.heist.bars[p.heistBar])) && !(p.fest && !G.festOn)) draw.push({ y: p.y, p }); // lot 5 : une barricade ne se voit que dressée ; lot 6 : le festival, pendant une édition
+    for (const p of props) if (!p.ground && !p.over && !(p.heistBar != null && !(G.heist && G.heist.bars[p.heistBar])) && !(p.fest && !G.festOn)) draw.push({ y: p.y, p }); // lot 5 : une barricade ne se voit que dressée ; lot 6 : le festival, pendant une édition
     if (G.structs) for (const st of G.structs.values()) { const x = st.tx * TILE + 8; if (x > camX - 40 && x < camX + W + 40 && st.ty * TILE > camY - 40 && st.ty * TILE < camY + H + 40) draw.push({ y: st.ty * TILE + 15, st }); }
     for (const e of G.ents.values()) if (e.k !== 'd' && e.x > camX - 60 && e.x < camX + W + 60 && e.y > camY - 30 && e.y < camY + H + 60) draw.push({ y: e.y, e });
     for (const n of G.npcs) if (!n.hidden && n.x > camX - 40 && n.x < camX + W + 40 && n.y > camY - 30 && n.y < camY + H + 40) draw.push({ y: n.y, n });
@@ -375,6 +377,14 @@ export class Renderer {
       else this.drawEntity(ctx, d.e, camX, camY, now, G);
     }
     if (!room) this.drawShipsTop(ctx, G, camX, camY, now); // 1.1 : mâture et voiles, au-dessus de tout
+    // 2.0 : ce qui pend au-dessus des têtes (lustres, cordages, voiles du pont) ; à demi transparent au-dessus du pirate
+    for (const p of props) if (p.over && !(p.fest && !G.festOn)) {
+      const sp = p.spr, x = Math.round(p.x - sp.ax - camX), y = Math.round(p.y - sp.ay - camY);
+      const under = me && me.x > p.x - sp.ax - 4 && me.x < p.x - sp.ax + sp.w + 4 && me.y - 30 < p.y - sp.ay + sp.h && me.y > p.y - sp.ay;
+      if (under) ctx.globalAlpha = 0.45;
+      ctx.drawImage(sp.cv, x, y);
+      if (under) ctx.globalAlpha = 1;
+    }
 
     this.drawFishing(ctx, G, camX, camY, now);
     this.drawFx(ctx, camX, camY, now, dt);

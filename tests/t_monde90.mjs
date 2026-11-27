@@ -23,20 +23,30 @@ if (!fs.existsSync(FX) || process.env.MONDE_BASE === '1') { // la photographie d
 }
 const B = JSON.parse(fs.readFileSync(FX, 'utf8'));
 ok(B.W === W.W && B.H === W.H, `la carte garde ses dimensions (${W.W} × ${W.H})`);
-const PB = W.port.box, R = B.port18, inPL = (i) => { const x = i % W.W, y = (i / W.W) | 0; return x >= PB.x0 && x <= PB.x1 && y >= PB.y0 && y <= PB.y1; };
-const hors = (a) => { const b = Uint8Array.from(a); for (let y = PB.y0; y <= PB.y1; y++) for (let x = PB.x0; x <= PB.x1; x++) b[y * W.W + x] = 0; return b; };
+// 2.0 : la refonte des lieux du Plus Grand Braquage redessine, volontairement, l'intérieur de six pièces (la demeure,
+// l'entrepôt, la cave, les toits, le pont du navire, et l'atelier neuf de Lafleur) et le quartier de la demeure. Ces
+// rectangles sont listés dans la référence (B.br20.rects, photographiée sur la 1.9.1) et le test vérifie que le monde
+// redessine EXACTEMENT ceux-là ; hors d'eux et de Port-Lanterne, tout est encore comparé case par case.
+const PB = W.port.box, R = B.port18, R2 = B.br20, RECTS = R2.rects;
+const inRects = (x, y) => RECTS.some((r) => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1);
+const inPL = (i) => { const x = i % W.W, y = (i / W.W) | 0; return x >= PB.x0 && x <= PB.x1 && y >= PB.y0 && y <= PB.y1; };
+const inBR = (i) => inRects(i % W.W, (i / W.W) | 0);
+const hors = (a) => { const b = Uint8Array.from(a); for (let i = 0; i < b.length; i++) if (inPL(i) || inBR(i)) b[i] = 0; return b; };
 ok(JSON.stringify(PB) === JSON.stringify(R.box), `le rectangle de Port-Lanterne est celui de la référence (${PB.x0}-${PB.x1} × ${PB.y0}-${PB.y1})`);
-ok(h(hors(W.tiles)) === R.tilesHors, 'hors de Port-Lanterne, le sol de la 1.6.1 n’a pas bougé (aucune case changée)');
-ok(h(hors(W.zones)) === R.zonesHors, 'hors de Port-Lanterne, les zones de la 1.6.1 n’ont pas bougé');
-ok(h(hors(W.sail)) === R.sailHors, 'hors de Port-Lanterne, la mer navigable n’a pas bougé');
+ok(JSON.stringify(W.heist.decor.envelopes) === JSON.stringify(RECTS), `les lieux redessinés du braquage sont exactement les ${RECTS.length} de la référence : ${RECTS.map((r) => r.room).join(', ')}`);
+ok(h(hors(W.tiles)) === R2.tilesHors, 'hors de Port-Lanterne et des lieux redessinés, le sol n’a pas bougé (aucune case changée depuis la 1.9.1, ni depuis la 1.6.1 hors de la ville)');
+ok(h(hors(W.zones)) === R2.zonesHors, 'hors de Port-Lanterne et des lieux redessinés, les zones n’ont pas bougé');
+ok(h(hors(W.sail)) === R2.sailHors, 'hors de Port-Lanterne et des lieux redessinés, la mer navigable n’a pas bougé');
 // 2. les cases libres restent libres (le mobilier ajouté à l'intérieur est la seule exception, et il est compté)
 const was = Buffer.from(B.free, 'base64'); let closedIn = 0, closedOut = 0, closedPL = 0, openedPL = 0;
-for (let i = 0; i < N; i++) { if (was[i] && !free[i]) { if (W.roomGrid[i] >= 0) closedIn++; else if (inPL(i)) closedPL++; else closedOut++; } else if (!was[i] && free[i] && inPL(i)) openedPL++; }
+let closedBR = 0;
+for (let i = 0; i < N; i++) { if (was[i] && !free[i]) { if (inBR(i)) closedBR++; else if (W.roomGrid[i] >= 0) closedIn++; else if (inPL(i)) closedPL++; else closedOut++; } else if (!was[i] && free[i] && inPL(i)) openedPL++; }
 ok(closedOut === 0, `hors de Port-Lanterne, aucune case libre du monde extérieur n’est devenue bloquante${closedOut ? ' — ' + closedOut + ' CASES BLOQUÉES' : ''}`);
 ok(closedIn <= 400, `intérieurs : ${closedIn} cases occupées par du mobilier ajouté depuis la 1.6.1 (limite 400)`);
-console.log(`     (Port-Lanterne : ${closedPL} cases désormais bâties ou meublées, ${openedPL} cases gagnées sur la mer ou dégagées)`);
-const propsHors = W.props.filter((p) => !(p.tx >= PB.x0 && p.tx <= PB.x1 && p.ty >= PB.y0 && p.ty <= PB.y1)).length;
-ok(propsHors >= R.propsHors && W.npcs.length >= B.npcs && W.doors.length >= B.doors, `rien n’a disparu (${propsHors} décors hors de la ville, ${W.npcs.length} personnages, ${W.doors.length} portes)`);
+console.log(`     (Port-Lanterne : ${closedPL} cases désormais bâties ou meublées, ${openedPL} cases gagnées sur la mer ou dégagées ; lieux du braquage : ${closedBR} cases de murs et de meubles, vérifiées par t_lieux20)`);
+const propsHors = W.props.filter((p) => !(p.tx >= PB.x0 && p.tx <= PB.x1 && p.ty >= PB.y0 && p.ty <= PB.y1) && !inRects(p.tx, p.ty)).length, moved = W.heist.decor.moved;
+ok(moved.length === 2 && moved.every((m) => m.why), `ce qui quitte l’ancien atelier de Lafleur est listé : ${moved.map((m) => m.type + ' (' + m.why + ')').join(', ')}`);
+ok(propsHors + moved.length >= R2.propsHors && W.npcs.length >= B.npcs && W.doors.length >= B.doors, `rien d’autre n’a disparu (${propsHors} décors hors de la ville et des lieux redessinés, ${W.npcs.length} personnages, ${W.doors.length} portes)`);
 ok(JSON.stringify(W.plots.map((p) => [p.k, p.tx, p.ty])) === JSON.stringify(R.plots), 'les parcelles des joueurs (maisons achetées) n’ont pas bougé d’une case');
 // 3. personne n'est muré : les espaces praticables, par remplissage
 const comp = new Int32Array(N).fill(-1), size = [];

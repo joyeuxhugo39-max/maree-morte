@@ -122,3 +122,35 @@ export const FIN_LINES = {
 export const SILAS_AFTER = {
   complice: ['Associé ! Une caisse ou deux pour Madame Corail ?', 'Les Sept Courants sont calmes, ce soir. Bon vent, complice.', 'Valdorne cherche toujours son voleur. Il cherche au mauvais endroit.'],
 };
+
+// 2.0 : la réception chez Valdorne — ce que se disent les invités (un sujet par groupe), ce que disent les domestiques,
+// le majordome, le portier, et les réactions au pirate, à la bagarre du salon de jeu et à l'alarme
+export const RECEPTION_LINES = {
+  hote: ['Valdorne, votre demeure est un palais.', 'Et cette vente de minuit, Octave ?', 'On dit que vous avez racheté la moitié du port.', 'Quel portrait ! Il vous flatte à peine.'],
+  commerce: ['Le rhum a encore pris deux doublons la barrique.', 'Les Sept Courants ? Une légende de matelot.', 'Je paie l’ancrage plus cher que mes équipages.', 'La Douane fouille tout, ces temps-ci.'],
+  ragots: ['Silas Virevent est en ville, paraît-il.', 'Le capitaine Ferrant perd encore aux cartes.', 'Valdorne cache un coffre, tout le monde le sait.', 'Trois maris, dont deux noyés. Une sainte femme.'],
+  buffet: ['Goûtez ce rôti, il est divin.', 'Encore un peu de punch ?', 'Qui a bien pu monter cette pièce montée ?', 'Je reprendrai bien des fruits.'],
+  gueridon: ['À la santé de notre hôte !', 'Ce vin vient de l’Anse-Tranquille.', 'Vous danserez, tout à l’heure ?'],
+  jeu: ['Je relance de dix doublons.', 'Ferrant, vous trichez.', 'Une dernière main, la vraie dernière.', 'Carré de dames !'],
+  spect: ['Il bluffe.', 'Pariez contre Ferrant : il finit toujours par perdre.'],
+  salon_o: ['Ces fauteuils viennent de Libertalia.', 'Quelle musique délicieuse.', 'Asseyez-vous donc, la soirée sera longue.'],
+  salon_e: ['On dit que la galerie vaut une flotte.', 'Ne fixez pas les gardes, ils détestent ça.', 'Minuit approche…'],
+  domestique: ['Champagne ?', 'Un canapé au crabe ?', 'Attention, c’est chaud !', 'Monsieur désire ?'],
+  cuisinier: ['Le rôti, vite, avant qu’il refroidisse !', 'Qui a touché à mes sauces ?', 'Encore deux plateaux pour le salon !'],
+  majordome: ['Bienvenue chez monsieur Valdorne.', 'Le salon est par ici. Le vestiaire, sur votre gauche.'],
+  portier: ['Bonne soirée.', 'On ne sort pas avec un verre, s’il vous plaît.'],
+  joueur: ['Nous connaissons-nous ?', 'Quel costume original !', 'Vous êtes de quel navire ?', 'Ne restez pas planté là, prenez un verre.'],
+  joueurGarde: ['Un garde au salon ? Tout va bien ?', 'Gardez l’œil sur la galerie, mon brave.', 'Ah, la garde ! Je me sens plus tranquille.'],
+  portierGarde: ['Votre poste est à la galerie, collègue.', 'La relève est à minuit. Tenez bon.'],
+  bagarre: ['Une bagarre !', 'Messieurs, voyons !', 'Ferrant a encore triché !', 'Dix doublons sur le grand !', 'Qu’on appelle la garde !'],
+  alarme: ['Au voleur !', 'Des intrus !', 'Gardes ! Gardes !', 'Ma bourse !', 'Qu’on ferme les portes !'],
+  portierAlarme: ['Personne ne sort !', 'Restez où vous êtes !'],
+  calme: ['Quelle soirée…', 'Je n’ai plus soif.', 'Où en étions-nous ?'],
+};
+Object.assign(RECEPTION_LINES, { // 2.0 : le quartier de la demeure
+  portail: ['Monsieur Valdorne reçoit ce soir. Tenez-vous bien.', 'La rue des Corsaires, c’est en bas. Ici, c’est chez monsieur Valdorne.'],
+  portailCasse: ['Vous êtes de la réception ? Entrez, on vous attend.', 'Les invités montent l’allée. Ne marchez pas sur les plates-bandes.'],
+  portailApres: ['Circulez. Monsieur ne reçoit plus personne, après ce qui s’est passé.', 'On a doublé la garde. Allez, circulez.'],
+  perron: ['La porte est ouverte. Essuyez vos bottes.', 'Bonsoir. Le vestiaire est à gauche en entrant.'],
+  jardinier: ['Ne marchez pas sur les plates-bandes !', 'Monsieur veut ses buis taillés au cordeau.', 'Ces roses viennent de l’Anse-Tranquille.'],
+});

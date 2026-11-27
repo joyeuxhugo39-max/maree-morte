@@ -38,7 +38,7 @@ export const heist = {
   },
   heistLoad(d) { const h = { trust: 0 }; if (d && typeof d === 'object') for (const k of SAVE_KEYS) if (d[k] != null) h[k] = d[k]; return h; },
   heistSave(p) { const o = {}; for (const k of SAVE_KEYS) if (p.heist && p.heist[k] != null) o[k] = p.heist[k]; return o; },
-  heistState(p = null) { const m = { t: 'heist', a: 'state', bars: this.hs.bars.map((b) => (b ? 1 : 0)), away: this.hs.away > this.time ? 1 : 0, locked: this.hs.locked > this.time ? 1 : 0 }; if (p) m.fav = p.heist && p.heist.favor ? 1 : 0; return m; }, // fav : le service promis à l'architecte (à soi seul)
+  heistState(p = null) { const m = { t: 'heist', a: 'state', bars: this.hs.bars.map((b) => (b ? 1 : 0)), away: this.hs.away > this.time ? 1 : 0, locked: this.hs.locked > this.time ? 1 : 0, brawl: this.hs.brawlUntil > this.time ? 1 : 0, alarm: this.hs.alarmD ? 1 : 0 }; /* 2.0 : la bagarre et l'alarme de la demeure (les invités y réagissent) */ if (p) m.fav = p.heist && p.heist.favor ? 1 : 0; return m; }, // fav : le service promis à l'architecte (à soi seul)
   heistBroadcast() { const m = this.heistState(); for (const p of this.players.values()) this.send(p, m); },
   // ------------------------------------------------------------ outils
   hq(p, qid) { const st = p.quests[qid]; return st && st.s === 'active' ? st : null; },
@@ -217,6 +217,7 @@ export const heist = {
     this.hs.brawlUntil = this.time + 40; this.hs.brawlCd = this.time + 90;
     this.hNpcSay('ferrant', FERRANT.brawl);
     for (const g of this.hs.guards) if (g.hg.room === 'demeure' && (g.hg.post || g.hg.hall) && !g.hg.alert) g.hg.distractUntil = this.hs.brawlUntil;
+    this.hs.brawlOn = 1; this.heistBroadcast(); // 2.0 : la salle réagit
     this.ev(p.x, p.y, ['shout', 0, 'Bagarre au salon !']);
     this.toast(p, 'Le salon s’embrase : les gardes de la galerie accourent. Vous avez quarante secondes.', 'quest');
   },
@@ -441,14 +442,17 @@ export const heist = {
         if (n) { m.target = n.id; m.state = 'chase'; } else if (now > g.alertUntil) { this.heistCalm(m); return true; } else { m.moving = false; return true; }
       }
       if (m.state !== 'chase') m.state = 'chase';
+      // 2.0 : un mur ou un meuble entre lui et sa cible : il le contourne (sinon, la poursuite ordinaire, et ses coups)
+      const t2 = this.players.get(m.target);
+      if (t2 && dist(m, t2) > 26 && !this.heistClear(m.x, m.y, t2.x, t2.y) && this.heistNav(m, t2.x, t2.y, speed, true) != null) return true;
       return false;
     }
     if (m.state === 'chase' || m.state === 'return') { m.state = 'idle'; m.target = 0; }
-    // la diversion : on court au salon voir la bagarre, puis on revient
-    if (g.distractUntil > now) { this.stepMob(m, this.world.heist.brawl.x + (m.id % 3) * 10, this.world.heist.brawl.y, speed * 0.9); return true; }
+    // la diversion : on court au salon voir la bagarre, puis on revient (2.0 : par les portes, autour des meubles)
+    if (g.distractUntil > now) { this.heistNav(m, this.world.heist.brawl.x + ((m.id % 3) - 1) * 12, this.world.heist.brawl.y, speed * 0.9); return true; }
     // la ronde, ou la faction (on regarde autour de soi)
     const P = g.path, tgt = P[g.i % P.length];
-    if (dist(m, tgt) > 3) { this.stepMob(m, tgt.x, tgt.y, speed * (P.length > 1 ? 0.45 : 0.6)); }
+    if (dist(m, tgt) > 3) { this.heistNav(m, tgt.x, tgt.y, speed * (P.length > 1 ? 0.45 : 0.6)); }
     else {
       m.moving = false;
       if (P.length > 1) { if (!g.wait) g.wait = now + 1.6; if (now > g.wait) { g.wait = 0; g.i = (g.i + 1) % P.length; } }
@@ -457,6 +461,43 @@ export const heist = {
     }
     this.heistWatch(m, dt);
     return true;
+  },
+  // 2.0 : se déplacer dans un lieu du braquage sans buter sur les murs ni les meubles. En ligne droite si la voie est
+  // libre ; sinon, on suit la carte des distances (un parcours en largeur, sur les cases de la pièce) jusqu'à la cible.
+  heistClear(x0, y0, x1, y1) {
+    const W = this.world, d = Math.hypot(x1 - x0, y1 - y0), n = Math.max(1, Math.ceil(d / 4));
+    for (let i = 1; i <= n; i++) {
+      const t = i / n, x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t;
+      for (const [ox, oy] of [[-4, 0], [4, 0], [0, -3], [0, 2]]) { const k = Math.floor((y + oy) / TILE) * W.W + Math.floor((x + ox) / TILE); if (W.solid[k] || W.block[k]) return false; }
+    }
+    return true;
+  },
+  heistNav(m, x, y, speed, strict = false) { // strict : null s'il n'y a pas de chemin (on laisse alors la poursuite ordinaire)
+    if (this.heistClear(m.x, m.y, x, y)) return this.stepMob(m, x, y, speed);
+    const W = this.world, r = W.rooms[m.room];
+    if (!r) return this.stepMob(m, x, y, speed);
+    const X0 = r.x0 - 1, Y0 = r.y0 - 1, w = r.w + 2, h = r.h + 2, ttx = Math.floor(x / TILE), tty = Math.floor(y / TILE);
+    const nav = this.hs.nav || (this.hs.nav = new Map()), key = m.room * 1e6 + tty * 1000 + ttx;
+    let F = nav.get(key);
+    if (!F || this.time - F.t > 3) {
+      const D = new Int16Array(w * h).fill(-1), q = [];
+      const free = (tx, ty) => tx >= X0 && ty >= Y0 && tx < X0 + w && ty < Y0 + h && !W.solid[ty * W.W + tx] && !W.block[ty * W.W + tx];
+      if (free(ttx, tty)) { D[(tty - Y0) * w + (ttx - X0)] = 0; q.push(ttx, tty); }
+      for (let k = 0; k < q.length; k += 2) {
+        const cx = q[k], cy = q[k + 1], cd = D[(cy - Y0) * w + (cx - X0)];
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = cx + dx, ny = cy + dy; if (free(nx, ny) && D[(ny - Y0) * w + (nx - X0)] < 0) { D[(ny - Y0) * w + (nx - X0)] = cd + 1; q.push(nx, ny); } }
+      }
+      F = { t: this.time, D, X0, Y0, w, h }; nav.set(key, F);
+      if (nav.size > 64) nav.delete(nav.keys().next().value);
+    }
+    const mtx = Math.floor(m.x / TILE), mty = Math.floor(m.y / TILE), at = (tx, ty) => (tx >= F.X0 && ty >= F.Y0 && tx < F.X0 + F.w && ty < F.Y0 + F.h ? F.D[(ty - F.Y0) * F.w + (tx - F.X0)] : -1);
+    let best = null, bd = at(mtx, mty) >= 0 ? at(mtx, mty) : 1e9;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const v = at(mtx + dx, mty + dy); if (v >= 0 && v < bd) { bd = v; best = [mtx + dx, mty + dy]; } }
+    if (!best) return strict ? null : this.stepMob(m, x, y, speed);
+    // on vise la case suivante, ou plus loin si la ligne droite y mène sans obstacle (un pas plus naturel)
+    let gx = best[0], gy = best[1];
+    for (let k = 0; k < 4; k++) { let nb = null, nd = at(gx, gy); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const v = at(gx + dx, gy + dy); if (v >= 0 && v < nd) { nd = v; nb = [gx + dx, gy + dy]; } } if (!nb || !this.heistClear(m.x, m.y, nb[0] * TILE + 8, nb[1] * TILE + 10)) break; gx = nb[0]; gy = nb[1]; }
+    return this.stepMob(m, gx * TILE + 8, gy * TILE + 10, speed);
   },
   heistNearest(m, r) { let best = null, bd = r; for (const p of this.players.values()) { if (p.dead || p.room !== m.room || this.inCinema(p)) continue; const d = dist(p, m); if (d < bd) { bd = d; best = p; } } return best; },
   heistCalm(m) { const g = m.hg; g.alert = false; m.state = 'idle'; m.target = 0; m.hp = m.maxHp; g.sus.clear(); this.ev(m.x, m.y, ['sus', m.id, 0]); },
@@ -474,7 +515,7 @@ export const heist = {
     let top = 0;
     for (const p of this.players.values()) {
       if (p.dead || p.room !== m.room || this.inCinema(p) || p.lab) continue;
-      if (g.room === 'demeure' && (p.heist.disguise || inRect(p, H.hall))) { g.sus.delete(p.id); continue; } // en uniforme, ou au salon : un invité parmi d'autres
+      if (g.room === 'demeure' && (p.heist.disguise || (H.halls || [H.hall]).some((R) => inRect(p, R)))) { g.sus.delete(p.id); continue; } // en uniforme, ou au salon (2.0 : au vestibule, à l'office, au salon de jeu) : un invité parmi d'autres
       const k = this.heistSees(m, p);
       let s = g.sus.get(p.id) || 0;
       s = k ? s + dt * k * (g.chase ? 2.2 : 1.1) : Math.max(0, s - dt * 0.45);
@@ -565,6 +606,9 @@ export const heist = {
     }
     if (this.hs.away && now > this.hs.away) { this.hs.away = 0; this.heistBroadcast(); this.hNpcSay('brechet', 'Bon. Où en étions-nous ?'); }
     if (this.hs.locked && now > this.hs.locked) { this.hs.locked = 0; for (const i of H.gates.archives) this.world.block[i] = 0; this.heistBroadcast(); }
+    // 2.0 : la fin de la bagarre, l'alarme de la demeure (et son retour au calme) : les invités du client y réagissent
+    if (this.hs.brawlOn && now > this.hs.brawlUntil) { this.hs.brawlOn = 0; this.heistBroadcast(); }
+    { const al = this.hs.guards.some((g) => g.hg.room === 'demeure' && g.hg.alert && g.state !== 'dead') ? 1 : 0; if (al !== (this.hs.alarmD || 0)) { this.hs.alarmD = al; this.heistBroadcast(); } }
     for (const p of this.players.values()) {
       if (p.dead) continue;
       if (p.heist.disguise && p.room !== H.rooms.demeure) { p.heist.disguise = false; this.recalc(p); }

@@ -40,12 +40,12 @@ export const lighting = {
   // l'ambiance du moment et du lieu
   ambient(G, f, dark, room) {
     const wx = this.weather || { rain: 0, storm: 0 };
-    if (room) {
+    if (room && !room.outdoor) { // 2.0 : les toits et le pont du navire sont dehors (la lumière du ciel)
       if (room.kind === 'cave') return { col: [60, 54, 88], vign: 0.4 };
       if (room.kind === 'underwater') return { col: [74, 132, 156], vign: 0.3 };
       return { col: mix([218, 200, 180], [150, 128, 116], dark), vign: 0.26 }; // un intérieur : la pénombre chaude
     }
-    const z = G.player ? zoneAt(this.world, G.player.x, G.player.y) : Z.TOWN;
+    const z = room ? Z.TOWN : G.player ? zoneAt(this.world, G.player.x, G.player.y) : Z.TOWN;
     // l'or du soir (vers 0,58) et le rose de l'aube (vers 0,94)
     const dusk = f > 0.5 && f < 0.68 ? Math.sin((f - 0.5) / 0.18 * Math.PI) : 0, dawn = f > 0.86 && f < 1 ? Math.sin((f - 0.86) / 0.14 * Math.PI) : 0;
     let col = mix(DAY, dusk > dawn ? DUSK : DAWN, Math.max(dusk, dawn) * 0.85);
