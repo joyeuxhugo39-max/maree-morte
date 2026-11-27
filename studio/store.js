@@ -40,7 +40,7 @@ export const store = {
   },
 };
 export function stats(doc) {
-  return { sol: Object.keys(doc.sol || {}).length, regions: Object.keys(doc.regions || {}).length, collisions: Object.keys(doc.collisions || {}).length, navigation: Object.keys(doc.navigation || {}).length, decors: (doc.decors || []).length, retouches: Object.keys(doc.retouches || {}).length };
+  return { sol: Object.keys(doc.sol || {}).length, regions: Object.keys(doc.regions || {}).length, collisions: Object.keys(doc.collisions || {}).length, navigation: Object.keys(doc.navigation || {}).length, decors: (doc.decors || []).length, retouches: Object.keys(doc.retouches || {}).length, pieces: (doc.pieces || []).length, portes: (doc.portes || []).length, zones: (doc.zones || []).length };
 }
 
 // ------------------------------------------------------------------ la publication sur GitHub

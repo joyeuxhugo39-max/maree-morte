@@ -797,6 +797,11 @@ export class UI {
       x.fillStyle = '#6b4a22'; x.fillRect(6, 2, 8, 2); x.fillRect(5, 3, 2, 6); x.fillRect(13, 3, 2, 6);
       x.fillStyle = '#c9962f'; x.fillRect(3, 8, 14, 10); x.fillStyle = '#f2c14a'; x.fillRect(4, 9, 12, 3);
       x.fillStyle = '#3a2410'; x.fillRect(9, 12, 2, 4); x.fillRect(8, 12, 4, 2);
+    } else if (glyph === 'parchemin') { // 2.2 : un parchemin roulé (les messages écrits dans LStudio)
+      x.fillStyle = '#8a6a3a'; x.fillRect(3, 3, 14, 3); x.fillRect(3, 15, 14, 3);
+      x.fillStyle = '#e8d8b0'; x.fillRect(4, 5, 12, 11); x.fillStyle = '#c8b088'; x.fillRect(4, 5, 12, 1);
+      x.fillStyle = '#6a4a2a'; for (const y of [8, 10, 12]) x.fillRect(6, y, 8 - (y === 12 ? 3 : 0), 1);
+      x.fillStyle = '#b02a22'; x.fillRect(13, 13, 2, 2);
     }
   }
 

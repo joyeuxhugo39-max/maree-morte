@@ -750,6 +750,7 @@ function interact() {
   else if (t.kind === 'struct') G.send({ t: 'sint', tx: t.tx, ty: t.ty });
   else if (t.kind === 'dig') { G.send({ t: 'dig' }); G.renderer.smoke(G.player.x, G.player.y, 6, 'rgba(160,120,80,0.6)', { size: 2 }); }
   else if (t.kind === 'door') useDoor(t.d, false, performance.now() / 1000);
+  else if (t.kind === 'szone') useZone(t.z, performance.now() / 1000); // 2.2 : LStudio
   else if (t.kind === 'homebuy' || t.kind === 'deed') G.send({ t: 'home', a: 'info', k: t.d.plot }); // 1.0 : le titre de propriété (visiter, acheter, gérer, revendre)
   else if (t.kind === 'lockpick') {
     if (!(G.inv || []).some((s) => s && s.id === 'crochets')) { G.ui.toast(`Maison de ${t.h0.name} : fermée à clé. Il faudrait des crochets de serrurier…`, 'info'); return; }
@@ -768,6 +769,26 @@ function interact() {
   else if (t.kind === 'berth') G.ui.openBerth(t.b); // 1.1 : armer un navire à quai
   else if (t.kind === 'shipboard') G.send({ t: 'ship', a: 'board', id: t.id }); // lot 1
   else if (t.kind === 'shipland') G.send({ t: 'ship', a: 'land' });
+}
+// 2.2 : les zones de LStudio — un message (un panneau, une inscription), un passage (un escalier, une trappe : on
+// passe d'un point à un autre, d'une pièce à une autre). Le moteur vérifie le passage ; le message ne regarde que le client.
+const inZone = (z, p, m = 0) => G.room === z.room && p.x >= z.x0 - m && p.x <= z.x1 + m && p.y >= z.y0 - m && p.y <= z.y1 + m + 4;
+function useZone(z, now) {
+  if (z.type === 'message') { G.ui.openThing(z.title || 'Une inscription', '', 'parchemin'); G.ui.say(z.text || '…', [{ label: 'Fermer', go: () => G.ui.close() }]); G.sfx.play('click'); return; }
+  const p = G.player;
+  if (!p || now < G.doorCd) return;
+  G.doorCd = now + 1.2;
+  G.send({ t: 'mv', x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, d: p.dir, m: 0 });
+  G.send({ t: 'passage', id: z.id });
+}
+function studioZonesStep(p, now) {
+  const Z = G.world.studioZones; if (!Z || !Z.length) return;
+  const inside = G.szIn || (G.szIn = new Set());
+  for (const z of Z) {
+    const was = inside.has(z.id), is = inZone(z, p);
+    if (is && !was) { inside.add(z.id); if (z.auto && !G.ui.anyOpen()) useZone(z, now); }
+    else if (!is && was) inside.delete(z.id);
+  }
 }
 function useDoor(d, out, now) {
   const p = G.player;
@@ -848,6 +869,7 @@ function findInteract() {
       if (dd < 26 && dd < bd) { bd = dd; best = { kind: 'exit', d, x: d.ex, y: d.ey - 4, h: 18, verb: 'Sortir' }; }
     }
   }
+  for (const z of G.world.studioZones || []) if (inZone(z, p, 6)) { const zx = Math.max(z.x0, Math.min(z.x1, p.x)), zy = Math.max(z.y0, Math.min(z.y1, p.y)), dd = Math.hypot(zx - p.x, zy - p.y) + 4; if (dd < bd) { bd = dd; best = { kind: 'szone', z, x: (z.x0 + z.x1) / 2, y: z.y0 + 6, h: 14, verb: z.label } } } // 2.2 : LStudio
   if (best) return best;
   const nowT = performance.now() / 1000;
   for (const st of G.structs.values()) {
@@ -1243,8 +1265,9 @@ function updatePlayer(now, dt) {
   // portes : on entre en poussant contre la porte, on sort par le seuil
   if (!B && !rolling && now > G.doorCd) {
     if (G.room < 0) { if (ax.y < -0.3) for (const d of G.world.doors) if (Math.abs(p.x - d.ox) < 9 && p.y < d.oy + 3 && p.y > d.oy - 24) { if (d.plot != null && !((G.homes.get(d.plot) || {}).name === p.name || now < G.burgleUntil)) break; if (d.seal && !((G.seals || {})[d.seal] > now)) break; useDoor(d, false, now); break; } }
-    else if (ax.y > 0.3 && tileAt(G.world, p.x, p.y) === T.EXIT) { const d = G.world.doors.find((q) => q.room === G.room); if (d) useDoor(d, true, now); }
+    else if (ax.y > 0.3 && tileAt(G.world, p.x, p.y) === T.EXIT) { let d = null, bd = 1e9; for (const q of G.world.doors) if (q.room === G.room) { const dd = Math.hypot(q.ex - p.x, q.ey - p.y); if (dd < bd) { bd = dd; d = q; } } if (d) useDoor(d, true, now); } // 2.2 : une pièce à deux portes : on sort par celle dont on foule le seuil
   }
+  studioZonesStep(p, now); // 2.2 : les zones écrites dans LStudio (les messages et les passages qui se déclenchent d'eux-mêmes)
   if (now - G.lastSend > 0.05 && (moved || p.moving !== G.lastMoving)) {
     G.send({ t: 'mv', x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, d: p.dir, m: p.moving ? 1 : 0 });
     G.lastSend = now; G.lastMoving = p.moving;

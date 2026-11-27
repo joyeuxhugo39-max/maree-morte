@@ -1786,9 +1786,10 @@ export function generateWorld(seed = 7, opts = {}) { // opts.studio : le documen
   // 2.0 : les lieux du braquage redessinés, en tout dernier (les pièces, les portes et les décors d'avant gardent leurs numéros)
   buildHeistDecor({ W, tiles, zones, solid, occ, idx, inMap, alloc, rooms, doors, props, addProp, npcs, roomGrid, sail, waterDist, heist, chests, stampPath, spawns });
   // LStudio : le monde écrit dans l'éditeur, par-dessus tout le reste (un document vide ne change rien)
-  const studio = applyStudio({ W, H, tiles, zones, solid, occ, sail, waterDist, plankDir, props, addProp, PROPS, inMap }, opts.studio !== undefined ? opts.studio : studioDoc());
+  const studioZones = []; // les zones d'interaction et de passage écrites dans LStudio (le client et le moteur les lisent)
+  const studio = applyStudio({ W, H, tiles, zones, solid, occ, sail, waterDist, plankDir, props, addProp, PROPS, inMap, rooms, doors, roomGrid, szones: studioZones }, opts.studio !== undefined ? opts.studio : studioDoc());
   const OUT = {
-    heist, fest, mobilier, port, spawnPoints: port.spawnPoints, studio,
+    heist, fest, mobilier, port, spawnPoints: port.spawnPoints, studio, studioZones,
     block: new Uint8Array(N), // constructions des joueurs : 1 bloque tout, 2 bloque les morts
     islandOf, islands, // 1.0 : chaque case de terre connaît son île
     doorOwner: new Map(), rooms, doors, sail, roomGrid, havre: HC, havreDock, OVER_H,

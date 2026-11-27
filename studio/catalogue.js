@@ -35,11 +35,26 @@ export const NOMS = {
   house: 'Maison', tavern: 'Taverne', forge: 'Forge', home: 'Maison de joueur', lighthouse: 'Phare', ship: 'Navire', wreck: 'Épave', volcan: 'Volcan', propriete: 'Maison de joueur', grotte: 'Entrée de grotte', fort: 'Fort',
 };
 export const nomDe = (type) => NOMS[type] || type.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
-// les sols que l'on peut peindre (les murs d'intérieur viendront avec l'éditeur de bâtiments)
+// les sols que l'on peut peindre (le mur d'intérieur : dans une pièce, une cloison)
 export const SOLS = [
   ['DEEP', 'Mer profonde'], ['WATER', 'Eau peu profonde'], ['SAND', 'Sable'], ['GRASS', 'Herbe'], ['DGRASS', 'Herbe sombre'], ['JUNGLE', 'Jungle'],
   ['DIRT', 'Terre'], ['MUD', 'Boue'], ['MARSH', 'Marécage'], ['SWAMP', 'Marais'], ['COBBLE', 'Pavés'], ['PLANK', 'Planches (quai, pont)'],
-  ['ROCK', 'Roche (falaise)'], ['ASH', 'Cendre'], ['LAVA', 'Lave'], ['FLOOR', 'Plancher d’intérieur'], ['STONEF', 'Dallage d’intérieur'], ['CAVE', 'Sol de grotte'],
+  ['ROCK', 'Roche (falaise)'], ['ASH', 'Cendre'], ['LAVA', 'Lave'], ['FLOOR', 'Plancher d’intérieur'], ['STONEF', 'Dallage d’intérieur'], ['CAVE', 'Sol de grotte'], ['IWALL', 'Mur d’intérieur'],
 ];
+// lot 2 : l'emprise des meubles de plusieurs cases [largeur, hauteur, cases solides] (celle qu'ils ont dans les lieux du
+// jeu) ; posés par la bibliothèque, ils prennent leur emprise : le dessin couvre ses cases, et ses cases bloquent
+export const EMPRISES = {
+  cheminee_m: [3, 1], canape: [2, 1], table_basse: [2, 1], estrade_m: [4, 4, 'aucune'], clavecin: [2, 1], buffet_m: [4, 1], console_m: [2, 1], table_office: [2, 1], table_jeu: [2, 1], vitrine: [2, 1], banquette: [2, 1], bureau_m: [2, 1], rayon_e: [2, 1], guichet: [3, 1], palan: [2, 1, 'aucune'], table_dessin: [2, 1], maquette_g: [2, 1], casier_vin: [2, 1], corde_linge: [4, 1, 'aucune'], passerelle: [3, 1, 'aucune'], ecoutille: [2, 2, 'aucune'],
+  tonneaux: [2, 2, [[0, 1], [1, 1]]], caisses: [2, 2], statue_m: [2, 2, [[0, 1], [1, 1]]], fontaine: [3, 2, [[0, 1], [1, 1], [2, 1], [1, 0]]], portail: [3, 1, [[0, 0], [2, 0]]], porche: [3, 1, [[0, 0], [2, 0]]],
+  // une case, mais solide dans les lieux du jeu (leur règle générale ne l'est pas)
+  fauteuil: [1, 1], horloge: [1, 1], buste: [1, 1], globe_m: [1, 1], cave_liqueurs: [1, 1], candelabre: [1, 1], colonne: [1, 1], armure: [1, 1], vestiaire_m: [1, 1], harpe: [1, 1], coffre_m: [1, 1], balance: [1, 1], diable: [1, 1], gueridon: [1, 1], cage: [1, 1],
+};
+// le décor mural : ses variantes (celles que le moteur sait dessiner)
+export const MUR_VARIANTES = {
+  fenetre: [[0, 'rideaux rouges'], [1, 'rideaux verts'], [2, 'rideaux bleus'], [3, 'sans rideaux']], tableau: [['mer', 'navire en mer'], ['paysage', 'paysage'], ['bataille', 'bataille navale'], ['portrait', 'portrait'], ['famille', 'famille'], ['nature', 'nature morte']],
+  portrait_ch: [['portrait', 'portrait'], ['famille', 'famille'], ['mer', 'navire en mer']], biblio: [[0, 'reliures brunes'], [1, 'reliures rouges'], [2, 'reliures vertes']], tapisserie: [[0, 'chasse'], [1, 'fleurie']],
+  rue_fenetre: [[0, 'volets verts, fleurs'], [1, 'volets rouges, éclairée'], [2, 'volets bleus, fleurs'], [3, 'volets jaunes, éclairée']], rue_porte: [[0, 'rouge'], [1, 'bleue'], [2, 'verte']], enseigne: [[0, 'une ancre'], [1, 'une chope'], [2, 'un poisson']], soupirail: [[0, ''], [1, '']],
+};
+export const AMBIANCES = [['', 'Aucune'], ['cave', 'Gouttes et égout'], ['entrepot', 'Charpente qui travaille'], ['atelier', 'Plume et poêle'], ['ville', 'Vent sur les toits'], ['navire', 'Coque qui grince']];
 // les styles de bâtiments (ceux de la cité), avec leur nom
 export const STYLES_BATIMENT = [['maison', 'Maison (générique)'], ['palais', 'Palais'], ['velours', 'Maison de jeu'], ['tripot', 'Tripot'], ['armurerie', 'Armurerie'], ['tailleur', 'Tailleur'], ['apothicaire', 'Apothicaire'], ['ecurie', 'Écurie'], ['chantier', 'Chantier naval'], ['capitainerie', 'Capitainerie'], ['entrepot', 'Entrepôt'], ['fosse', 'Arène'], ['voilerie', 'Voilerie'], ['cartographe', 'Cartographe'], ['epicerie', 'Épicerie'], ['tonnellerie', 'Tonnellerie'], ['corderie', 'Corderie']];

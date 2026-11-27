@@ -17,7 +17,8 @@ export class MapView {
   constructor(canvas, editor, renderer) {
     this.cv = canvas; this.ctx = canvas.getContext('2d'); this.ed = editor; this.R = renderer; this.world = editor.world;
     this.cam = { x: 150 * 16, y: 96 * 16, z: 1 }; // Port-Lanterne
-    this.show = { grille: true, collisions: false, regions: false, navigation: false, portes: true, pnj: true };
+    this.show = { grille: true, collisions: false, regions: false, navigation: false, portes: true, pnj: true, pieces: true, zones: true };
+    this.struct = null; this.bhover = null; this.zrect = null; this.pghost = null; // lot 2 : la structure sélectionnée, ce que vise l'outil Bâtir
     this.sel = []; this.hover = null; this.ghost = null; this.marquee = null; this.brush = null;
     this.buckets = new Map(); this.reindex();
     this.mini = this.buildMini(); this.dirty = true; this.pending = 0;
@@ -137,9 +138,41 @@ export class MapView {
     if (this.brush) { ctx.strokeStyle = this.brush.col || '#fff'; ctx.strokeRect(this.brush.x * 16, this.brush.y * 16, this.brush.n * 16, this.brush.n * 16); }
     if (this.marquee) { const m = this.marquee; ctx.strokeStyle = '#8ad0ff'; ctx.fillStyle = 'rgba(138,208,255,0.1)'; const rx = Math.min(m.x0, m.x1), ry = Math.min(m.y0, m.y1); ctx.fillRect(rx, ry, Math.abs(m.x1 - m.x0), Math.abs(m.y1 - m.y0)); ctx.strokeRect(rx, ry, Math.abs(m.x1 - m.x0), Math.abs(m.y1 - m.y0)); }
     if (this.ghost && this.ghost.spr) { const g = this.ghost, s = g.spr; ctx.globalAlpha = 0.6; ctx.drawImage(s.cv, Math.round(g.x - s.ax), Math.round(g.y - s.ay)); ctx.globalAlpha = 1; ctx.strokeStyle = g.ok ? '#7dff9a' : '#ff6a6a'; ctx.strokeRect(g.tx * 16, g.ty * 16, 16 * (g.w || 1), 16 * (g.h || 1)); }
+    if (!far) this.drawStructure(ctx, x0, y0, x1, y1);
     // les repères
     for (const r of this.ed.doc.reperes || []) { const px = r.x * 16 + 8, py = r.y * 16 + 8; if (px < x0 || px > x1 || py < y0 || py > y1) continue; ctx.fillStyle = '#ffcf4a'; ctx.beginPath(); ctx.arc(px, py, 5 / this.cam.z + 2, 0, 6.3); ctx.fill(); }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+  // lot 2 : les pièces de LStudio (leur contour, leur nom, leur sortie), les zones (jaune : un message, violet : un passage,
+  // avec la flèche vers son arrivée), la structure sélectionnée, et ce que vise l'outil Bâtir. En édition seulement.
+  drawStructure(ctx, x0, y0, x1, y1) {
+    const W = this.world, doc = this.ed.doc, z = this.cam.z, S = this.struct, lw = 1.5 / z;
+    const vis = (ax, ay, bx, by) => bx >= x0 && ax <= x1 && by >= y0 && ay <= y1;
+    const font = Math.max(7, Math.round(11 / z));
+    ctx.font = `${font}px sans-serif`; ctx.textBaseline = 'bottom';
+    if (this.show.pieces) for (const pc of doc.pieces) {
+      const ax = (pc.x - 1) * 16, ay = (pc.y - 2) * 16, bx = (pc.x + pc.w + 1) * 16, by = (pc.y + pc.h + 1) * 16;
+      if (!vis(ax, ay, bx, by)) continue;
+      const on = S && S.k === 'piece' && S.uid === pc.uid, valid = this.ed.S.pieceRooms.has(pc.uid);
+      ctx.strokeStyle = !valid ? '#ff5a5a' : on ? '#ffd84a' : 'rgba(255,216,74,0.55)'; ctx.lineWidth = on ? lw * 1.6 : lw; ctx.setLineDash(on ? [] : [6 / z, 4 / z]);
+      ctx.strokeRect(ax, ay, bx - ax, by - ay); ctx.setLineDash([]);
+      ctx.fillStyle = !valid ? '#ff8a8a' : '#ffe9a0'; ctx.fillText((valid ? '🏠 ' : '⛔ ') + (pc.nom || 'Pièce'), ax + 2, ay - 2);
+    }
+    if (this.show.zones) for (const zn of doc.zones) {
+      const ax = zn.x * 16, ay = zn.y * 16, bx = (zn.x + zn.w) * 16, by = (zn.y + zn.h) * 16, on = S && S.k === 'zone' && S.uid === zn.uid;
+      const col = zn.type === 'passage' ? '192,122,255' : '255,216,74';
+      if (vis(ax, ay, bx, by)) { ctx.fillStyle = `rgba(${col},${on ? 0.35 : 0.2})`; ctx.fillRect(ax, ay, bx - ax, by - ay); ctx.strokeStyle = `rgba(${col},${on ? 1 : 0.8})`; ctx.lineWidth = on ? lw * 1.6 : lw; ctx.strokeRect(ax, ay, bx - ax, by - ay); ctx.fillStyle = `rgb(${col})`; ctx.fillText(zn.type === 'passage' ? '⇢ ' + (zn.bouton || 'Passer') : '✉ ' + (zn.bouton || 'Lire'), ax + 1, ay - 1); }
+      if (zn.type === 'passage' && zn.vers) {
+        const tx = zn.vers.x * 16 + 8, ty = zn.vers.y * 16 + 8;
+        if (vis(tx - 8, ty - 8, tx + 8, ty + 8)) { ctx.strokeStyle = 'rgb(192,122,255)'; ctx.lineWidth = lw; ctx.beginPath(); ctx.arc(tx, ty, 6, 0, 6.3); ctx.stroke(); ctx.fillStyle = 'rgba(192,122,255,0.5)'; ctx.fill(); }
+        if (on || Math.hypot(tx - (ax + bx) / 2, ty - (ay + by) / 2) < 1200) { ctx.strokeStyle = `rgba(192,122,255,${on ? 0.9 : 0.45})`; ctx.setLineDash([5 / z, 4 / z]); ctx.beginPath(); ctx.moveTo((ax + bx) / 2, (ay + by) / 2); ctx.lineTo(tx, ty); ctx.stroke(); ctx.setLineDash([]); }
+      }
+    }
+    // la porte sélectionnée : un anneau autour de son entrée, et autour de son arrivée dedans
+    if (S && S.k === 'porte') { const d = this.ed.S.doorOf.get(S.uid); if (d) for (const [px, py] of [[d.ox, d.oy], [d.ix, d.iy]]) { ctx.strokeStyle = '#ffd84a'; ctx.lineWidth = lw * 1.6; ctx.beginPath(); ctx.arc(px, py - 5, 9, 0, 6.3); ctx.stroke(); } }
+    if (this.bhover) { const b = this.bhover; ctx.fillStyle = b.fill || 'rgba(255,255,255,0.18)'; ctx.strokeStyle = b.col || '#fff'; ctx.lineWidth = lw; for (const [cx, cy] of b.cells) { ctx.fillRect(cx * 16, cy * 16, 16, 16); ctx.strokeRect(cx * 16, cy * 16, 16, 16); } if (b.label) { ctx.fillStyle = b.col || '#fff'; ctx.fillText(b.label, b.cells[0][0] * 16, b.cells[0][1] * 16 - 2); } }
+    for (const R of [this.zrect, this.pghost]) if (R) { ctx.strokeStyle = R.col || '#8ad0ff'; ctx.fillStyle = R.fill || 'rgba(138,208,255,0.12)'; ctx.lineWidth = lw; ctx.fillRect(R.x0 * 16, R.y0 * 16, (R.x1 - R.x0 + 1) * 16, (R.y1 - R.y0 + 1) * 16); ctx.strokeRect(R.x0 * 16, R.y0 * 16, (R.x1 - R.x0 + 1) * 16, (R.y1 - R.y0 + 1) * 16); }
+    void W;
   }
   drawNpc(ctx, n) {
     let s = this.npcSpr.get(n.id);

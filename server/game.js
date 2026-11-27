@@ -288,6 +288,7 @@ export class Game {
       case 'sint': return this.structInteract(p, m.tx | 0, m.ty | 0);
       case 'stor': return this.chestAction(p, String(m.a), m.slot | 0);
       case 'door': return this.onDoor(p, m.id | 0, !!m.out);
+      case 'passage': return this.onPassage(p, m.id | 0); // 2.2 : une zone de passage écrite dans LStudio
       case 'board': return this.armShip(p, '');
       case 'home': return this.homeAction(p, String(m.a), m.k | 0);
       case 'lock': return this.pickLock(p, m.k | 0, !!m.ok);
@@ -2230,6 +2231,18 @@ export class Game {
       this.cinemaOnEnter(p, d.room); // lot 4 : une scène attend peut-être ici
       if (d.dungeon) { this.pushDng(p); this.toast(p, 'Le Bastion Englouti : deux leviers par grille, à tirer ensemble — à plusieurs. Et méfiez-vous de l’Écluse.', 'quest'); }
     }
+  }
+  // 2.2 : un passage de LStudio (un escalier, une trappe) : d'un rectangle à un point, d'une pièce à une autre. On ne passe
+  // que depuis le rectangle (dans la même pièce que lui), vers une case où l'on tient debout.
+  onPassage(p, id) {
+    const z = (this.world.studioZones || [])[id];
+    if (!z || z.type !== 'passage' || !z.to || p.dead || p.boat || p.ship || (p.cds.door || 0) > this.time) return;
+    if (p.room !== z.room || p.x < z.x0 - 14 || p.x > z.x1 + 14 || p.y < z.y0 - 14 || p.y > z.y1 + 18) return;
+    p.cds.door = this.time + 0.8;
+    if (!canStand(this.world, z.to.x, z.to.y, false, p.key)) return this.toast(p, 'Le passage est bouché.', 'warn');
+    if (p.riding) this.dismount(p);
+    this.teleport(p, z.to.x, z.to.y, { door: -1, passage: z.id });
+    if (p.room >= 0) this.cinemaOnEnter(p, p.room);
   }
   // ------------------------------------------------------------ navigation
   boatSlot(p, slot) {

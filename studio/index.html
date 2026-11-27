@@ -16,6 +16,7 @@
       <button data-tool="select" title="Sélectionner et déplacer (V)">⬚ <span>Sélection</span></button>
       <button data-tool="place" title="Poser l'élément choisi dans la bibliothèque (P)">✚ <span>Poser</span></button>
       <button data-tool="paint" title="Peindre le sol, les régions, les collisions, la navigation (B)">🖌 <span>Peindre</span></button>
+      <button data-tool="build" title="Bâtir : pièces, cloisons, sols et murs d'intérieur, décor mural, zones (K)">🏠 <span>Bâtir</span></button>
       <button data-tool="pan" title="Se déplacer sur la carte (H) — aussi : clic molette, ou Espace + glisser">✋ <span>Main</span></button>
     </div>
     <div class="group">
@@ -34,7 +35,7 @@
     </div>
   </header>
   <aside id="left">
-    <nav class="tabs" data-for="left"><button data-tab="lib" class="on">Bibliothèque</button><button data-tab="paint">Peinture</button><button data-tab="map">Carte</button></nav>
+    <nav class="tabs" data-for="left"><button data-tab="lib" class="on">Bibliothèque</button><button data-tab="paint">Peinture</button><button data-tab="build">Bâtiments</button><button data-tab="map">Carte</button></nav>
     <section data-pane="lib" class="pane on">
       <input id="lib-search" placeholder="Rechercher (ex. tonneau, lanterne…)" spellcheck="false">
       <div class="row"><select id="lib-cat"></select><label class="chk"><input type="checkbox" id="lib-used"> déjà utilisés</label></div>
@@ -47,6 +48,7 @@
       <div id="paint-list" class="plist"></div>
       <p class="hint" id="paint-hint"></p>
     </section>
+    <section data-pane="build" class="pane"><div id="build-pane"></div></section>
     <section data-pane="map" class="pane">
       <h3>Aller à</h3>
       <div class="row"><input id="go-x" type="number" placeholder="x"><input id="go-y" type="number" placeholder="y"><button id="go-btn">Aller</button></div>

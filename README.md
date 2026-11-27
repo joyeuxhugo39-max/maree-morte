@@ -25,6 +25,34 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Version 2.2.0 : LStudio, les bâtiments et les intérieurs (lot 2)
+
+LStudio sait maintenant bâtir : des intérieurs, leurs portes, leurs étages, et des zones de message et de passage. Ce
+sont des pièces du jeu comme les autres (rendu, lumière, sons, portes, déplacements). Mode d'emploi : `LSTUDIO.md`,
+rapport : `rapports/ls3-lot2.md`.
+
+- **Cinq bâtiments complets**, posés d'un clic : une maison de pêcheur, une taverne, une échoppe, un entrepôt, une petite
+  demeure. La façade, son intérieur meublé et la porte qui les relie, en une seule action.
+- **Les pièces** : créées à la taille voulue et rangées toutes seules sous l'archipel ; déplacées avec leur contenu,
+  redimensionnées, supprimées.
+  - Les cloisons, le style du sol et des murs case par case (les sols et les murs que le moteur dessine), et le décor
+    mural : fenêtres, tableaux, bibliothèques, cartes.
+- **Les portes** : depuis la porte dessinée d'un bâtiment (elle le suit s'il bouge), depuis un point du dehors, ou vers
+  une pièce du jeu. Une pièce peut avoir plusieurs portes : on ressort par celle dont on foule le seuil.
+- **Les étages** : une pièce de plus, et un escalier dans chacune.
+- **Les zones** : un message (un panneau, une inscription), ou un passage d'un point à un autre. Le moteur vérifie
+  chaque passage.
+- **Le contrôle** des bâtiments : les pièces sans entrée, les entrées et les passages bouchés, les cases murées, les
+  bâtiments dont la porte ne mène nulle part, le décor mural sans mur ; avec la correction quand elle est sûre (comme
+  « Créer son intérieur »).
+- **Les meubles de plusieurs cases** se posent avec leur vraie emprise.
+- **La suite `t_studio20`** vérifie :
+  - le format et l'application ;
+  - le vrai moteur : on entre, on monte, on ressort ;
+  - 300 actions au hasard dans l'éditeur, identiques au jeu, puis entièrement annulées ;
+  - le contrôle, et chaque modèle.
+- **Le monde publié reste vide** : le jeu n'a pas changé.
+
 ## Version 2.1.0 : LStudio, le studio de création (lot 1)
 
 **LStudio** (`lstudio.html`, à côté du jeu sur GitHub Pages) modifie le vrai monde de Marée Morte depuis le navigateur,

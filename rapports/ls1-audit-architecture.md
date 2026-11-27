@@ -81,6 +81,27 @@ l'applique **en tout dernier**, après toutes ses couches, avec le même code pa
 Les intérieurs, les portes, les zones d'interaction et de transition, et les modèles viendront compléter ce format
 aux lots suivants, sans changer ce qui existe (le numéro de version permet de faire évoluer le format).
 
+**Version 2 (lot 2)** : trois listes de plus, rien d'autre ne change (un document de la version 1 se lit tel quel) :
+
+```
+  pieces: [ { uid, nom, x, y, w, h,                 // le coin du sol, et sa taille ; l'enveloppe de murs autour
+              genre, sol: 'FLOOR' | 'STONEF', style, mur,  // le style par défaut ; style : un sol du moteur, mur : un style de mur
+              sols: { "dx,dy": style }, murs: { "dx,dy": mur },   // case par case, relatifs au coin
+              deco: [ { x, y, k, n, v } ],          // le décor mural : la case de sol au pied du mur, le genre, la largeur
+              decoAuto, sortie, ambiance, dehors } ],      // sortie : la colonne de la sortie (-1 : aucune)
+  portes: [ { uid, piece: "<uid d'une pièce>" | <numéro d'une pièce du jeu>,
+              x, y | batiment: "<uid d'un bâtiment>", nom, sortie } ],
+  zones:  [ { uid, type: 'message' | 'passage', x, y, w, h, bouton, titre, texte, auto, vers: { x, y } } ]
+```
+
+Les décors gagnent aussi une `emprise` facultative (`[largeur, hauteur]`) pour les meubles de plusieurs cases.
+
+Une pièce est creusée dans la bande des intérieurs, seulement là où il n'y a que du vide d'origine ; elle devient une
+pièce du jeu (numérotée après toutes les pièces du jeu), et ses portes des portes du jeu (numérotées après toutes les
+portes du jeu). Les zones sont lues par le client (`world.studioZones`) et le moteur vérifie chaque passage. Le jeu et
+l'éditeur rebâtissent pièces, portes et zones d'un coup, dans l'ordre du document : le résultat ne dépend que du
+document.
+
 ### Où vit LStudio
 
 - **Une page à part**, `lstudio.html`, publiée à côté du jeu sur GitHub Pages. Elle n'est liée nulle part dans le

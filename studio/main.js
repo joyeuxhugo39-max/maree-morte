@@ -6,7 +6,9 @@ import { Renderer } from '../client/render/renderer.js';
 import { MINI_COL } from '../client/render/terrain.js';
 import { Editor } from './editor.js';
 import { MapView, ZOOMS, zoneColor } from './view.js';
-import { CATEGORIES, HORS_BIBLIOTHEQUE, nomDe, SOLS, STYLES_BATIMENT } from './catalogue.js';
+import { CATEGORIES, HORS_BIBLIOTHEQUE, nomDe, SOLS, STYLES_BATIMENT, EMPRISES } from './catalogue.js';
+import { installBatir } from './batir.js';
+import { interiorFor } from './modeles.js';
 import { store, stats, github, guessRepo, PUB_PATH } from './store.js';
 
 const $ = (id) => document.getElementById(id);
@@ -16,7 +18,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
 const APERCU_KEY = 'lstudio:apercu';
 const S = { tool: 'select', armed: null, armedV: 0, paintKind: 'sol', paintVal: { sol: 'SAND', regions: 1, collisions: 1, navigation: 1 }, brush: 1, erase: false, activeLayer: 'decors', clip: null, dirty: false, lastSaved: null, qc: null, space: false };
-let ED, VIEW, R, WORLD;
+let ED, VIEW, R, WORLD, B;
 
 // ------------------------------------------------------------------ messages
 function toast(msg, kind = '') { const e = h('div', { class: 'toast ' + kind }, msg); $('toasts').append(e); setTimeout(() => e.remove(), kind === 'err' ? 6000 : 3200); }
@@ -47,15 +49,16 @@ async function boot() {
   ED = new Editor(WORLD, doc, PROPS);
   msg('Mise en place…', 90); await frame();
   VIEW = new MapView($('map'), ED, R);
+  B = installBatir({ S, ED, VIEW, WORLD, h, toast, field, num, sel, confirmBox, modal, select, setTool, renderProps, zoomLabel, ghostModel });
   $('boot').classList.add('hidden'); $('app').classList.remove('hidden');
   VIEW.resize(); window.addEventListener('resize', () => VIEW.resize());
   wire();
-  ED.on((ch) => { if (ch.dirty) markDirty(); if (ch.layers) renderLayers(); if (ch.reperes) renderReperes(); schedulePanel(); });
+  ED.on((ch) => { if (ch.dirty) markDirty(); if (ch.layers) renderLayers(); if (ch.reperes) renderReperes(); if (ch.structure || ch.history) S.structDirty = true; schedulePanel(); });
   renderAll();
   if (ED.report.ecartes.length) toast(`${ED.report.ecartes.length} modification(s) du brouillon n’ont pas pu être appliquées : voir « Contrôle ».`, 'warn');
   toast(from === 'brouillon' ? 'Brouillon rouvert : vous reprenez où vous en étiez.' : from === 'publié' ? 'Nouveau brouillon, à partir du monde publié.' : 'Nouveau brouillon : le monde d’origine du jeu.');
   setSaveState();
-  window.LS = { ED, VIEW, S, store }; // pour les vérifications automatiques
+  window.LS = { ED, VIEW, S, store, B }; // pour les vérifications automatiques
 }
 
 // ------------------------------------------------------------------ l'état de l'enregistrement
@@ -90,7 +93,9 @@ async function replaceDraft(doc, why) {
 function setTool(t) {
   S.tool = t; for (const b of document.querySelectorAll('#tools button')) b.classList.toggle('on', b.dataset.tool === t);
   if (t !== 'place') { VIEW.ghost = null; } if (t !== 'paint') VIEW.brush = null;
+  if (t !== 'build' && S.build) { S.build.pick = null; S.build.modele = null; VIEW.bhover = null; if (B) B.renderPane(); }
   if (t === 'paint') showTab('left', 'paint');
+  if (t === 'build') { showTab('left', 'build'); if (B) B.renderPane(); }
   $('map').style.cursor = t === 'pan' ? 'grab' : t === 'select' ? 'default' : 'crosshair'; VIEW.dirty = true; status();
 }
 function arm(type, v = 0) { S.armed = type; S.armedV = v; setTool('place'); renderLib(); toast(`« ${nomDe(type)} » : cliquez sur la carte pour le poser (Échap pour arrêter).`); }
@@ -102,7 +107,7 @@ function paintAt(tx, ty) {
 }
 function line(x0, y0, x1, y1, fn) { const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1); for (let i = 0; i <= n; i++) fn(Math.round(x0 + (x1 - x0) * i / n), Math.round(y0 + (y1 - y0) * i / n)); }
 function selected() { return VIEW.sel.filter((r) => { const p = ED.propOf(r); return p && WORLD.props.includes(p); }); }
-function select(refs) { VIEW.sel = refs; VIEW.dirty = true; renderProps(); }
+function select(refs) { VIEW.sel = refs; if (refs.length && S.struct) { S.struct = null; VIEW.struct = null; } VIEW.dirty = true; renderProps(); }
 const refEq = (a, b) => a.k === b.k && (a.k === 'd' ? a.uid === b.uid : a.id === b.id);
 function wireMap() {
   const cv = $('map'); let drag = null;
@@ -111,11 +116,17 @@ function wireMap() {
   cv.addEventListener('pointerdown', (e) => {
     cv.focus(); cv.setPointerCapture(e.pointerId);
     const [wx, wy] = VIEW.toWorld(e.offsetX, e.offsetY), [tx, ty] = cellAt(wx, wy);
-    if (e.button === 1 || e.button === 2 && S.tool !== 'paint' || S.tool === 'pan' || S.space) { drag = { k: 'pan', sx: e.offsetX, sy: e.offsetY, cx: VIEW.cam.x, cy: VIEW.cam.y }; cv.style.cursor = 'grabbing'; if (e.button === 2 && S.tool === 'place') { S.armed = null; setTool('select'); renderLib(); } return; }
+    if (e.button === 1 || e.button === 2 && S.tool !== 'paint' && S.tool !== 'build' || S.tool === 'pan' || S.space) { drag = { k: 'pan', sx: e.offsetX, sy: e.offsetY, cx: VIEW.cam.x, cy: VIEW.cam.y }; cv.style.cursor = 'grabbing'; if (e.button === 2 && S.tool === 'place') { S.armed = null; setTool('select'); renderLib(); } return; }
     if (S.tool === 'place' && S.armed) { placeArmed(tx, ty, e.altKey ? wx : null, e.altKey ? wy : null); return; }
     if (S.tool === 'paint') { const er = S.erase; if (e.button === 2) S.erase = true; ED.begin(paintLabel()); paintAt(tx, ty); drag = { k: 'paint', tx, ty, er }; return; }
-    // la sélection
-    const p = VIEW.pick(wx, wy);
+    if (S.tool === 'build') { const dr = B.down(e, wx, wy, tx, ty); if (dr) drag = dr; return; }
+    // la sélection : l'entrée d'une porte, puis un décor, puis une zone, puis une pièce (lot 2)
+    const p = VIEW.pick(wx, wy), st = B.pickStruct(wx, wy, p && !ED.locked(p));
+    if (st && st.k === 'porte') { B.selectStruct(st); return; }
+    if (st && !(p && !ED.locked(p))) {
+      if (S.struct && S.struct.k === st.k && S.struct.uid === st.uid && st.k !== 'porte') { drag = { k: 'smove', st, wx, wy, dx: 0, dy: 0 }; return; } // une seconde fois : on la déplace
+      B.selectStruct(st); drag = { k: 'sclick', wx, wy, add: e.shiftKey }; return;
+    }
     if (p && !ED.locked(p)) {
       const ref = ED.refOf(p), has = VIEW.sel.some((r) => refEq(r, ref));
       if (e.shiftKey) { select(has ? VIEW.sel.filter((r) => !refEq(r, ref)) : [...VIEW.sel, ref]); return; }
@@ -133,7 +144,16 @@ function wireMap() {
       if (S.tool === 'select') { const p = VIEW.pick(wx, wy); if (p !== VIEW.hover) { VIEW.hover = p; VIEW.dirty = true; } }
       if (S.tool === 'place' && S.armed) ghostAt(tx, ty, e.altKey ? wx : null, e.altKey ? wy : null);
       if (S.tool === 'paint') { const n = S.brush, o = Math.floor((n - 1) / 2); VIEW.brush = { x: tx - o, y: ty - o, n, col: S.erase ? '#ff9a9a' : '#ffffff' }; VIEW.dirty = true; }
+      if (S.tool === 'build') B.hover(tx, ty);
       status(); return;
+    }
+    if (drag.k === 'build') { B.move(drag, wx, wy, tx, ty); return; }
+    if (drag.k === 'sclick') { if (Math.hypot(wx - drag.wx, wy - drag.wy) > 4 / VIEW.cam.z * 2) { drag = { k: 'marquee', wx: drag.wx, wy: drag.wy, add: drag.add }; VIEW.marquee = { x0: drag.wx, y0: drag.wy, x1: wx, y1: wy }; } return; }
+    if (drag.k === 'smove') {
+      drag.dx = Math.round((wx - drag.wx) / 16); drag.dy = Math.round((wy - drag.wy) / 16);
+      const o = drag.st.k === 'piece' ? ED.piece(drag.st.uid) : ED.zone(drag.st.uid);
+      if (o) { const E = drag.st.k === 'piece' ? { x0: o.x - 1, y0: o.y - 2, x1: o.x + o.w, y1: o.y + o.h } : { x0: o.x, y0: o.y, x1: o.x + o.w - 1, y1: o.y + o.h - 1 }; const okp = drag.st.k !== 'piece' || !ED.canPut({ ...o, x: o.x + drag.dx, y: o.y + drag.dy }, o.uid); VIEW.pghost = { x0: E.x0 + drag.dx, y0: E.y0 + drag.dy, x1: E.x1 + drag.dx, y1: E.y1 + drag.dy, col: okp ? '#7dff9a' : '#ff6a6a', fill: okp ? 'rgba(125,255,154,0.1)' : 'rgba(255,106,106,0.12)' }; VIEW.dirty = true; }
+      return;
     }
     if (drag.k === 'pan') { const z = VIEW.cam.z; VIEW.cam.x = drag.cx - (e.offsetX - drag.sx) / z; VIEW.cam.y = drag.cy - (e.offsetY - drag.sy) / z; VIEW.clamp(); VIEW.dirty = true; return; }
     if (drag.k === 'paint') { line(drag.tx, drag.ty, tx, ty, (x, y) => paintAt(x, y)); drag.tx = tx; drag.ty = ty; const n = S.brush, o = Math.floor((n - 1) / 2); VIEW.brush = { x: tx - o, y: ty - o, n, col: S.erase ? '#ff9a9a' : '#fff' }; return; }
@@ -150,13 +170,15 @@ function wireMap() {
   const up = () => {
     if (!drag) return;
     if (drag.k === 'paint') { ED.end(); if (drag.er !== undefined) S.erase = drag.er; renderPaint(); }
+    if (drag.k === 'build') B.up(drag);
+    if (drag.k === 'smove') { VIEW.pghost = null; if (drag.dx || drag.dy) { if (drag.st.k === 'piece') { const o = ED.piece(drag.st.uid); if (o) B.movePiece(o, o.x + drag.dx, o.y + drag.dy); } else { const z = ED.zone(drag.st.uid); if (z) ED.changeZone(z.uid, { x: z.x + drag.dx, y: z.y + drag.dy }); } } }
     if (drag.k === 'move' && drag.started) ED.end();
     if (drag.k === 'marquee') { const m = VIEW.marquee; VIEW.marquee = null; const found = VIEW.inRect(m.x0, m.y0, m.x1, m.y1).map((p) => ED.refOf(p)); if (Math.abs(m.x1 - m.x0) > 3 || Math.abs(m.y1 - m.y0) > 3) select(drag.add ? [...VIEW.sel, ...found.filter((f) => !VIEW.sel.some((r) => refEq(r, f)))] : found); else if (!drag.add) select([]); }
     if (drag.k === 'pan') $('map').style.cursor = S.tool === 'pan' ? 'grab' : S.tool === 'select' ? 'default' : 'crosshair';
     drag = null; VIEW.dirty = true;
   };
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
-  cv.addEventListener('pointerleave', () => { VIEW.hover = null; VIEW.brush = null; if (S.tool === 'place') VIEW.ghost = null; VIEW.dirty = true; });
+  cv.addEventListener('pointerleave', () => { VIEW.hover = null; VIEW.brush = null; VIEW.bhover = null; if (S.tool === 'place' || (S.build && S.build.modele)) VIEW.ghost = null; VIEW.dirty = true; });
   // glisser-déposer depuis la bibliothèque
   cv.addEventListener('dragover', (e) => { e.preventDefault(); const t = e.dataTransfer.types.includes('text/lstudio') ? S.dragType : null; if (!t) return; const [wx, wy] = VIEW.toWorld(e.offsetX, e.offsetY); const [tx, ty] = cellAt(wx, wy); S.armed = t; S.armedV = 0; ghostAt(tx, ty); });
   cv.addEventListener('drop', (e) => { e.preventDefault(); const t = S.dragType; if (!t) return; const [wx, wy] = VIEW.toWorld(e.offsetX, e.offsetY), [tx, ty] = cellAt(wx, wy); S.armed = t; placeArmed(tx, ty); VIEW.ghost = null; S.dragType = null; if (S.tool !== 'place') S.armed = null; });
@@ -164,18 +186,23 @@ function wireMap() {
 function ghostAt(tx, ty, wx = null, wy = null) {
   const type = S.armed; if (!type) return;
   const d = { type, v: S.armedV, tx, ty, x: 0, y: 0 };
-  const isB = BUILDING_PROPS.has(type);
+  const isB = BUILDING_PROPS.has(type), E = EMPRISES[type] || [1, 1];
   const fake = { type, v: S.armedV, tx, ty, w: isB ? 5 : undefined, h: isB ? 4 : undefined, door: isB ? 2 : undefined, style: isB ? 'maison' : undefined };
   const s = VIEW.spr(fake);
-  fake.x = isB ? tx * 16 + 8 + 5 * 8 - 8 : (wx != null ? Math.round(wx) : tx * 16 + 8); fake.y = isB ? ty * 16 + 14 + 4 * 16 - 14 : (wy != null ? Math.round(wy) : ty * 16 + 14);
-  VIEW.ghost = { spr: s, x: fake.x, y: fake.y, tx, ty, w: isB ? 5 : 1, h: isB ? 4 : 1, ok: tx >= 0 && ty >= 0 && tx < WORLD.W && ty < WORLD.H };
+  fake.x = isB ? tx * 16 + 8 + 5 * 8 - 8 : (wx != null ? Math.round(wx) : tx * 16 + 8 + E[0] * 8 - 8); fake.y = isB ? ty * 16 + 14 + 4 * 16 - 14 : (wy != null ? Math.round(wy) : ty * 16 + 14 + (E[1] - 1) * 16);
+  VIEW.ghost = { spr: s, x: fake.x, y: fake.y, tx, ty, w: isB ? 5 : E[0], h: isB ? 4 : E[1], ok: tx >= 0 && ty >= 0 && tx < WORLD.W && ty < WORLD.H };
   VIEW.dirty = true; void d;
+}
+// le fantôme d'un bâtiment complet (la façade du modèle) sous le pointeur
+function ghostModel(M, tx, ty) {
+  if (!M) return; const F = M.facade, fake = { type: 'cite', v: 0, tx, ty, w: F.w, h: F.h, door: F.door, style: F.style };
+  VIEW.ghost = { spr: VIEW.spr(fake), x: tx * 16 + 8 + F.w * 8 - 8, y: ty * 16 + 14 + F.h * 16 - 14, tx, ty, w: F.w, h: F.h, ok: ty < WORLD.OVER_H - 4 }; VIEW.dirty = true;
 }
 function placeArmed(tx, ty, wx = null, wy = null) {
   if (tx < 0 || ty < 0 || tx >= WORLD.W || ty >= WORLD.H) return toast('Hors de la carte.', 'warn');
   const L = ED.layer(S.activeLayer); if (!L || L.origine) S.activeLayer = 'decors';
   if (ED.layer(S.activeLayer) && ED.layer(S.activeLayer).verrou) return toast('La couche active est verrouillée.', 'warn');
-  const d = ED.placeDecor(S.armed, tx, ty, { v: S.armedV, couche: S.activeLayer });
+  const E = EMPRISES[S.armed], d = ED.placeDecor(S.armed, tx, ty, { v: S.armedV, couche: S.activeLayer, ...(E ? { emprise: [E[0], E[1]], solide: E[2] || 'tout' } : {}) });
   if (wx != null) ED.change({ k: 'd', uid: d.uid }, { dx: Math.round(wx - (tx * 16 + 8)), dy: Math.round(wy - (ty * 16 + 14)) });
   select([{ k: 'd', uid: d.uid }]);
 }
@@ -197,11 +224,13 @@ function wireKeys() {
     if (ctrl && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicate(); return; }
     if (ctrl && e.key.toLowerCase() === 'a') { e.preventDefault(); return; }
     if (e.key === ' ') { S.space = true; $('map').style.cursor = 'grab'; return; }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && S.struct) { B.deleteStruct(); return; }
     if (e.key === 'Delete' || e.key === 'Backspace') { const s = selected(); if (s.length) { ED.remove(s); select([]); toast(`${s.length} élément(s) supprimé(s) (Ctrl+Z pour annuler).`); } return; }
-    if (e.key === 'Escape') { if (S.tool === 'place') { S.armed = null; setTool('select'); renderLib(); } else select([]); return; }
+    if (e.key === 'Escape') { if (S.tool === 'place') { S.armed = null; setTool('select'); renderLib(); } else if (S.tool === 'build' && (S.build.pick || S.build.modele)) { setTool('select'); toast('Annulé.'); } else if (S.struct) B.selectStruct(null); else select([]); return; }
+    if (e.key.startsWith('Arrow') && S.struct && !selected().length) { e.preventDefault(); const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key]; B.nudge(d[0], d[1]); return; }
     if (e.key.startsWith('Arrow')) { const s = selected(); if (!s.length) { const k = e.shiftKey ? 160 : 48; VIEW.cam.x += e.key === 'ArrowLeft' ? -k : e.key === 'ArrowRight' ? k : 0; VIEW.cam.y += e.key === 'ArrowUp' ? -k : e.key === 'ArrowDown' ? k : 0; VIEW.clamp(); VIEW.dirty = true; return; } e.preventDefault(); const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key]; if (e.altKey) ED.move(s, 0, 0, d[0], d[1]); else ED.move(s, d[0], d[1]); return; }
     const k = e.key.toLowerCase();
-    if (k === 'v') setTool('select'); else if (k === 'p') { if (S.armed) setTool('place'); else showTab('left', 'lib'); } else if (k === 'b') setTool('paint'); else if (k === 'h') setTool('pan');
+    if (k === 'v') setTool('select'); else if (k === 'p') { if (S.armed) setTool('place'); else showTab('left', 'lib'); } else if (k === 'b') setTool('paint'); else if (k === 'h') setTool('pan'); else if (k === 'k') setTool('build');
     else if (k === 'm') { const s = selected(); if (s.length) { ED.begin('Miroir'); for (const r of s) { const d = ED.describe(r); ED.change(r, { miroir: !d.miroir }); } ED.end(); } }
     else if (k === 'l') { const s = selected().filter((r) => r.k === 'd'); if (s.length) { ED.begin('Verrouiller'); for (const r of s) { const d = ED.describe(r); ED.change(r, { verrou: !d.verrou }); } ED.end(); renderProps(); } }
     else if (k === ']' || k === 'pagedown') variant(+1); else if (k === '[' || k === 'pageup') variant(-1);
@@ -283,7 +312,7 @@ function renderMapPane() {
 }
 function renderRooms() {
   const q = $('room-search').value.trim().toLowerCase(), RL = $('room-list'); RL.innerHTML = '';
-  for (const r of WORLD.rooms) { if (q && !r.name.toLowerCase().includes(q)) continue; RL.append(h('div', { class: 'li', on: { click: () => { VIEW.goTo(r.x0 + (r.w >> 1), r.y0 + (r.h >> 1), 1); zoomLabel(); } } }, r.name, h('span', { class: 'x' }, `${r.w} × ${r.h}`))); }
+  for (const r of WORLD.rooms) { if (q && !r.name.toLowerCase().includes(q)) continue; RL.append(h('div', { class: 'li', on: { click: () => { VIEW.goTo(r.x0 + (r.w >> 1), r.y0 + (r.h >> 1), 1); zoomLabel(); } } }, r.studio ? h('span', {}, '🏠') : null, r.name, h('span', { class: 'x' }, `${r.w} × ${r.h}${r.studio ? ' · LStudio' : ''}`))); }
 }
 function renderReperes() {
   const L = $('rep-list'); L.innerHTML = '';
@@ -307,21 +336,22 @@ function renderLayers() {
 function setLayer(id, f) { ED.set('couches', '', ED.doc.couches.map((c) => (c.id === id ? { ...c, ...f } : c))); VIEW.dirty = true; }
 function renderShow() {
   const L = $('show-list'); L.innerHTML = '';
-  for (const [k, label] of [['grille', 'Quadrillage (G)'], ['collisions', 'Collisions (rouge : bloque)'], ['regions', 'Régions'], ['navigation', 'Navigation (bleu : les bateaux passent)'], ['portes', 'Portes (vert : dehors, bleu : dedans)'], ['pnj', 'Personnages']]) L.append(h('label', { class: 'chk li' }, h('input', { type: 'checkbox', checked: VIEW.show[k], on: { change: (e) => { VIEW.show[k] = e.target.checked; VIEW.dirty = true; } } }), label));
+  for (const [k, label] of [['grille', 'Quadrillage (G)'], ['collisions', 'Collisions (rouge : bloque)'], ['regions', 'Régions'], ['navigation', 'Navigation (bleu : les bateaux passent)'], ['portes', 'Portes (vert : dehors, bleu : dedans)'], ['pieces', 'Pièces de LStudio (contour, nom)'], ['zones', 'Zones (jaune : message, violet : passage)'], ['pnj', 'Personnages']]) L.append(h('label', { class: 'chk li' }, h('input', { type: 'checkbox', checked: VIEW.show[k], on: { change: (e) => { VIEW.show[k] = e.target.checked; VIEW.dirty = true; } } }), label));
 }
 // ------------------------------------------------------------------ les propriétés
 let panelT = null;
-function schedulePanel() { clearTimeout(panelT); panelT = setTimeout(() => { renderProps(); }, 60); }
+function schedulePanel() { clearTimeout(panelT); panelT = setTimeout(() => { renderProps(); if (S.structDirty) { S.structDirty = false; B.renderPane(); renderRooms(); } }, 60); }
 function field(label, input) { return h('div', { class: 'field' }, h('span', {}, label), input); }
 function num(v, on, step = 1) { return h('input', { type: 'number', value: v, step, on: { change: (e) => on(+e.target.value) } }); }
 function sel(v, opts, on) { const s = h('select', { on: { change: (e) => on(e.target.value) } }); for (const [k, l] of opts) s.append(h('option', { value: k, selected: String(k) === String(v) }, l)); return s; }
 function renderProps() {
   const P = $('props'); P.innerHTML = '';
+  if (S.struct && B && B.renderStruct(P)) return; // lot 2 : une pièce, une porte, une zone
   const s = selected();
   if (!s.length) {
     const st = stats(ED.doc);
-    P.append(h('p', { class: 'hint' }, 'Cliquez sur un élément de la carte pour le sélectionner (Maj : plusieurs ; glisser dans le vide : un cadre).'),
-      h('h3', {}, 'Ce monde'), field('Décors ajoutés', h('b', {}, st.decors)), field('Décors retouchés', h('b', {}, st.retouches)), field('Cases repeintes', h('b', {}, st.sol)), field('Régions peintes', h('b', {}, st.regions)), field('Collisions', h('b', {}, st.collisions)), field('Navigation', h('b', {}, st.navigation)),
+    P.append(h('p', { class: 'hint' }, 'Cliquez sur un élément de la carte pour le sélectionner (Maj : plusieurs ; glisser dans le vide : un cadre). Dans une pièce, cliquez sur le sol vide pour choisir la pièce.'),
+      h('h3', {}, 'Ce monde'), field('Décors ajoutés', h('b', {}, st.decors)), field('Décors retouchés', h('b', {}, st.retouches)), field('Cases repeintes', h('b', {}, st.sol)), field('Régions peintes', h('b', {}, st.regions)), field('Collisions', h('b', {}, st.collisions)), field('Navigation', h('b', {}, st.navigation)), field('Pièces', h('b', {}, st.pieces)), field('Portes', h('b', {}, st.portes)), field('Zones', h('b', {}, st.zones)),
       h('h3', {}, 'Raccourcis'), h('p', { class: 'hint', html: 'Ctrl+Z / Ctrl+Y : annuler, rétablir · Ctrl+C / Ctrl+V : copier, coller · Ctrl+D : dupliquer · Suppr : supprimer · flèches : déplacer d’une case (Alt : d’un pixel) · [ et ] : variante · M : miroir · L : verrouiller · molette : zoom · Espace + glisser : se déplacer · Ctrl+S : enregistrer une version' }));
     return;
   }
@@ -349,7 +379,8 @@ function renderProps() {
       P.append(h('h3', {}, 'Bâtiment'), field('Largeur × hauteur', h('div', { class: 'two' }, num(D.w || 5, (v) => ED.change(r, { 'donnees.w': Math.max(2, Math.min(16, v | 0)) })), num(D.h || 4, (v) => ED.change(r, { 'donnees.h': Math.max(2, Math.min(10, v | 0)) })))),
         field('Porte (colonne)', num(D.door ?? 2, (v) => ED.change(r, { 'donnees.door': Math.max(-1, Math.min((D.w || 5) - 1, v | 0)) }))),
         field('Style', sel(D.style || 'maison', STYLES_BATIMENT, (v) => ED.change(r, { 'donnees.style': v }))),
-        h('p', { class: 'hint' }, 'Une façade, pour l’instant sans intérieur : relier une porte à un intérieur viendra avec l’éditeur de bâtiments (lot 2).'));
+        field('Nom', h('input', { value: D.nom || '', placeholder: 'le nom de l’entrée, en jeu', on: { change: (e) => ED.change(r, { 'donnees.nom': e.target.value.slice(0, 60) }) } })));
+      B.buildingSection(P, r, d);
     }
     P.append(field('Couche', sel(d.couche || 'decors', ED.doc.couches.filter((c) => !c.origine).map((c) => [c.id, c.nom]), ch('couche'))));
     P.append(field('Nom', h('input', { value: d.nom || '', placeholder: 'facultatif', on: { change: (e) => ED.change(r, { nom: e.target.value.slice(0, 60) }) } })));
@@ -365,7 +396,7 @@ function status() {
   const [tx, ty] = S.mouse || [0, 0]; if (tx < 0 || ty < 0 || tx >= WORLD.W || ty >= WORLD.H) return;
   const i = ty * WORLD.W + tx, room = WORLD.roomGrid[i] >= 0 ? WORLD.rooms[WORLD.roomGrid[i]].name : null;
   const sol = SOLS.find(([n]) => T[n] === WORLD.tiles[i]);
-  const tool = { select: 'Sélection', place: S.armed ? `Poser « ${nomDe(S.armed)} » (variante ${S.armedV + 1}, [ ] pour changer ; Alt : au pixel)` : 'Poser', paint: paintLabel() + ` (pinceau ${S.brush})`, pan: 'Main' }[S.tool];
+  const tool = { select: 'Sélection', place: S.armed ? `Poser « ${nomDe(S.armed)} » (variante ${S.armedV + 1}, [ ] pour changer ; Alt : au pixel)` : 'Poser', paint: paintLabel() + ` (pinceau ${S.brush})`, pan: 'Main', build: S.build && S.build.pick ? 'Bâtir : choisissez un point sur la carte' : S.build && S.build.modele ? 'Bâtir : posez le bâtiment' : 'Bâtir : ' + ({ murs: 'cloisons', stylesol: 'style du sol', stylemur: 'style des murs', deco: 'décor mural', zone: 'zone' }[S.build && S.build.mode] || '') }[S.tool];
   $('status').textContent = `Case ${tx}, ${ty} · ${sol ? sol[1] : TILE_NAMES[WORLD.tiles[i]]} · ${ZONES[WORLD.zones[i]] ? ZONES[WORLD.zones[i]].name : 'région ' + WORLD.zones[i]}${room ? ' · ' + room : ''} · ${WORLD.solid[i] ? 'bloque' : 'libre'}${WORLD.sail[i] ? ' · navigable' : ''} — ${tool}`;
 }
 function zoomLabel() { $('z-val').textContent = Math.round(VIEW.cam.z * 100) + ' %'; }
@@ -390,12 +421,14 @@ function renderQC(ms) {
   L.append(h('p', { class: 'hint' }, I.length ? `${nb} problème(s) bloquant(s), ${I.length - nb} avertissement(s)${ms ? ` (vérifié en ${ms} ms)` : ''}. Les problèmes bloquants empêchent la publication.` : `Aucun problème trouvé${ms ? ` (vérifié en ${ms} ms)` : ''}.`));
   for (const it of I.slice(0, 200)) {
     L.append(h('div', { class: 'qc' + (it.niveau === 'bloquant' ? ' b' : '') }, h('div', { class: 'm' }, (it.niveau === 'bloquant' ? '⛔ ' : '⚠ ') + it.msg), h('div', { class: 'w' }, `case ${it.x}, ${it.y}`),
-      h('div', { class: 'btns' }, h('button', { class: 'mini', on: { click: () => { VIEW.goTo(it.x, it.y, Math.max(1, VIEW.cam.z)); zoomLabel(); } } }, 'Aller voir'), it.fix ? h('button', { class: 'mini', on: { click: () => { fix(it.fix); runQC(); } } }, fixLabel(it.fix)) : null)));
+      h('div', { class: 'btns' }, h('button', { class: 'mini', on: { click: () => { VIEW.goTo(it.x, it.y, Math.max(1, VIEW.cam.z)); zoomLabel(); } } }, 'Aller voir'), it.fix && it.fix.op !== 'aller' ? h('button', { class: 'mini', on: { click: () => { fix(it.fix); runQC(); } } }, fixLabel(it.fix)) : null)));
   }
 }
-const fixLabel = (f) => ({ supprimer: 'Supprimer ce décor', retirer_sol: 'Annuler ce sol', liberer: 'Libérer la case' }[f.op] || 'Corriger');
+const fixLabel = (f) => ({ supprimer: 'Supprimer ce décor', retirer_sol: 'Annuler ce sol', liberer: 'Libérer la case', interieur: 'Créer son intérieur', retirer_deco: 'Décrocher ce décor' }[f.op] || 'Corriger');
 function fix(f) {
-  if (f.op === 'supprimer') ED.set('decor', f.uid, undefined);
+  if (f.op === 'interieur') { const r = interiorFor(ED, f.uid); if (r.err) toast('Impossible : ' + r.err, 'err'); else toast('Intérieur créé, relié à la porte du bâtiment.'); }
+  else if (f.op === 'retirer_deco') ED.removeMurDeco(f.uid, f.x, f.y);
+  else if (f.op === 'supprimer') ED.set('decor', f.uid, undefined);
   else if (f.op === 'retirer_sol') ED.set('sol', f.k, undefined);
   else if (f.op === 'liberer') ED.set('collisions', key(f.x, f.y), 0);
 }
@@ -482,6 +515,7 @@ function showHelp() {
   <li><b>Poser</b> : choisissez un élément dans la Bibliothèque, puis cliquez sur la carte (ou glissez-le). <b>[</b> et <b>]</b> changent la variante, Alt place au pixel près.</li>
   <li><b>Modifier</b> : outil Sélection (V), cliquez sur un élément ; ses propriétés s’affichent à droite. Glissez pour déplacer, flèches pour ajuster, Suppr pour supprimer. Les décors d’origine du jeu peuvent aussi être déplacés ou retirés, et « Rétablir l’original » les remet.</li>
   <li><b>Peindre</b> : onglet « Peinture » — le sol (sable, herbe, pavés, eau…), les régions, les collisions (ce qui bloque), la navigation des bateaux. Clic droit : gomme.</li>
+  <li><b>Bâtir</b> : onglet « Bâtiments » — posez un bâtiment complet (façade, intérieur meublé, porte), ou créez une pièce, dessinez ses cloisons, ses sols et ses murs, accrochez des fenêtres et des tableaux, reliez-la à une entrée dehors, ajoutez un étage, tracez des zones (un message, un passage).</li>
   <li><b>Couches</b> : rangez vos ajouts, masquez-les, verrouillez-les.</li>
   <li><b>Vérifier</b> : le contrôle cherche ce qui serait cassé (un décor inconnu, une porte bouchée, un personnage muré…) et propose une correction.</li>
   <li><b>Tester dans le jeu</b> : le vrai jeu s’ouvre, en solo, avec vos modifications. Votre pirate y est copié : sa vraie sauvegarde n’est jamais touchée.</li>
@@ -493,7 +527,7 @@ function showHelp() {
 function wire() {
   wireMap(); wireKeys();
   for (const b of document.querySelectorAll('#tools button')) b.onclick = () => { if (b.dataset.tool === 'place' && !S.armed) { showTab('left', 'lib'); toast('Choisissez d’abord un élément dans la bibliothèque.'); return; } setTool(b.dataset.tool); };
-  for (const nav of document.querySelectorAll('.tabs')) for (const b of nav.querySelectorAll('button')) b.onclick = () => { showTab(nav.dataset.for, b.dataset.tab); if (b.dataset.tab === 'paint') setTool('paint'); };
+  for (const nav of document.querySelectorAll('.tabs')) for (const b of nav.querySelectorAll('button')) b.onclick = () => { showTab(nav.dataset.for, b.dataset.tab); if (b.dataset.tab === 'paint') setTool('paint'); if (b.dataset.tab === 'build') B.renderPane(); };
   $('b-undo').onclick = () => { const l = ED.undo(); toast(l ? 'Annulé : ' + l : 'Rien à annuler.'); };
   $('b-redo').onclick = () => { const l = ED.redo(); toast(l ? 'Rétabli : ' + l : 'Rien à rétablir.'); };
   $('b-save').onclick = () => saveVersion(); $('b-versions').onclick = showVersions; $('b-check').onclick = runQC; $('qc-run').onclick = runQC;
