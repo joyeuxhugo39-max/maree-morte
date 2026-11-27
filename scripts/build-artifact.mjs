@@ -12,7 +12,8 @@ const pages = process.argv.includes('--pages');
 const out = await build({
   entryPoints: [path.join(ROOT, 'client/main.js')],
   bundle: true, format: 'iife', minify: true, write: false, target: ['es2020'], legalComments: 'none',
-  define: { __MM_PAGES__: pages ? 'true' : 'false' },
+  // LStudio : le monde publié (docs/monde-studio.json) est embarqué dans la page ; sur GitHub Pages, le jeu relit le fichier à côté de lui
+  define: { __MM_PAGES__: pages ? 'true' : 'false', __MM_STUDIO__: fs.existsSync(path.join(ROOT, 'docs/monde-studio.json')) ? fs.readFileSync(path.join(ROOT, 'docs/monde-studio.json'), 'utf8') : 'null' },
   // la page claude.ai n'embarque pas le multijoueur direct (inutile là-bas)
   plugins: pages ? [] : [{
     name: 'sans-peerjs',

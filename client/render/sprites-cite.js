@@ -53,7 +53,7 @@ function curtains(pb, y0, y1, c = 0xc01a36) {
 }
 
 // ------------------------------------------------------------------ façades
-const STYLES = {
+export const STYLES = { // LStudio : la liste des styles de bâtiments
   palais: () => ({ wall: 'plaster', plaster: PLA.white, roof: RF.copper, floors: 2, chimney: false, sign: 'crown', shutter: SHUT[0], flowers: FLOW[0],
     extra(pb, W, H, top) {
       const cx = W >> 1;

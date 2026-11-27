@@ -19,12 +19,19 @@ export class WSNet {
 }
 
 // Sauvegarde locale du navigateur (mode solo)
+// LStudio : pendant un aperçu, les sauvegardes vont dans un espace à part (mm_apercu_…) ; on part d'une copie du vrai
+// pirate, qui, lui, n'est jamais réécrit
 export class BrowserStorage {
+  constructor() { this.prefix = window.MM_APERCU ? 'mm_apercu_' : 'mm_save_'; }
   async auth(key) {
-    try { const s = localStorage.getItem('mm_save_' + key); return { ok: true, data: s ? JSON.parse(s) : null }; } catch (e) { return { ok: true, data: this.mem && this.mem[key] || null }; }
+    try {
+      let s = localStorage.getItem(this.prefix + key);
+      if (!s && this.prefix !== 'mm_save_') s = localStorage.getItem('mm_save_' + key); // la copie du vrai pirate, en lecture seule
+      return { ok: true, data: s ? JSON.parse(s) : null };
+    } catch (e) { return { ok: true, data: this.mem && this.mem[key] || null }; }
   }
   async save(key, data) {
-    try { localStorage.setItem('mm_save_' + key, JSON.stringify(data)); } catch (e) { this.mem = this.mem || {}; this.mem[key] = data; }
+    try { localStorage.setItem(this.prefix + key, JSON.stringify(data)); } catch (e) { this.mem = this.mem || {}; this.mem[key] = data; }
   }
 }
 

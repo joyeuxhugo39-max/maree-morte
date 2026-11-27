@@ -16,6 +16,7 @@ import { UI } from './ui.js';
 import { Input } from './input.js';
 import { Sfx } from './audio.js';
 import { WSNet, LocalNet } from './net.js';
+import { loadStudioWorld } from './studio-load.js'; // LStudio : le monde écrit dans l'éditeur
 import { RoomNet } from './roomnet.js';
 import { iconURL, iconCanvas } from './render/sprites-items.js';
 import { updateCine, cineLocked, endCine, bossIntro, bossDown, krakenIntro, krakenDown } from './cine.js';
@@ -87,6 +88,8 @@ window.MM_OUTFITS = Object.entries(ITEMS).filter(([, it]) => it.slot === 'outfit
 
 // ------------------------------------------------------------ démarrage
 async function boot(hotData = {}) {
+  G.studio = await loadStudioWorld(); // LStudio : le monde publié (ou l'aperçu de l'éditeur), appliqué par generateWorld
+  if (G.studio.mode === 'apercu') window.MM_APERCU = true;
   G.world = generateWorld(7);
   G.renderer = new Renderer($('view'), G.world);
   G.renderer.G = G;
@@ -130,6 +133,7 @@ async function boot(hotData = {}) {
   const submit = async ({ name, pass, look, solo }) => {
     G.sfx.init();
     if (!name || name.length < 3) return G.ui.loginError('Choisissez un nom de pirate (3 à 16 caractères).');
+    if (G.studio && G.studio.mode === 'apercu') solo = true; // LStudio : un aperçu se joue seul (le monde de test n'est que dans ce navigateur)
     if (!online && !G.net) {
       if (PAGES && !solo) {
         G.ui.loginError('Connexion au monde en ligne…');
@@ -151,7 +155,8 @@ async function boot(hotData = {}) {
     const rs = resumeInfo(); // 1.0 : reprise après une coupure, sans redemander le mot de passe
     G.send({ t: 'login', v: PROTOCOL, name, pass: online && !solo ? pass : 'solo', look, rt: rs && rs.name === name ? rs.rt : undefined });
   };
-  if (PAGES && !online) G.ui.showLogin({ noPass: true, offerSolo: true, note: 'En ligne : tous ceux qui ouvrent ce lien jouent dans le même monde. Votre progression reste dans ce navigateur.', onSubmit: submit });
+  if (G.studio && G.studio.mode === 'apercu') G.ui.showLogin({ solo: true, noPass: true, note: `Aperçu LStudio : « ${(G.studio.doc.meta && G.studio.doc.meta.nom) || 'monde de test'} », en solo. Votre pirate est copié : rien de ce que vous faites ici ne touche sa vraie sauvegarde.`, onSubmit: submit });
+  else if (PAGES && !online) G.ui.showLogin({ noPass: true, offerSolo: true, note: 'En ligne : tous ceux qui ouvrent ce lien jouent dans le même monde. Votre progression reste dans ce navigateur.', onSubmit: submit });
   else G.ui.showLogin({ solo: !online, offerSolo: online, onSubmit: submit });
   const rs0 = resumeInfo();
   if (online && rs0 && rs0.auto) { try { sessionStorage.setItem('mm_resume', JSON.stringify({ ...rs0, auto: 0 })); } catch (e) { /* */ } G.ui.loginError('Reconnexion en cours…'); submit({ name: rs0.name, pass: '', look: null, solo: false }); }

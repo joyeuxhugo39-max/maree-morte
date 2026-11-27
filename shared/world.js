@@ -7,6 +7,7 @@ import { buildFest } from './festival-world.js'; // lot 6 : la Nuit des Mille Vo
 import { buildMobilier } from './mobilier-world.js'; // monde vivant, lot 4 : le mobilier des métiers
 import { buildPort } from './port-world.js'; // 1.8 : la refonte de Port-Lanterne, construite en tout dernier
 import { buildHeistDecor, HEIST_PROPS } from './heist-decor.js'; // 2.0 : la refonte des lieux du braquage, après Port-Lanterne
+import { applyStudio, studioDoc } from './studio-world.js'; // LStudio : la couche écrite par l'éditeur, appliquée en tout dernier
 import { BERTHS } from './data/ships.js';
 
 export const Z = { SEA: 0, TOWN: 1, BEACH: 2, PLAINS: 3, JUNGLE: 4, RUINS: 5, SWAMP: 6, WRECK: 7, HAVRE: 8, CRANE: 9, ILOT: 10, INTERIOR: 11, CAVE: 12, GOUFFRE: 13,
@@ -91,7 +92,7 @@ export const PROPS = {
 const idx = (x, y) => y * W + x;
 export const inMap = (x, y) => x >= 0 && y >= 0 && x < W && y < H;
 
-export function generateWorld(seed = 7) {
+export function generateWorld(seed = 7, opts = {}) { // opts.studio : le document LStudio à appliquer (null : aucun ; absent : celui du jeu)
   const N = W * H;
   const tiles = new Uint8Array(N);
   const zones = new Uint8Array(N);
@@ -1784,8 +1785,10 @@ export function generateWorld(seed = 7) {
   const port = buildPort({ W, tiles, zones, solid, occ, idx, inMap, props, addProp, npcs, doors, rooms, sail, waterDist, plankDir, path, spawns, islandOf, Z, PROPS, heist, fest, BERTHS, nextId: () => pid++ });
   // 2.0 : les lieux du braquage redessinés, en tout dernier (les pièces, les portes et les décors d'avant gardent leurs numéros)
   buildHeistDecor({ W, tiles, zones, solid, occ, idx, inMap, alloc, rooms, doors, props, addProp, npcs, roomGrid, sail, waterDist, heist, chests, stampPath, spawns });
+  // LStudio : le monde écrit dans l'éditeur, par-dessus tout le reste (un document vide ne change rien)
+  const studio = applyStudio({ W, H, tiles, zones, solid, occ, sail, waterDist, plankDir, props, addProp, PROPS, inMap }, opts.studio !== undefined ? opts.studio : studioDoc());
   const OUT = {
-    heist, fest, mobilier, port, spawnPoints: port.spawnPoints,
+    heist, fest, mobilier, port, spawnPoints: port.spawnPoints, studio,
     block: new Uint8Array(N), // constructions des joueurs : 1 bloque tout, 2 bloque les morts
     islandOf, islands, // 1.0 : chaque case de terre connaît son île
     doorOwner: new Map(), rooms, doors, sail, roomGrid, havre: HC, havreDock, OVER_H,

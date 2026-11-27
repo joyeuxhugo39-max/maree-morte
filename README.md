@@ -25,6 +25,32 @@ tient les morts à distance.
 - **Interface** : création du pirate, inventaire avec équipement, journal de quêtes, boutiques,
   dialogues, chat, minimap, carte.
 
+## Version 2.1.0 : LStudio, le studio de création (lot 1)
+
+**LStudio** (`lstudio.html`, à côté du jeu sur GitHub Pages) modifie le vrai monde de Marée Morte depuis le navigateur,
+sans serveur ni ligne de commande. Le mode d'emploi est dans `LSTUDIO.md`.
+
+- **La carte** : le vrai monde, dessiné par le jeu, avec zoom, déplacements, quadrillage et carte réduite. Les calques
+  d'affichage (collisions, régions, navigation, portes, personnages) n'existent qu'en édition.
+- **La bibliothèque** : 182 éléments en 13 catégories, avec leur aperçu, leurs dimensions et leur nombre d'emplois.
+- **Les éléments** : on les pose, on les sélectionne (à plusieurs), on les déplace (à la case ou au pixel), on les
+  duplique, on les copie, on les colle, on les supprime. On règle leur variante, leur plan (au sol, normal,
+  au-dessus), leur miroir, leur solidité, leur couche, et on peut les verrouiller.
+  - Les bâtiments se redimensionnent.
+  - Les décors d'origine du jeu se retouchent, et « Rétablir l'original » les remet.
+- **La peinture** : le sol, les régions, les collisions et la navigation, au pinceau ; et des couches pour s'organiser.
+- **Annuler et rétablir** chaque action.
+- **Les sauvegardes** : un brouillon enregistré automatiquement, des versions nommées et automatiques avec leur
+  restauration, et des copies de sécurité avant tout remplacement. On peut exporter et importer un fichier.
+- **Le contrôle qualité** : les décors inconnus ou hors de la carte, les entrées bouchées, les personnages murés, les
+  arrivées bloquées… avec l'emplacement de chaque problème et sa correction.
+- **Tester dans le jeu** : le vrai jeu, en solo, avec les modifications, dans une sauvegarde à part.
+- **Publier** : le monde est écrit dans le dépôt (`docs/monde-studio.json`, avec une clé GitHub de l'administrateur),
+  et le jeu le charge au démarrage. Le monde publié aujourd'hui est vide : le jeu n'a pas changé.
+- **La suite `t_studio10`** vérifie qu'après 400 actions au hasard, l'éditeur et le jeu ont exactement le même monde.
+- Les intérieurs et les portes, la vue du monde, les modèles et l'import d'images viendront aux lots suivants (rapport :
+  `rapports/ls2-lot1.md`).
+
 ## Version 2.0.0 : les lieux du Plus Grand Braquage, reconstruits
 
 Les huit lieux de la grande quête sont redessinés comme de vrais lieux, d'après un plan écrit pour chacun

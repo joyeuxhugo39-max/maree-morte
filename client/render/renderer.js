@@ -35,7 +35,7 @@ const TAU = Math.PI * 2;
 const TREES = new Set(['tree', 'jtree', 'palm', 'deadtree']);
 // monde vivant, lot 3 : le reflet d'un sprite de décor, gardé en cache (le pied reste au même endroit, en miroir)
 const MIRRORS = new Map();
-function mirrorSpr(s) {
+export function mirrorSpr(s) { // LStudio s’en sert aussi
   let m = MIRRORS.get(s);
   if (!m) {
     const cv = document.createElement('canvas'); cv.width = s.w; cv.height = s.h;
@@ -165,8 +165,9 @@ export class Renderer {
       const s = p.type === 'cite' ? citeSprite(p) : p.type === 'propriete' ? proprieteSprite(p, this.env) : list ? list[p.v % list.length] : null;
       p.spr = s;
       if (s && TREES.has(p.type) && hash2(p.tx | 0, p.ty | 0, 919) > 0.5) p.spr = mirrorSpr(s); // monde vivant, lot 3 : un arbre sur deux est vu de l'autre côté (même taille, même pied)
-      p.ground = !!(PROPS[p.type] && PROPS[p.type].ground);
-      p.over = !!(PROPS[p.type] && PROPS[p.type].over); // 2.0 : lustres, cordages, linge tendu : au-dessus des personnages
+      if (s && p.flip != null) p.spr = p.flip ? mirrorSpr(s) : s; // LStudio : le miroir choisi dans l'éditeur
+      p.ground = p.plan === 'sol' || (!p.plan && !!(PROPS[p.type] && PROPS[p.type].ground)); // LStudio : le plan choisi (au sol, normal, au-dessus)
+      p.over = p.plan === 'dessus' || (!p.plan && !!(PROPS[p.type] && PROPS[p.type].over)); // 2.0 : lustres, cordages, linge tendu : au-dessus des personnages
       if (!s) continue;
       const nl0 = this.lights.length; // lot 6 : les lumières d'un décor du festival ne brillent que pendant une édition
       const ox = p.x - s.ax, oy = p.y - s.ay;

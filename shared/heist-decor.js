@@ -246,6 +246,7 @@ function tools(C) {
     const cells = o.solid === 0 ? [] : Array.isArray(o.solid) ? o.solid : [...Array(w * h)].map((_, k) => [k % w, (k / w) | 0]);
     if (o.keepSolid == null) for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) { const i = idx(X0 + x + xx, Y0 + y + yy); occ[i] = 1; if (r || !o.solid) solid[i] = 0; }
     for (const [dx, dy] of cells) { const i = idx(X0 + x + dx, Y0 + y + dy); if (tiles[i] === T.IWALL || tiles[i] === T.VOID) throw new Error(`${type} posé dans un mur de ${name} (${x + dx}, ${y + dy})`); solid[i] = 1; }
+    p.cells = cells; // LStudio : les cases solides du meuble, relatives à sa case
     placed.push({ p, r: r ? r.id : -1, cells: cells.map(([dx, dy]) => [x + dx, y + dy]) });
     return p;
   };

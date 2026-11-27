@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LStudio — Marée Morte</title>
+<link rel="stylesheet" href="studio.css">
+</head>
+<body>
+<div id="boot"><div class="boot-box"><div class="brand big">⚓ LStudio</div><div id="boot-msg">Chargement du monde de Marée Morte…</div><div class="bar"><i id="boot-bar"></i></div></div></div>
+<div id="app" class="hidden">
+  <header id="top">
+    <div class="brand">⚓ LStudio</div>
+    <input id="doc-name" title="Le nom de ce monde" spellcheck="false">
+    <div class="group" id="tools">
+      <button data-tool="select" title="Sélectionner et déplacer (V)">⬚ <span>Sélection</span></button>
+      <button data-tool="place" title="Poser l'élément choisi dans la bibliothèque (P)">✚ <span>Poser</span></button>
+      <button data-tool="paint" title="Peindre le sol, les régions, les collisions, la navigation (B)">🖌 <span>Peindre</span></button>
+      <button data-tool="pan" title="Se déplacer sur la carte (H) — aussi : clic molette, ou Espace + glisser">✋ <span>Main</span></button>
+    </div>
+    <div class="group">
+      <button id="b-undo" title="Annuler (Ctrl+Z)">↶</button>
+      <button id="b-redo" title="Rétablir (Ctrl+Y)">↷</button>
+    </div>
+    <div class="grow"></div>
+    <span id="save-state" class="state">—</span>
+    <div class="group">
+      <button id="b-save" title="Enregistrer une version (Ctrl+S)">💾 Enregistrer</button>
+      <button id="b-versions" title="Les versions enregistrées, et la restauration">🕘 Versions</button>
+      <button id="b-check" title="Contrôle qualité">✔ Vérifier</button>
+      <button id="b-test" class="accent" title="Jouer ce monde dans le vrai jeu, en solo, dans ce navigateur">▶ Tester dans le jeu</button>
+      <button id="b-publish" class="primary" title="Publier dans le jeu (pour tout le monde)">⬆ Publier</button>
+      <button id="b-menu" title="Nouveau, exporter, importer, aide">☰</button>
+    </div>
+  </header>
+  <aside id="left">
+    <nav class="tabs" data-for="left"><button data-tab="lib" class="on">Bibliothèque</button><button data-tab="paint">Peinture</button><button data-tab="map">Carte</button></nav>
+    <section data-pane="lib" class="pane on">
+      <input id="lib-search" placeholder="Rechercher (ex. tonneau, lanterne…)" spellcheck="false">
+      <div class="row"><select id="lib-cat"></select><label class="chk"><input type="checkbox" id="lib-used"> déjà utilisés</label></div>
+      <div id="lib-list" class="lib"></div>
+    </section>
+    <section data-pane="paint" class="pane">
+      <div class="seg" id="paint-kind"><button data-k="sol" class="on">Sol</button><button data-k="regions">Régions</button><button data-k="collisions">Collisions</button><button data-k="navigation">Navigation</button></div>
+      <div class="row"><span>Pinceau</span><div class="seg" id="paint-size"><button data-n="1" class="on">1</button><button data-n="2">2</button><button data-n="3">3</button><button data-n="5">5</button><button data-n="9">9</button></div></div>
+      <label class="chk"><input type="checkbox" id="paint-erase"> Gomme : revenir au monde d’origine</label>
+      <div id="paint-list" class="plist"></div>
+      <p class="hint" id="paint-hint"></p>
+    </section>
+    <section data-pane="map" class="pane">
+      <h3>Aller à</h3>
+      <div class="row"><input id="go-x" type="number" placeholder="x"><input id="go-y" type="number" placeholder="y"><button id="go-btn">Aller</button></div>
+      <h3>Mes repères <button id="rep-add" class="mini" title="Poser un repère au centre de la vue">+ ici</button></h3>
+      <div id="rep-list" class="plist"></div>
+      <h3>Régions du monde</h3>
+      <div id="zone-list" class="plist"></div>
+      <h3>Intérieurs</h3>
+      <input id="room-search" placeholder="Filtrer les pièces" spellcheck="false">
+      <div id="room-list" class="plist"></div>
+    </section>
+  </aside>
+  <main id="stage">
+    <canvas id="map" tabindex="0"></canvas>
+    <canvas id="minimap" width="240" height="140" title="Cliquer pour s'y rendre"></canvas>
+    <div id="status"></div>
+    <div id="zoom"><button id="z-out">−</button><span id="z-val">100 %</span><button id="z-in">+</button></div>
+  </main>
+  <aside id="right">
+    <nav class="tabs" data-for="right"><button data-tab="props" class="on">Propriétés</button><button data-tab="layers">Couches</button><button data-tab="qc">Contrôle <b id="qc-count"></b></button></nav>
+    <section data-pane="props" class="pane on"><div id="props"></div></section>
+    <section data-pane="layers" class="pane">
+      <h3>Couches <button id="layer-add" class="mini">+ couche</button></h3>
+      <div id="layer-list"></div>
+      <h3>Affichage (en édition seulement)</h3>
+      <div id="show-list" class="plist"></div>
+    </section>
+    <section data-pane="qc" class="pane">
+      <button id="qc-run" class="wide">✔ Vérifier le monde</button>
+      <div id="qc-list"></div>
+    </section>
+  </aside>
+</div>
+<div id="modal" class="hidden"><div class="box"><header><h2 id="m-title"></h2><button id="m-close">✕</button></header><div id="m-body"></div><footer id="m-actions"></footer></div></div>
+<div id="menu" class="hidden"></div>
+<div id="toasts"></div>
+<input type="file" id="file-in" accept=".json,application/json" class="hidden">
+<script type="module" src="main.js"></script>
+</body>
+</html>
